@@ -35,11 +35,17 @@ English version: [README.md](../README.md).
 | Надёжность | lock-файл от наложения запусков, таймауты с жёстким kill, повторы с задержкой, crash recovery |
 | Качество | команда Quality Gate, before/after hooks, allow/deny списки инструментов для задачи |
 | Оркестрация | DAG `dependsOn`, цепочки `nextTaskOnSuccess` / `nextTaskOnError`, матричный fan-out (parallel/sequential, `continue`/`stop`, concurrency, переопределения для workspace, агрегатор) |
-| Триггеры | cron, одноразовый запуск (`triggerType: "once"`), изменение файла (chokidar), MCP-события, входящие webhooks (`POST /api/hooks/:task` с HMAC) |
+| Триггеры | cron, одноразовый запуск (`triggerType: "once"`), git-коммиты (`triggerType: "git"`, фильтры ветки/путей/игнорирования), изменение файла (chokidar, glob-маски `watchGlobs`/`watchIgnore`), MCP-события, входящие webhooks (`POST /api/hooks/:task` с HMAC) |
 | Мультирепо | workspaces с валидацией путей, запуски по workspace, матрица поверх родительской задачи |
 | Наблюдаемость | история SQLite (success / error / timeout / partial / running), метрики (длительность, токены, стоимость), JSONL-логи с `/api/logs`, Prometheus `/metrics`, экспорт OTLP, логи по задачам, веб-дашборд с аналитикой за 14 дней, ретеншн истории и экспорт CSV/JSON |
 | Эксплуатация | dry-run, экспорт/импорт JSON, шаблоны, уведомления по нескольким каналам (webhook, Telegram, нативные toast), тихие часы, дайджест, зашифрованные секреты (`${secret:NAME}`), журнал аудита, настройки |
 | Интерфейсы | панель OpenCode GUI, веб-дашборд, 24 инструмента для агента, встроенный скилл |
+
+### Язык интерфейса
+
+Интерфейс доступен на русском (по умолчанию) и английском. Язык переключается в настройках сайдбара (Настройки → Язык) или инструментом `manage_settings` (`action: "update"`, `locale: "en"`). Изменение применяется сразу к панели, уведомлениям и дайджесту, дашборду и результатам инструментов агента — перезапуск не нужен. Описания и схемы инструментов агента остаются английскими, диагностика в консоли — русской.
+
+Каталоги лежат в `locales/ru.json` и `locales/en.json`; набор ключей в них должен совпадать, иначе CI падает.
 
 ## Установка
 
@@ -84,7 +90,7 @@ npm run build && npm run build:gui
 
 | Инструмент | Аргументы | Что делает |
 |---|---|---|
-| `schedule_task` | `name`, `prompt`, `schedule` для cron или `runAt` / `delaySeconds` для одноразового запуска, опционально `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType`, `mcpEvent`, `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Регистрирует задачу в планировщике ОС (cron, одноразовый запуск, файл или MCP-событие) |
+| `schedule_task` | `name`, `prompt`, `schedule` для cron или `runAt` / `delaySeconds` для одноразового запуска, опционально `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType` (`cron`/`file`/`git`/`mcp-event`/`once`), `mcpEvent`, `watchPath`, `watchGlobs`, `watchIgnore`, `gitBranch`, `gitPaths`, `gitIgnore`, `gitPollSeconds`, `activeDays`, `windowPolicy` (`skip`/`postpone`/`run`), `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Регистрирует задачу в планировщике ОС (cron, одноразовый запуск, файл, git или MCP-событие) |
 | `list_tasks` | — | Задачи: расписание, статус, следующее время запуска, цепочки, workspace, сводка матрицы |
 | `update_task` | `name` + изменяемые поля | Частичное обновление: незаданные поля сохраняются, пустые — очищаются, `matrix: null` убирает матрицу |
 | `delete_task` | `name` | Удаляет задачу (родитель матрицы — вместе с клонами и агрегатором) |
@@ -168,14 +174,21 @@ src/
 
 Обёртки задач запускают `opencode run` в рабочей директории задачи, поэтому MCP-серверы проекта подхватываются автоматически.
 
+### Режим входа (Windows)
+
+По умолчанию задачи **интерактивные** (`Interactive only`): Планировщик Windows запускает их только при активном входе пользователя, создавшего задачу, — с обычным профилем, дисками и сохранёнными учётными данными. Передайте `runWhenLoggedOff: true`, чтобы задача работала без входа (`schtasks /ru SYSTEM`). Такая задача идёт в session 0 — без профиля пользователя, подключённых дисков, сетевых ресурсов и сохранённых паролей, поэтому задачи, которым нужно ваше окружение, могут упасть; проверяйте их через `dry_run`. На Linux crontab и так работает без входа, а launchd-агент macOS — только внутри пользовательской сессии.
+
 ## Разработка
 
 ```bash
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # полный набор тестов, 500+ проверок
+npm test             # 33 сюиты, 500+ проверок
+npm run test:en      # те же сюиты с английской локалью
 ```
+
+`npm run test:en` выставляет `OPENCODE_SCHEDULER_LOCALE=en` для каждой сюиты; переменная нужна тестам и сервисам, это не пользовательская настройка.
 
 Подробности — в [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -189,6 +202,9 @@ npm test             # полный набор тестов, 500+ проверо
 
 **Работает ли плагин, когда OpenCode закрыт?**
 Да. Задачи регистрируются в нативном планировщике ОС, поэтому выполняются без открытого OpenCode.
+
+**Выполняются ли задачи, когда никто не вошёл в систему?**
+На Windows — только если явно включить `runWhenLoggedOff: true`: задача регистрируется как `schtasks /ru SYSTEM` и идёт в session 0 без вашего профиля, подключённых дисков и сохранённых учётных данных. По умолчанию задача интерактивная и работает при активном входе. Linux crontab выполняет задачи и без входа, а launchd-агент macOS — только внутри пользовательской сессии.
 
 **Какие платформы поддерживаются?**
 Windows (Планировщик Windows), macOS (launchd) и Linux (crontab). Различия описаны в [CROSS_PLATFORM.md](../CROSS_PLATFORM.md).

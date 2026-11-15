@@ -16,7 +16,6 @@ Every package is a folder with its own README. Open the one you want; its README
 | --- | --- | --- | --- | --- |
 | janua | MCP | `0.5.1` | Persistent interactive terminals: spawn a program, type into it, read live output, resize it, kill it. | `npx -y @nathwn12/janua` (stdio MCP server). |
 | oc-bifrost | plugin | `1.7.1` | Runs older OpenCode plugins on the current runtime. | Add `@nathwn12/oc-bifrost` to your `plugins`. |
-| oc-fallback | plugin | - | Steps an agent seat down its model fallback ladder when its model fails. | Repo path only: add `packages/oc-fallback` to your `plugins`. Private, never published. |
 | oc-flight-deck | plugin | `0.22.0` | Live session telemetry in the OpenCode sidebar. | Add `oc-flight-deck` to your `plugins`. |
 | oc-harness-setup | CLI | `1.0.2` | Installs the Windows agent harness. | `npx -y oc-harness-setup setup` |
 | oc-plugin-view | plugin | `0.2.0` | Installed plugin list in the OpenCode sidebar. | Add `oc-plugin-view` to your `plugins`. |

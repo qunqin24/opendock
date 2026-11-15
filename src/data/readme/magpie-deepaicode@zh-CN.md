@@ -4,7 +4,7 @@
 直连 `https://api.deepai.org/deepai_code`，发送**真实设备指纹**领取每日 Theos，
 与官方桌面端行为一致。
 
-> 状态：v0.2.1 —— 61 个单测全绿。2026-11-06/07 已在真实账号上完成回归：
+> 状态：v0.2.4 —— 63 个单测全绿。2026-11-06/07 已在真实账号上完成回归：
 > 对话、流式、工具调用、图片输入均可用；额度与签到读到真实值。
 > 上游思维链在 `reasoning` 字段，magpie 已确认原生渲染（PROTOCOL.md §4）。
 
@@ -67,7 +67,7 @@ deepaicode/gpt-6-astra            # 仅 Responses 通道
 | 选项 | 默认 | 含义 |
 |---|---|---|
 | `baseOrigin` | `https://api.deepai.org` | 上游地址 |
-| `laneVersion` | `"auto"` | `X-DeepAI-Code-Theos` 车道版本：自动探测 `/models`（免鉴权）取当前受理值并缓存；传 `"4"` 之类的显式值可固定 |
+| `laneVersion` | `"auto"` | `X-DeepAI-Code-Theos` 车道版本：自动探测 `/models` 取当前受理值并缓存（2026-11-14 起该端点要求鉴权，插件已带 key）；传 `"4"` 之类的显式值可固定 |
 | `secretDir` | `""` | 桌面端凭据目录（留空自动探测） |
 | `lang` | `zh` | 界面语言（`zh` \| `en`） |
 | `debug` | `false` | 输出详细日志——只记录字段**名**，不记录值 |

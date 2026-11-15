@@ -1,12 +1,14 @@
 # TokenSaver
 
-### Reduce Claude Code, Codex, opencode, and Qoder token usage without losing tool output
+### Reduce Claude Code, Codex, opencode, Qoder, and Copilot CLI token usage without losing tool output — plus a universal npx MCP install for any other host
 
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-6b4fbb)](https://code.claude.com/docs/en/plugins/overview)
 [![Codex plugin](https://img.shields.io/badge/OpenAI%20Codex-plugin-111111)](https://developers.openai.com/plugins/build/plugins)
 [![opencode plugin](https://img.shields.io/badge/opencode-plugin-1f6feb)](https://opencode.ai/docs/plugins)
 [![Qoder plugin](https://img.shields.io/badge/Qoder-plugin-00a0e9)](https://docs.qoder.com/extensions/plugins)
+[![Copilot CLI adapter](https://img.shields.io/badge/Copilot%20CLI-adapter-24292f)](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-hooks)
+[![Universal MCP install](https://img.shields.io/badge/any%20MCP%20host-npx%20install-2ea44f)](https://www.npmjs.com/package/token-saver-compactor)
 
 **TokenSaver is a local-first context optimization plugin.** Coding agents read thousands of lines of command logs, test output, search matches, and source code into context, then pay to resend all of it on every turn. TokenSaver compacts that noise before the model sees it, keeps what matters visible (failures, exit codes, paths, line numbers), and stores the complete original output on disk so nothing is ever lost.
 
@@ -37,6 +39,8 @@ TokenSaver uses **deterministic local compaction**, not another AI summarization
 | Codex CLI | On request (Codex hooks do not support output replacement yet) | MCP tools plus a bundled skill that teaches the agent when to use them |
 | opencode | Automatically via the plugin hook (`bash`, `read`, `grep`) | Plugin tools: `output_slice`, `stats` |
 | Qoder | Automatically via the `PostToolUse` hook | MCP server: `compact_read`, `compact_search`, `compact_run`, `output_slice`, `stats` |
+| Copilot CLI | Automatically via the `postToolUse` hook (`bash`, `powershell`, `grep`, `glob`; `view`/read is opt-in) | MCP server: `compact_read`, `compact_search`, `compact_run`, `output_slice`, `stats` |
+| Other MCP hosts (Cursor, Cline, Goose, Zed, …) | On demand via `npx -y token-saver-compactor` and the bundled skill (no automatic hooks) | MCP server: `compact_read`, `compact_search`, `compact_run`, `output_slice`, `stats` |
 
 Compaction keeps a small preview with the head, the tail, and the important lines:
 
@@ -62,7 +66,7 @@ Additional behavior:
 - At auto-compact time, guides the host's own compactor to replace old verbose tool results with artifact placeholders when enough output has been stored (see the [Roadmap](#roadmap)).
 - Fails open: the original result passes through if compaction fails.
 
-Automatic compaction of `Read`/`read` output is **off by default**: an agent that edits a file it has only seen as a head/tail preview can produce wrong edits. Large-file reads stay available through the explicit `compact_read` tool (which always compacts, since calling it is an explicit request), and automatic read compaction can be enabled with `TOKEN_SAVER_TOOLS=shell,test,search,read`.
+Automatic compaction of `Read`/`read` output is **off by default**: an agent that edits a file it has only seen as a head/tail preview can produce wrong edits. Large-file reads stay available through the explicit `compact_read` tool (which applies the read compaction policy even when automatic read compaction is off, though small files still pass through unchanged), and automatic read compaction can be enabled with `TOKEN_SAVER_TOOLS=shell,test,search,read`.
 
 ## Quick start
 
@@ -122,6 +126,31 @@ qoder plugins validate <path-to-release/qoder/token-saver>
 
 The plugin bundles the automatic `PostToolUse` compaction hook, the `PreCompact` guidance hook, and the token-saver MCP server (`compact_read`, `compact_search`, `compact_run`, `output_slice`). If your Qoder version does not resolve bundled MCP or hook paths, follow the manual fallback in `packages/qoder/install/README.md`, which also documents an optional Always Apply rule for biasing the agent toward the compact tools.
 
+### Copilot CLI
+
+Copilot CLI compacts automatically through a native `postToolUse` hook and retrieves through MCP tools. From a clone of this repository:
+
+1. Build the adapter: `npm run build` (produces `packages/copilot/dist/post-tool-use.js`).
+2. Copy `packages/copilot/hooks/hooks.json` into Copilot's hooks directory (`.github/hooks/` for a project, `~/.copilot/hooks/` for your user) as `token-saver.json`, keeping `post-tool-use.sh`/`post-tool-use.ps1` beside it and the built `dist/` folder as a sibling of the hooks directory.
+3. In Copilot CLI, run `/mcp add` and register `token-saver` as a local server with command `npx` and args `-y token-saver-compactor` (see `packages/copilot/.mcp.json`).
+4. Restart Copilot CLI.
+
+See [docs/hosts.md](docs/hosts.md#github-copilot-cli-native-adapter) for the full steps, including the optional bundled skill. Read compaction (`view`) stays opt-in, like the other hosts.
+
+### Other MCP hosts (Cursor, Cline, Goose, Zed, …)
+
+Any MCP-capable host can run TokenSaver on demand. Register the universal MCP server (Node.js 22+):
+
+```json
+{
+  "mcpServers": {
+    "token-saver": { "command": "npx", "args": ["-y", "token-saver-compactor"] }
+  }
+}
+```
+
+Then place the matching skill wrapper from `release/skills/` (created by `npm run package`). Per-host config locations, skill placement, and version/offline fallbacks are in [docs/hosts.md](docs/hosts.md).
+
 ## Recovering omitted output
 
 To recover lines 450-469 of a compacted result without rerunning the command, pass this object to the `output_slice` tool (MCP tool, or plugin tool on opencode):
@@ -156,7 +185,7 @@ Compact model-visible result           |
                output_slice retrieval
 ```
 
-Compaction policies are shared across hosts. Claude Code, Qoder, and opencode compact automatically through host hooks; Claude and Qoder additionally bundle the MCP server for retrieval and explicit compact operations, opencode registers `output_slice` as a plugin tool, and Codex registers everything through MCP tools and a skill.
+Compaction policies are shared across hosts. Claude Code, Qoder, opencode, and Copilot CLI compact automatically through host hooks; Claude and Qoder additionally bundle the MCP server for retrieval and explicit compact operations, opencode registers `output_slice` as a plugin tool, and Codex registers everything through MCP tools and a skill. Any other MCP host runs the same tools on demand via `npx -y token-saver-compactor` (see [docs/hosts.md](docs/hosts.md)).
 
 ## Benchmarks
 
@@ -302,6 +331,7 @@ packages/
 ├── mcp-server/  # compact_read, compact_search, compact_run, output_slice
 ├── claude/      # Claude manifest, hooks, skill, bundled runtime
 ├── codex/       # Codex manifest, hooks, skill, bundled runtime
+├── copilot/     # Copilot CLI hook adapter, MCP config, skill, bundled runtime
 ├── opencode/    # opencode plugin (npm package and drop-in bundle)
 └── qoder/       # Qoder plugin manifest, hooks, MCP config, skill, bundled runtime
 benchmarks/      # Reproducible synthetic fixtures

@@ -309,9 +309,10 @@ go build -o design-compare
 ./design-compare --mode layout_tree --figma-layout-file figma.json --web-layout-file web.json
 ./design-compare --mode layout_tree --figma-layout '[{"id":"1","name":"card","x":0,"y":0,"w":400,"h":300}]' --web-layout '[{"selector":"#card","x":0,"y":0,"w":400,"h":300}]'
 ./design-compare --help
+./design-compare --version
 ```
 
-主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch`
+主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch` / `--version`
 
 真偽値フラグは `--include-aa`（値なしで true）または `--generate-diff=false` の形式で指定し、空白区切りの値（例: `--generate-diff false`）は受け付けません。位置引数や解釈できなかった引数はエラーになります。
 
@@ -336,7 +337,7 @@ npm test
 
 - **発火条件:** `main` への push から始まった `ci.yml` が成功したときだけです。PR の CI 完了やフォークリポジトリからの実行では起動しません。`workflow_dispatch` で手動実行する場合は `main` 上で起動してください（他のブランチを指定しても実行されません）。失敗したコミットはリリース対象になりません。
 - **件数の数え方:** 直近の `v*` タグ以降のコミット数。`v*` タグがまだ無いリポジトリでは初回コミット以降の全コミットを数えます。CI 完了からリリース処理までの間に `main` が進んでいた場合は公開せずスキップし、最新の `main` の CI 完了時に改めて判定します。
-- **版番号:** `package.json` と npm の最新公開版のうち大きい方のパッチを 1 つ上げ、`plugin.yaml`、`.codex-plugin/plugin.json`、各 `marketplace.json` の `plugins[].version` も同じ値に揃えます（marketplace 最上位の `version` は形式の版なので更新しません）。
+- **版番号:** `package.json` と npm の最新公開版のうち大きい方のパッチを 1 つ上げ、`plugin.yaml`、`.codex-plugin/plugin.json`、各 `marketplace.json` の `plugins[].version`、`main.go` の `version` 定数（`--version` と MCP serverInfo が返す値）も同じ値に揃えます（marketplace 最上位の `version` は形式の版なので更新しません）。
 - **処理順:** 公開が成功してから `chore: release vX.Y.Z [skip ci]` を `main` にコミットし、`vX.Y.Z` タグと GitHub リリースを作成します（レジストリとタグのずれを避けるため）。
 - **必要な設定:** リポジトリシークレット `NPM_TOKEN`（npm の automation token）。未設定のときは公開だけをスキップし、実行ログに警告を出します。`main` に PR 必須のブランチ保護をかけている場合は、`github-actions[bot]` からの直接 push が拒否されるため、リリース用の bypass を許可するか保護の対象外にしてください。
 

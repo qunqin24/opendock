@@ -36,11 +36,22 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Reliability | lock-file no-overlap protection, timeouts with hard kill, retries with delay, crash recovery |
 | Quality | Quality Gate command, before/after hooks, per-task allowed/denied tool lists |
 | Orchestration | `dependsOn` DAG, `nextTaskOnSuccess` / `nextTaskOnError` chains, matrix fan-out (parallel/sequential, `continue`/`stop`, concurrency, per-workspace overrides, aggregator task) |
-| Triggers | cron, one-shot (`triggerType: "once"`), file change (chokidar), MCP events, incoming webhooks (`POST /api/hooks/:task` with HMAC) |
+| Triggers | cron, one-shot (`triggerType: "once"`), git commits (`triggerType: "git"`, branch/path/ignore filters), file change (chokidar, with glob masks `watchGlobs`/`watchIgnore`), MCP events, incoming webhooks (`POST /api/hooks/:task` with HMAC) |
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
 | Interfaces | OpenCode GUI panel, web dashboard, 24 agent tools, built-in agent skill |
+
+### Language
+
+The interface ships in Russian (default) and English. Switch it in the sidebar settings
+(Settings → Language) or with the `manage_settings` tool (`action: "update"`,
+`locale: "en"`). The change applies immediately to the GUI, notifications and digest,
+the dashboard and agent tool results — no restart. Agent tool descriptions and schemas
+stay English by design, and diagnostics printed to the console stay Russian.
+
+Catalogs live in `locales/ru.json` and `locales/en.json`; every key must exist in both,
+otherwise CI fails.
 
 ## Install
 
@@ -81,11 +92,11 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 22 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 24 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
-| `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType`, `mcpEvent`, `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file or MCP-event trigger) |
+| `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType` (`cron`/`file`/`git`/`mcp-event`/`once`), `mcpEvent`, `watchPath`, `watchGlobs`, `watchIgnore`, `gitBranch`, `gitPaths`, `gitIgnore`, `gitPollSeconds`, `activeDays`, `windowPolicy` (`skip`/`postpone`/`run`), `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file, git or MCP-event trigger) |
 | `list_tasks` | — | Returns jobs with schedule, status, next run, chains, workspace and matrix summary |
 | `update_task` | `name` + any field to change | Partial update; omitted fields keep their values, empty values clear them, `matrix: null` removes the matrix |
 | `delete_task` | `name` | Deletes a job (a matrix parent deletes clones and aggregator) |
@@ -167,14 +178,22 @@ src/
 
 Job wrappers run `opencode run` in the task working directory, so project MCP servers are picked up automatically.
 
+### Logon mode (Windows)
+
+Tasks are **interactive only** by default: Task Scheduler starts them only while the user who created them is logged on, with the normal profile, drives and saved credentials. Pass `runWhenLoggedOff: true` to run a job without a logged-on user (`schtasks /ru SYSTEM`). Such a task runs in session 0 — no user profile, mapped drives, network shares or saved credentials — so jobs that need your environment may fail; test them with `dry_run` first. On Linux crontab already runs without a login, and a macOS launchd agent runs only inside a user session.
+
 ## Development
 
 ```bash
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 29 test suites, 500+ checks
+npm test             # 33 test suites, 500+ checks
+npm run test:en      # same suites with the English locale
 ```
+
+`npm run test:en` sets `OPENCODE_SCHEDULER_LOCALE=en` for every suite; the variable is a
+service hook, not a user setting.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
@@ -189,6 +208,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 **Does it work when OpenCode is closed?**
 Yes. Jobs are registered with the native OS scheduler, so they run without an open OpenCode window.
+
+**Do jobs run when nobody is logged on?**
+On Windows, only if you opt in with `runWhenLoggedOff: true`: the task is then registered as `schtasks /ru SYSTEM` and runs in session 0 without your profile, mapped drives or saved credentials. The default is interactive only — the job runs while the user is logged on. Linux crontab always runs without a login; a macOS launchd agent runs only inside a user session.
 
 **Which platforms are supported?**
 Windows (Task Scheduler), macOS (launchd) and Linux (crontab). Backend differences are documented in [CROSS_PLATFORM.md](CROSS_PLATFORM.md).

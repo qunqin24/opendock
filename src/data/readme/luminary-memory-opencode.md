@@ -28,6 +28,14 @@ Strategies fuse via **weighted RRF (semantic 0.4, keyword 0.3, graph 0.2, tempor
 
 **Core and recall are different surfaces.** The Hermes provider separately loads owner-designated `core` rules (the DB-backed `MEMORY.md`) and deduplicates them against query retrieval. Native OpenCode, pi, and omp adapters return only relevant, evidence-bearing recall; a core tag cannot turn abstention into success. Their historical reference stays outside system instructions and the persistent transcript. Hermes can also expose bounded exact-session continuity without turning raw conversation into durable memory.
 
+**Unreleased scope compatibility:** Scoped reads require the complete user,
+workspace, and agent identity; missing fields are not wildcards. Unscoped
+local clients see only fully unowned local records. Global records are not
+included in scoped reads by default. Legacy partial ownership is not assigned
+on startup; review the [migration guidance](docs/api.md#ownership-and-legacy-migration)
+before changing it. Scope is an application boundary, not authentication
+against another process running as the same OS user.
+
 ---
 
 ## Quickstart
@@ -57,6 +65,8 @@ luminary-memory add "deploy target is staging" --tags deploy
 luminary-memory recall "where do we deploy?" --json
 luminary-memory activity --limit 5
 luminary-memory list
+luminary-memory core 12            # promote to auto-loaded core memory
+luminary-memory core 12 --off      # back to ordinary query recall
 luminary-memory lifecycle
 luminary-memory stats
 ```
@@ -65,8 +75,12 @@ luminary-memory stats
 
 ## One-command install (OpenCode, pi, omp)
 
-Full guide, including manual installation and complete removal:
-[docs/install.md](docs/install.md).
+**Registry current: 0.3.5.** Python and all three native npm packages are
+published at `0.3.5`; the installer below provisions the managed bridge from
+that release.
+
+Install a supported host first. Recommended public installer entry points
+(`main` may differ from this unreleased checkout):
 
 Windows (PowerShell):
 
@@ -76,43 +90,45 @@ irm https://raw.githubusercontent.com/alertxsto/luminary-memory/main/install.ps1
 
 Linux / macOS:
 
-```bash
+```sh
 curl -fsSL https://raw.githubusercontent.com/alertxsto/luminary-memory/main/install.sh | sh
 ```
 
-The installer provisions a private Python runtime with `uv`, installs the
-version-matched bridge, writes `~/.luminary/bridge.json`, configures every
-detected agent, and verifies the bridge with a live handshake. No Python, Node,
-or venv setup is required, and no shell profile or `PATH` is modified.
+The **installer**, not native npm package installation, provisions a uv-managed
+Python 3.12 bridge under `~/.luminary/venvs/<version>`, with tooling under
+`~/.luminary/bin`. It validates the bridge and registers matching native
+packages user-wide by default: `pi install npm:luminary-memory-pi@X`,
+`omp plugin install luminary-memory-omp@X`, or OpenCode's plural `plugins`
+configuration. `X` must be an available coordinated release. No manual Python,
+pip, venv, or interpreter export is needed for managed setup; the host supplies
+its supported runtime. No persistent PATH or shell profile is changed.
 
-It is non-interactive and idempotent. Run it again to update.
+Normal repeat setup repairs/reuses the selected compatible release.
+Migration from 0.3.4 requires the **new installer** with explicit `--upgrade`
+and an available target `--version X` (`-Upgrade -Version X` in PowerShell);
+it is not a bridge-record-only update. Modified copied adapters cause a visible
+conflict rather than being deleted or left double-loaded.
 
-| Option | Meaning |
-|---|---|
-| `--agents opencode,pi` | configure only these agents |
-| `--all` | configure every supported agent |
-| `--check` | report versions and drift, change nothing |
-| `--upgrade` | move plugin pins to the target version |
-| `--uninstall` | remove Luminary entries |
-| `--prune` | remove unreferenced bridge venvs |
-| `--version X` | pin the bridge version |
-| `--no-config` | install the bridge only |
-| `--project` | target project-local config |
-| `--dry-run` | show actions without writing |
-| `--list` | show agent detection (`luminary-memory setup --list`) |
+`--check`, `--dry-run`, and `setup --list` are read-only and never provision uv,
+Python, packages, or models. `--uninstall --agents pi` removes only that host's
+Luminary registration, preserving other hosts and memory; `--prune` separately
+removes unreferenced managed environments. Native project registration supports
+pi `--local` and OpenCode project config. omp's native package CLI remains
+user-scoped despite showing `--scope`; setup refuses native omp `--project`.
+Use the explicit copied adapter for project-local omp.
+See [the full options and scope guide](docs/install.md#options-and-scope)
+for PowerShell syntax and local-wrapper examples.
 
-The same logic is available without the shell wrapper:
+Memory tools and the inspector resolve Python in this order:
+**explicit `LUMINARY_PYTHON` > per-agent schema-1 `~/.luminary/bridge.json`
+record > embedded interpreter > PATH**. An invalid explicit interpreter
+fails visibly without fallback. Ordinary turns never install runtimes.
+Offline use needs a healthy cached runtime **and** the configured embedding
+model in cache; an uncached model can still require a download.
 
-```bash
-luminary-memory setup --agents auto
-luminary-memory setup --check
-luminary-memory setup --agents pi --version 0.3.4
-```
-
-`setup` reads each agent's plugin pin and installs the matching bridge, so a
-plugin and its bridge cannot drift apart. `~/.luminary/bridge.json` records the
-interpreter per agent; adapters read it automatically, so `LUMINARY_PYTHON` is
-only needed as an explicit override.
+Full [installation, advanced copied-adapter alternative, and removal guide](docs/install.md).
+Hermes remains a separate provider/catalog path, not one of these three Node
+bridge hosts; a catalog submission does not mean its upstream PR has merged.
 
 ---
 
@@ -122,7 +138,9 @@ The harness-neutral JSON bridge supports native adapters without coupling the
 memory engine to one runner. The current source targets OpenCode V2's
 `@opencode/plugin` 2.2.0 API, pi, and omp; Hermes keeps its provider integration.
 
-```bash
+Advanced copied-adapter alternative (not the managed installer's default):
+
+```sh
 luminary-memory hook install opencode  # or pi / omp; project-local by default
 ```
 
@@ -134,10 +152,10 @@ API or standalone desktop app is assumed. A portable OpenCode agent skill lives
 at [`opencode/SKILL.md`](opencode/SKILL.md); install it under
 `~/.config/opencode/skills/luminary-memory/` or a project's `.opencode/skills/`.
 
-The `0.3.4` source includes native interactive inspectors for the verified
+Published `0.3.5` packages include native interactive inspectors for the verified
 surfaces: OpenCode CLI/Desktop, pi and omp, Hermes Desktop/dashboard and an
-explicitly launched loopback companion. The `0.3.4` registry packages include
-the inspector; see the installation guide for current availability.
+explicitly launched loopback companion. Managed interpreter setup and shared
+inspector discovery described above remain unreleased source changes.
 Two native targets remain blocked on upstream
 contracts and are recorded in the roadmap: OpenCode Web GUI contribution
 discovery and Hermes terminal/TUI authority plus scope lifecycle. See
@@ -156,15 +174,15 @@ npm ci --ignore-scripts
 npm run pack:plugins
 ```
 
-The three installable tarballs are written to `artifacts/plugins/`. Set
-`LUMINARY_PYTHON` to the interpreter containing the bridge. pi supports
-`pi install /absolute/path/to/plugins/pi`; omp supports
+The three installable tarballs are written to `artifacts/plugins/`. For manual
+source development, set `LUMINARY_PYTHON` to the interpreter containing the bridge.
+pi supports `pi install /absolute/path/to/plugins/pi`; omp supports
 `omp plugin link /absolute/path/to/plugins/omp` after building. OpenCode V2 uses
 `{"plugins":["/absolute/repo/plugins/opencode/dist"]}`: a directory, not a file.
 Choose the native package **or** the copied hook, never both.
 
 Registry names are `luminary-memory-pi`, `luminary-memory-opencode`, and
-`luminary-memory-omp`. Python and all three npm `latest` tags are `0.3.4`.
+`luminary-memory-omp`. Python and all three npm `latest` tags are `0.3.5`.
 The npm tarballs are byte-identical to the tagged GitHub release assets,
 and their built resources match the PyPI wheel. Use this coordinated release
 instead of the mismatched npm `0.3.3` builds.
@@ -255,8 +273,8 @@ Every setting has a `LUMINARY_*` env var or a `Settings` object.
 | `pg_hnsw_index` | `LUMINARY_PG_HNSW_INDEX` | `false` |
 | `pg_hnsw_m` | `LUMINARY_PG_HNSW_M` | `16` |
 | `pg_hnsw_ef_construction` | `LUMINARY_PG_HNSW_EF_CONSTRUCTION` | `64` |
-| `embedding_model` | `LUMINARY_EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` |
-| `embedding_dim` | `LUMINARY_EMBEDDING_DIM` | `384` |
+| `embedding_model` | `LUMINARY_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` |
+| `embedding_dim` | `LUMINARY_EMBEDDING_DIM` | `768` |
 | `ingest_llm` | `LUMINARY_INGEST_LLM` | `false` |
 | `rrf_k` | `LUMINARY_RRF_K` | `60` |
 | `strategy_weights` | `LUMINARY_WEIGHT_{SEMANTIC,KEYWORD,GRAPH,TEMPORAL}` | `0.4 / 0.3 / 0.2 / 0.1` |

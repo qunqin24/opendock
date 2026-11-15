@@ -256,7 +256,8 @@ git push --follow-tags
 
 `.github/workflows/publish.yml` 会：
 
-- 校验 tag 和 `package.json` 的 version 一致
+- 安装依赖后跑 `npm test` 和 typecheck，测试不过就不发布
+- 对**两种触发方式执行同一套版本保护**：校验发布版本（tag 名去掉 `v`，或手动运行时填写的 `version` 输入）非空、格式合法、与 `package.json` 一致，且 npm 上尚未发布该版本
 - 用 `id-token: write` 和 `npm publish --provenance` 发布
 - 不需要 `NPM_TOKEN`
 
@@ -266,7 +267,7 @@ git push --follow-tags
 - 已发布的 tag 不要强推；要重发就 bump 一个新版本。
 - 如果还没配置 Trusted Publishing 就推 tag，publish workflow 会失败。
 - 如果 tag 没有跟着 push 上去（极少数 `--follow-tags` 情况），补一个 `git push origin v0.1.2`。
-- `.github/workflows/ci.yml` 仍然在 push / PR 时跑 typecheck 和 build；手动 **Publish to npm** 仅作为重试入口保留。
+- `.github/workflows/ci.yml` 在 push / PR 时跑 `npm test`、typecheck 和 build；手动 **Publish to npm** 仅作为重试入口保留，运行时必须填写 `version` 输入（须与 `package.json` 一致），版本保护规则与 tag 发布完全相同。
 
 ## 已知边界
 

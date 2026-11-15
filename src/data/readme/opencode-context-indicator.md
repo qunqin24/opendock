@@ -9,7 +9,7 @@ The package ships a **dual V1 + V2 plugin**, an optional TUI module (`./tui`:
 live sidebar, composer capsule, zero-LLM `/cx` panel with measured contributors
 and redacted export) and an **experimental Desktop GUI part**
 (`./gui-experimental`: side-panel tab + composer pill). V2 is tested against
-**opencode 2.2.7 / OpenTUI 0.8.1** (the e2e also passes on the 2.2.0-2.2.5
+**opencode 2.3.0 / OpenTUI 0.8.4** (the e2e also passes on the 2.2.0-2.2.5
 Desktop CLI); V1 against 1.18.29+. **V1 is feature-frozen** (bug fixes only).
 
 ![TUI sidebar — per-category context breakdown](docs/sidebar.png)
@@ -467,8 +467,8 @@ behaves like an npm install ([Live sidebar](#live-sidebar)).
 * **OpenCode ≥ 1.18.29** for V1. **V1 is feature-frozen** (bug fixes only): it
   relies on `experimental.chat.*` hooks, and if those change or stop firing the
   breakdown falls back to throttled `session.messages` fetches.
-* **OpenCode ≥ 2.2.3** for V2 with TUI surfaces (verified on **2.2.7** /
-  OpenTUI **0.8.1**; the load + state-write e2e also passes on the 2.2.0-2.2.5
+* **OpenCode ≥ 2.2.3** for V2 with TUI surfaces (verified on **2.3.0** /
+  OpenTUI **0.8.4**; the load + state-write e2e also passes on the 2.2.0-2.2.5
   Desktop CLI). Server-only V2 works on 2.0.16+. The TUI module is typed against
   the host's OpenTUI generation, so older hosts (0.7, 0.6) may not load it.
 * **TUI surfaces** resolve `@opentui/core`, `@opentui/solid` and `solid-js` from

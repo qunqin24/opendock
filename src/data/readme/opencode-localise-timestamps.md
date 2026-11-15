@@ -14,7 +14,7 @@ When an assistant message says *"merged by you at 03:45 UTC"*, you shouldn't hav
 
 ISO instants are replaced outright with the equivalent offset form; prose forms keep their original text and gain a parenthesised annotation, so nothing is lost.
 
-<img width="679" height="460" alt="image" src="https://github.com/user-attachments/assets/ceb364ca-08a0-435b-b1ab-74727e9b0f4f" />]
+<img width="679" height="460" alt="image" src="https://github.com/user-attachments/assets/ceb364ca-08a0-435b-b1ab-74727e9b0f4f" />
 
 ## Requirements
 
@@ -101,14 +101,14 @@ To try a local checkout, point `opencode.json` at the file instead of the npm sp
 
 ## Releasing
 
-Two equivalent paths — both run checks, build `dist/`, and publish to npm:
+Two paths run checks, build `dist/`, and publish to npm:
 
-- **Actions UI**: *Actions → Release → Run workflow* (on `main`), pick **breaking / minor / bugfix**. The workflow opens a short-lived `release/vX.Y.Z` PR (satisfying protected-main rules like CodeQL), waits for it to merge, and tags the merged commit.
-- **Tag push**: bump `package.json` via a PR, then `git tag v0.1.0 && git push origin v0.1.0`.
+- **Actions UI**: *Actions → Release → Run workflow* (on `main`), pick **breaking / minor / bugfix**. After validation, the workflow uses the `seankoji-com-ci` GitHub App to push the version commit to `main` and its tag atomically. The App needs permission to push to the protected branch.
+- **Tag push**: bump `package.json` via a PR, then run `git tag vX.Y.Z && git push origin vX.Y.Z`, replacing `vX.Y.Z` with the matching new package version.
 
-Either path then builds `dist/`, publishes to npm, and creates a GitHub Release on the new tag with notes auto-generated from the merged PRs since the last release.
+After the build, each path publishes to npm and creates a GitHub Release on the new tag with notes auto-generated from the merged PRs since the last release.
 
-Publishing uses npm trusted publishing (OIDC): the package declares this repo and `release.yml` as its trusted publisher, so releases need no stored npm token. For fully hands-off releases, also add a `RELEASE_PAT` secret (a PAT with repo contents + pull-request write): the release PR is then authored by you, so its checks skip GitHub's "workflow awaiting approval" gate that applies to bot-authored PRs. Without it, each release PR needs one manual "Approve and run" click.
+Publishing uses npm trusted publishing (OIDC): the package declares this repo and `release.yml` as its trusted publisher, so releases need no stored npm token. The dispatch path requires the `SEANKOJI_CI_APP_ID` variable and `SEANKOJI_CI_PRIVATE_KEY` secret. GitHub Release creation uses `RELEASE_PAT` if set, otherwise the workflow's GitHub token.
 
 ## License
 

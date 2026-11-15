@@ -72,6 +72,8 @@ bun install
 - 标「立即」的字段保存即生效，标「重启」的字段要重载插件。
 - 会话的 cwd、文件工具、`AGENTS.md` 与 git 都取这个工作目录，不跟随加载插件的项目目录。
 - 面板（默认开启，只监听 `127.0.0.1:7391`）可以可视化编辑这份配置，见 [docs/panel.md](docs/panel.md)。
+  首次启动会在 `config.json` 里写入 `panel.token`；不想要面板就设 `panel.enabled: false`，
+  令牌可以随时改值轮换，也可以用 `panel.tokenRevoked` 吊销。别把 `panel.host` 改成 `0.0.0.0`。
 - 面板里还有两个独立页面：「会话覆盖」编辑 `chat-overrides.json`，「工具档案」编辑 `tool-profiles.json`，都不用手改文件。
 - 日志写在 `$XDG_STATE_HOME/opencode-qq-bot/logs`，写盘前统一脱敏；`trace.*` 打开时会在同目录记录一条入站消息的完整处理链。
 
@@ -163,14 +165,19 @@ NapCat 连接断开后机器人就不再响应。根治办法是在 `opencode.js
 
 ## 会话覆盖
 
-每个群 / 私聊可以单独改唤醒方式、要不要主动说话、用哪个 agent / 模型 / 角色设定，
+每个群 / 私聊可以单独改唤醒方式、要不要主动说话、消息收集窗口、用哪个 agent / 模型 / 角色设定，
 配置写在机器人工作目录的 `chat-overrides.json`（`chatOverridesPath` 可改路径，文件不存在时启动会把随包示例复制过去）：
 
 ```json
 {
   "chats": {
     "group:100": { "wake": "mention" },
-    "group:200": { "wake": "prefix", "wake.prefixes": ["bot,"], "proactive.enabled": false },
+    "group:200": {
+      "wake": "prefix",
+      "wake.prefixes": ["bot,"],
+      "proactive.enabled": false,
+      "collect.groupMs": 30000
+    },
     "private:300": {
       "agent": "helper",
       "model": "openai/gpt-4o",
@@ -186,6 +193,8 @@ NapCat 连接断开后机器人就不再响应。根治办法是在 `opencode.js
 | `wake.prefixes`              | 字符串数组                            | `wake` 为 `prefix` 时的唤醒前缀，命中即必回  |
 | `proactive.enabled`          | 布尔                                  | `false` 表示这个聊天不主动开口               |
 | `proactive.startProbability` | 0 到 1                                | 这个聊天单次心跳的触发概率，不写时用全局公式 |
+| `collect.privateMs`          | 毫秒（≥ 0）                           | 这个私聊的消息收集窗口，`0` 表示立即回复     |
+| `collect.groupMs`            | 毫秒（≥ 0）                           | 这个群聊的消息收集窗口，`0` 表示立即回复     |
 | `agent`                      | 字符串                                | 覆盖这个聊天使用的 OpenCode agent            |
 | `model`                      | `provider/model[/variant]`            | 覆盖这个聊天使用的模型                       |
 | `soulPath`                   | 文件或目录路径                        | 覆盖这个聊天使用的角色设定文件               |
@@ -284,6 +293,8 @@ TUI 侧执行时结果发到该会话绑定的 QQ 聊天：
 - **被 @ 才必须回**：群里没被 @ 时模型可以调用 `qq_send_message` 并设 `reply=false` 选择已读不回；私聊消息必须回复。
   每个群可以用会话覆盖改这条规则（每条必回 / 前缀必回 / 完全不理）。
 - **消息合并**：会话正在跑模型时新到的消息进缓存，会话空闲后合并成一轮再投进去；同一聊天的消息按到达顺序处理。
+- **消息收集窗口**：收到消息不立刻回复，先开一个窗口攒着，私聊默认 10 秒、群聊默认 60 秒，
+  到点后合并成一轮发出去；`collect.privateMs` / `collect.groupMs` 可改，会话覆盖里也能单独调。
 - **单实例消费**：同一台机器上只允许一个插件实例连接 NapCat 接收消息，其余实例不连接并等待接管，
   避免同一条 QQ 消息被重复投递给模型。
 - **异常恢复**：模型失败、中断或长时间无响应时会释放忙碌状态并放行缓存消息。

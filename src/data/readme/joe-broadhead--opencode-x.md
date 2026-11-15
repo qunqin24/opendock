@@ -5,6 +5,8 @@ OpenCode, through X's official MCP server.
 
 Unofficial; not affiliated with X Corp.
 
+X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
+
 ## Requirements
 
 - OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
@@ -17,7 +19,7 @@ Unofficial; not affiliated with X Corp.
 
   ```text
   tweet.read users.read follows.read like.read block.read list.read list.write
-  space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write offline.access
+  space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write media.write offline.access
   http://127.0.0.1:8766/callback
   ```
 
@@ -43,7 +45,7 @@ Unofficial; not affiliated with X Corp.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-x#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-x#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/x-status`: it shows `not configured` until you save your X
@@ -53,12 +55,12 @@ The plugin registers X's MCP server under the name `x`, adds default permission 
 `/x` status view and two skills. Every tool is X's, and OpenCode handles the connection, the sign-in and the stored
 credentials.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.2" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.4" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -128,14 +130,17 @@ Two skills teach the model to use X well:
 - `x-write`: whom each change reaches, saying so before the call, drafting and publishing an Article, and how `access`
   decides whether a change runs, asks or is refused.
 
-### Memory's events
+### Sources
 
-`x_events_list` is for Memory's collector, not for answering questions: it lists, since a cursor, your mentions and new
-bookmarks (and your home timeline if you turn it on) as normalised events, oldest first, each with its author's handle
-and link. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default, your account's
-lookup included) and says there is more when it stops early; a collector picks up the rest on its next call. It is
-this plugin's side of the shared `events_list` source contract
-([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#events-list)).
+X's mentions, bookmarks and home timeline are sources under the shared source contract, declared in `package.json`
+(`x.mentions`, `x.bookmarks`, `x.timeline`), so Memory and other projects read them the same way. `x_events_list` is
+for their collectors, not for answering questions: it lists, since a cursor, one feed (or, as source `x`, every feed
+`events.feeds` names) as normalised events, oldest first, each with its author's handle and link. The tools RPC's
+`probe` says who is signed in. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default,
+an account lookup included) and says there is more when it stops early; a collector picks up the rest on its next
+call. A feed's page counts the posts, authors and users X returned, and refuses for good a post holding a secret.
+Leaving a feed out of `events.feeds` turns its source off
+([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#sources)).
 
 ### Scripts
 
@@ -212,7 +217,7 @@ Set options with the object form of the plugin entry:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.2",
+      "package": "github:joe-broadhead/opencode-x#v0.0.4",
       "options": {
         "oauth": { "client_id": "YOUR_X_CLIENT_ID", "client_secret": "{env:X_CLIENT_SECRET}" }
       }
@@ -227,12 +232,12 @@ Set options with the object form of the plugin entry:
 | `oauth.client_secret` | Your X app's client secret, preferably `{env:X_CLIENT_SECRET}` | none | For a confidential (Web App) app. Leave it out for a Native App (public client); X issued it a refresh token in the live test. |
 | `oauth.redirect_uri` | A URL registered in the app | `http://127.0.0.1:8766/callback` | Must match X's registered callback exactly. |
 | `oauth.callback_port` | `1`–`65535` | none | Only with an `https:` redirect: the local port a proxy forwards to. |
-| `oauth.scopes` | X OAuth 2.0 scopes | `tweet.read users.read follows.read like.read block.read list.read list.write space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write offline.access` | Dropping a group's scope makes those tools fail with `403` or removes them; dropping `offline.access` means no refresh token. |
+| `oauth.scopes` | X OAuth 2.0 scopes | `tweet.read users.read follows.read like.read block.read list.read list.write space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write media.write offline.access` | Dropping a group's scope makes those tools fail with `403` or removes them; dropping `offline.access` means no refresh token. |
 | `access` | `all`, `ask-changes` or `read-only` | `all` | The generated permission block: everything, reads with changes asking, or reads only. |
 | `ownsXApp` | `true` or `false` | `false` | Use the $0.001 Owned Read price for the account's own posts, mentions, bookmarks, followers and lists. Set it only if that account owns the developer app. |
 | `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
-| `events.feeds` | `mentions`, `bookmarks`, `timeline` | `["mentions", "bookmarks"]` | What `x_events_list` lists for Memory. Your home timeline is the busiest and dearest feed, so it is listed only when you name it. |
-| `events.maxCalls` | `2` or more | `4` | The most billed X reads one `x_events_list` call makes, your account's lookup included. |
+| `events.feeds` | `mentions`, `bookmarks`, `timeline` | `["mentions", "bookmarks"]` | The feeds `x_events_list` lists, and so which of X's sources are on. Your home timeline is the busiest and dearest feed, so it is listed only when you name it. |
+| `events.maxCalls` | `2` or more | `4` | The most billed X reads one `x_events_list` call makes, an account lookup included. |
 
 `{env:NAME}` is substituted when OpenCode loads the config, so the secret can stay in your environment instead of the
 file. An unset variable arrives as an empty string, which the plugin rejects with `OPTIONS_INVALID`. A variable
@@ -253,7 +258,7 @@ on macOS, or `/etc/opencode/opencode.json` on Linux. Members then only run `/con
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.2",
+      "package": "github:joe-broadhead/opencode-x#v0.0.4",
       "options": { "oauth": { "client_id": "YOUR_TEAM_APP_CLIENT_ID" } }
     }
   ]
@@ -300,20 +305,22 @@ Run `/x-status` first. Its last line is the next step.
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `x`, replaces the plugin's. Rename or move it. |
 | `/x` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `INPUT_INVALID` | `x_events_list`: the input is not the contract's, such as a `limit` outside 1 to 500. | Pass the inputs as its schema describes them. |
-| `SOURCE_UNKNOWN` | `x_events_list`: `source` is not `x`. | Leave `source` out, or pass `x`. |
-| `ACCOUNT_UNKNOWN` | `x_events_list`: `account` is not the signed-in handle. | Leave `account` out, or pass the handle the message names. |
+| `INPUT_INVALID` | `x_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, or a feed source's listing without `account`. | Pass the inputs as its schema describes them. |
+| `SOURCE_UNKNOWN` | `x_events_list` or `probe`: `source` is not `x`, `mentions`, `bookmarks` or `timeline`. | Leave `source` out, or pass one of them. |
+| `SOURCE_DISABLED` | `x_events_list` or `probe`: the feed `source` names is not in `events.feeds`, so that source is turned off. | Add the feed to `events.feeds` if you want it read, then restart OpenCode. |
+| `ACCOUNT_UNKNOWN` | `x_events_list`, source `x`: `account` is not the signed-in handle. | Leave `account` out, or pass the handle the message names. |
+| `ACCOUNT_MISMATCH` | `probe`: `account` is not the signed-in handle. `x_events_list`, a feed source: the cursor names another account than `account`. | For `probe`, sign in to X as that account, or read as the handle the message names; for a cursor, pass it with its own account, or start again without one. |
 | `CURSOR_INVALID` | `x_events_list`: the cursor is malformed, another source's, or another account's. | Call without a cursor to start again. |
-| `UPSTREAM_ERROR` | `x_events_list`: X refused one of its reads, such as a rate limit. The message holds the first line of X's text, at most 300 characters, with tokens and URL query strings removed. | Run `/x-status`, then call again with the same cursor. |
-| `UPSTREAM_UNREADABLE` | `x_events_list`: one of its reads answered in a shape it does not read. | Call the read the message names directly, and run `/x-status`. |
-| `TOOL_UNAVAILABLE` | `x_events_list`: OpenCode does not list a read it needs. While X cannot be called, it gives status's own code and next step instead. | Wait a few seconds, then run `/x-status` and follow its next step. |
+| `UPSTREAM_ERROR` | `x_events_list` or `probe`: X refused one of its reads, such as a rate limit. The message holds the first line of X's text, at most 300 characters, with tokens and URL query strings removed. | Run `/x-status`, then call again with the same cursor. |
+| `UPSTREAM_UNREADABLE` | `x_events_list` or `probe`: one of its reads answered in a shape it does not read. | Call the read the message names directly, and run `/x-status`. |
+| `TOOL_UNAVAILABLE` | `x_events_list` or `probe`: OpenCode does not list a read it needs. While X cannot be called, it gives status's own code and next step instead. | Wait a few seconds, then run `/x-status` and follow its next step. |
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `x` server. Restart OpenCode. |
 | `RULES_NOT_ADDED` | The default permission rules could not be added, so X tools may run without asking. Restart OpenCode. |
 | `X_BUDGET_EXCEEDED` | The next script call's estimate does not fit the opt-in `scriptBudgetUsd` or `scriptDailyBudgetUsd` you set. Raise or remove the option, or wait for the window to roll. |
-| `X_PRICE_UNKNOWN` | The script called a method with no published price, so it was refused. Use a priced method. |
+| `X_PRICE_UNKNOWN` | A script budget is set, and the script called a method X publishes no price for (`media_upload` or a chat media method), so it was refused. Use a priced method, or remove the budget. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md#errors).
@@ -323,6 +330,20 @@ A script's errors from the tools RPC have their own codes, listed in
 - **The tool table was checked against X's live list on 2026-11-06.** X publishes no tool annotations, so each
   tool's class comes from its name, description and schema. X may add, rename or remove tools; an unknown one is allowed with `access: all`
   before it runs, and a known one can be missing for a token with fewer scopes.
+- **A sign-in from before an upgrade can lack a new default scope.** This version's default sign-in asks for
+  `media.write`, which `x_media_upload` and the chat media tools need. X records the scopes it granted with the
+  sign-in, and the plugin compares them with the ones it asks for: when one is missing, `/x-status` and the status RPC
+  say "sign-in required" and name it, and `/connect` marks the X account "sign in again". Add the scope to the X app
+  if it lacks it, then sign in once more. `x_media_upload` was listed by Code Mode's catalogue of X's tools on
+  2026-11-14, names and inputs only, because OpenCode's sign-in to X was refused that day.
+- **Media uploads have no published price.** X's pricing page gives none for `x_media_upload` or the chat media tools,
+  so the plugin does not guess one: a script with a budget set is refused them (`X_PRICE_UNKNOWN`), and without a
+  budget their cost line says the price is unknown. X's Developer Console has the real bill.
+- **A feed source notices a change of X account only when told.** `x_events_list`'s feed sources never ask X who is
+  signed in, because the source contract keeps that identity read for `probe`. If you sign in to X as another account,
+  a feed notices only when its caller passes the new account (the old account's cursor is then `ACCOUNT_MISMATCH`) or
+  calls `probe`. Until then a cursor reads its own account's feed: X refuses bookmarks and the home timeline of anyone
+  but the signed-in user, and mentions are public posts. Source `x` asks X on every call.
 - **A public app refreshes.** X issued a Native App (public client) a refresh token on 2026-11-06, and OpenCode
   refreshed it about two hours later; `offline.access` is still required.
 - **There is no delete or Article-publish tool.** A Post published by mistake is removed in the X app; an Article
@@ -356,7 +377,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out: `opencode mcp logout x`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: x` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **X**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.2`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.4`, then `opencode reload`.
    `opencode mcp list` no longer lists `x`.
 4. Remove the **X app** entry: `opencode auth logout x-app` from a terminal, or in `/connect`. Remove any X rules you
    copied into your agents' own `permissions`.

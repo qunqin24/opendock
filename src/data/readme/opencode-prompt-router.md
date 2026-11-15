@@ -8,7 +8,7 @@ An OpenCode plugin that automatically matches user prompts to relevant skills (S
 2. **Parsing** -- Extracts YAML frontmatter (`name`, `description`, `tags`) from each skill file
 3. **Enrichment** -- Auto-derives tags from skill body content for skills without explicit tags
 4. **Scoring** -- Two-stage TF-IDF scoring:
-   - **Stage 1:** Weighted field matching (name ×3, tags ×2, description ×1) with suppressor filtering and IDF floor
+   - **Stage 1:** Weighted field matching (name ×3, tags ×2, description ×1) with suppressor filtering (on stemmed tokens) and IDF floor; a prompt with every word of a skill's name gets a bonus and needs only that one match
    - **Stage 2:** Body scan bonus for borderline matches
 5. **Routing** -- Returns top N matches above the minimum score, formatted as a preamble prepended to the user's message
 

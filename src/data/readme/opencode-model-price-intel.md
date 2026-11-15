@@ -72,7 +72,7 @@ list the same plugin twice.
 | --- | --- | --- |
 | `decorateNames` | `true` | Append the price/score summary to `/models` names. The `/model-pricing` dialog still works when this is off. |
 | `costFormat` | `"detailed"` | `"detailed"` renders `in $2.5 out $15 · cache read $0.25 write $0`; `"compact"` renders `$2.5/$15/$0.25/$0`. |
-| `aaApiKey` | unset | Artificial Analysis API key. Falls back to `ARTIFICIALANALYSIS_API_KEY`. Without either, the public model-list page is used. |
+| `aaApiKey` | unset | Artificial Analysis API key. Falls back to `ARTIFICIALANALYSIS_API_KEY`. Without either, the public leaderboard page is used. |
 | `refreshHours` | `12` | Score cache TTL and refresh interval, clamped to `1..596` hours. |
 
 Invalid option values log one warning and fall back to the defaults.
@@ -110,10 +110,12 @@ scrolls vertically (and horizontally when the window is narrow).
 - Prices come from `Model.Info.cost` in the live OpenCode registry. The plugin
   does not bundle a price table and does not convert currencies.
 - Scores are fetched from the Artificial Analysis Free Data API when a key is
-  configured, otherwise from the public model-list page.
-- A bundled v5.0 snapshot (captured 2026-10-31) is registered before any
+  configured, otherwise from the public leaderboard page. The index version
+  (including patch releases such as v5.0.1) is read from the live payload, so
+  new releases are adopted automatically.
+- A bundled v5.0.1 snapshot (captured 2026-11-14) is registered before any
   network or storage work, so the first render is immediate. It is only merged
-  with live data from the same **major** index version.
+  with live data from the exact same index version.
 - The last good result is cached in OpenCode plugin storage for `refreshHours`.
   A cache older than 30 days is ignored.
 - The model registry reloads only when the score data actually changes.
@@ -128,8 +130,8 @@ scrolls vertically (and horizontally when the window is narrow).
   the model **name**. Set `decorateNames: false` to leave names untouched.
 - Prices are catalog prices, not your invoice. Providers can add surcharges,
   discounts, or regional pricing that the registry does not carry.
-- AA scores are comparative within one index major version. The plugin never
-  mixes a v5 snapshot into a v6 result.
+- AA scores are comparative within one index version. The plugin never mixes
+  scores from different versions, including patch releases.
 - The plugin only decorates the model list and renders the pricing dialog. It
   does not route requests or change model selection.
 - The `/model-pricing` dialog requires the TUI. Other clients still get the

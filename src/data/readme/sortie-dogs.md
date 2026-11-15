@@ -19,11 +19,12 @@ evidence-backed result, not more agents for their own sake.
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
-**Release: [v0.16.24](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.16.24)**
-· [Release notes](docs/releases/v0.16.24.md)
+**Release notes: [v0.16.26](docs/releases/v0.16.26.md)**
+· [GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases)
 · [Execution vision](docs/v0.14.0-execution-vision.md)
 
-The npm examples below target v0.16.24; use its fixed GitHub Release archive until npm publication is verified.
+The npm examples below target v0.16.25, the published npm version at release preparation time.
+Publication of v0.16.26 to npm is a separate manual step; use its fixed GitHub Release archive once available.
 
 [When to use](#when-to-use-sortie-dogs) · [Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
 [Measured results](#measured-results) · [Configuration](#configuration) · [Documentation](#documentation)
@@ -80,7 +81,7 @@ Use an existing Codex CLI signed in with **ChatGPT**. On Windows, PowerShell **7
 available; POSIX uses bash. Sortie does not install Codex, start login or use a metered API fallback.
 
 ```sh
-npm install --save-dev sortie-dogs@0.16.24
+npm install --save-dev sortie-dogs@0.16.25
 npx --no-install sortie-dogs codex init .
 ```
 
@@ -109,7 +110,7 @@ bridge. [Codex guide: SDK, permissions, progress, resume and manifest route](doc
 Use **OpenCode V2**. In the target project:
 
 ```sh
-npm install --save-dev sortie-dogs@0.16.24
+npm install --save-dev sortie-dogs@0.16.25
 npx --no-install sortie-dogs init .
 ```
 
@@ -129,7 +130,7 @@ v0.10 is installed. [OpenCode setup and configuration](docs/configuration.md) ·
 
 ### Project Memory (OpenCode v010, opt-in)
 
-With v0.16.24 installed, run `sortie-dogs memory on .` once and reload
+With v0.16.25 installed, run `sortie-dogs memory on .` once and reload
 the project plugin. Ordinary public turns then become pending sources; the existing
 Operator records semantic additions, corrections, withdrawals and decisions without
 another save request or a dedicated model call per turn. New sessions recall the
@@ -205,13 +206,14 @@ one. Required success checks, missing commands and active/unstarted operations s
 
 ## Default models
 
-- **Operator / Coordinator / Reviewer / Advisor:** GPT-6.1 Sol, `xhigh`.
+- **Mission Coordinator:** GPT-6.1 Terra, `xhigh`.
+- **Operator / Reviewer / Advisor:** GPT-6.1 Sol, `xhigh`.
 - **Worker:** GPT-6.1 Terra Standard, `max` (no Fast/priority).
 - **Scout / dedicated Luna Worker:** Luna Fast, `max`, unchanged.
-- **OpenCode:** ordinary Worker `openai/gpt-6.1-terra#max`; management/review
-  `openai/gpt-6.1-sol#xhigh`.
-- **Codex:** ordinary Worker native `gpt-6.1-terra` / `max`, Standard; management/review
-  `gpt-6.1-sol` / `xhigh`. The retained Luna-fast alias maps to native
+- **OpenCode:** ordinary Worker `openai/gpt-6.1-terra#max`; Mission Coordinator
+  `openai/gpt-6.1-terra#xhigh`; Operator/review `openai/gpt-6.1-sol#xhigh`.
+- **Codex:** ordinary Worker native `gpt-6.1-terra` / `max`, Standard; Coordinator
+  `gpt-6.1-terra` / `xhigh`; Operator/review `gpt-6.1-sol` / `xhigh`. The retained Luna-fast alias maps to native
   `gpt-6-luna` / `max` with separate `serviceTier: "priority"` (Fast).
 
 Explicit host model selections remain authoritative. OpenCode routing and Codex native settings
@@ -313,8 +315,9 @@ Install the desired package version and rerun **your host's** initializer:
 
 An OpenCode config-local bridge may resolve a separate package; npm-global update alone does not
 update it. [Global/update instructions](docs/configuration.md#global-availability).
-The v0.16.24 Mission asset marker is `0.16.24-prelaunch-scope-recovery-v1`; the Codex skill marker is
-`0.14.6-codex-skill-v1`. Installed markers alone do not prove a running host reloaded the new version.
+The v0.16.26 Mission asset marker is `0.16.26-nested-validation-scratch-v1`; v0.16.25 uses
+`0.16.25-execution-recovery-v1`. The Codex skill marker is `0.14.6-codex-skill-v1`.
+Installed markers alone do not prove a running host reloaded the new version.
 
 There is no supported uninstall command. Remove the dependency and only known Sortie-owned paths;
 follow the [manual removal guide](docs/uninstall.md), never delete the entire `.opencode` directory.
@@ -329,7 +332,7 @@ follow the [manual removal guide](docs/uninstall.md), never delete the entire `.
   [SWE-bench history](docs/benchmarks/swebench-lite-history.md) · [Historical local case study](docs/benchmark-reference.md).
 - **Development:** [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md) ·
   [Windows tests](docs/windows-tests.md) · [Release routine](docs/release-batch.md).
-- **Release:** [v0.16.24](docs/releases/v0.16.24.md).
+- **Release notes:** [v0.16.26](docs/releases/v0.16.26.md) · [v0.16.25](docs/releases/v0.16.25.md) · [v0.16.24](docs/releases/v0.16.24.md).
 - **Releases:** [v0.15.2](docs/release-v0.15.2.md) · [v0.15.1](docs/v0.15.1-migration.md) · [v0.15.0](docs/release-v0.15.0.md) · [v0.14.9](docs/release-v0.14.9.md) · [v0.14.8](docs/release-v0.14.8.md) · [v0.14.7](docs/release-v0.14.7.md) · [v0.14.6](docs/release-v0.14.6.md) · [v0.14.5](docs/release-v0.14.5.md) · [v0.14.4](docs/release-v0.14.4.md) · [v0.14.3](docs/release-v0.14.3.md) · [v0.14.2](docs/release-v0.14.2.md) · [v0.14.1](docs/release-v0.14.1.md) · [v0.14.0](docs/release-v0.14.0.md) · [v0.13.22](docs/release-v0.13.22.md) · [v0.13.21](docs/release-v0.13.21.md) · [v0.13.20](docs/release-v0.13.20.md) · [v0.13.19](docs/release-v0.13.19.md) · [v0.13.18](docs/release-v0.13.18.md) · [v0.13.17](docs/release-v0.13.17.md) · [v0.13.16](docs/release-v0.13.16.md) · [v0.13.15](docs/release-v0.13.15.md) · [v0.13.14](docs/release-v0.13.14.md) · [v0.13.13](docs/release-v0.13.13.md) · [v0.13.12](docs/release-v0.13.12.md) · [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
   [v0.13.9](docs/release-v0.13.9.md) · [All GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases).
 

@@ -587,7 +587,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 
 | Command | What it does |
 | --- | --- |
-| `ahood snap create <content> [--tags tag1,tag2] [--failed <t>] [--worked <t>] [--fix <t>] [--lesson <t>] [--artifact <owner/slug>] [--json]` | Capture a new private snap, from an argument or piped stdin. |
+| `ahood snap create <content> [--tags tag1,tag2] [--failed <t>] [--worked <t>] [--fix <t>] [--lesson <t>] [--artifact <owner/slug or slug>] [--json]` | Capture a new private snap, from an argument or piped stdin. |
 | `ahood snap list [--json] [--limit <n>] [--tags tag1,tag2]` | List your own snaps, most recent first. |
 | `ahood snap search <query> [--json] [--limit <n>] [--tags tag1,tag2]` | Search your own snaps by content. |
 | `ahood snap show <id> [--json]` | Print a single snap's full content. |

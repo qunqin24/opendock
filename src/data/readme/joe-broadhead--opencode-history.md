@@ -13,17 +13,17 @@ Unofficial; not affiliated with OpenCode.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-history#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-history#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/history-status`. On first start the plugin indexes every session in OpenCode's database in the background, newest first. The tools work while it runs, over the sessions indexed so far. `/history-status`, or `/history` in the terminal UI, shows the progress.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.2" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4" }] }
 ```
 
 The index is kept; when a new version changes its layout, the plugin rebuilds it in the background.
@@ -52,7 +52,7 @@ await tools.history.sql({ sql: "select date(created) as day, round(sum(cost), 2)
 - **Sessions and files.** `history_sessions` lists sessions without a query, by last update, creation, cost or size. `history_files` lists the sessions that read or changed a file or folder, with counts per operation and the `seq`s of its touches.
 - **Recall.** `history_recall` searches, takes the best sessions and returns quoted evidence with session IDs and `seq`s, for the agent to answer from.
 - **SQL.** `history_sql` runs one read-only `SELECT` or `WITH` statement over the index, for counts and reports. Its stable interface is four views, `v_sessions`, `v_docs`, `v_files` and `v_links`, and two full-text tables, `docs_words` (`MATCH`) and `docs_sub` (`text LIKE '%substring%'`). The other tables can change between versions.
-- **Events list.** `history_events_list` lists what changed in this machine's sessions since a cursor, as normalised events, for Memory's collector and other scripts. It is the History side of the shared `events_list` source contract; agents answering questions use the tools above.
+- **Events list.** `history_events_list` lists what changed in this machine's sessions since a cursor, as normalised events, for Memory, other consumers of the source contract and scripts. It is History's side of the source contract, `@we-the-rebel-alliance/source-contract`: `package.json` declares one source, `history.sessions` (`source: "sessions"`), whose owner the tools RPC method `probe` names; the default source `history` lists as before. Agents answering questions use the tools above.
 - **Pin.** `history_pin` keeps a past session's brief, or a range of its messages, in the current session's instructions, so it stays in view through compactions. It is not in Code Mode, because it changes the current session.
 
 Search, sessions, files and recall look in the current project by default. They leave out the current session, subagent sessions and archived sessions unless you ask for them. The filters are `scope` (`project`, `directory`, `all` or `session`), `since` and `until` (an ISO date, or an age such as `36h`, `7d`, `3w`, `2m` or `1y`), `kinds`, `tool`, `agent`, `path`, `sessionID`, `includeSubagents`, `includeCurrent` and `includeArchived`.
@@ -103,7 +103,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs
    | `"read-only"` | the reads | nothing: `history_pin` and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.2", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -141,6 +141,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/per
 | `history_recall` | `*` | `allow` |
 | `history_sql` | `*` | `allow` |
 | `history_events_list` | `*` | `allow` |
+| `history_probe` | `*` | `allow` |
 | `history_pin` | `*` | `allow` |
 
 <!-- /generated:rules-all -->
@@ -160,6 +161,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/per
 | `history_recall` | `*` | `allow` |
 | `history_sql` | `*` | `allow` |
 | `history_events_list` | `*` | `allow` |
+| `history_probe` | `*` | `allow` |
 | `history_pin` | `*` | `ask` |
 
 <!-- /generated:rules-ask-changes -->
@@ -179,6 +181,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/per
 | `history_recall` | `*` | `allow` |
 | `history_sql` | `*` | `allow` |
 | `history_events_list` | `*` | `allow` |
+| `history_probe` | `*` | `allow` |
 | `history_pin` | `*` | `deny` |
 
 <!-- /generated:rules-read-only -->
@@ -206,7 +209,7 @@ Options go on the plugin entry in `opencode.json`:
 ```jsonc
 {
   "plugins": [{
-    "package": "github:joe-broadhead/opencode-history#v0.0.2",
+    "package": "github:joe-broadhead/opencode-history#v0.0.4",
     "options": {
       "defaultScope": "project",
       "mask": ["internal-token-[0-9a-f]{32}"]
@@ -225,7 +228,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.2", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
   "permissions": [
     { "action": "history_sql", "resource": "*", "effect": "deny" }
   ]
@@ -241,6 +244,7 @@ There is nothing to sign in to and no client ID to set. `mask` adds patterns tha
 - **Masking matches patterns.** The built-in patterns and your `mask` entries catch the credentials they describe, not every secret. Text indexed before a change keeps its old form until `/history-reindex rebuild`.
 - **The index is large and grows with your history.** It takes about 2.7 times the text it holds, and deleting a session does not shrink the file.
 - **Every tool is allowed by default.** Any agent can read any indexed session in any project, and `access` decides what runs without asking. `scope` filters results; it is not access control.
+- **History's source reads only this machine.** `history.sessions` is one account, this machine, owned by its OS user; it reads the local index only, costs nothing and makes no network call. Its cursor never expires, so a consumer never gets `CURSOR_EXPIRED`, which the source contract `v0.1.0` cannot yet say, so the plugin's conformance report stays incomplete on that one check. A cursor from before this release lists only the `history` source; for `sessions`, start again with `since`. The account is this machine's host name, so renaming the host changes the account and the owner: every cursor of the old account is then refused (`ACCOUNT_MISMATCH`), and a consumer binds the source again and starts with `since`.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6.** Other releases inside `>=2.2.3 <2.3.0` start, and status reports them as untested.
 - **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301 does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
@@ -253,6 +257,7 @@ Start with `/history-status`. It ends with one next step. Errors read `CODE: wha
 
 | Code | What happened | Next step |
 | --- | --- | --- |
+| `ACCOUNT_MISMATCH` | History's sessions source reads only this machine's account, and the call names another account, or passes another account's cursor. | Pass this machine's account, as probe names it, with the cursor it issued. |
 | `ACCOUNT_UNKNOWN` | History lists only this machine's sessions, and that account is another machine's. | Call history_events_list without account, or with the account its events name. |
 | `CANCELLED` | The call was cancelled. | Call the tool again if you still need the result. |
 | `CLOSED` | The History plugin is shutting down. | Retry after OpenCode has reloaded the plugin. |
@@ -279,6 +284,7 @@ Start with `/history-status`. It ends with one next step. Errors read `CODE: wha
 | `SKILLS_INVALID` | A History skill file is missing or malformed, so that skill was skipped. | Reinstall the plugin. |
 | `SOURCE_SCHEMA_UNKNOWN` | OpenCode's database has a layout this plugin version does not know. | Update the plugin, or use the OpenCode version it was tested with. |
 | `SOURCE_UNAVAILABLE` | OpenCode's session history could not be read. | Check that the database option points at OpenCode's opencode.db, then restart OpenCode. |
+| `SOURCE_UNKNOWN` | History has no such source. | Pass source "sessions", or leave it out for "history". |
 | `SQL_FAILED` | The SQL query failed. | Check the view and column names in the history_sql description, then retry. |
 | `SQL_REJECTED` | The SQL was refused. | Rewrite it as one read-only SELECT or WITH statement over the v_* views and the docs_words and docs_sub tables. |
 | `SQL_TIMEOUT` | The SQL query ran longer than 10 seconds and was stopped. | Narrow it: filter by time or session, and bound a recursive WITH with a LIMIT or a WHERE on its counter. |
@@ -313,7 +319,7 @@ The codes a tool call can return, each with its next step, are in [docs/configur
 2. Remove the plugin, then run `opencode reload` or restart OpenCode:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.2
+   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.4
    ```
 
 3. Delete the index, which removing the plugin keeps: `~/.local/share/opencode-history`, or your `indexPath` with its `-wal` and `-shm` files. OpenCode's database is not touched either way.

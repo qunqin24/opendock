@@ -15,17 +15,17 @@ The plugin is plain JavaScript. It bundles no Node runtime or Plaud software, do
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.3
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/plaud-status`: it shows `sign-in required` until you sign in.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-plaud#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.2`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-plaud#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.3" }] }
 ```
 
 ## Sign in
@@ -54,7 +54,7 @@ Ask about your recordings, for example "what did I record this week?" or "save t
 | `plaud_get_file` | `tools.plaud.get_file` | One recording in full: 150 to 320 KB, mostly the raw transcript and the notes again. The skill and Code Mode's description steer the model away from it, to the notes, the transcript, or `plaud_export` for audio | runs |
 | `plaud_get_current_user` | `tools.plaud.get_current_user` | The signed-in account | runs |
 | `plaud_recent` | `tools.plaud.recent` | The newest recordings, one line each: title, start time and length | runs |
-| `plaud_events_list` | `tools.plaud.events_list` | For Memory's collector and scripts: one account's recordings since a cursor, as normalised events, oldest first | runs |
+| `plaud_events_list` | `tools.plaud.events_list` | For Memory and other consumers of the source contract, and scripts: one account's recordings since a cursor, as normalised events, oldest first | runs |
 | `plaud_export` | `tools.plaud.export` | Save audio, a transcript or a note as a file | runs, unless `access` asks |
 
 Plaud maintains the read tools and their arguments. Plaud has no write API: nothing here can create, rename, delete, upload, share or send a recording. Any other tool on a Plaud server runs too; set `access` to `"ask-changes"` or `"read-only"` to hold it back.
@@ -88,7 +88,7 @@ See [SECURITY.md](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/SECU
 
 ### Scripts
 
-A script or a cron job can call Plaud's five read tools, `plaud_recent` and `plaud_events_list` with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Every tool is allowed by default, so a script runs a read, `recent` or `events_list` unless you restrict the plugin: an `ask` is refused when nobody can answer it, and a saved "Always allow" is not enough. Add `"account": "<alias>"` to read another account. Exports and every other Plaud tool are never available to scripts, and a script never gets a signed link:
+A script or a cron job can call Plaud's five read tools, `plaud_recent` and `plaud_events_list` with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Every tool is allowed by default, so a script runs a read, `recent` or `events_list` unless you restrict the plugin: an `ask` is refused when nobody can answer it, and a saved "Always allow" is not enough. Add `"account": "<alias>"` to read another account. A consumer of the source contract, such as Memory, reads the declared source `plaud.recordings` through `events_list` and the method `probe` ([Events list](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#events-list)). Exports and every other Plaud tool are never available to scripts, and a script never gets a signed link:
 
 ```sh
 opencode api post /api/rpc/plaud.recordings.tools/list_files -H "x-opencode-directory:$PWD" \
@@ -110,7 +110,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/s
    | `"read-only"` | the reads and `plaud_recent` | nothing: exports and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.1", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.3", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -148,6 +148,7 @@ The block for each value, for the default account's `plaud` server, generated fr
 | `plaud_export` | `*` | `allow` |
 | `plaud_recent` | `*` | `allow` |
 | `plaud_events_list` | `*` | `allow` |
+| `plaud_probe` | `*` | `allow` |
 
 <!-- /generated:rules-all -->
 
@@ -166,6 +167,7 @@ The block for each value, for the default account's `plaud` server, generated fr
 | `plaud_export` | `*` | `ask` |
 | `plaud_recent` | `*` | `allow` |
 | `plaud_events_list` | `*` | `allow` |
+| `plaud_probe` | `*` | `allow` |
 
 <!-- /generated:rules-ask-changes -->
 
@@ -184,6 +186,7 @@ The block for each value, for the default account's `plaud` server, generated fr
 | `plaud_export` | `*` | `deny` |
 | `plaud_recent` | `*` | `allow` |
 | `plaud_events_list` | `*` | `allow` |
+| `plaud_probe` | `*` | `allow` |
 
 <!-- /generated:rules-read-only -->
 
@@ -205,7 +208,7 @@ Every option is optional. To add a second Plaud account, give it an alias in `ac
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-plaud#v0.0.1",
+      "package": "github:joe-broadhead/opencode-plaud#v0.0.3",
       "options": { "accounts": ["work"], "exportRoots": ["~/Plaud", "~/Documents/Meetings"] }
     }
   ]
@@ -222,7 +225,7 @@ OpenCode registers itself with Plaud's server automatically, so there is no clie
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.1", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.3", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
   "permissions": [{ "action": "plaud_export", "resource": "*:audio", "effect": "deny" }]
 }
 ```
@@ -246,12 +249,14 @@ Members then only sign in, once per account: run `/connect` and choose **Plaud**
 
 | Code | What happened | Next step |
 | --- | --- | --- |
+| `ACCOUNT_MISMATCH` | The recordings source was asked about an account the plugin does not have, or given another account's cursor. | Pass the account the cursor was issued for, or an account /plaud-status lists. |
 | `ACCOUNT_UNKNOWN` | The tools RPC refused the call. | Leave "account" out for the default account, or pass "default" or an alias from the plugin's accounts option, as /plaud-status lists them. |
 | `AUTH_REQUIRED` | The account's Plaud server is not connected or not signed in. | Run /connect and choose Plaud, or Plaud (<alias>) for another account, then press o or Enter to open the sign-in page. |
 | `CANCELLED` | The tools RPC refused the call. | Call the method again if you still need the result. |
 | `CONNECTING` | The tools RPC refused the call. | Wait a few seconds while OpenCode connects to the account's server, then call the method again. |
 | `CONNECTION_FAILED` | The tools RPC refused the call. | Run /plaud-status and follow its next step. |
 | `CONTENT_UNAVAILABLE` | Plaud has no audio, or no such transcript block, for that recording. | Export another transcript block, or the note. |
+| `CURSOR_INVALID` | The cursor was not issued by `events_list` for the recordings of this account, or the account is signed in as another user since. | Start again: call `events_list` for the account with `since`, without a cursor. |
 | `DISABLED` | The tools RPC refused the call. | Enable the account's server, plaud or plaud-<alias>, in /mcps. |
 | `EVENTS_CURSOR_INVALID` | The cursor was not issued by `events_list` for this account and its signed-in user. | Pass a cursor from a previous result of the same account, or start again with `since`. |
 | `EVENTS_OWNER_UNKNOWN` | Plaud's `get_current_user` named no email or id for the account. | Run /plaud-status, and sign in to this account again if it shows a problem. |
@@ -269,7 +274,9 @@ Members then only sign in, once per account: run `/connect` and choose **Plaud**
 | `PLAUD_UNREADABLE` | Plaud returned something this release cannot use, such as a page that never ends or a link that is not a URL. | Update opencode-plaud and retry later; if it still fails, report it to the plugin's maintainers. |
 | `SESSION_AGENT_REQUIRED` | The tools RPC refused the call. | Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id. |
 | `SESSION_UNKNOWN` | The tools RPC refused the call. | Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id. |
+| `SOURCE_UNKNOWN` | `events_list` or `probe` was asked for a source this plugin does not have. | Pass source `recordings`, or leave it out. |
 | `TOOL_UNAVAILABLE` | The tools RPC refused the call. | Call describe to see which methods OpenCode lists now, and run /plaud-status. |
+| `UNAVAILABLE` | A listing of the recordings source came before any probe named the account's owner since OpenCode started. | Call `probe` for the account, then list again. |
 | `UPSTREAM_ERROR` | The tools RPC refused the call. | Check the input against the method's schema from describe, and run /plaud-status if it keeps failing. |
 
 <!-- /generated:codes -->
@@ -282,7 +289,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 
 1. Sign out of each account: `opencode mcp logout plaud`, and `opencode mcp logout plaud-<alias>` for each account in `accounts`. If one answers `MCP server not found` while the plugin is still installed, OpenCode is still loading the plugin for that folder: wait a few seconds and run it again.
 2. Check: `opencode auth list` lists no **Plaud** entry.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.1`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.3`, then `opencode reload`.
 4. Your exports stay in your export roots (`~/Plaud` by default); delete them if you no longer want them. The plugin keeps no other data.
 5. Remove any Plaud rules you copied into your agents' own `permissions`.
 
@@ -295,7 +302,12 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 - **Signed links.** Tool results never show a signed link. Audio and transcripts reach a file only through `plaud_export`.
 - **Unattended exports.** An export folder is outside the project, so an unattended run needs the `external_directory` rule as well as `plaud_export` (see [Permissions](#permissions)).
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release starts, and `/plaud-status` marks it untested.
+- **Other accounts in Jelly.** Jelly's declaration names another account's reads as patterns (`plaud-*.get_file` and the rest), so they keep their read-only rules in Jelly. In a Jelly that does not yet write a pattern's rules, those tools follow the plugin's namespace and are denied at Read only, reads included.
 - **Jelly.** The settings declare their choices and bounds, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
+- **The recordings source.** `plaud.recordings` names the owner the account's last `probe` named, so every listing of an account, with a cursor or without, needs a probe of it since OpenCode started (`UNAVAILABLE` otherwise). A cursor issued for another Plaud user than the one the probe names is refused (`CURSOR_INVALID`). The source contract `v0.1.0` does not let a page read who is signed in itself (source-contract#30).
+- **Other accounts through the source contract.** The source contract `v0.1.0` derives a consumer's session rules for `plaud.recordings` as `plaud_get_current_user` and `plaud_list_files`, whatever the account, while another account's reads are its own server's, `plaud-<alias>_…`. So a consumer's fenced read of an account other than `default` is refused by the session until the contract can name a per-account server. Scripts and the model are unaffected.
+- **A day's query spans three days.** Plaud's date filter takes whole days (`YYYY-MM-DD`) in a time zone its docs do not name, so the plugin's narrowest query asks for a day and one either side. While Plaud ignores `page` under a date filter, three days that hold more recordings than one page of Plaud's answer keep failing with `PLAUD_READ_FAILED` (the cursor stays put, so nothing is lost) until Plaud honours `page`, or until such a listing is started after those days.
+- **Plaud's limits.** Plaud publishes no request limit for its server, and its docs say `list_files` ignores `page` and `page_size` under a date filter, which `events_list` always sets. So when a page that is not empty repeats the one before, whatever its length, the plugin cannot tell whether Plaud sent every recording, and lists the week again one day at a time; when a day's query still repeats, it fails with `PLAUD_READ_FAILED` before the cursor moves, rather than skip a recording ([Plaud MCP](https://docs.plaud.ai/plaud-mcp-cli/mcp), "Filtering recordings with `list_files`"). The source's answers in the conformance test are invented in the shapes those docs give, not recorded from a live account.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links

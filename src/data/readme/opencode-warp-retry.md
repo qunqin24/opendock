@@ -23,7 +23,7 @@ The plugin only activates when the OpenCode **server process** has `HTTPS_PROXY`
 
 ## Requirements
 
-- **OpenCode v2** (tested with `2.2.6`).
+- **OpenCode v2** (tested with `2.3.0`).
 - **Cloudflare WARP** client installed, logged in, and in **proxy mode**.
 - `curl` available (Windows 10+ ships it; macOS and most Linux distributions do too).
 - The OpenCode server must inherit the proxy environment variables.
@@ -238,7 +238,9 @@ The first line should be `plugin loaded; automatic free-limit retry enabled`. If
 
 OpenBot does not use the OpenCode Desktop service: it starts its own `opencode acp` process. That process inherits OpenBot's environment and needs the proxy on its own.
 
-See [openbot/README.en.md](openbot/README.en.md) for the full guide, including the [`openbot/opencode.cmd`](openbot/opencode.cmd) wrapper, `XDG_DATA_HOME`/`XDG_STATE_HOME` isolation, `OPENBOT_OPENCODE_PATH`, logs, and troubleshooting.
+See [openbot/README.en.md](openbot/README.en.md) for the complete guide for **Windows, Linux, and macOS** — every command, expected output, file paths, logs, troubleshooting, manual ACP tests, and a deployment checklist. It covers the [`openbot/opencode.cmd`](openbot/opencode.cmd) (Windows) and [`openbot/opencode.sh`](openbot/opencode.sh) (Linux/macOS) wrappers, `XDG_DATA_HOME`/`XDG_STATE_HOME` isolation, `OPENBOT_OPENCODE_PATH`, and WARP proxy checks.
+
+Portuguese: [openbot/README.md](openbot/README.md).
 
 ## Configuration
 
@@ -309,7 +311,7 @@ plugin loaded but no proxy environment matches http://127.0.0.1:40000; automatic
 ```text
 src/index.ts                  plugin source
 launcher/windows/             Windows launcher + one-click installer (not used on Linux)
-openbot/                      OpenBot (ACP) wrapper and guide
+openbot/                      OpenBot (ACP) wrappers (Windows/Unix) and guides (PT/EN)
 examples/opencode.jsonc       configuration example
 ```
 

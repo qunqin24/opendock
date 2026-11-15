@@ -1,4 +1,4 @@
-# Autocompact
+# Esuyo Opencode Compaction
 
 An OpenCode V2 plugin that compacts a session **before** it reaches the model's
 context limit, with a config file in `~/.config/opencode` and a per-session
@@ -10,7 +10,7 @@ context window the provider reports. Set `contextWindow` to `null` if you want
 to follow each model's reported limit instead.
 
 OpenCode already has automatic compaction (`compaction.buffer`, default 15%).
-Autocompact makes the trigger explicit and adds a session-local on/off switch.
+This plugin makes the trigger explicit and adds a session-local on/off switch.
 See [Relationship to built-in compaction](#relationship-to-built-in-compaction).
 
 ## Install
@@ -48,10 +48,10 @@ needed.
 
 ### Config file
 
-Copy `autocompact.example.json` to:
+Copy `esuyo-opencode-compaction.example.json` to:
 
 ```text
-~/.config/opencode/autocompact.json
+~/.config/opencode/esuyo-opencode-compaction.json
 ```
 
 The plugin uses built-in defaults when the file is missing, so this step is
@@ -61,23 +61,23 @@ optional. Any file named by `$XDG_CONFIG_HOME/opencode` is also supported.
 
 | Command | Behavior |
 | --- | --- |
-| `/autocompact` | Show status, current estimate, and the trigger |
-| `/autocompact on` | Enable Autocompact for this session |
-| `/autocompact off` | Disable Autocompact for this session |
-| `/autocompact toggle` | Switch this session |
-| `/autocompact reset` | Remove the session override and use the global default |
-| `/autocompact reload` | Reread the config file |
-| `/autocompact help` | Show command help |
+| `/compaction` | Show status, current estimate, and the trigger |
+| `/compaction on` | Enable Compaction for this session |
+| `/compaction off` | Disable Compaction for this session |
+| `/compaction toggle` | Switch this session |
+| `/compaction reset` | Remove the session override and use the global default |
+| `/compaction reload` | Reread the config file |
+| `/compaction help` | Show command help |
 
-Autocompact is **on by default**. Session overrides are stored in OpenCode's
+Compaction is **on by default**. Session overrides are stored in OpenCode's
 plugin storage, so they survive a server restart until you reset them.
 
 Feedback is shown as a TUI toast. It does not add a message to the
-conversation, so checking status or turning Autocompact off costs no context.
+conversation, so checking status or turning it off costs no context.
 
 ## Configuration
 
-`~/.config/opencode/autocompact.json`:
+`~/.config/opencode/esuyo-opencode-compaction.json`:
 
 ```json
 {
@@ -102,7 +102,7 @@ conversation, so checking status or turning Autocompact off costs no context.
 | `contextWindow` | `256000` | Fixed reference window for every model. Set `null` to use the model's reported limit |
 | `fallbackContextWindow` | `256000` | Window used when the model reports none |
 | `debounceMs` | `2000` | Minimum gap between context checks for one session |
-| `notify` | `false` | Show a toast when Autocompact requests a compaction |
+| `notify` | `false` | Show a toast when Compaction requests a compaction |
 | `debug` | `false` | Log measurements to the OpenCode server log |
 
 ### How the trigger is calculated
@@ -124,7 +124,7 @@ trigger  217,600  (85% full)
 ```
 
 Edits to the config file are picked up automatically through its modification
-time. A broken file keeps the last good values instead of turning Autocompact
+time. A broken file keeps the last good values instead of turning Compaction
 off.
 
 ## How it measures context
@@ -142,7 +142,7 @@ It uses the same idea as OpenCode's built-in compaction:
 This is deliberately conservative. A 15% reserve leaves room for the estimate
 to be a little low and for a large turn to overshoot before the next check.
 
-Autocompact checks on step boundaries, on idle, and after a model switch. Checks
+Compaction checks on step boundaries, on idle, and after a model switch. Checks
 are debounced, and a session never has two plugin-initiated compactions pending.
 After a failed compaction it backs off (one minute, then longer) instead of
 retrying in a loop.
@@ -161,10 +161,10 @@ OpenCode's built-in automatic compaction is still controlled by `compaction` in
 }
 ```
 
-The built-in default is 15%, which starts compaction at 85% full. Autocompact
+The built-in default is 15%, which starts compaction at 85% full. Compaction
 uses the same 15% reserve, so both fire at the same point. That is safe — either
-one compacts the session in time — but it means Autocompact is not *earlier*
-than the built-in trigger. To make Autocompact fire first, lower the built-in
+one compacts the session in time — but it means Compaction is not *earlier*
+than the built-in trigger. To make Compaction fire first, lower the built-in
 buffer (a smaller buffer means a later built-in trigger), for example:
 
 ```jsonc
@@ -176,15 +176,15 @@ buffer (a smaller buffer means a later built-in trigger), for example:
 }
 ```
 
-Then Autocompact compacts at 85% full and the built-in one remains a safety net
+Then the plugin compacts at 85% full and the built-in one remains a safety net
 at 95% full:
 
-- Autocompact on: compaction at 85% of the 256k reference window.
-- `/autocompact off`: the built-in compaction still protects the session.
+- Compaction on: compaction at 85% of the 256k reference window.
+- `/compaction off`: the built-in compaction still protects the session.
 - Built-in compaction also recovers once if a provider rejects an oversized
   request.
 
-If you want Autocompact to be the **only** automatic compaction, turn the
+If you want Compaction to be the **only** automatic compaction, turn the
 built-in one off:
 
 ```jsonc
@@ -197,10 +197,10 @@ built-in one off:
 
 Manual `/compact` and plugin-requested compaction still work with `auto:
 false`, but the provider-overflow recovery is lost. In that setup,
-`/autocompact off` means no automatic compaction at all for that session.
+`/compaction off` means no automatic compaction at all for that session.
 
-> Autocompact cannot change the built-in threshold per session.
-> `/autocompact off` only disables this plugin's trigger.
+> Compaction cannot change the built-in threshold per session.
+> `/compaction off` only disables this plugin's trigger.
 
 ## Notes and limitations
 
@@ -215,7 +215,7 @@ false`, but the provider-overflow recovery is lost. In that setup,
   Set `contextWindow` or `triggerTokens` to be explicit.
 - Status and toggle feedback is delivered through an RPC event and shown as a
   TUI toast. Clients other than the TUI still get the command behavior, and
-  the status is available through the plugin RPC (`esuyo.autocompact`).
+  the status is available through the plugin RPC (`esuyo.compaction`).
 
 ## Development
 
@@ -232,7 +232,7 @@ Layout:
 - `src/index.ts` — plugin registration and config path
 - `src/config.ts` — JSONC loading, validation, threshold calculation
 - `src/measure.ts` — prompt measurement and text estimation
-- `src/autocompact.ts` — event handling, trigger, storage, RPC, and slash command
+- `src/compaction.ts` — event handling, trigger, storage, RPC, and slash command
 - `src/rpc.ts` — typed methods and the feedback event
 - `src/tui.tsx` — TUI toast renderer
 

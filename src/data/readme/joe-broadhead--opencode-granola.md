@@ -17,7 +17,7 @@ Unofficial; not affiliated with Granola.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-granola#v0.0.3
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -28,12 +28,12 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.3" }] }
 ```
 
 ### Update
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-granola#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.2`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-granola#v<version>`.
 
 ## Sign in
 
@@ -66,9 +66,11 @@ before it writes. Its inputs are `meeting_ids`, `content` (`notes`, `transcript`
 the export folder, and `overwrite`. When your plan has no transcripts, the file holds the notes and says that
 transcripts are not available on your Granola plan.
 
-It also adds `events_list` (`granola_events_list`), for Memory's collector and other scripts, not for answering
-questions: the meetings you took part in since a cursor, as normalised events with their summaries, oldest first. It
-only reads, and never asks. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
+It also declares one source, `granola.meetings`, under the source contract (`package.json`'s `sources`), for Memory's
+collector and other scripts, not for answering questions: `events_list` (`granola_events_list`) lists the meetings you
+took part in since a cursor, as normalised events with their summaries, oldest first, for the account it names (the
+source's accounts are named: the signed-in email), and the tools RPC method `probe` names who is signed in, which is
+how a consumer learns that email. Both only read, and never ask. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
 
 To see the connection, the workspace, the tools and the next step:
 
@@ -87,7 +89,7 @@ export needs a prior explicit `allow` in the session's or the agent's rules, bec
 answer it. `sign_out` is not a method: the plugin removes it, and `opencode mcp logout granola` revokes the grant.
 
 ```sh
-opencode api post /api/rpc/granola.meetings.tools/list_meetings \
+opencode api post /api/rpc/granola.meetings.tools/search_meetings \
   -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{"limit":10}}}'
 ```
@@ -113,7 +115,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.1", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.3", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -132,6 +134,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    ```json
    { "permissions": [
      { "action": "granola_give_feedback", "resource": "*", "effect": "deny" },
+     { "action": "granola_create_meeting_note_from_transcript", "resource": "*", "effect": "deny" },
      { "action": "granola_create_folder", "resource": "*", "effect": "ask" }
    ] }
    ```
@@ -144,7 +147,6 @@ The plugin inserts this block directly after each agent's base "allow everything
   { "action": "granola_*", "resource": "*", "effect": "allow" },
   { "action": "granola_get_account_info", "resource": "*", "effect": "allow" },
   { "action": "granola_list_meeting_folders", "resource": "*", "effect": "allow" },
-  { "action": "granola_list_meetings", "resource": "*", "effect": "allow" },
   { "action": "granola_search_meetings", "resource": "*", "effect": "allow" },
   { "action": "granola_get_meetings", "resource": "*", "effect": "allow" },
   { "action": "granola_get_meeting_transcript", "resource": "*", "effect": "allow" },
@@ -152,7 +154,9 @@ The plugin inserts this block directly after each agent's base "allow everything
   { "action": "granola_get_meeting_attachment", "resource": "*", "effect": "allow" },
   { "action": "granola_list_templates", "resource": "*", "effect": "allow" },
   { "action": "granola_search_transcripts", "resource": "*", "effect": "allow" },
+  { "action": "granola_get_agent_brief", "resource": "*", "effect": "allow" },
   { "action": "granola_events_list", "resource": "*", "effect": "allow" },
+  { "action": "granola_probe", "resource": "*", "effect": "allow" },
   { "action": "granola_create_folder", "resource": "*", "effect": "allow" },
   { "action": "granola_update_folder", "resource": "*", "effect": "allow" },
   { "action": "granola_add_note_to_folder", "resource": "*", "effect": "allow" },
@@ -160,6 +164,7 @@ The plugin inserts this block directly after each agent's base "allow everything
   { "action": "granola_update_private_notes", "resource": "*", "effect": "allow" },
   { "action": "granola_generate_summary", "resource": "*", "effect": "allow" },
   { "action": "granola_give_feedback", "resource": "*", "effect": "allow" },
+  { "action": "granola_create_meeting_note_from_transcript", "resource": "*", "effect": "allow" },
   { "action": "granola_export_markdown", "resource": "*", "effect": "allow" }
 ]
 ```
@@ -194,7 +199,7 @@ plugin in the system config, which outranks each member's own config: `/etc/open
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.1",
+      "package": "github:joe-broadhead/opencode-granola#v0.0.3",
       "options": { "exportDirectory": "<an absolute path>/Granola" }
     }
   ]
@@ -223,12 +228,11 @@ exactly one `Next step`. Every error the plugin raises has a code and a next ste
 | `STATUS_UNAVAILABLE` | Status could not be read. | Run `/granola-status` again in a few seconds. |
 | `SKILLS_INVALID` | A bundled skill file is missing or broken. | Reinstall the plugin. |
 | `PACKAGE_INVALID` | The plugin's `package.json` is inconsistent. | Reinstall the plugin. |
-| `EVENTS_INVALID_INPUT` | The events_list input is invalid: *problems*. | Pass only since, cursor, limit (1 to 500), account and source, as the tool's schema describes. |
-| `EVENTS_CURSOR_INVALID` | The cursor was not issued by Granola's events_list for this account and its signed-in user. | Pass a cursor from a previous result of the same account, or start again with since. |
-| `EVENTS_ACCOUNT_UNKNOWN` | Granola has one account, default. | Leave account out, or pass "default". |
-| `EVENTS_SOURCE_UNKNOWN` | This plugin lists one source, granola. | Leave source out, or pass "granola". |
-| `EVENTS_OWNER_UNKNOWN` | Granola did not name the signed-in account's email. | Run /granola-status, and sign in to Granola again if it shows a problem. |
-| `EVENTS_READ_FAILED` | Granola's *tool* failed: *reason*. | Call events_list again with the same cursor; if it keeps failing, run /granola-status. |
+| `INPUT_INVALID` | The events_list (or probe) input is invalid: *problems*; or a listing names no account. | Pass account, the signed-in Granola email that probe answers, and only since, cursor, limit (1 to 500) and source besides. |
+| `CURSOR_INVALID` | The cursor was not issued by Granola's events_list for this account. | Pass a cursor from a previous result for the same account, or start again with since. |
+| `ACCOUNT_MISMATCH` | The cursor is for another Granola account, or Granola is signed in to another account than the one named. | Pass the cursor with its own account, or sign in to Granola as that account (/connect, Granola), or read as the account probe names. |
+| `SOURCE_UNKNOWN` | This plugin lists one source, granola. | Leave source out, or pass "granola". |
+| `UNAVAILABLE` | Granola's *tool* failed: *reason*; or Granola did not name the signed-in account's email. | Call events_list (or probe) again; if it keeps failing, run /granola-status. |
 | `EXPORT_INVALID_INPUT` | The export request is malformed. | Pass `meeting_ids` (1 to 20) and `content` (`notes`, `transcript` or `both`), and only `path` and `overwrite` besides. |
 | `EXPORT_INVALID_PATH` | The export path is not allowed. | Use a relative path inside the export folder, without `..`, a leading `/` or links. |
 | `EXPORT_EXISTS` | The file already exists. | Choose another path, or export again with `overwrite: true` after asking. |
@@ -278,7 +282,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.1`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.3`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 
@@ -291,6 +295,8 @@ Files you exported stay in your export folder.
 - **Exports are bounded.** An export takes 1 to 20 meetings and at most 8 MB; a transcript that does not fit is cut with a note. The file goes outside the project, so OpenCode also asks for `external_directory`.
 - **`give_feedback` reaches Granola's team.** It is allowed by default, and the skill tells the model to send it only when the user asks.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
+- **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, and a listing cannot tell when the plan hides older meetings, so it never reports a gap: a cursor older than 30 days on the free plan lists only what the plan still shows. Switching the active workspace changes what a listing reads under the same account.
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. Its report is incomplete on one check, the expired cursor, because the source never answers `CURSOR_EXPIRED`.
 - **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6, and runs on macOS or Linux. A later 2.2 release starts and is reported as untested.
 - In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
   older Jelly refuses the plugin's whole declaration.

@@ -24,7 +24,7 @@ is allowed like every other tool by default: see [Permissions](#permissions).
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.3
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/wisprflow-status`: it shows `sign-in required` until you sign
@@ -34,12 +34,12 @@ The plugin registers Wispr Flow's MCP server under the name `wisprflow`, adds de
 `/wisprflow-status` command, the `/wisprflow` status view and two skills. Every tool is Wispr Flow's, and OpenCode
 handles the connection, the sign-in and the stored credentials.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-wisprflow#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.2`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-wisprflow#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -119,7 +119,7 @@ other people's words and contact details. Restrict it in any of these three ways
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.1", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -164,6 +164,7 @@ The plugin inserts this block directly after each agent's base rule that allows 
   { "action": "wisprflow_search_meetings", "resource": "*", "effect": "allow" },
   { "action": "wisprflow_search_scratchpad_notes", "resource": "*", "effect": "allow" },
   { "action": "wisprflow_events_list", "resource": "*", "effect": "allow" },
+  { "action": "wisprflow_probe", "resource": "*", "effect": "allow" },
   { "action": "wisprflow_get_participant_contacts", "resource": "*", "effect": "allow" }
 ]
 ```
@@ -185,7 +186,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.1", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -204,7 +205,7 @@ plugin entry in the system config: `/Library/Application Support/opencode/openco
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.1"]
+  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.3"]
 }
 ```
 
@@ -217,6 +218,8 @@ all, and Scratchpad through it, is set in Wispr Flow's admin portal.
 - **Meetings need Cloud Sync.** A meeting recorded while Dictation cloud storage is off never appears, even after you turn it on.
 - **Some Wispr Flow data is out of reach.** No tool reads dictation history, the dictionary, snippets, styles, usage stats or Notetaker chat, and no tool takes audio.
 - **The tool list depends on the account.** An active HIPAA agreement or an organisation policy can turn Wispr Flow's MCP off, and a tool the plugin has not classified runs at the `access` value you set.
+- **The meetings source sees what Wispr Flow's MCP sees.** Wispr Flow's MCP needs Notetaker and MCP access, Cloud Sync, no active HIPAA agreement and no organisation policy that turns MCP off; it answers "Too many requests" when queries come too fast, publishes no number for that limit, and asks you to wait about a minute ([Wispr Flow](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)). A listing reads `search_meetings` once per page of 200 meetings of each week. Wispr Flow names no account, so the source's owner is unverified (OpenCode's sign-in, not a Wispr Flow identity): its id is the sign-in's credential id and its label is for display only, so after any new sign-in an old cursor is refused with `ACCOUNT_MISMATCH`, and a consumer starts again. A cursor never expires, and Wispr Flow gives no sign of history it no longer serves, so a listing never reports a gap.
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Wispr Flow whose answers follow the JSON shape Wispr Flow's live `search_meetings` returned when last checked; their content is made up, not live-verified. Its report is incomplete on one check, the expired cursor, because the source never answers `CURSOR_EXPIRED`.
 - **Attendee contacts are readable at every `access` value.** `get_participant_contacts` is a read, so it is allowed unless you add a rule for it.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6.** Other releases inside `>=2.2.3 <2.3.0` start, and status reports them as untested.
 - **Jelly.** The `access` setting declares its choices, which a Jelly needs app#1301 to read; an older Jelly turns the declaration down.
@@ -249,13 +252,12 @@ Run `/wisprflow-status` first. Its last line is the next step.
 | A Wispr Flow tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool. |
 | `/wisprflow` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `EVENTS_INVALID_INPUT` | `events_list`: the input breaks the shared contract. | Pass only since, cursor, limit (1 to 500), account and source, as the tool's schema describes. |
-| `EVENTS_CURSOR_INVALID` | `events_list`: the cursor was not issued by Wispr Flow's events_list for this sign-in. | Pass a cursor from a previous result of the same account, or start again with since. |
-| `EVENTS_ACCOUNT_UNKNOWN` | `events_list`: an account other than `default`. | Leave account out, or pass "default". |
-| `EVENTS_SOURCE_UNKNOWN` | `events_list`: a source other than `wisprflow`. | Leave source out, or pass "wisprflow". |
-| `EVENTS_OWNER_UNKNOWN` | `events_list`: OpenCode holds no Wispr Flow sign-in to name as the owner. | Run /connect and choose Wispr Flow to sign in, then call events_list again. |
-| `EVENTS_UNAVAILABLE` | `events_list`: `wisprflow_search_meetings` is not available, because the server is not connected or signed in, or the `wisprflow` name is another server's. | Run /wisprflow-status and follow its next step. |
-| `EVENTS_READ_FAILED` | `events_list`: Wispr Flow's `search_meetings` failed, or capped one week's meetings. The message holds the first line of Wispr Flow's text, cut and redacted. | Call events_list again with the same cursor; if it keeps failing, run /wisprflow-status. |
+| `INPUT_INVALID` | `events_list` or `probe`: the input breaks the shared contract, or a cursor comes without its account. | Pass account "default" with a cursor, and only since, cursor, limit (1 to 500), account and source, as the tool's schema describes. |
+| `CURSOR_INVALID` | `events_list`: the cursor was not issued by Wispr Flow's events_list, an earlier version's included. | Pass a cursor from a previous result for the same account, or start again with since. |
+| `ACCOUNT_MISMATCH` | `events_list` or `probe`: an account other than `default`, or a cursor issued for another Wispr Flow sign-in than the one OpenCode holds now. | Pass account "default"; after a new sign-in, call probe and start again with since. |
+| `SOURCE_UNKNOWN` | `events_list` or `probe`: a source other than `wisprflow`. | Leave source out, or pass "wisprflow". |
+| `NEEDS_SIGN_IN` | `events_list` or `probe`: OpenCode holds no Wispr Flow sign-in to name as the owner. | Run /connect and choose Wispr Flow to sign in, then call probe and start again with since. |
+| `UNAVAILABLE` | `events_list` or `probe`: `wisprflow_search_meetings` is not available (the server is not connected or signed in, or the `wisprflow` name is another server's), or Wispr Flow's `search_meetings` failed or capped one week's meetings. The message holds the first line of Wispr Flow's text, cut and redacted. | Run /wisprflow-status and follow its next step, or call events_list again with the same cursor. |
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
@@ -274,7 +276,7 @@ credential store.
 1. Sign out: `opencode mcp logout wisprflow`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: wisprflow` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Wispr Flow**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.1`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.3`, then `opencode reload`.
    `opencode mcp list` no longer lists `wisprflow`.
 4. Remove any Wispr Flow rules you copied into your agents' own `permissions`.
 

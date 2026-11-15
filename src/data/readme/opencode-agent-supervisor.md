@@ -29,7 +29,12 @@ while it happens.
   rides the conversation as one trailing user message every turn.
 - **[The agent console](#5-the-agent-console)** — five self-serve
   tools: durable reminders, full-state recall, engineer reports,
-  on-demand audits.
+  on-demand audits (a sixth, `request_access`, with external access
+  enabled).
+- **[External access](#46-external-access)** — opt-in: writes outside
+  the project root need an engineer grant, asked for through a
+  relayed question (once or for the session) or kept in a grants
+  file; reads pass by default.
 - **[The engineer console](#6-the-engineer-console)** — directive
   files pairing advisory text with machine rules (`when`, `enforce`,
   `approve`, `review`, `repair`) that shape the memo, the audit
@@ -68,7 +73,7 @@ Requires OpenCode **1.19.0** or later.
 ### 3.1 Install for yourself
 
 ```bash
-opencode plugin opencode-agent-supervisor@2.9.1 --global
+opencode plugin opencode-agent-supervisor@2.10.0 --global
 ```
 
 OpenCode downloads the package and adds it to the `plugin` array of
@@ -84,7 +89,7 @@ the repository runs the same supervisor version:
 
 ```json
 {
-  "plugin": ["opencode-agent-supervisor@2.9.1"]
+  "plugin": ["opencode-agent-supervisor@2.10.0"]
 }
 ```
 
@@ -336,9 +341,9 @@ tuple registration — Section 6):
 | :--- | :--- |
 | `event` | Observes completed reasoning parts (`message.part.updated`), deduplicates them, strips narrative, runs the invariants and the side-session peer audit, records steps in the verified trace (passed, or minor deterministic findings marked unpassed), and routes failures to critique delivery. |
 | `chat.message` | Captures the session's model identity (drives the tool-arg repair schema lookup) and the first user message of the session as the goal. The goal is never replaced. Also records the session's agent — the `agent` of the latest user message (Section 7.2). |
-| `tool.execute.before` | Tool-arg repair first: validates raw arguments against the tool's JSON schema and repairs malformed ones in place (Section 4.5). Then the tool guard: blocks reward-hacking tool calls, engineer-directive violations, and file paths absent from the verified trace (never blocks when the trace is empty; a trace block with an audit in flight waits up to 10 s for the settled trace, failing open up to the per-session `maxTimeoutFailOpens` cap — Section 4.2); holds approve-gated calls for engineer approval and review-gated calls for a passed peer audit (agent-console tools are exempt so `request_audit` stays reachable); records directive triggers. A global guard profile matching the session's slash command or agent (or an ancestor session's) may exempt a tool from the trace check only (Section 7.2). |
-| `tool.execute.after` | Appends a solved item (tool name + short outcome) to a bounded log. |
-| `tool` | Agent console: registers `remind_me` / `forget_reminder` (durable reminders), `recall` (full retained state), `report` (self-reported events), and `request_audit` (on-demand peer audit) (Section 5). |
+| `tool.execute.before` | Tool-arg repair first: validates raw arguments against the tool's JSON schema and repairs malformed ones in place (Section 4.5). Then the tool guard: blocks reward-hacking tool calls, engineer-directive violations, and file paths absent from the verified trace (never blocks when the trace is empty; a trace block with an audit in flight waits up to 10 s for the settled trace, failing open up to the per-session `maxTimeoutFailOpens` cap — Section 4.2); holds approve-gated calls for engineer approval and review-gated calls for a passed peer audit (agent-console tools are exempt so `request_audit` stays reachable); records directive triggers. With external access enabled, gates external writes (and reads under `readPolicy: "gate"`) on an engineer grant (Section 4.6). A global guard profile matching the session's slash command or agent (or an ancestor session's) may exempt a tool from the trace check only (Section 7.2). |
+| `tool.execute.after` | Appends a solved item (tool name + short outcome) to a bounded log. With external access enabled, mints grants from the engineer's answers to relayed `request_access` questions (Section 4.6). |
+| `tool` | Agent console: registers `remind_me` / `forget_reminder` (durable reminders), `recall` (full retained state), `report` (self-reported events), and `request_audit` (on-demand peer audit) (Section 5), plus `request_access` when external access is enabled (Section 4.6). |
 | `experimental.chat.messages.transform` | Appends the supervisor memo to the conversation as one trailing user message per user prompt. Degrades gracefully (memo-less operation) when the hook is absent. |
 | `dispose` | Clears all in-process session state. |
 
@@ -404,12 +409,77 @@ with:
 }
 ```
 
+### 4.6 External Access
+
+OpenCode's `external_directory` permission is all or nothing: its
+ask prompt has no read-versus-write choice, and an approved path
+inherits the workspace's `edit: allow`, so approving access grants
+write too. With `externalAccess.enabled`, the supervisor becomes a
+mode-aware gate for tool calls that reach outside the project root
+(off by default — nothing changes until you opt in):
+
+- **Detection** is lexical, over operational arguments (bash
+  `command` and `workdir`; other tools' arguments minus write/edit
+  content and grep's `pattern`). `~`, `$HOME`, and `$PWD` expand,
+  relative paths resolve against the project directory (bash: its
+  `workdir`), and `..` collapses. A path outside the project
+  directory and worktree is external; `/dev/null` and friends and
+  URLs are not paths.
+- **Classes**: `read`, `glob`, `grep`, `list`, and `lsp` are reads;
+  everything else — bash included, even `cat` — is a write. Tools
+  that touch no file (`question`, `task`, `todowrite`, `webfetch`,
+  `websearch`, the console tools) are never gated.
+- **Gate**: an external write with no covering grant is blocked
+  after the protected-state check and before approve gates; the
+  reason names the path, the class, `request_access`, and the
+  grants-file record to add. Reads pass under `readPolicy: "allow"`
+  (default); `"gate"` gates them too.
+- **Asking**: the agent calls `request_access` with `path`, `mode`
+  (`read` or `read-write`), and `justification`. It grants nothing:
+  it returns the exact `question` tool arguments to relay — worded by
+  the plugin, naming the resolved path and mode, with the options
+  *Allow once*, *Allow for this session*, and *Deny*. When the
+  question completes, the supervisor matches the request id and the
+  unchanged question text and mints the grant from your answer (an
+  edited question mints nothing). Session grants also cover the
+  session's subagents; a once grant is spent by the first call it
+  lets through.
+- **Persistent grants** live in
+  `.opencode/supervisor/external-access.json`, read fresh per gated
+  call, and fail closed when unreadable or malformed:
+
+  ```json
+  [
+    { "path": "~/shared/fixtures", "mode": "read-write", "note": "fixture sync" },
+    { "path": "/data/*/cache", "mode": "read", "expires": "2026-12-31" }
+  ]
+  ```
+
+  A literal path covers itself and everything under it; a glob
+  covers what it matches and everything under that; `expires` is
+  inclusive, UTC end of day; at most 50 entries are kept. A `read`
+  grant never covers a write. The file is engineer-authored state —
+  agent calls touching it are blocked — and the plugin never writes
+  it.
+
+The agent cannot grant itself access: grants come only from the
+file or from your answer to a question (tool output produced by the
+host). Pair the gate with `"external_directory": "allow"` in
+`opencode.json` so the supervisor is the single interactive gate
+(otherwise core asks too). The memo shows the session's grants and
+pending requests; every request, mint, denial, and spent once grant
+is logged.
+
+```json
+{ "externalAccess": { "enabled": true, "readPolicy": "allow" } }
+```
+
 ---
 
 ## 5. The Agent Console
 
 The plugin registers five tools (`Hooks.tool`) the supervised agent
-can call like any other tool:
+can call like any other tool — six with external access enabled:
 
 - **`remind_me` / `forget_reminder`** — durable session reminders:
   dead ends ("the flaky import always fails — use the direct path
@@ -433,10 +503,17 @@ can call like any other tool:
   consuming the regeneration budget. Bounded per session
   (`maxOnDemandAudits`, default 8); the automatic audit loop is
   unaffected.
+- **`request_access`** — registered only when `externalAccess.enabled`
+  resolves true at plugin load. Asks the engineer for read or
+  read-write access to a path outside the project root by returning a
+  question to relay; the engineer's answer grants (Section 4.6).
 
-Console-tool behavior: whitespace-only text is rejected; text over
-2000 characters is truncated (both reported in the result); side
-sessions get inert results; tool bodies fail open — malformed
+Console-tool behavior: whitespace-only text is rejected; reminder
+text, report text, and the `request_audit` focus over 2000
+characters are truncated (both reported in the result; the focus is
+truncated before the audit sees it); with `maxReminders` or
+`maxReports` at 0, `remind_me` or `report` says the surface is
+disabled and stores nothing; side sessions get inert results; tool bodies fail open — malformed
 arguments yield actionable results, never thrown errors; report text
 never enters audit prompts.
 
@@ -459,6 +536,16 @@ directive is advisory text plus optional machine rules:
 - **`when` rules** surface a directive just-in-time: `tool` (name,
   case-insensitive) or `path` (argument-path glob). Blocked calls
   still record the trigger.
+- **Path globs** in `forbidPath` and `when` rules match a path in
+  the arguments — including paths nested in array and object
+  arguments — when they match the whole path or any part of it
+  after a `/`. So `secrets/**` matches `secrets/token`,
+  `./secrets/token`, `~/secrets/token`, and
+  `/home/dev/proj/secrets/token`, and `.env*` matches a `.env` file
+  in any directory. A relative glob can therefore match deeper than
+  the project root (`config/*.json` also matches
+  `vendor/x/config/a.json`); start a glob with `/` to match whole
+  absolute paths only.
 - **`approve` rules** hold matching tool calls for engineer approval:
   `id` (optional explicit gate key, else `<directive>/<rule
   index>`) and any of `tool`, `path` (glob), `pattern` (regex) — all
@@ -503,11 +590,14 @@ Directives can also ride plugin options through tuple registration in
 ```
 
 File directives load first (sorted by filename), then option
-directives append. Bounds are fixed: 20 directives, 1000 characters
-of advisory text per directive, 10 rules of each kind per directive,
-and a 4000-character aggregate render budget. Malformed files and
-invalid rules are skipped with a warning — loading fails open.
-Directives load once at plugin start; there is no hot reload.
+directives append. Bounds are fixed: 25 directive files read (files
+past that are not read, with one warning), 20 directives, 1000
+characters of advisory text per directive, 10 rules of each kind per
+directive, and a 4000-character aggregate render budget. Malformed
+files and invalid rules are skipped with a warning — loading fails
+open. Directives load once at plugin start; there is no hot reload.
+The startup log line names each loaded directive and its source
+(`no-secrets (no-secrets.md)`, `prefer-bun (options)`).
 
 **Approvals.** `approve` gates read
 `.opencode/supervisor/approvals.json` fresh at each gated call — a
@@ -581,8 +671,8 @@ when unset, the side-session prompt omits it.
 | `requireStepReferenceInTools` | `OPENCODE_SUPERVISOR_REQUIRE_STEP_REFERENCE_IN_TOOLS` | `true` | When `true`, the tool guard blocks tool calls whose file-path arguments do not appear in the verified reasoning trace. Never blocks when the trace is empty. |
 | `memoLimits.maxSolvedItems` | `OPENCODE_SUPERVISOR_MEMO_MAX_SOLVED_ITEMS` | `5` | Cap on solved items shown in the memo. Storage retains more (50) for `recall`; this knob bounds the rendered view. |
 | `memoLimits.maxCritiques` | `OPENCODE_SUPERVISOR_MEMO_MAX_CRITIQUES` | `3` | Cap on critiques shown in the memo. Storage retains more (30) for `recall`; this knob bounds the rendered view. |
-| `memoLimits.maxReminders` | `OPENCODE_SUPERVISOR_MEMO_MAX_REMINDERS` | `10` | Cap on reminders kept in state and shown in the memo (the most recent are kept). |
-| `memoLimits.maxReports` | `OPENCODE_SUPERVISOR_MEMO_MAX_REPORTS` | `5` | Cap on agent reports kept in state and shown in the memo (the most recent are kept). |
+| `memoLimits.maxReminders` | `OPENCODE_SUPERVISOR_MEMO_MAX_REMINDERS` | `10` | Cap on reminders kept in state and shown in the memo (the most recent are kept). `0` disables `remind_me`, which then says so. |
+| `memoLimits.maxReports` | `OPENCODE_SUPERVISOR_MEMO_MAX_REPORTS` | `5` | Cap on agent reports kept in state and shown in the memo (the most recent are kept). `0` disables `report`, which then says so. |
 | `maxOnDemandAudits` | `OPENCODE_SUPERVISOR_MAX_ON_DEMAND_AUDITS` | `8` | Per-session cap on audits requested through the `request_audit` tool. The automatic audit loop is unaffected. |
 | `maxTimeoutFailOpens` | `OPENCODE_SUPERVISOR_MAX_TIMEOUT_FAIL_OPENS` | `3` | Per-session cap on trace-check waits that time out and fail open (the wait itself is bounded at 10 seconds). Past the cap a timed-out wait blocks naming the still-unsettled audit. |
 | `maxCoveredTimeoutFailOpens` | `OPENCODE_SUPERVISOR_MAX_COVERED_TIMEOUT_FAIL_OPENS` | `6` | Per-session cap on covered timeout fail-opens — waits whose blocked path an in-flight audit's step text names (the corrective reasoning is under audit). Past the cap a covered timed-out wait blocks naming the still-unsettled audit. |
@@ -592,7 +682,9 @@ when unset, the side-session prompt omits it.
 | `argRepair.tools` | *(config file/options only)* | builtin tool ids | Tools in the repair scope; `"*"` covers everything including MCP and plugin tools. |
 | `argRepair.maxPerSession` | *(config file/options only)* | `8` | Per-session bound on repair-model attempts; deterministic repairs are unbounded. |
 | `argRepair.timeoutMs` | *(config file/options only)* | `15000` | Timeout on the repair side session. |
-| `lockGuards` | *(global config file only)* | `false` | When `true`, `blockRewardHacking: false`, `requireStepReferenceInTools: false`, and `mode: "repair-only"` from the project config file, plugin options, or the environment are ignored with a warning, so a committed project config or per-directory env file cannot turn the guards off or unregister them. Fails closed (Section 7.2). |
+| `lockGuards` | *(global config file only)* | `false` | When `true`, `blockRewardHacking: false`, `requireStepReferenceInTools: false`, `mode: "repair-only"`, `externalAccess.enabled: false`, and `externalAccess.readPolicy: "allow"` from the project config file, plugin options, or the environment are ignored with a warning, so a committed project config or per-directory env file cannot turn the guards off or unregister them. Fails closed (Section 7.2). |
+| `externalAccess.enabled` | `OPENCODE_SUPERVISOR_EXTERNAL_ACCESS` | `false` | Gate tool calls outside the project root on engineer grants (Section 4.6). `request_access` registers only when this resolves `true` at plugin load. |
+| `externalAccess.readPolicy` | `OPENCODE_SUPERVISOR_EXTERNAL_ACCESS_READ_POLICY` | `allow` | `allow` lets external reads pass; `gate` requires a grant for them too (a `read` grant suffices). |
 | `profiles` | *(global config file only)* | *(none)* | Task-scoped grants, matched on slash command and/or agent, that narrow where a guard applies (Section 7.2). |
 
 Gate approvals are not a knob: `approve` rules read the approvals file
@@ -601,7 +693,9 @@ the next tool call with no restart (Section 6).
 
 Environment variable values: booleans accept exactly `true` or
 `false`; numbers must be non-negative; `stripMode` must be one of the
-three mode names; `mode` must be `full` or `repair-only`. Invalid
+three mode names; `mode` must be `full` or `repair-only`;
+`OPENCODE_SUPERVISOR_EXTERNAL_ACCESS_READ_POLICY` must be `allow` or
+`gate`. Invalid
 values fall through to the next precedence tier.
 
 All plugin diagnostics go to the OpenCode server log (service tag
@@ -694,7 +788,8 @@ the task. The global config file holds the grants:
 - `lockGuards: true` fails closed. Under it, guard-disabling values
   are ignored, with a warning, from the project file, plugin options,
   and the environment (`OPENCODE_SUPERVISOR_BLOCK_REWARD_HACKING=false`,
-  `..._REQUIRE_STEP_REFERENCE_IN_TOOLS=false`, `OPENCODE_SUPERVISOR_MODE=repair-only`),
+  `..._REQUIRE_STEP_REFERENCE_IN_TOOLS=false`, `OPENCODE_SUPERVISOR_MODE=repair-only`,
+  `OPENCODE_SUPERVISOR_EXTERNAL_ACCESS=false`, `..._EXTERNAL_ACCESS_READ_POLICY=allow`),
   because per-directory env tools (mise.toml `[env]`, `.envrc`) let a
   repository set environment variables. A global file rejected for
   another key still keeps the lock. If `XDG_CONFIG_HOME` points away
@@ -804,6 +899,21 @@ cp skills/reasoning-auditor/skill.md ~/.config/opencode/skills/reasoning-auditor
   directory backstop uses the path lens only. Review gates block
   the first matching calls of a session until a passing audit
   references the path.
+- External access (Section 4.6) is lexical: containment is not
+  symlink-resolved (a symlink inside the project pointing outside
+  reads as internal; creating one with bash names the target, which
+  is gated) and is case-sensitive (a different-case spelling of an
+  internal path reads as external — fails closed). Bash detection is
+  conservative and can false-positive (an absolute-looking regex in
+  `sed`, `/usr/bin/env`); command substitution and computed paths are
+  not followed, lower-case shell variables are skipped (their values
+  must be assigned in the same command), and an upper-case variable
+  path (`$TMPDIR/x`) is treated as external. With
+  `external_directory: "allow"`, core's native ask is suppressed and
+  the supervisor's block reason is the agent's corrective signal;
+  core's prompt cannot be made mode-aware from a plugin. Headless and
+  `--auto` runs cannot answer questions, so only file grants apply
+  there.
 
 ---
 
@@ -827,7 +937,10 @@ improving accuracy
 
 Formerly `opencode-reasoning-audit` (1.x). Version 2.0.0 renames the
 plugin and its configuration surface; the break is clean — 1.x names
-are not read as aliases.
+are not read as aliases. If any `OPENCODE_AUDITOR_*` variable is
+still set, the plugin logs one warning at load (server log, service
+`opencode-supervisor`) naming each variable and its replacement; the
+values themselves are never read.
 
 | 1.x variable | 2.0.0 variable |
 | :--- | :--- |

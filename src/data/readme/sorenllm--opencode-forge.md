@@ -199,7 +199,7 @@ What this plugin touches, exhaustively:
 | `<tmp>/opencode-forge/jobs/ledger.jsonl` | job registry ledger (bounded: 1 MB reset, 200 entries) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
 | `<tmp>/opencode-forge/watchdog/log.jsonl` | watchdog interventions ledger (bounded: 200 entries, oldest rotated) | runtime debris — delete freely, also after uninstall |
-| `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (the dispatch engine was removed); only present as inert debris from older versions | runtime debris — delete freely |
+| `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (dispatch records — including async orphans — live in the jobs ledger; this separate file dates from the retired `forge_dispatch` tool) | runtime debris — delete freely |
 | `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
 | `~/.cache/opencode/packages/...` | installed package copy | written by the `opencode plugin` installer, not the plugin |
 | `~/.config/opencode/opencode.json` | `plugin` array entry | written by the installer |
@@ -492,12 +492,15 @@ entry is either **pinned** (a model + a reasoning depth, bound at
 materialization) or an **Auto worker** (no model — it inherits the parent
 session's model at dispatch), materializes as a native `forge-<ns>-<id>`
 subagent — EVERY pool family is namespaced, no exceptions (see
-*Pools on a shared host* below) — and is dispatched through the host's
-**native `task`
-tool** — which means every run is visible in the TUI, expandable and
-monitorable, exactly like any native subagent. There is no dispatch tool, no
-child-session engine, and no configuration invitation anywhere: the session
-AI never writes your config.
+*Pools on a shared host* below) — and is dispatched through the **`task`
+tool, which the plugin owns**: forge's SDK dispatch engine is registered
+under the native tool NAME `task` (an OMO-proven shadow), so every dispatch
+— forge-* targets AND any other host agent — renders in the TUI's native
+live task panel and drives a REAL SDK child session on the same host, with
+an async mode (`run_in_background`) the native tool does not have. There is
+exactly ONE dispatch surface; the old `forge_dispatch` tool is retired.
+There is still no configuration invitation anywhere: the session AI
+never writes your config.
 
 No forge.json? Nothing happens — the plugin registers nothing and the native
 subagent behavior is untouched. Onboarding is this README, for you the human.
@@ -571,7 +574,76 @@ workspace's pool / the global layer. The `/crew` roster and the
 `crew_begin` registration output lead with the session's dispatchable pool
 (its forge.json origin — workspace pool, or the global layer marked as
 fallback) and list every other host pool as NOT dispatchable with its
-origin path.
+ origin path.
+
+### task — the single dispatch surface (native name, forge engine)
+
+The plugin registers its dispatch implementation under the tool name
+**`task`**, shadowing the native task tool host-wide (removed with the whole
+forge family under `agent["forge"].disable` — the native task tool then
+returns). A dispatch creates a **real child session on the same host server**
+via the SDK (`session.create` with `parentID` linking, the session directory
+of the parent, and the target agent id): the child renders in the host
+session tree exactly like a native task child — the **native live task
+panel**, progress, expandable transcript, **user abort in the TUI** (the
+tool-part metadata mirrors the native shape — `agent`, `sessionId`,
+`taskId`, `run_in_background`, `description`, `prompt` — so the TUI's task
+renderer drives off the same keys). **Any materialized target dispatches
+through it**: a `forge-*` subagent from the pool-gated roster, or any other
+host agent with full native parity (same engine, no forge gates; the
+recursion policy of a non-forge child is that target's own config business).
+
+- **sync (default)** — blocking parity with native task: the call polls the
+  child to a terminal state and returns the child's final assistant message
+  plus the agent identity and child session id. **Questions stay available**
+  (native parity — the user is present at the panel, the child may ask).
+  **Abort parity**: aborting the dispatching turn aborts the child via the
+  SDK and the call resolves with the abort disclosed. A child that never
+  reaches terminal within the poll timeout (default 10 minutes) returns an
+  **honest timeout finding naming the child session id** — the child stays a
+  real session the user can inspect or abort natively; there is no
+  auto-convert to async (the dependency structure did not change).
+- **`run_in_background: true` (async)** — the call returns a task handle
+  immediately (task id, agent, child session id); when the child finishes,
+  **exactly one `[forge:dispatch-complete]` message carrying the child's
+  final report** (bounded to the final 2500 characters — the full transcript
+  lives in the child session, natively inspectable) is
+  injected into the dispatching session through the same job-supervisor
+  completion-wake discipline as `[forge:job-complete]` (idle-only injection,
+  at-most-once, delivery window with ledger overflow). The tool description
+  teaches the model to END ITS TURN after an async dispatch and never poll —
+  and the per-session concurrent async cap is **3** (a fourth is refused with
+  the in-flight task ids and sync guidance). Async children **survive turn
+  aborts** by design (session-scoped); when the dispatching session ends,
+  its live children are aborted via the SDK and recorded as orphans in the
+  diagnostics ledger.
+
+**Question policy is mode-keyed.** Sync dispatches keep questions available
+(native parity — the user is watching the panel). Async dispatches create
+the child with the **question-deny seal**:
+`permission: [{permission: "question", action: "deny", pattern: "*"}]` — an
+unattended child can never block on human input; it proceeds and reports
+honestly. A **permission ask nobody answers degrades to the honest
+poll-timeout finding** (child session id disclosed, natively abortable) —
+that is the accepted fail-closed posture for unattended dispatches,
+contained by the permission map, the seal, the concurrency cap, and
+owner-death harvest. Write workers remain dispatchable in both modes —
+write authority is the target's **materialized permission map**, not a mode
+gate.
+
+**Gates.** For `forge-*` targets the session-domain pool gate (cross-pool
+targets refused with the `not dispatchable from this session` finding and
+its exits), the crew pending/compliance gates, the plan-draft interop
+(readonly targets pass as reconnaissance in BOTH modes during a draft; write
+targets are refused in BOTH modes until approval), and the primary-only rule
+(forge-* workers cannot dispatch — their materialized permission carries a
+permanent `task: "deny"` recursion ban) all apply through the SAME
+predicates as the execute-before belt. Non-forge targets dispatch with
+native parity; an unknown target is refused honestly (`Agent not found`).
+
+> **Breaking note — do not co-install with oh-my-opencode.** Both plugins
+> shadow the `task` tool name; registration order would decide whose engine
+> answers. Choose ONE orchestration layer per host.
 
 | axis | follows | survives restart? |
 | --- | --- | --- |
@@ -739,11 +811,12 @@ opencode config file reloads. A NEW session on a long-lived shared host
 
 ### Dispatching
 
-Say "dispatch a subagent..." in a forge session and the model picks from the
-task tool vocabulary: a configured `forge-*` agent whose description matches
-runs on its pinned brain; if none matches, forge is instructed to say so
-plainly and fall back to the native task channel. During a plan draft the
-`task` tool is gated by the dispatch target's effective readonly shape:
+Say "dispatch a subagent..." in a forge session and the model calls the
+`task` tool (ours): a configured `forge-*` agent whose description matches
+runs on its pinned brain; any other host agent dispatches through the same
+call with native parity. Blocking dispatch is the default (sync);
+async dispatch is `run_in_background: true`. During a plan draft dispatch is
+gated by the dispatch target's effective readonly shape:
 readonly scout dispatch passes as reconnaissance (breadth evidence without
 burning the planning session's context), write-shaped workers and native
 agents are denied with the dispatchable roster and the two exits.
@@ -1065,7 +1138,8 @@ approve the plan first (revising after approval is allowed via a new `/plan`).
 The escape hatches are `plan_approve` and `/plan discard`, by design.
 
 One carve-out, keyed on the target rather than the tool: during a draft the
-`task` tool is gated by the dispatch target's **effective readonly shape**. A
+`task` tool (ours — in BOTH modes, through the same predicate) is gated by
+the dispatch target's **effective readonly shape**. A
 dispatch to a forge worker whose shape is EXPLICITLY `readonly` AND whose
 permission
 overrides do not lift `write`/`edit`/`bash` — nor any host patch-family tool

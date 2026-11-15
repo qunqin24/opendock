@@ -1,9 +1,10 @@
 # Charts for OpenCode
 
-Deterministic, themed charts from a spec, with no model and no network. It takes Vega-Lite, Vega or ECharts in, and
-writes SVG, PNG (1–3x) and an optional offline interactive HTML page under `outputs/charts/`. The same input gives
-the same bytes on the same platform, and the same picture on any: across platforms a coordinate can differ only in
-its last digits. Nothing is ever loaded from the network.
+Deterministic, themed charts from a spec, with no model and no network. It takes Vega-Lite, Vega, ECharts,
+Observable Plot, table and diagram input, and writes SVG, PNG (1–3×), animated GIF and an optional offline
+interactive HTML page — or a multi-panel dashboard — under `outputs/charts/`. The same input gives the same bytes on
+the same platform, and the same picture on any: across platforms a coordinate can differ only in its last digits.
+Nothing is ever loaded from the network.
 
 Unofficial; not affiliated with OpenCode or Anomaly.
 
@@ -15,24 +16,24 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 
 ## Install
 
-Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.2`:
+Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.4`:
 
 ```json
-{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.2"] }
+{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.4"] }
 ```
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-charts#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-charts#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/charts-status`.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-charts#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-charts#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.2" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.4" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -41,7 +42,7 @@ A new release is a new tag: install it with its own `#v<version>` spec.
 Options (all optional):
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.2", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.4", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
 ```
 
 Options, limits and errors are in [docs/configuration.md](docs/configuration.md).
@@ -58,20 +59,19 @@ Ask for the chart you want, as a question or a spec:
 For the 14 standard types the agent writes a typed **chart document** for `charts_quick`: a recipe, its data, field
 bindings and an explicit aggregation, checked strictly. The files come with an editable `<name>.chart.json`, and
 `charts_update` then changes its theme, size or interactions without touching its data or meaning. Any other chart is
-a Vega-Lite, Vega or ECharts spec for `charts_render`. The PNG comes back for the agent to look at. Every tool is
-listed under [Tools](#tools); documents are described in [docs/documents.md](docs/documents.md).
+a spec for `charts_render` on one of its six engines; tables, diagrams and dashboards have their own tools. The PNG
+comes back for the agent to look at. Every tool is listed under [Tools](#tools); documents are described in
+[docs/documents.md](docs/documents.md).
 
-- **Any chart.** 53 tested chart types:
+- **Any chart, table, diagram or dashboard.** 79 tested types across six local engines:
   - statistical charts, facets, layers, dual axes and selections (Vega-Lite);
+  - hexbin, contour, beeswarm, bollinger, difference area, waffle, ridgeline, horizon, US/EU cartograms and geodesic flow maps (Observable Plot);
   - treemap, sunburst, tree, force network and word cloud (Vega);
-  - Sankey, chord, gauge, funnel, calendar heatmap, candlestick, radar and parallel coordinates (ECharts);
-  - world and US maps from bundled atlases.
-- **Revisable.** A saved chart document keeps its data, theme base and defaults, so a theme, size or interaction
-  change is a new immutable generation with the same data, aggregation and colours. Recipe sizes are the outer canvas,
-  exact in SVG and PNG, with readable-label floors per target (inline, analysis, report, presentation, paper).
-- **Interactive HTML that works offline.** Tooltips, legend highlight, temporal x zoom and scatter brushing, each
-  tested in a real browser under the page's CSP; SVG and PNG show the initial view.
-- **Any theme.** `light`, `dark`, `high-contrast`, `print` and `presentation`, or your own tokens, saved by name. Palettes are colour-blind-safe and checked for contrast. Fonts are bundled (Inter, JetBrains Mono), so text measures and draws identically everywhere.
+  - Sankey, chord, gauge, funnel, calendar heatmap, candlestick, radar, parallel coordinates, violin and ECharts 6 `matrix` sparkline grids (ECharts);
+  - publication data-graphic tables with inline sparklines, bullets, bars, deltas and heatmaps (`charts_table`), offline Mermaid/mindmap/org/fishbone diagrams (`charts_diagram`), and multi-panel `@ui-sdk` dashboards (`charts_board`).
+- **Editorial framing, annotations and motion.** Five-part figure frame (`kicker`, `title`, `subtitle`, `source`, `notes`), reference lines/bands (including NBER recessions), leader-line callouts, portable CSS-animated `.svg`, and deterministic `.gif` exports (`formats: ["gif"]`).
+- **Any theme.** Nine built-in themes (`light`, `dark`, `geist`, `geist-dark`, `editorial-ft`, `editorial-economist`, `high-contrast`, `print` and `presentation`), or your own tokens saved by name. The Universal Host-Theme Contract turns a host's `seed` into a matching theme, in OKLCH and with a colour-blind-safe categorical ring; `variants` carry light and dark, `.charts/theme.json` supplies a workspace default, and adaptive SVGs follow the reader's polarity. Palettes use OKLCH perceptual spacing and WCAG/APCA contrast checks. Inter, Geist, JetBrains Mono and Geist Mono are bundled, so text measures and draws identically everywhere.
+- **Inline in the client.** The `./tui` and `./gui-experimental` surfaces render a `chart` or `charts-board` code fence as Braille/Unicode art in a terminal, or as a chart card in the Web and Desktop app, and follow the host's live theme.
 - **Right first time.**
   - Validation that teaches: `Field "revenu" is not in the data. Did you mean "revenue"?`, with the JSON path.
   - Lint for misleading or unreadable charts.
@@ -92,6 +92,9 @@ is the default, so this is the block in force:
   {"action": "charts_quick", "resource": "*", "effect": "allow"},
   {"action": "charts_validate", "resource": "*", "effect": "allow"},
   {"action": "charts_update", "resource": "*", "effect": "allow"},
+  {"action": "charts_board", "resource": "*", "effect": "allow"},
+  {"action": "charts_table", "resource": "*", "effect": "allow"},
+  {"action": "charts_diagram", "resource": "*", "effect": "allow"},
   {"action": "charts_recommend", "resource": "*", "effect": "allow"},
   {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
   {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
@@ -101,7 +104,7 @@ is the default, so this is the block in force:
 ```
 <!-- /rules:all -->
 
-With `access: "ask-changes"`, the five reads run and the four writers ask:
+With `access: "ask-changes"`, the five reads run and the seven writers ask:
 
 <!-- rules:ask-changes -->
 ```json
@@ -111,6 +114,9 @@ With `access: "ask-changes"`, the five reads run and the four writers ask:
   {"action": "charts_quick", "resource": "*", "effect": "ask"},
   {"action": "charts_validate", "resource": "*", "effect": "allow"},
   {"action": "charts_update", "resource": "*", "effect": "ask"},
+  {"action": "charts_board", "resource": "*", "effect": "ask"},
+  {"action": "charts_table", "resource": "*", "effect": "ask"},
+  {"action": "charts_diagram", "resource": "*", "effect": "ask"},
   {"action": "charts_recommend", "resource": "*", "effect": "allow"},
   {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
   {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
@@ -120,7 +126,7 @@ With `access: "ask-changes"`, the five reads run and the four writers ask:
 ```
 <!-- /rules:ask-changes -->
 
-With `access: "read-only"`, the five reads run and the four writers are denied:
+With `access: "read-only"`, the five reads run and the seven writers are denied:
 
 <!-- rules:read-only -->
 ```json
@@ -130,6 +136,9 @@ With `access: "read-only"`, the five reads run and the four writers are denied:
   {"action": "charts_quick", "resource": "*", "effect": "deny"},
   {"action": "charts_validate", "resource": "*", "effect": "allow"},
   {"action": "charts_update", "resource": "*", "effect": "deny"},
+  {"action": "charts_board", "resource": "*", "effect": "deny"},
+  {"action": "charts_table", "resource": "*", "effect": "deny"},
+  {"action": "charts_diagram", "resource": "*", "effect": "deny"},
   {"action": "charts_recommend", "resource": "*", "effect": "allow"},
   {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
   {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
@@ -170,14 +179,17 @@ next step.
 
 | Tool | What it does |
 |---|---|
-| `charts_render` | Any spec (Vega-Lite, Vega or ECharts, detected) plus `data` (`rows`, or a workspace `path` to CSV, TSV, JSON, JSONL or Parquet, with optional Vega-Lite `transform`s). Writes `<name>.svg`, `<name>.png` and `<name>.vl.json` (plus `.html` on request), and returns a markdown image line to show it inline. Also takes a `document` (recipe or engine), or a saved `documentPath` to draw again from what it captured. |
+| `charts_render` | Any spec on any of the six engines (Vega-Lite, Vega, ECharts, Observable Plot, table or diagram, detected) plus `data` (`rows`, or a workspace `path` to CSV, TSV, JSON, JSONL or Parquet, with optional Vega-Lite `transform`s). Writes `<name>.svg`, `<name>.png` (and `.gif` on request) plus the resolved spec (`.vl.json`, `.vg.json`, `.echarts.json`, `.plot.json`, `.table.json` or `.diagram.json`), and an `.html` page when asked, and returns a markdown image line to show it inline. Takes the editorial frame (`kicker`, `subtitle`, `source`, `notes`), `annotations` and `motion`. Also takes a `document` (recipe or engine), or a saved `documentPath` to draw again from what it captured. |
 | `charts_quick` | `bar`, `horizontal_bar`, `grouped_bar`, `stacked_bar`, `line`, `area`, `stacked_area`, `scatter`, `bubble`, `pie`, `donut`, `histogram`, `box_plot` and `heatmap`. Recommended: a typed recipe `document`, saved as `<name>.chart.json` in a generation folder `<outDir>/<name>-<digest>/`. The older form (type and field names) still works. |
 | `charts_validate` | The same checks as render, plus the PNG, with no files written. It takes the same input as `charts_render`, checks the requested formats can be made, and returns `valid: true` or `valid: false` with the issues. Also returns the figure tree: every label, its box, and which ones collide or run off the edge, with ids the preview numbers. |
 | `charts_update` | Change a saved chart's presentation (theme, token overrides, category colours, layout and size, title, alt text, interactions) from its `.chart.json` at a known revision; writes a new generation folder `<outDir>/<name>-<digest>/` with the new revision, and never overwrites the saved chart. Data, bindings, aggregation and sorting stay as saved. |
+| `charts_board` | Render a multi-panel `BoardDocumentV1` dashboard (KPI strip with sparklines and deltas, filter controls, Bento chart/table panels, and an offline `@ui-sdk` cross-filtering `.board.html` app plus 2× poster `.png` and `.svg`). |
+| `charts_table` | Render a publication data-graphic table (spanners, row groups, summary row, and inline `bar`, `sparkline`, `sparkarea`, `sparkbar`, `bullet`, `delta`, `badge`, `heatmap`, and `dot` cells) to SVG, PNG and sortable HTML. |
+| `charts_diagram` | Render a deterministic offline diagram from Mermaid DSL (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`) or structured `mindmap`, `org_chart`, `fishbone` and `architecture` specs to SVG, PNG and terminal ASCII. |
 | `charts_recommend` | Which chart fits a question, its data and its medium: a ranked shortlist with a reason each, the encoding to use, a ready `charts_render` call on your own columns and, for a recipe type, a `charts_quick` document draft whose layout target is your medium. Advises; it never renders. |
 | `charts_capabilities` | Exactly what this build can do: engines, working output formats, document versions, the recipes and their interactions, layout targets, themes and palette sizes, bundled fonts and the scripts they cover, data formats, limits, and what is known not to work. |
 | `charts_catalogue` | Every chart type, and a working example of any: the exact tested call, with its data, title, currency and size; for a recipe type, its contract and exact `charts_quick` document calls. |
-| `charts_themes` / `charts_theme_save` | List themes and their tokens; save a brand theme to `.charts/themes/<name>.json`. |
+| `charts_themes` / `charts_theme_save` | List themes and their tokens, including the nine built-in and the saved ones; `charts_themes` also synthesises and previews a theme from a host `seed`. `charts_theme_save` saves a brand theme to `.charts/themes/<name>.json`. |
 
 There is one list behind all of these: `src/registry.ts` defines each tool once, and the plugin's tool registration,
 the Jelly declaration, the tools RPC and `docs/tool-parity.md` are projections of it. A test fails when they drift.
@@ -201,7 +213,7 @@ A document call (the recommended path for the standard types):
 Then `charts_update` with the result's `.chart.json` path and revision changes its presentation:
 `{"documentPath": "…/revenue-by-region.chart.json", "expectedRevision": "sha256:…", "patch": {"layout": {"target": "presentation"}}}`.
 
-A raw spec (the advanced path, for any of the 53 types):
+A raw spec (the advanced path, for any of the 79 types):
 
 ```json
 {
@@ -246,9 +258,10 @@ metadata, and a test keeps this table and the code equal.
 
 ## Configure
 
-`theme`, `locale`, `outDir`, `themes`, `svgText` and the limits are in
+`theme`, `locale`, `outDir`, `themes` and the limits are in
 [docs/configuration.md](docs/configuration.md), with their defaults. A theme saved in the workspace
-(`.charts/themes/<name>.json`) wins over one in this config. `/charts-status` shows the values in force.
+(`.charts/themes/<name>.json`) wins over one in this config, and `.charts/theme.json` applies when neither the call
+nor the options name a theme. `/charts-status` shows the values in force.
 
 ## Organisation rollout
 
@@ -257,7 +270,7 @@ A shared `opencode.json` (for example `/etc/opencode/opencode.json` on Linux and
 everyone, and `access: "read-only"` stops agents writing files at all:
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.2", { "theme": "acme", "access": "read-only" }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.4", { "theme": "acme", "access": "read-only" }]] }
 ```
 
 Charts makes no network call, sends nothing anywhere, and needs no credential, so a rollout has no data egress to
@@ -273,16 +286,16 @@ its next step is in [docs/configuration.md](docs/configuration.md#errors).
 
 ## Uninstall
 
-`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.2`. Rendered charts stay where they were written
+`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.4`. Rendered charts stay where they were written
 (`outputs/charts` by default), and the plugin leaves no other state.
 
 ## Development
 
 ```bash
 npm ci
-npm run check              # build, typecheck, unit, browser, copies, forbidden, icons, whitelist, jelly, actionlint, pack, evals, host
-bun scripts/gallery.ts /tmp/gallery     # 63 charts across all themes + contact sheets
-bun eval/run.ts /tmp/eval  # 28 natural-language requests, checked
+npm run check              # build, typecheck, unit, kit, browser, copies, forbidden, icons, whitelist, jelly, actionlint, pack, evals, host
+bun scripts/gallery.ts /tmp/gallery     # 97 charts across all themes + contact sheets
+bun eval/run.ts /tmp/eval  # 42 natural-language requests, checked
 bun eval/recommend.ts /tmp/rec  # 21 advice cases against the committed baseline
 bun eval/perf.ts           # timings
 UPDATE_GOLDEN=1 bun test test/output.test.ts   # accept a reviewed change in output
@@ -298,29 +311,29 @@ are committed. The browser stage needs playwright-core's headless Chromium once:
 `npx playwright-core install --only-shell chromium` (on Linux add `--with-deps`).
 
 Bundled fonts cover Latin, Greek and Cyrillic; a label beyond them gets `FONT_GLYPH_MISSING` and the fix is a font
-file with `theme.font.files`. There is no PDF output and no Plotly or Mermaid input. `charts_capabilities` reports
-the same list for the build you have, and [docs/status.md](docs/status.md) says what does not work and why.
+file with `theme.font.files`. There is no PDF output and no Plotly input; Mermaid is supported for the five diagram
+kinds in `charts_diagram` (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`).
+`charts_capabilities` reports the same list for the build you have, and [docs/status.md](docs/status.md) says what
+does not work and why.
 
 See [DESIGN.md](DESIGN.md) for the design and its evidence, [docs/architecture.md](docs/architecture.md) for how
 it is built, [docs/jelly.md](docs/jelly.md) for Jelly, and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for licences: Vega and Vega-Lite (BSD-3-Clause), ECharts
-(Apache-2.0), resvg (MPL-2.0), and the fonts (OFL-1.1).
+(Apache-2.0), Observable Plot (ISC), `@ui-sdk` (Apache-2.0), beautiful-mermaid (MIT), gifenc (MIT), linkedom (ISC),
+resvg (MPL-2.0), and the fonts (OFL-1.1).
 
 ## Known limits
 
-- **No PDF output, and no Plotly or Mermaid input.** [docs/status.md](https://github.com/joe-broadhead/opencode-charts/blob/HEAD/docs/status.md) says what does not work and why, and `charts_capabilities` reports what this build supports.
+- **No PDF output, and no Plotly input.** Mermaid is supported for the five diagram kinds in `charts_diagram`; other Mermaid kinds (`gantt`, `pie`, `journey`, `gitGraph`) are refused with the kinds that work. [docs/status.md](https://github.com/joe-broadhead/opencode-charts/blob/HEAD/docs/status.md) says what does not work and why, and `charts_capabilities` reports what this build supports.
 - **Bundled fonts cover Latin, Greek and Cyrillic.** A label beyond them gets `FONT_GLYPH_MISSING`; the fix is a font file with `theme.font.files`.
-- **Built-in themes are neutral.** Brand themes are not in the plugin. Save one with `charts_theme_save`, or set it in the plugin's options, and use it by name.
+- **Built-in themes cover neutral, product and editorial palettes.** The nine include the neutral `light`, `dark`, `high-contrast`, `print` and `presentation`, the Geist pair, and the FT and Economist palettes. A brand theme is saved per workspace with `charts_theme_save`, set in the plugin's options, or derived from a host `seed`.
 - **Nothing is loaded from the network.** A remote data file or image is not fetched.
-- **Recipes cover the 14 standard types.** The other 39 catalogue types are raw specs; an engine document keeps its
-  native layout (no outer-size fitting or responsive reflow) and its own interaction syntax.
+- **Recipes cover the 14 standard types.** The other 65 catalogue entries are not recipes: 56 are raw engine specs, 2 are tables for `charts_table` and 7 are diagrams for `charts_diagram`. An engine document keeps its native layout (no outer-size fitting or responsive reflow) and its own interaction syntax.
 - **Four interaction presets.** Tooltip, legend highlight, temporal x zoom and scatter/bubble brush, in the documented
   combinations; no series hiding, no ECharts zoom or brush, and SVG/PNG always show the initial view.
 - **PNG and HTML need the packaged runtime.** A missing runtime is reported as `PNG_UNAVAILABLE` or `HTML_UNAVAILABLE`; reinstalling the plugin restores it.
-- **Some catalogue examples and the light ramp have rough edges.** The candlestick example's date labels, close-set
-  ticks in the histogram and binned heatmap examples, and treemap labels cut short in small cells; the light theme's
-  sequential ramp starts near white, so the lowest values in a light heatmap or choropleth sit close to the canvas.
-- **Package size.** The package is about 8 MB unpacked, and `dist/index.js` is 2.3 MB: Vega, ECharts and the PNG rasteriser are bundled, so a render needs no network.
+- **Some catalogue examples have rough edges.** Close-set ticks in the histogram and binned heatmap examples.
+- **Package size.** The package is about 12.5 MB unpacked, and `dist/index.js` is about 5.2 MB: Vega, Vega-Lite, ECharts, Observable Plot, the diagram and table engines, and the PNG rasteriser are bundled, so a render needs no network.
 - **Host range.** OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 - In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
   older Jelly refuses the plugin's whole declaration.

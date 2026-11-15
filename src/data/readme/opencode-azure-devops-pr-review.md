@@ -52,46 +52,57 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.3.7
+   opencode plugin add opencode-azure-devops-pr-review@0.4.0
    ```
 
 2. Follow the [quickstart](docs/QUICKSTART.md) to save your PAT in a private
    file and run `/pr-setup` with your organization and one model. Restart the
    OpenCode service (`opencode service restart`) to load the settings.
-3. In one OpenCode conversation, check access, then review and preview:
+3. In one OpenCode conversation, check access, then review:
 
    ```text
    /pr-check https://dev.azure.com/YOUR_ORG/YOUR_PROJECT/_git/YOUR_REPO/pullrequest/123
-   /pr-review https://dev.azure.com/YOUR_ORG/YOUR_PROJECT/_git/YOUR_REPO/pullrequest/123 --preview
+   /pr-review https://dev.azure.com/YOUR_ORG/YOUR_PROJECT/_git/YOUR_REPO/pullrequest/123
    ```
 
 Replace the sample URL with your PR. Wait for `/pr-check` to report `READY`
 before starting the review; it uses no model. The review runs functional and risk
 reviewers, then separate verification. If the completed review has findings to
-comment on, `--preview` prepares their comments in a separate, cancellable run.
-**Nothing is posted by these commands.** Previewing comments also uses a model.
-For a lighter first pass, use `/pr-quick <PR URL> --preview`; its findings are
-not independently verified.
+comment on, a **comment preview** follows in a separate, cancellable run and
+shows the comments as they would be posted. **Nothing is posted by these
+commands** unless you set `afterReview` to `publish`. Previewing comments also
+uses a model; add `--no-comment` after the URL for a review without a preview.
+For a lighter first pass, use `/pr-quick <PR URL>`; its findings are not
+independently verified. Every command answers `--help` with its options,
+without a model.
 
 <details>
 <summary>Optional: adjust findings and publish after reading the preview</summary>
 
-Read the report and preview. Before publishing, you can exclude a finding or
-change its severity using IDs from your report, for example:
+Read the preview; it ends with the commands for the next step. Before
+publishing, you can leave findings out or change their severity, using the
+finding IDs the preview and the report show:
 
 ```text
-/pr-comment REVIEW_ID_FROM_RECEIPT --exclude F-1 --severity F-2=low
+/pr-comment --exclude F-1,R-2                     leave two findings out
+/pr-comment --severity F-3=low,R-4=medium         change two severities
+/pr-comment --exclude F-1,R-2 --severity F-3=low  both in one command
 ```
 
-F-1 is excluded from the new preview; F-2 appears as low in the summary, with no
-new inline comment. Adjusting runs comment planning again with a model. Read the
-whole new preview, then publish from the same conversation:
+With the last line, F-1 and R-2 are excluded from the new preview and F-3
+appears as low in the summary, with no inline comment. Adjusting runs comment
+planning again with a model. Read the whole new preview, then publish from the
+same conversation:
 
 ```text
-/pr-comment REVIEW_ID_FROM_RECEIPT --publish
+/pr-comment --publish
 ```
 
-Use the review ID from the completed receipt. The command posts the saved
+None of these commands needs a review ID: they act on the conversation's
+current review, the one completed or used there last, and each receipt names
+that review and its PR. To act on an older review, put its ID first
+(`/pr-comment 1a2b3c4d --publish`); `/pr-comment --list` shows the saved
+reviews. The command posts the saved
 preview as the PAT owner and skips matching comments AZPR already posted. It
 never edits them; for an adjusted review, the receipt identifies those whose
 text differs from the new preview. See
@@ -184,6 +195,12 @@ and reasoning effort** on the same 50 PRs:
 - **Why not higher or lower?** `high` scored about the same at a higher cost,
   `xhigh` added more marginal findings, and `low` missed more issues, including
   High-severity ones.
+- **`/pr-review` depends on its models in the same way.** In that comparison
+  `/pr-review` with GPT-6 Luna at its default effort posted 91 comments and
+  matched 27.8% of the expected issues; the recommended deep setup posted 323
+  and matched 65.2% (one run each, scored by our local judge). A smaller model
+  in `models.review` trades issues found for cost and time, so run `/pr-deep`,
+  or set stronger review models, where a missed defect costs more.
 
 The full method, the comparison of all 12 combinations and the limits are in
 the [validation record](docs/VALIDATION.md#martian-code-review-bench-2026-11-05-and-06).
@@ -339,8 +356,9 @@ for both quick and verified reviews.
 6. `/pr-comment` plans a preview with a model. With `--publish`, the runtime
    posts the saved text itself, skipping comments that already exist and
    reading every created comment back from Azure DevOps. Re-running a publish
-   is safe. `afterReview` or a flag after the PR URL can start this step after
-   a COMPLETE review ([automatic comments](#automatic-comments)).
+   is safe. A COMPLETE review is followed by a preview unless `afterReview` or
+   a flag after the PR URL says otherwise
+   ([automatic comments](#automatic-comments)).
 
 `/pr-quick` is the lighter alternative for small or routine PRs: one reviewer
 per shard covers both the functional and the risk focus and checks its own
@@ -382,14 +400,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.7
+opencode plugin add opencode-azure-devops-pr-review@0.4.0
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.7'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.0'
 ```
 
 Add only one of them. OpenCode 2.2.4 loads the plugin into a running OpenCode
@@ -403,7 +421,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.3.7",
+    "package": "opencode-azure-devops-pr-review@0.4.0",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -428,7 +446,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.7 &&
+opencode plugin add opencode-azure-devops-pr-review@0.4.0 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -451,9 +469,10 @@ configuration needs no new `/pr-setup`. `opencode plugin list` should then
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.3.7 release notes](docs/releases/v0.3.7.md) for what changed and the
-[0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments, which
-remain disabled unless you configure `afterReview` or request them with a
+See the [0.4.0 release notes](docs/releases/v0.4.0.md) for what changed and the
+[0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments. A
+preview follows each COMPLETE review unless `afterReview` says otherwise;
+automatic publication stays off unless you configure it or request it with a
 review command flag.
 
 ### Source archive or checkout
@@ -461,8 +480,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.3.7 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.7.tar.gz)
-and extract it, or check out tag `v0.3.7`. The installer needs POSIX `sh` and
+Download the [v0.4.0 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.0.tar.gz)
+and extract it, or check out tag `v0.4.0`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -657,19 +676,19 @@ copies that different reviewers get can each produce a finding.
 | `shell` | `deny`: private reviewers cannot run shell commands (the tool is hidden). `ask`: each command needs your approval in OpenCode. `inherit`: host permissions decide. |
 | `progressNotices` | `true`: short PROGRESS notices in the invoking conversation. |
 | `deletePrivateSessions` | `true`: AZPR deletes its private reviewer sessions once they are no longer needed (see [retention](#retention-and-privacy)); `false` keeps every session. |
-| `afterReview.quick` / `.review` / `.deep` | `none` each: nothing follows a review; run `/pr-comment` yourself. `preview` plans a comment preview after a COMPLETE review of that mode (a model runs; nothing is posted); `publish` plans and posts it as the PAT owner; a comment that a safeguard holds back waits for a person. A flag after the PR URL overrides it for one run. See [automatic comments](#automatic-comments). |
+| `afterReview.quick` / `.review` / `.deep` | What follows a COMPLETE review of that mode; `preview` each.<br>`preview`: plan a comment preview (a model runs; nothing is posted).<br>`none`: nothing follows; run `/pr-comment` yourself.<br>`publish`: plan the comments and post them as the PAT owner; a comment that a safeguard holds back waits for a person.<br>A flag after the PR URL (`--preview`, `--publish`, `--no-comment`) overrides it for one run. See [automatic comments](#automatic-comments). |
 | `azure.organization` | Required. The `<org>` of `https://dev.azure.com/<org>`; PR URLs of other organizations are refused. |
 | `azure.pat` | A personal access token for that organization with **Code (Read)** and **Pull Request Threads (Read & write)**, or `""` when `azure.patFile` is set. Sent only to `https://dev.azure.com/<org>` and never logged. |
 | `azure.patFile` | `""`. Recommended: the absolute path of a file that holds only the PAT, so `settings.json` holds no secret. It must be a regular file you own that only you can access (mode 600, not a symbolic link). AZPR reads it at start and before each command; after replacing it, restart the OpenCode service. Set either this or `azure.pat`. |
-| `azure.concurrency` | `3` simultaneous Azure DevOps calls across all AZPR commands. |
+| `azure.concurrency` | `6` (1–8) simultaneous Azure DevOps calls across all AZPR commands. |
 | `azure.callTimeoutSeconds` | `120`; a hung call is aborted and its slot released (reads are retried). |
-| `azure.archiveMegabytes` | `100` (1–1024): the largest repository zip that content search downloads per run and commit; a larger repository is not searched. It is held in memory during a review. |
+| `azure.archiveMegabytes` | `100` (1–1024): the largest repository zip that content search downloads per run and commit; a larger repository is not searched, and the review's report and receipt say so. It is held in memory during a review. |
 | `azure.proxy` | `""`: no AZPR proxy (`HTTPS_PROXY` and `NO_PROXY` in OpenCode's environment still apply; a host in `NO_PROXY` bypasses a set proxy too). A forward proxy for AZPR's Azure DevOps calls only, such as `http://proxy.example.com:8080`; credentials go in the URL as `http://user:password@host:port` (percent-encoded) and are never shown. See [proxies](docs/AZURE_DEVOPS.md#proxies-and-tls-inspection). |
 | `azure.caFile` | `""`. The absolute path of a PEM file with CA certificates AZPR trusts in addition to the built-in roots, for a proxy that inspects HTTPS. |
 | `azure.verifyTls` | `true`. `false` skips certificate checks for AZPR's Azure DevOps calls (like `curl -k`), so anyone who can intercept the connection can read the PAT; prefer `azure.caFile`. `/pr-check` warns while it is off. |
 | `workflow.shardFiles` | `25` changed files per initial-review session. |
 | `workflow.shardFindings` | At most `15` findings per verification session; one file's findings stay in the same session (a file is split only when it alone has more). |
-| `workflow.parallelSessions` | `4` reviewer sessions at once within a command; comment planning runs at most two pages at once (one when this is `1`). |
+| `workflow.parallelSessions` | `8` (1–16) reviewer sessions at once within a command; it matters only for a PR of more than one shard. Lower it, to `4` for example, when the provider limits your request rate, or with OpenCode's claude-agent provider on a machine with little memory: each of its sessions keeps a process of about 200 MB for minutes after it ends. Comment planning runs at most two pages at once (one when this is `1`). |
 | `workflow.repairAttempts` | `2` correction turns when an answer breaks the output contract. A quick review's one follow-up turn for unfinished work uses the same budget. |
 | `workflow.stageRetries` | `1` new-session retry after a transient failure (provider 429/5xx, interrupted stream) or an inactivity stop. A used-up usage or spend limit (provider quota, ChatGPT or OpenCode Go usage limit, OpenCode free-model or spend limit) is named and not retried, whatever its status, and AZPR refuses OpenCode's own retries of it. |
 | `workflow.stageIdleSeconds` | `600` (`0` turns it off, otherwise 60–7200): a reviewer stage that shows no activity this long while it waits on OpenCode (the model stream, a tool or the host stopped responding) is stopped with `failure=idle` and an error naming its last activity, then retried in a new session. Every model request, streamed chunk of output, tool start or end and announced host retry restarts the window, so a stage that keeps working, including a long answer that keeps streaming, is never cut. With shell allowed, an approval or a command that takes longer counts as inactivity. |
@@ -731,10 +750,19 @@ troubleshooting.
 | `/pr-deep <PR URL> [flag] [context]` | The same review with the stronger models of `models.deep`; usually slower and costlier. |
 | `/pr-quick <PR URL> [flag] [context]` | One reviewer per shard for both focuses, no verification; findings are reported, not verified. |
 | `/pr-stop [run-id]` | Cancel this conversation's active command. |
-| `/pr-comment [review-id]` | Preview comments for this conversation's latest completed review. |
+| `/pr-comment [review-id]` | Preview comments for this conversation's current review. |
 | `/pr-comment [review-id] --publish` | Post the saved preview. A review that was never adjusted is planned first if needed; an adjusted one needs its new preview. Safe to repeat. |
 | `/pr-comment [review-id] --show` | Show the saved preview again; no model or Azure DevOps request. |
-| `/pr-comment <review-id> --exclude <IDs>` / `--severity <ID=level,…>` / `--reset` | Leave findings out or change their severity after reading the preview, then preview again (see [adjusting findings](docs/COMMENTING.md#adjusting-findings-after-a-preview)). |
+| `/pr-comment [review-id] --exclude <IDs>` / `--severity <ID=level,…>` / `--reset` | Leave findings out or change their severity after reading the preview, then preview again, for example `--exclude F-1,R-2` (see [adjusting findings](docs/COMMENTING.md#adjusting-findings-after-a-preview)). |
+| `/pr-comment --list` | The reviews saved for this conversation, with their IDs, PRs and state; no model or Azure DevOps request. |
+| `/<command> --help` | The command's usage and examples; no model or Azure DevOps request. |
+
+A `/pr-comment` command without a review ID acts on the conversation's
+**current review**: the one completed or used there last (in one of a review's
+own sessions, that review). Its STARTED notice and receipt name the review and
+its PR, and a preview ends with the commands for the next step. OpenCode's
+command list shows one line per command and cuts what does not fit, so the
+options are in `--help`.
 
 Supported PR URLs are `https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequest/<id>`
 and `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>/pullrequest/<id>`.
@@ -796,12 +824,21 @@ them into one comment under fixed rules (see [commenting](docs/COMMENTING.md)).
 
 ### Adjusting findings after a preview
 
-When a preview contains a finding you disagree with, leave it out or change
-its severity, then read the new preview:
+When a preview contains findings you disagree with, leave them out or change
+their severity, then read the new preview. Several IDs go in one list,
+separated by commas:
 
 ```text
-/pr-comment <review-id> --exclude F-1 --severity F-2=low
+/pr-comment --exclude F-1,R-2                     leave F-1 and R-2 out
+/pr-comment --severity F-3=low,R-4=medium         publish F-3 as low and R-4 as medium
+/pr-comment --exclude F-1,R-2 --severity F-3=low  both in one command
+/pr-comment --exclude none                        put every finding back
+/pr-comment --reset                               undo every adjustment
 ```
+
+The commands act on the conversation's current review; put a review ID first
+to adjust another one (`/pr-comment 1a2b3c4d --exclude F-1`). The finding IDs
+are those of the report and the preview, and `f1` reads as F-1.
 
 Changed adjustments trigger new model planning when findings remain, so
 combine both options in one command when you use both. Repeating the saved
@@ -812,7 +849,7 @@ adjustment. Each option replaces its whole saved list: `--exclude F-1` and then
 `--exclude F-2` excludes only F-2. A changed severity changes how a finding is
 published, not the finding itself; when a finding is wrong, exclude it.
 Excluding every finding posts nothing. `--reset` clears the adjustments, and
-`/pr-comment <review-id> --show` shows the saved preview without a model. An
+`/pr-comment --show` shows the saved preview without a model. An
 adjusted review is posted only from the preview planned after its latest
 adjustment; once its publication has started, it is neither adjusted nor
 planned again. Comments that an earlier publication put on the PR are never
@@ -822,24 +859,33 @@ names those whose text differs from the preview. See
 
 ### Automatic comments
 
-By default nothing follows a review: you preview with `/pr-comment` and post
-with `/pr-comment <id> --publish`. `afterReview` sets, per mode, what follows
-a COMPLETE review, and a flag right after the PR URL sets it for one run:
+By default a comment preview follows a COMPLETE review: it shows the comments
+as they would be posted and posts nothing, and you post them with
+`/pr-comment --publish`. `afterReview` sets, per mode, what follows a COMPLETE
+review, and a flag right after the PR URL sets it for one run:
 
 ```json
-{ "afterReview": { "quick": "preview", "review": "none", "deep": "none" } }
+{ "afterReview": { "quick": "preview", "review": "preview", "deep": "none" } }
 ```
 
 ```text
+/pr-review <PR URL>               what afterReview.review says (a preview unless you changed it)
 /pr-review <PR URL> --preview     plan a preview after a COMPLETE review
 /pr-review <PR URL> --publish     plan and post the comments after a COMPLETE review
 /pr-review <PR URL> --no-comment  nothing follows this review, whatever afterReview says
 ```
 
+Set a mode to `none` when you mostly read the report and comment rarely, for
+example for `/pr-deep` with a costly model: the preview is planned by that
+mode's `risk` model (the quick reviewer for a quick review), one request for
+about four findings. A settings file
+that names `afterReview` keeps its values on an upgrade; one that does not,
+such as the file `/pr-setup` writes, follows this default.
+
 The step runs after the review's receipt as a separate comment command with
 its own run ID, `STARTED` notice and receipt; `/pr-stop` stops it like any
 command. It is the same planning and publication as `/pr-comment`, so a
-preview uses a model, and `/pr-comment <id> --publish` later posts exactly that
+preview uses a model, and `/pr-comment --publish` later posts exactly that
 preview. Nothing follows a review that is not COMPLETE, or that was stopped
 while its report was delivered. A review without
 findings to comment on gets one notice instead, with no planning, model
@@ -868,13 +914,13 @@ written. A
 quick review is posted when you chose
 it: its comments keep the disclosure `quick review, not independently
 verified`, and its summary names incomplete coverage; its verification hint
-is advisory (set `afterReview.quick` to `preview` to read the comments first).
+is advisory (leave `afterReview.quick` at `preview` to read the comments first).
 When every finding is already discussed on the PR, typically by AZPR's own
 comment from an earlier run, there is nothing new to post: the receipt says
 `NOTHING_TO_POST` and the plan is saved (the summary's marker follows the
 inline comments, so re-reviewing an unchanged PR would otherwise add a summary
 each time). Publication itself still rechecks that the PR is active and
-unchanged. A command you type, such as `/pr-comment <id> --publish`, posts
+unchanged. A command you type, such as `/pr-comment --publish`, posts
 every item of the saved preview, held ones included.
 
 ### Publication
@@ -927,8 +973,8 @@ and a loopback fake Azure DevOps REST service in disposable directories under
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.3.7` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.7'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.4.0` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.0'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -941,7 +987,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.3.7](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.7)
+release scope, [v0.4.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.0)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

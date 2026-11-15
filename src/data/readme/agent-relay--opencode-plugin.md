@@ -11,6 +11,12 @@ connects Muse through OAuth and registers scheduled inbox polling with
 an actual scheduled pickup; manual messaging works independently. Muse Code uses the
 separate desktop coding integration.
 
+Gemini app setup: [agent-relay-gemini](skills/agent-relay-gemini/SKILL.md)
+connects Gemini through a Developer Mode custom MCP app. Pick the workspace
+explicitly on the consent screen: it pre-selects the previous one. Gemini has
+no push delivery, so it reads its inbox only when it calls a tool. Gemini CLI
+uses the desktop setup.
+
 ## Published Skills
 
 | Skill | Version | Description |
@@ -90,6 +96,11 @@ grok plugin install AgentWorkforce/skills#plugins/grok/agent-relay --trust
 ```
 
 ## Grok Bot and ChatGPT plugins
+
+For a customer-owned server, use
+[`agent-relay-grok-bot-selfhosted`](skills/agent-relay-grok-bot-selfhosted/SKILL.md).
+It connects to the customer's MCP endpoint and configures webhook wake-ups on
+that server; the hosted plugin below retains its fixed Cloud endpoint.
 
 [`plugins/grok-bot`](plugins/grok-bot) packages the hosted Agent Relay MCP
 connection and its [skill](skills/agent-relay-grok-bot/SKILL.md) together for

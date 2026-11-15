@@ -4,6 +4,8 @@ Search, extract, map, crawl and research the web from OpenCode with Tavily's off
 
 Unofficial; not affiliated with Tavily.
 
+Tavily is a trademark of Tavily Inc.; this unofficial plugin is not endorsed by them.
+
 ## Requirements
 
 - OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release, such as 2.2.99, works, and `/tavily-status` calls it untested. Outside `>=2.2.3 <2.3.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#options).
@@ -13,7 +15,7 @@ Unofficial; not affiliated with Tavily.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-tavily#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-tavily#v0.0.2
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/tavily-status` in a session.
@@ -23,12 +25,12 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.2" }] }
 ```
 
 ### Update
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-tavily#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-tavily#v<version>`.
 
 ## Sign in
 
@@ -109,7 +111,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/
    | `"read-only"` | the five tools | a tool Tavily adds later: it is **denied** |
 
    ```jsonc
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.1", "options": { "access": "ask-changes" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.2", "options": { "access": "ask-changes" } }] }
    ```
 
    The default block, generated from `defaultRules()` for `access: "all"`:
@@ -153,7 +155,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.1", "options": { "websearch": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.2", "options": { "websearch": true } }]
 }
 ```
 
@@ -204,7 +206,7 @@ Sign out first, while the plugin is installed: once it is removed, `opencode mcp
 3. Remove the plugin, then reload:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.1
+   opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.2
    opencode reload
    ```
 
@@ -220,6 +222,7 @@ Sign out first, while the plugin is installed: once it is removed, `opencode mcp
 - **Web content is not trusted.** A page can carry instructions, and nothing asks by default. The `tavily` skill tells the model not to follow them, but that is a rule for the model, not a guard in the plugin.
 - **A shell key does not reach the server.** A `TAVILY_API_KEY` exported only in a terminal does not reach a running OpenCode server. See [Sign in](#sign-in).
 - **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6, and runs on macOS or Linux. A later 2.2 release starts and is reported as untested.
+- **Web search needs the key.** Only a Tavily API key serves OpenCode's `websearch`; signed in with a Tavily account alone, it uses Tavily's keyless access.
 - **Jelly.** The settings declare their choices and bounds, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
@@ -233,4 +236,4 @@ Sign out first, while the plugin is installed: once it is removed, `opencode mcp
 - [Issues](https://github.com/joe-broadhead/opencode-tavily/issues)
 - [Tavily's MCP documentation](https://docs.tavily.com/documentation/mcp)
 
-MIT licence; see [LICENSE](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/LICENSE). Tavily is a trademark of its owner.
+MIT licence; see [LICENSE](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/LICENSE). Tavily is a trademark of Tavily Inc.

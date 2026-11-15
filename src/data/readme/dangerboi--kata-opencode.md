@@ -1,6 +1,6 @@
 # Kata Plugin
 
-Kata work tracking for oh-my-pi, pi and OpenCode. Todo plans, and the delegations that work their items or name a ticket, become Kata issues with attributed ownership and evidence for completion. Kata validates each close; automatic session parents close after their children finish.
+Kata work tracking for oh-my-pi, pi and OpenCode. Todo plans, and the delegations that name their items or a ticket, become Kata issues with attributed ownership and evidence for completion. Kata validates each close; automatic session parents close after their children finish.
 
 | Plugin | Tracks |
 | --- | --- |
@@ -40,7 +40,7 @@ OpenCode 2.2.7 or later:
 
 Add that to `opencode.json`, then run `kata agent-hook install opencode` for Kata's contract, inbox and attention. To load a checkout, put the absolute path of `plugins/opencode` in `plugins` instead. The TUI sidebar needs nothing more; set `experimental.todo: true` only for the desktop composer pill. See the [install guide](docs/how-to/install.md#opencode) for plugin options.
 
-Requires Kata 0.23.0, plus the selected harness. Plan tools report incompatible installations; see [runtime compatibility](docs/how-to/install.md#runtime-compatibility). The omp plugin delegates session attention to `kata agent-hook attention-native`. Tested host versions are oh-my-pi 18.18.1, pi 1.5.0 and OpenCode 2.2.7. Bun and Node are needed for development.
+Requires Kata 0.23.0, plus the selected harness. Plan tools report incompatible installations; see [runtime compatibility](docs/how-to/install.md#runtime-compatibility). The omp plugin delegates session attention to `kata agent-hook attention-native`. Tested host versions are oh-my-pi 18.20.2, pi 1.5.0 and OpenCode 2.2.7. Bun and Node are needed for development.
 
 Start with the [first session tutorial](docs/tutorials/first-session.md), [installation guide](docs/how-to/install.md), or [development guide](docs/development.md). See [completion rules](docs/reference/closing-rules.md) and [limits](docs/explanation/limits.md) before adopting automatic closure.
 
