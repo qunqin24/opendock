@@ -38,7 +38,7 @@ sending tools. The plugin must rewrite the outgoing request in
 For the free provider the plugin sets the CLI-shaped User-Agent and then
 chooses one of two bridges:
 
-- **tools present, or no tools with a reply budget of at least 256 tokens** —
+- **tools present, or no tools with a reply budget of at least 256 tokens (and `NODECODE_FREE_LOCAL_EVAL` allowing it)** —
   rewrite the request to NodeCode's single native `eval` tool (exact vendor
   schema + the four-line Lisp system prompt), preserve the client's tool
   catalog in the system prompt, and run the model's `eval` calls in a local
@@ -46,12 +46,38 @@ chooses one of two bridges:
   `(write-file …)` and `(look "shot.png")` execute locally; client tools are
   carried as `(magpie-tool "name" "json")` and turned back into normal OpenAI
   `tool_calls`. A client that declares no tools at all still gets this image,
-  so the free lane is an agent rather than plain chat. A client that sets
-  `tool_choice: "none"` gets the image too, but its client tools are refused
-  inside the loop and the model has to answer in text.
+  so the free lane is an agent rather than plain chat.
+  `tool_choice: "none"` does **not** switch local execution off: the image
+  still runs, the client's tools are refused inside the loop, and the reply is
+  guaranteed to carry no `tool_calls`. If `none` must mean "no local side
+  effects", set `NODECODE_FREE_LOCAL_EVAL=strict` (or `off`) — see
+  [Local execution switch](#local-execution-switch-nodecode_free_local_eval).
 - **A `max_tokens` too small to render a tool call (below 256)** — collapse the
   multi-turn transcript into one `system` + one `user` message and use a JSON
-  tool-call protocol.
+  tool-call protocol. This lane never runs a local form.
+
+Every free response states which lane served it:
+`x-nodecode-free-mode: eval|transcript`,
+`x-nodecode-free-local-eval: on|off`,
+`x-nodecode-free-client-tools: allowed|denied`.
+
+### Local execution switch (`NODECODE_FREE_LOCAL_EVAL`)
+
+The eval image runs `sh`, writes files and edits the workspace with the plugin
+host's own privileges. The working-directory header only decides *where* forms
+start — it is **not** an OS sandbox. The switch is the boundary a caller can
+rely on:
+
+| value | image used when | local forms |
+| --- | --- | --- |
+| `auto` (default) | tools, tool-less requests, and `tool_choice:"none"` (subject to the 256-token floor) | run; `none` only loses client tool hand-back |
+| `strict` | only when the client declared tools **and** `tool_choice !== "none"` | never for tool-less or `none` requests — those are plain text |
+| `off` | never | never; every request uses the transcript bridge |
+
+`strict` is the mode for a caller that treats `tool_choice:"none"` (or a
+tool-less request) as an approval boundary: it gets a real plain-text lane with
+no local execution, and the headers above confirm it. The same value can be
+pinned per instance via `makeFetch({ localEval: "strict" })`.
 
 The paid provider never rewrites the body.
 
@@ -66,7 +92,7 @@ magpie plugins add /abs/path/to/nodecode-magpie
 From npm (published package):
 
 ```sh
-magpie plugins add npm:nodecode-magpie@0.6.4
+magpie plugins add npm:nodecode-magpie@0.6.5
 ```
 
 If the configured npm mirror has not caught up yet, point Bun at the official
@@ -74,13 +100,13 @@ registry for this one command:
 
 ```sh
 NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
-  magpie plugins add npm:nodecode-magpie@0.6.4
+  magpie plugins add npm:nodecode-magpie@0.6.5
 ```
 
 From a git tag:
 
 ```sh
-magpie plugins add github:ChasLui/nodecode-magpie#v0.6.4
+magpie plugins add github:ChasLui/nodecode-magpie#v0.6.5
 ```
 
 `magpie plugins add` restarts the plugin host. Local-path plugins are loaded in place,
@@ -311,10 +337,12 @@ the `tools` check. `lib/free-bridge.mjs` therefore:
    native `tool_calls`, and for streaming clients synthesizes an OpenAI SSE
    stream from the non-streamed upstream response.
 
-`tool_choice: "none"` no longer forces this bridge: the free lane still runs the
-eval image, and a client tool the model asks for is answered with a tool error
-(`disabled by tool_choice:"none"`), so the reply is plain text with no
-`tool_calls`. A `max_tokens` below 256 still uses this bridge, where an eval
+`tool_choice: "none"` does not force this bridge in the default `auto` mode: the
+free lane still runs the eval image, and a client tool the model asks for is
+answered with a tool error (`disabled by tool_choice:"none"`), so the reply is
+plain text with no `tool_calls`. `NODECODE_FREE_LOCAL_EVAL=strict` sends exactly
+these requests here instead, so `none` also stops local execution; `off` routes
+everything here. A `max_tokens` below 256 always uses this bridge, where an eval
 call could not be rendered reliably. If such a client sends a multi-turn
 request, only the transcript collapse is applied.
 

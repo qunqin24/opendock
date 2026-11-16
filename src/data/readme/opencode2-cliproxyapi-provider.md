@@ -36,11 +36,11 @@ Install the plugin through OpenCode, specifying the version:
 
 ```sh
 opencode --version
-opencode plugin add opencode2-cliproxyapi-provider@0.1.1
+opencode plugin add opencode2-cliproxyapi-provider@0.1.2
 opencode plugin list
 ```
 
-This keeps the plugin at `0.1.1` until you choose to upgrade. You do not need
+This keeps the plugin at `0.1.2` until you choose to upgrade. You do not need
 `npm install -g` or a local copy of this repository.
 
 You can also add it to the `plugins` array in your existing `opencode.json(c)`:
@@ -48,7 +48,7 @@ You can also add it to the `plugins` array in your existing `opencode.json(c)`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode2-cliproxyapi-provider@0.1.1"]
+  "plugins": ["opencode2-cliproxyapi-provider@0.1.2"]
 }
 ```
 
@@ -119,7 +119,7 @@ To change plugin options, edit its existing entry:
 ```jsonc
 {
   "plugins": [{
-    "package": "opencode2-cliproxyapi-provider@0.1.1",
+    "package": "opencode2-cliproxyapi-provider@0.1.2",
     "options": {
       "transport": "auto",
       "compaction": "summary",
@@ -152,7 +152,7 @@ Restart OpenCode if it has not picked up the change.
 To uninstall:
 
 ```sh
-opencode plugin remove opencode2-cliproxyapi-provider@0.1.1
+opencode plugin remove opencode2-cliproxyapi-provider@0.1.2
 ```
 
 Also remove any entry you added manually to a project config. Credentials,

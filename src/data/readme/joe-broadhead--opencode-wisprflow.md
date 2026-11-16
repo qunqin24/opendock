@@ -5,9 +5,11 @@ Wispr Flow's official MCP server.
 
 Unofficial; not affiliated with Wispr Flow.
 
+Wispr Flow is a trademark of Wispr AI, Inc.; this unofficial plugin is not endorsed by them.
+
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux.
 - A Wispr Flow account with Notetaker and MCP access; the free plan includes it. The Wispr Flow app on Mac or Windows
@@ -24,7 +26,7 @@ is allowed like every other tool by default: see [Permissions](#permissions).
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/wisprflow-status`: it shows `sign-in required` until you sign
@@ -39,7 +41,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.4" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -119,7 +121,7 @@ other people's words and contact details. Restrict it in any of these three ways
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.4", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -186,13 +188,13 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.3", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.4", "options": { "allowUntestedHost": true } }]
 }
 ```
 
 | Option | Values | Default | Effect |
 | --- | --- | --- | --- |
-| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
+| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.4.0`, with a warning in status. |
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-wisprflow/blob/HEAD/docs/configuration.md) has the
 details, including your own `mcp.servers.wisprflow` entry, permission recipes and every error.
@@ -205,7 +207,7 @@ plugin entry in the system config: `/Library/Application Support/opencode/openco
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.3"]
+  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.4"]
 }
 ```
 
@@ -221,7 +223,7 @@ all, and Scratchpad through it, is set in Wispr Flow's admin portal.
 - **The meetings source sees what Wispr Flow's MCP sees.** Wispr Flow's MCP needs Notetaker and MCP access, Cloud Sync, no active HIPAA agreement and no organisation policy that turns MCP off; it answers "Too many requests" when queries come too fast, publishes no number for that limit, and asks you to wait about a minute ([Wispr Flow](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)). A listing reads `search_meetings` once per page of 200 meetings of each week. Wispr Flow names no account, so the source's owner is unverified (OpenCode's sign-in, not a Wispr Flow identity): its id is the sign-in's credential id and its label is for display only, so after any new sign-in an old cursor is refused with `ACCOUNT_MISMATCH`, and a consumer starts again. A cursor never expires, and Wispr Flow gives no sign of history it no longer serves, so a listing never reports a gap.
 - **The meetings source's test data is invented.** The conformance kit runs on a synthetic Wispr Flow whose answers follow the JSON shape Wispr Flow's live `search_meetings` returned when last checked; their content is made up, not live-verified. Its report is incomplete on one check, the expired cursor, because the source never answers `CURSOR_EXPIRED`.
 - **Attendee contacts are readable at every `access` value.** `get_participant_contacts` is a read, so it is allowed unless you add a rule for it.
-- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6.** Other releases inside `>=2.2.3 <2.3.0` start, and status reports them as untested.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.** Other releases inside `>=2.2.3 <2.4.0` start, and status reports them as untested.
 - **Jelly.** The `access` setting declares its choices, which a Jelly needs app#1301 to read; an older Jelly turns the declaration down.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
@@ -243,7 +245,7 @@ Run `/wisprflow-status` first. Its last line is the next step.
 | Tools: unknown | Your account lists tools the plugin hasn't classified, such as ones Wispr Flow added or lists only with a feature turned on. The default block's `wisprflow_*` rule decides them: they run at the default `access`, ask at `"ask-changes"` and are denied at `"read-only"`. |
 | Skills: `wisprflow` is replaced by a path | A skill of yours with the id `wisprflow` or `wisprflow-meeting-brief`, for example in `~/.config/opencode/skills/` or a project's `.opencode/skills/`, loads instead of the plugin's own. Rename or move that file, as the next step says. |
 | Agents without default rules | Put the default rules shown by `/wisprflow-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Wispr Flow tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Wispr Flow misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Wispr Flow misbehaves, use a tested release. |
 | "Cloud Sync must be enabled to use this feature." | Turn on Dictation cloud storage in Wispr Flow's Settings → Data & Privacy, or ask your admin. Meetings recorded while it was off never appear, even after you turn it on. |
 | "This feature is not available for HIPAA-covered accounts." | Wispr Flow's MCP is not available on this account. |
 | "MCP access has been disabled by your organization's administrator." or "Scratchpad access has been disabled…" | Ask your organisation's Wispr Flow admin. |
@@ -258,7 +260,7 @@ Run `/wisprflow-status` first. Its last line is the next step.
 | `SOURCE_UNKNOWN` | `events_list` or `probe`: a source other than `wisprflow`. | Leave source out, or pass "wisprflow". |
 | `NEEDS_SIGN_IN` | `events_list` or `probe`: OpenCode holds no Wispr Flow sign-in to name as the owner. | Run /connect and choose Wispr Flow to sign in, then call probe and start again with since. |
 | `UNAVAILABLE` | `events_list` or `probe`: `wisprflow_search_meetings` is not available (the server is not connected or signed in, or the `wisprflow` name is another server's), or Wispr Flow's `search_meetings` failed or capped one week's meetings. The message holds the first line of Wispr Flow's text, cut and redacted. | Run /wisprflow-status and follow its next step, or call events_list again with the same cursor. |
-| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
+| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.4.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.4.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `wisprflow` server. Restart OpenCode. |
@@ -276,7 +278,7 @@ credential store.
 1. Sign out: `opencode mcp logout wisprflow`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: wisprflow` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Wispr Flow**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.3`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.4`, then `opencode reload`.
    `opencode mcp list` no longer lists `wisprflow`.
 4. Remove any Wispr Flow rules you copied into your agents' own `permissions`.
 

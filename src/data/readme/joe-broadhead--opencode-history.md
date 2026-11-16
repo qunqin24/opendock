@@ -6,14 +6,14 @@ Unofficial; not affiliated with OpenCode.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release inside that range starts too, and status says it is untested. Outside `>=2.2.3 <2.3.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs/configuration.md#options).
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Another release inside that range starts too, and status says it is untested. Outside `>=2.2.3 <2.4.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs/configuration.md#options).
 - macOS or Linux.
 - Nothing else: no native programs, downloads or accounts. The index is SQLite with full-text search, through the `node:sqlite` module of OpenCode's runtime.
 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-history#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-history#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/history-status`. On first start the plugin indexes every session in OpenCode's database in the background, newest first. The tools work while it runs, over the sessions indexed so far. `/history-status`, or `/history` in the terminal UI, shows the progress.
@@ -23,7 +23,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5" }] }
 ```
 
 The index is kept; when a new version changes its layout, the plugin rebuilds it in the background.
@@ -103,7 +103,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs
    | `"read-only"` | the reads | nothing: `history_pin` and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -209,7 +209,7 @@ Options go on the plugin entry in `opencode.json`:
 ```jsonc
 {
   "plugins": [{
-    "package": "github:joe-broadhead/opencode-history#v0.0.4",
+    "package": "github:joe-broadhead/opencode-history#v0.0.5",
     "options": {
       "defaultScope": "project",
       "mask": ["internal-token-[0-9a-f]{32}"]
@@ -228,7 +228,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.4", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
   "permissions": [
     { "action": "history_sql", "resource": "*", "effect": "deny" }
   ]
@@ -245,7 +245,7 @@ There is nothing to sign in to and no client ID to set. `mask` adds patterns tha
 - **The index is large and grows with your history.** It takes about 2.7 times the text it holds, and deleting a session does not shrink the file.
 - **Every tool is allowed by default.** Any agent can read any indexed session in any project, and `access` decides what runs without asking. `scope` filters results; it is not access control.
 - **History's source reads only this machine.** `history.sessions` is one account, this machine, owned by its OS user; it reads the local index only, costs nothing and makes no network call. Its cursor never expires, so a consumer never gets `CURSOR_EXPIRED`, which the source contract `v0.1.0` cannot yet say, so the plugin's conformance report stays incomplete on that one check. A cursor from before this release lists only the `history` source; for `sessions`, start again with `since`. The account is this machine's host name, so renaming the host changes the account and the owner: every cursor of the old account is then refused (`ACCOUNT_MISMATCH`), and a consumer binds the source again and starts with `since`.
-- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6.** Other releases inside `>=2.2.3 <2.3.0` start, and status reports them as untested.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.** Other releases inside `>=2.2.3 <2.4.0` start, and status reports them as untested.
 - **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301 does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
@@ -264,7 +264,7 @@ Start with `/history-status`. It ends with one next step. Errors read `CODE: wha
 | `CONTRACT_MISMATCH` | The history index returned data this plugin version does not expect. | Reinstall the plugin, and if it persists, report it with the /history-status output. |
 | `CURSOR_INVALID` | The cursor is invalid or has expired. | Repeat the call without cursor. |
 | `EVENTS_UNAVAILABLE` | OpenCode's session events stopped, so the index may lag behind new sessions. | Wait, since the plugin subscribes again by itself, and restart OpenCode if it persists. |
-| `HOST_UNTESTED` | This OpenCode version is outside the range History supports. | Use OpenCode 2.2.3, 2.2.4, 2.2.5 or 2.2.6, or another release inside >=2.2.3 <2.3.0, or set the plugin option allowUntestedHost: true to run anyway. |
+| `HOST_UNTESTED` | This OpenCode version is outside the range History supports. | Use OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0, or another release inside >=2.2.3 <2.4.0, or set the plugin option allowUntestedHost: true to run anyway. |
 | `INDEX_BUSY` | The history index is locked by another writer, such as a second OpenCode process. | Retry in a moment. |
 | `INDEX_FAILED` | Updating the history index failed. | Run /history-status, and if it persists, delete the index file at indexPath and restart OpenCode. |
 | `INDEX_MISMATCH` | The history index was rebuilt for another version of this plugin, likely by another OpenCode process. | Restart every OpenCode process, so they all run one version of the plugin. |
@@ -300,7 +300,7 @@ Start with `/history-status`. It ends with one next step. Errors read `CODE: wha
 | `Agents without default rules: …` | Those agents run every History tool, `history_pin` included, without asking. Put the default rules shown by `/history-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for History tools. |
 | `Index: ..., 35 s behind` | Seconds since the index was last in step with OpenCode. The next search, sessions or recall call catches up, or run `/history-reindex`. |
 | A recent session is missing | Search, sessions and recall catch up for up to about 200 ms before they answer. A longer catch-up finishes in the background, so run `/history-reindex` to wait for it. |
-| `HOST_UNTESTED`, `OpenCode: … (untested; …)` | The OpenCode release is not one of the tested 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it starts only with `allowUntestedHost: true`. If something fails, use a tested release. |
+| `HOST_UNTESTED`, `OpenCode: … (untested; …)` | The OpenCode release is not one of the tested 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it starts only with `allowUntestedHost: true`. If something fails, use a tested release. |
 | `Skill: history-recall is hidden by <path>` | A skill with the same id, such as one in your own skills folder, loads instead of the plugin's. Rename or move the skill at that path. |
 | `Masks: changed since text was indexed` | You changed `mask` or `maskDefaults` after text was indexed. Results already use the new patterns, but the index file holds the old text: run `/history-reindex rebuild`. |
 | A large index file | The index takes about 2.7 times the text it holds, about 500 MB for 200,000 indexed texts, and status shows its size in the `Index file` row. It grows with your history; a deleted session leaves it, but the file keeps its size and reuses the space. To make it smaller, set `index.toolResults: false`, which leaves out tool output, or a lower `index.maxDocChars`, then delete the index file (with its `-wal` and `-shm` files) and restart OpenCode: the plugin builds a new one. |
@@ -319,7 +319,7 @@ The codes a tool call can return, each with its next step, are in [docs/configur
 2. Remove the plugin, then run `opencode reload` or restart OpenCode:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.4
+   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.5
    ```
 
 3. Delete the index, which removing the plugin keeps: `~/.local/share/opencode-history`, or your `indexPath` with its `-wal` and `-shm` files. OpenCode's database is not touched either way.

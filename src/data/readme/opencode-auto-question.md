@@ -232,6 +232,9 @@ Dewey's `dewey gate auto-answer` startup check refuses `/dewey-distill` independ
 | `resultTrailer` | `false` | Append `AUTO_QUESTION_RESULT {json}` to the answer the asking agent receives. See [Results](#results) |
 | `onDefer` | `"human"` | A question that isn't auto-answered: `"human"` leaves it pending for the TUI form; `"reject"` answers it with a `NO_SECOND_OPINION:` marker so unattended sessions continue. See [Unattended sessions](#unattended-sessions-ondefer) |
 | `secondOpinion.enabled` | `false` | Register the `second_opinion` tool. See [Second opinion tool](#second-opinion-tool) |
+| `headless` | `false` | Replace the `question` tool so every agent's questions are answered in the call and no form is ever shown. `AUTO_QUESTION_HEADLESS` overrides it. See [Headless mode](#headless-mode) |
+| `escalation.text` / `escalation.file` | `""` | Headless mode: the playbook the agent follows when a human must decide. `AUTO_QUESTION_ESCALATION` sets the file. See [When a human is needed](#when-a-human-is-needed) |
+| `escalation.deferred` | `"decide"` | Headless mode: an unconfident question is decided by the agent (`"decide"`) or treated like a human gate (`"escalate"`) |
 | `profiles` | `{}` | Per-agent overrides; see [Profiles](#profiles) |
 
 ### Config files
@@ -250,11 +253,67 @@ A relative `guidance.globalPath` resolves against the directory of the file that
 
 By default a question the plugin doesn't answer stays pending for the TUI form. That covers low confidence, project guidance that covered the question without a confident answer, an engine failure and a handler timeout. In an unattended session, such as a TUI nobody is watching or a session driven through `opencode serve` or the SDK, nobody answers, so the run hangs.
 
-`opencode run` is different: unless it runs with `--mini`, it denies the `question` tool for its session (opencode 1.18), so its agents never ask and this setting has no effect there.
+`opencode run` is different: unless it runs with `--interactive` (`-i`), it denies the `question` tool for its session (opencode 1.18), so its agents never ask and this setting has no effect there.
 
 With `"onDefer": "reject"`, set at the top level or per profile:
 - **Deferred questions:** each question in the request gets one answer, a marker the asking agent can act on, for example `NO_SECOND_OPINION: deferred (confidence 0.31 < 0.35, pass 2)` or `NO_SECOND_OPINION: deferred — LLM API 503 (pass 1 (no gathered context))`. The run continues, at the latest after `handlerTimeoutMs`.
 - **`HUMAN_GATE:` questions:** these are rejected, never answered. opencode ends the agent's turn on a rejected question, so the run finishes instead of hanging, and the session summary records `HUMAN_GATE_UNANSWERED`. Questions from agents in `humanGatedAgents` aren't touched; those agents are never auto-answered.
+
+### Headless mode
+
+`onDefer` still needs the question to reach the plugin. In a headless run, questions can get stuck in ways it can't fix:
+- **Agents outside `agents`:** their forms stay pending.
+- **Long forms:** a form with more questions than fit the screen can sit waiting for input in a pane.
+- **Subagents:** opencode denies the `question` tool to every agent except `build` and `plan`, and a subagent started through `task` inherits that deny, so it can't ask at all.
+
+Headless mode handles a run with no TUI at all. Turn it on with `"headless": true`, or with `AUTO_QUESTION_HEADLESS=1` for one process. `0` turns it off even when the config enables it, and any value other than `1`, `true`, `yes`, `on`, `0`, `false`, `no` or `off` stops the plugin from loading.
+
+With headless on:
+- **No form is ever shown.** The plugin registers its own `question` tool in place of the built-in one. It runs the usual passes (human gate check, guidance, pass 1, pass 2) inside the tool call, and returns the result in the built-in tool's format.
+- **Every agent is answered.** The `agents` list doesn't apply, but each agent's profile still sets its engine, models and thresholds.
+- **Every agent can ask.** `question: allow` is added globally and to each agent that has no `question` rule of its own, so subagents can ask too. That includes human-gated agents: the tool never answers for them, so a gated subagent gets `HUMAN_GATE_UNANSWERED` and the playbook instead of a permission error. This only reaches agents opencode defines; a name listed only in `humanGatedAgents` has nothing to attach the permission to. Agents with an explicit `question` rule keep it, and the plugin's own subagents (`contextGathering.agent`, `agentDecision.agent`) get `question: deny`.
+- **Each question is decided on its own:**
+  - Pass 1 answers every question it is confident about.
+  - Pass 2 gathers context and re-asks only the questions pass 1 left.
+  - Any question still short of its threshold gets its own `NO_SECOND_OPINION:` marker, for example `NO_SECOND_OPINION: deferred (confidence 0.10 < 0.35, pass 2)`.
+  - On a handler timeout, the answers already decided are kept and the rest are marked.
+- **Human gates mark the whole form.** If any question carries `HUMAN_GATE:`, or the agent is human-gated, every question gets `HUMAN_GATE_UNANSWERED: <reason>`. Nothing on that form is answered, since the other answers may depend on the gated decision.
+- **`onDefer` and `sessionSummary` don't apply.** The tool output already appears in the session.
+- **Results:** each call writes a record with `source: "headless"` and `action: "returned"`. Its `outcome` is `answered`, `partial`, `deferred`, `timeout` or `gated`, and a `questions` array holds each question's outcome, answer, reply, confidence, threshold, pass and reason. `resultTrailer` works as it does for `question`.
+- **Not with plain `opencode run`.** Unless it runs with `--interactive` (`-i`), `opencode run` denies the `question` tool for its session. That deny also covers the plugin's tool, so agents there can't ask at all. Headless mode works in TUI sessions and in sessions driven through `opencode serve` or the SDK.
+
+#### When a human is needed
+
+A human is needed when a form has a human gate, or when a question isn't answered confidently and the agent's profile sets `escalation.deferred` to `"escalate"`. With the default `"decide"`, the agent is told to decide unconfident questions itself from the evidence and to say that it did.
+
+When a human is needed, the agent is told not to decide those questions or act on a guess about them. It then gets a playbook. The default is: stop, and end your turn naming each decision a human must make, with its options and your recommendation.
+
+Configure a playbook with `escalation.text`, or with `escalation.file`, which is relative to the config file that sets it and wins over `text`. `AUTO_QUESTION_ESCALATION=<path>` sets the file for one process. A profile can set its own playbook. The plugin passes the playbook on and nothing more, for example:
+
+```markdown
+Comment on the issue or PR with the decision needed, the options, and your
+recommendation. Commit and push your work to your branch; keep any PR a draft.
+Then end your turn.
+```
+
+The file is read at question time. If it is missing or empty, the default instruction is used.
+
+#### Contract
+
+These are stable, for tools that judge a finished session:
+- **The markers.** An answer that starts with `HUMAN_GATE_UNANSWERED:` or `NO_SECOND_OPINION:` is a marker, not an answer.
+- **The `autoQuestion` block** in the `question` tool part's metadata, for example `{ "v": 1, "outcome": "partial", "answered": 1, "total": 2, "humanGate": false, "humanNeeded": true }`. `outcome` is `answered`, `partial`, `deferred`, `timeout` or `gated`. `humanGate` is true when a human gate was hit; `humanNeeded` is true when the agent was told to escalate. The shape changes only with a new `v`.
+
+The full record in `metadata.result` is not part of the contract.
+
+#### Forgiving arguments
+
+The plugin's `question` tool accepts shapes models commonly get wrong, and asks only when there is question text to work with:
+- `questions` as a JSON string, or as a single object;
+- one question at the top level;
+- `options` as a JSON string, or as plain strings;
+- a missing header;
+- `multiple` as a string.
 
 ### Results
 
@@ -265,7 +324,7 @@ Every question from an auto-answered agent ends with one JSON line in `~/.local/
 ```
 
 - `outcome`: `answered`, `deferred`, `gated` or `timeout`.
-- `action`: what the plugin did: `replied`, `marker` (a `NO_SECOND_OPINION:` reply under `onDefer: "reject"`), `rejected` (a human gate under `"reject"`) or `left_for_human`.
+- `action`: what the plugin did: `replied`, `marker` (a `NO_SECOND_OPINION:` reply under `onDefer: "reject"`), `rejected` (a human gate under `"reject"`), `left_for_human`, or `returned` (the `second_opinion` tool, or the `question` tool in [headless mode](#headless-mode)).
 - `answer`: the labels joined with `", "` when there is one question, otherwise `null`. It is `null` whenever the question wasn't answered.
 - `confidence`: the lowest per-question confidence of the decision that counted, or of the one that fell short.
 - `pass`: 0 (guidance agent), 1 or 2.
@@ -362,7 +421,7 @@ The [result](#results) names the model that decided.
 - Session-agent detection uses user-message events plus a session-messages fallback (the v1.19 session type has no agent field).
 - Context gathering creates a temporary child session (deleted afterwards) that inherits the project directory, so per-project tools like dewey MCP are available to the context subagent.
 - The pass-0 decision agent runs in the same kind of temporary child session; the project directory is resolved from the opencode launch directory (`input.directory`), so guidance is read from the project opencode was started in.
-- Decisions and errors are logged to `~/.local/share/opencode-auto-question/log.txt` (set `"verbose": true` for debug detail); one structured record per question goes to `results.jsonl` next to it. Each file is truncated once it passes 2 MB.
+- Decisions and errors are logged to `~/.local/share/opencode-auto-question/log.txt` (set `"verbose": true` for debug detail); one structured record per question goes to `results.jsonl` next to it. Each file is truncated once it passes 2 MB. `AUTO_QUESTION_LOG_DIR=<dir>` moves both files to another directory.
 - **Session summaries**: when `sessionSummary` is enabled (default), the plugin injects a visible `noReply` message into the session history after auto-answering or deferring to human. This shows the engine used, confidence scores, and which answers were selected (or why the question was deferred). The message carries the latest user message's agent/model/variant/system/format — without those, opencode stamps a new user message with the default agent and switches the session to `build` mid-run — and its text part is marked `ignored`, so it shows in the history but stays out of the model's context. Set `"sessionSummary": false` to disable.
 - If the human answers first, the plugin's reply fails harmlessly (the pending request is gone) and it moves on.
 

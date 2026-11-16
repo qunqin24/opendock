@@ -7,7 +7,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux.
 - **Jobs run while OpenCode is running.** Nothing runs while the OpenCode service is stopped, and nothing runs after a
@@ -16,14 +16,14 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/jobs-status`.
 
 `opencode plugin add opencode-jobs` (unscoped) installs a different, unrelated systemd plugin.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-jobs#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-jobs#v<old version>`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-jobs#v<version>`.
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 A new release is a new tag: install it with its own `#v<version>` spec.
@@ -41,7 +41,8 @@ A new release is a new tag: install it with its own `#v<version>` spec.
 The model has fourteen `jobs_*` tools: `jobs_status`, `jobs_list`, `jobs_get` and `jobs_history` read, `jobs_pause` and
 `jobs_pause_all` pause, `jobs_create`, `jobs_update`, `jobs_delete`, `jobs_run_now`, `jobs_resume`, `jobs_extend`,
 `jobs_approve` and `jobs_run_script` change a job or run a script. The default `access: "all"` allows every tool;
-`ask-changes` asks for changes except pauses, and `read-only` denies changes. `jobs_history` returns run summaries and
+`ask-changes` asks before every change, a pause included, and `read-only` denies changes; `/jobs-pause`, a command,
+pauses every job without asking under any access. `jobs_history` returns run summaries and
 script results; `jobs_get` also returns a script run's capped result. A failed run is retried for its slot by `policy.retries`, and `notify` posts a run's
 outcome into a session as job output.
 
@@ -117,8 +118,12 @@ The `access` option picks the block the plugin inserts after each agent's base r
 | `access` | Jobs' own tools | A script |
 | --- | --- | --- |
 | `all` (default) | allowed, like every other plugin's tools | approved automatically; the digest and the audit record are still kept |
-| `ask-changes` | the four reads and the two pauses are allowed; every change asks | an all-read script with no file writes is approved automatically; anything else asks once per version |
+| `ask-changes` | the four reads are allowed; every change, a pause included, asks | an all-read script with no file writes is approved automatically; anything else asks once per version |
 | `read-only` | the four reads are allowed; every change is denied | an all-read script with no file writes is allowed; anything else is denied |
+
+A script follows `access` like every other Jobs tool: at the default `all` no script asks for approval, `ask-changes`
+asks once (the `jobs_script` prompt, bound to the script's digest) before a script that can change something, and
+`read-only` denies one.
 
 There are three ways to restrict it:
 
@@ -177,7 +182,7 @@ Set options with the object form of the plugin entry. Every option is optional.
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-jobs#v0.0.0",
+      "package": "github:joe-broadhead/opencode-jobs#v0.0.1",
       "options": { "enabled": true, "concurrency": 2, "keepAliveMinutes": 20 }
     }
   ]
@@ -197,7 +202,7 @@ Put the plugin entry in the system config: `/Library/Application Support/opencod
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.0", "options": { "concurrency": 2 } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.1", "options": { "concurrency": 2 } }],
   "experimental": { "location_idle_timeout": "60 minutes" }
 }
 ```
@@ -246,10 +251,10 @@ Run `/jobs-status` first. Its last line is the next step.
 | `JOBS_AGENTS_UNKNOWN` | OpenCode could not list its agents, so nothing ran. Restart OpenCode, then run `/jobs-status`. |
 | `JOBS_STORAGE_VERSION` | The job store was written by a newer version of the plugin. Update the plugin, or clear its storage. |
 | `JOBS_UNCHECKED` | A tool that changes something was called with no tool call behind it. Call it from a session, never from a script. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. |
 | `/jobs` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
+| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.4.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.4.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `SKILLS_INVALID` | The jobs skill's file is missing or its front matter does not name it, so OpenCode does not list the skill. Next step: Reinstall the plugin. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 
@@ -264,7 +269,7 @@ Run `/jobs-status` first. Its last line is the next step.
 ## Uninstall
 
 1. Pause first if a job is mid-run: `/jobs-pause`.
-2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.0`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.1`, then `opencode reload`.
 3. Remove the agent block you copied into `opencode.json`, or the job agent's Markdown file.
 
 The plugin's storage stays in OpenCode's own database; removing the plugin does not delete it.
@@ -276,6 +281,9 @@ The plugin's storage stays in OpenCode's own database; removing the plugin does 
 - **A changed declared file is re-approved under `all`.** The run record names the script's digest, but not yet the declared-file set (its paths, modes and caps), so the record alone does not show which file declaration a run used.
 - **Declared files are read on the host.** Each one is read up to its size limit, before the VM starts, and that memory is outside `memoryMb`.
 - **A restore can fail.** When a file cannot be put back after a failed commit, its run records `rollback_failed` and the error names the kept original, which a person must restore by hand.
+- **A run stopped while its own subagent works ends at its timeout.** A run waits until its session is idle with no
+  subagent or shell of its own still running. If the session is stopped while one is, OpenCode reports no further idle,
+  so the run is recorded as `timed_out` when the job's timeout passes, rather than at once.
 - **An agent without the default rules still runs its jobs.** Status warns with `JOBS_AGENT_UNGUARDED` and the block to paste; nothing blocks the run.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 

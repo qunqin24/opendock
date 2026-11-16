@@ -206,6 +206,13 @@ saved to history). The model ponders where the conversation is going. The
 result rides into your next message as a `<pondering>` block, which the model
 uses silently — like the reminder, it never replies to it.
 
+## Misplaced tag filter
+
+With `misplaced_tag_filter: on`, tag signs (`<`, `>`, `|`) that leak into the
+thinking or message text are swapped for safe look-alikes, so they cannot break
+the next turn. Tool calls are not touched. When a message was changed, a short
+note is added so you do not copy broken code from it.
+
 ## Green light
 
 With `manual_green_light: on`, tool calls are denied unless your latest message ends with an approval word (in its last
@@ -214,6 +221,14 @@ is always allowed. Set your own words with `manual_green_light_words: yes, do, g
 
 With `auto_green_light: on`, the model checks itself before the first tool call of each turn: it must allow the call
 and state its plan, or explain why it cannot. The check fires once per turn and is not saved in the chat history.
+
+## Clockwork
+
+With `clockwork: on`, the agent runs hands-off. Every permission ask is denied,
+and after each finished turn the plugin runs one quiet thinking request (like
+pondering) to write a fresh "keep going" message, then sends it. The session
+keeps working on its own until you stop it. Only agents with `clockwork: on` are
+affected.
 
 ## Notes
 

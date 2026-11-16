@@ -62,7 +62,7 @@ V1 uses the legacy `plugin` list (singular) and the same package:
 ```
 
 V2 requires OpenCode **2.2.1 or newer** (the first release with the
-`experimental.idle` hook used for Stop/SubagentStop) and is tested on 2.2.7;
+`experimental.idle` hook used for Stop/SubagentStop) and is tested on 2.3.0;
 V1 requires 1.19.5 or newer. Windows is not tested; use WSL.
 
 Restart OpenCode. The plugin logs:
@@ -262,7 +262,12 @@ not control.
 bun install
 bun run ci        # biome + tsc + tests + build + smoke
 bun run smoke     # doctor against a temporary fixture
+bun run compat    # ci + live smoke against a real OpenCode binary
 ```
+
+`bun run compat` starts an ephemeral `opencode serve` in an isolated
+HOME/XDG, so it needs an OpenCode binary on `PATH` (`OPENCODE_BIN=/path`
+overrides it) and no model or API key.
 
 The repository has no runtime dependencies. The plugin runs inside OpenCode's
 Bun runtime; the published CLI is a Node-compatible bundle. If Bun is present,

@@ -4,7 +4,7 @@
 
 ![设计草图](design/sketch.png)
 
-> 当前是 `1.0.0`。数字来自本机真实数据库快照，界面会随本机数据变化。完整版本历史见 [ROADMAP.md](ROADMAP.md)。
+> npm 最新发布版 **`0.3.2`**（2026-11-15 发布）：会话回放真分页、长会话性能与生命周期可靠性。变更清单见 [CHANGELOG.md](CHANGELOG.md)。数字来自本机真实数据库快照，界面会随本机数据变化。完整版本历史见 [ROADMAP.md](ROADMAP.md)。
 
 ## 功能
 
@@ -29,7 +29,7 @@
 
 ```json
 {
-  "plugins": ["opencode-usage-center@1.0.0"]
+  "plugins": ["opencode-usage-center@0.3.2"]
 }
 ```
 
@@ -62,7 +62,7 @@
 
 性能：
 
-- 查询把总量、趋势、模型、时延合并成一次数据库扫描；本机 5.4 万条 assistant 消息下，30 天约 0.3 秒，全部约 1 秒。
+- 总量、趋势、模型、时延按天聚合，历史天复用落盘聚合、只有当天现算，分批合并控制内存峰值；本机 5.4 万条 assistant 消息下，30 天约 0.3 秒，全部约 1 秒。
 - 内存缓存 60 秒；重复打开设置页/弹窗先显示上次快照，再在后台静默刷新。
 - 额度接口独立加载，最多 8 秒超时也不会阻塞本地用量快照。
 - 首次读取没有缓存时显示骨架屏，不阻塞页面结构。
@@ -86,7 +86,7 @@
 - 数据库以只读方式打开。
 - 密钥只在服务端读取，用于请求额度接口；不进入渲染进程、不写日志、不显示在界面。
 - 会话回放只在本地读取并展示；提示词、回复和工具输出不写日志、不上传，且只在打开会话时按需读取。
-- 会话标题和内容只在本地页面展示；CSV 导出由本地浏览器完成，不上传；云同步尚未实现。
+- 会话标题和内容只在本地页面展示；CSV 导出由本地浏览器完成，不上传；云同步经评估决定不做（见 ROADMAP）。
 
 ## 开发
 
@@ -116,34 +116,28 @@ preview/              本地渲染预览（不发布）
 详细版本规划见 [ROADMAP.md](ROADMAP.md)。概要：
 
 - **0.3.x 稳定化**（已完成）：凭据与额度合并、数据源统一、DB 兼容检测与降级、口径说明、会话组合筛选、告警冷却、回放复制、性能基线
-- ~~0.4 监控闭环~~（跳过：额度历史、预算、限流 hook 收益不足，决策记录见 ROADMAP）
-- **0.5 深度分析**（已完成）：成本归因（agent × 项目）、Session 成本瀑布、模型效率散点对比、费用异常检测
-- **1.0 UI/UX 升级**（已完成）：主题变量化、模型行钻取会话、JSON 导出 + 脱敏开关、键盘页签导航、DB 告警条
+- **0.3.2**（2026-11-15 已发布）：会话回放真分页（服务端 seq 游标、首屏只读当前页、10k 回合 167 页全链 < 0.5s）、长会话性能（汇总缓存，翻页不重复汇总）、生命周期可靠性（16 组请求竞态修复：切换 / 刷新乱序 / loadMore 并发 / Revert / Delete / 卸载）、成本归因（agent × 项目）与费用瀑布、模型效率散点对比、费用异常检测、结构化 JSON 导出 + 脱敏开关、主题变量化与键盘导航——原 0.5 / 1.0 规划内容随本版一并交付
+- ~~0.4 监控闭环~~（暂不做：额度历史、预算、限流 hook 收益不足，决策记录见 ROADMAP；未经重新评估不恢复）
+- 下一阶段（0.3.3 及以后）：**待规划**，功能目标与发布日期均未确定
 
 ## 发布
 
-> 本地 `npm publish` 已被 `prepublishOnly` 守卫禁止；版本只通过推送 `v*` tag 由 GitHub Actions 发布（`npm version patch && git push --follow-tags`）。
+> 本地 `npm publish` 已被 `prepublishOnly` 守卫禁止；版本只通过推送 `v*` tag 由 GitHub Actions 发布（`.github/workflows/publish.yml`）。
 
-第一次发布（npm 目前没有这个包）：
+发布流程（包已在 npm 上，走 Trusted Publishing）：
 
-```bash
-npm login --registry=https://registry.npmjs.org
-npm publish --access public --registry=https://registry.npmjs.org
-```
-
-发布成功后，在 npmjs.com 的包设置里配置 Trusted Publisher：
-
-- Repository: `meiyx7/opencode-usage-center`
-- Workflow: `publish.yml`
-
-之后推送 `v*` tag 就会由 GitHub Actions 自动发布：
+1. 发布决策确认后，把 `package.json` 与 `package-lock.json` 的根版本**同步**更新为目标版本（如 `0.3.3`；`npm version 0.3.3` 一步完成两处并自动建 tag），并核对 [CHANGELOG.md](CHANGELOG.md) 已有对应条目；
+2. 提交并推送 tag：
 
 ```bash
-npm version patch
-git push --follow-tags
+git push origin main
+git push origin v0.3.3
 ```
 
-第一次发布不能直接走 OIDC，因为 npm 需要包已经存在后才能配置 Trusted Publisher；这是 npm 的限制，不是仓库配置问题。
+3. `publish.yml` 自动执行：校验 tag 与 `package.json` 版本一致 → `npm ci` → typecheck → build → `npm publish --access public --provenance`；
+4. 发布后在 npm 包页面确认 provenance 徽标（0.3.1 起已验证 OIDC Trusted Publishing 链路实际生效，0.3.2 同路径发布成功）。
+
+说明：npm 的 Trusted Publisher 要求包存在后才能配置；本包首个版本（0.1.0）已于 2026-11-08 手动发布完成，此限制已成历史，不再需要本地或令牌发布。
 
 ## License
 

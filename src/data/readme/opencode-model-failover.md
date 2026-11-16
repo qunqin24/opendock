@@ -41,7 +41,7 @@ opencode plugin add opencode-model-failover
 ### From GitHub
 
 ```bash
-opencode plugin add github:nabheet/opencode-model-failover
+opencode plugin add github:singlebarrellabs/opencode-model-failover
 ```
 
 Or add it to `opencode.json(c)` directly:
@@ -220,7 +220,7 @@ publisher per package; the workflow filename must stay `ci.yml`):
 One-time bootstrap: npm cannot attach a trusted publisher to a package that does
 not exist yet, so `opencode-model-failover` must be published once by hand before
 the workflow can publish. Then configure the trusted publisher on npmjs.com:
-repository `nabheet/opencode-model-failover`, workflow filename `ci.yml`, and
+repository `singlebarrellabs/opencode-model-failover`, workflow filename `ci.yml`, and
 tick **Allow `npm publish`**. A trusted publisher created after Sep 03 2026 is
 stage-only by default, and stage-only sends CI publishes to the staging area to
 wait for a 2FA approval instead of going live. A new config must also complete

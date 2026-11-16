@@ -9,8 +9,8 @@ GitHub is a trademark of GitHub, Inc.; this unofficial plugin is not endorsed by
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release loads too, and the status marks it
-  untested. Outside `>=2.2.3 <2.3.0` the plugin does not load, unless you set
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release loads too, and the status marks it
+  untested. Outside `>=2.2.3 <2.4.0` the plugin does not load, unless you set
   [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md#allowuntestedhost).
 - macOS or Linux.
 - A GitHub account.
@@ -18,18 +18,18 @@ GitHub is a trademark of GitHub, Inc.; this unofficial plugin is not endorsed by
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-github#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-github#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/github-status`: it shows `Connection: sign-in required` until
 you sign in, and `opencode mcp list` shows `github  needs authentication`.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-github#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-github#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.3" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -142,7 +142,7 @@ asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied**, and GitHub's own server lists no write tools |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.3", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
    `readOnly: true` and `false` still work: they mean `"read-only"` and `"all"`, and `/github-status` says they are
@@ -334,7 +334,7 @@ Options go in the plugin's entry in `opencode.json`:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.3", "options": { "toolsets": ["context", "repos", "issues"] } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5", "options": { "toolsets": ["context", "repos", "issues"] } }]
 }
 ```
 
@@ -365,7 +365,7 @@ overrides user and project config, so members only sign in:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-github#v0.0.3",
+      "package": "github:joe-broadhead/opencode-github#v0.0.5",
       "options": {
         "clientId": "<your organisation's OAuth App client ID>",
         "scopes": ["repo", "read:org"],
@@ -412,7 +412,7 @@ Error codes:
 
 | Code | What to do |
 | --- | --- |
-| `HOST_UNTESTED` | OpenCode is outside the supported range `>=2.2.3 <2.3.0`, so the plugin does not load: there is no `/github-status`, `/github` dialog or status RPC. Update OpenCode or the plugin, or set the option `allowUntestedHost: true` to load it anyway, with a warning in the status. |
+| `HOST_UNTESTED` | OpenCode is outside the supported range `>=2.2.3 <2.4.0`, so the plugin does not load: there is no `/github-status`, `/github` dialog or status RPC. Update OpenCode or the plugin, or set the option `allowUntestedHost: true` to load it anyway, with a warning in the status. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value; the message names it. Fix that option for the plugin in `opencode.json`. |
 | `SKILLS_INVALID` | A skill file the plugin ships is missing or malformed. Reinstall the plugin. |
 | `STATUS_UNAVAILABLE` | OpenCode did not report the `github` server's state. Try again in a few seconds; if it persists, restart OpenCode. |
@@ -481,7 +481,7 @@ still stores its token.
    account, which works only in an interactive terminal. Then, on GitHub, delete the token under **Settings →
    Developer settings → Personal access tokens**, or, after a device sign-in, revoke the app under **Settings →
    Applications → Authorized OAuth Apps** (or **Authorized GitHub Apps**).
-2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.3` (the spec you installed), then `opencode reload`.
+2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.5` (the spec you installed), then `opencode reload`.
 3. Data folders: none. The plugin stores nothing of its own.
 4. Remove the default rules you copied into agents' own `permissions`.
 
@@ -491,7 +491,7 @@ still stores its token.
 - **The token limits what is possible.** The scopes you granted decide what the account's token can do. The default `repo` scope reaches every repository the account can write.
 - **Toolsets are a selection.** The default `toolsets` turn on 15 of the 24 toolsets, which show 69 tools. Nine toolsets are off by default, such as `copilot` and `gists`, and GitHub's two issue artifact tools need a feature flag the plugin does not turn on. See the [toolsets table](docs/configuration.md#toolsets).
 - **An allow on `github_api` covers writes.** An allow for `github_api` authorises every `api` call, reads included, and also its writes, downloads and uploads. Grant it only to a session that may change GitHub, or set `access` to `"read-only"` for a read-only script.
-- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 only.** Other releases in `>=2.2.3 <2.4.0` run untested.
 - **Agents without the base allow ask before reads.** Every GitHub request asserts `github_api` on its own `METHOD /path` first. An agent without the base `* * allow` rule gets no default block, so its `github_api` reads ask, and a script's reads there are refused with `PERMISSION_DENIED` until that agent's rules allow them (see [Permissions](#permissions)). `events_list` is not affected: its reads assert `github_events_list`, so an allow for that tool, which Jelly writes, is enough.
 - **A GitHub App sign-in expires after six months.** Its 8-hour user token is renewed with its refresh token, which lasts six months; after that, or once GitHub refuses it, `/connect` asks for a new sign-in. The App reaches only the accounts it is installed on.
 - **Jelly.** The `access` and `unknownTools` settings declare their choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.

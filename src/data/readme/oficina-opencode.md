@@ -7,7 +7,7 @@
 <a href="https://www.npmjs.com/package/oficina-opencode"><img src="https://img.shields.io/npm/v/oficina-opencode?style=for-the-badge&labelColor=0d1117&color=cb3837" alt="npm" /></a>
 <a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-2ea44f?style=for-the-badge&labelColor=0d1117" alt="licencia MIT" /></a>
 <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&labelColor=0d1117" alt="node >= 22" /></a>
-<a href="https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests"><img src="https://img.shields.io/badge/tests-571%20passing-1f6feb?style=for-the-badge&labelColor=0d1117" alt="571 tests passing" /></a>
+<a href="https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests"><img src="https://img.shields.io/badge/tests-574%20passing-1f6feb?style=for-the-badge&labelColor=0d1117" alt="574 tests passing" /></a>
 <a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/tsconfig.json"><img src="https://img.shields.io/badge/typescript-strict-3178c6?style=for-the-badge&labelColor=0d1117" alt="TypeScript strict" /></a>
 
 <br>
@@ -26,7 +26,7 @@
 <!-- BEGIN GENERATED: facts -->
 | | |
 |---|---|
-| **Paquete** | `oficina-opencode` v3.2.6 |
+| **Paquete** | `oficina-opencode` v3.3.0 |
 | **Tools** | 18 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |
@@ -774,11 +774,24 @@ La seguridad de la corrida y la seguridad del paquete son dos frentes distintos,
 [política de seguridad](SECURITY.md): reporta por GitHub Security Advisories
 pestaña *Security → Report a vulnerability*.
 
+<a id="feedback"></a>
+## 🗣️ Encontraste un error o querés colaborar
+
+El proyecto se valida en el uso real. Tres caminos, todos bienvenidos:
+
+| Qué | Dónde |
+|---|---|
+| **Reportar un error concreto** | [Bug report](https://github.com/SOCRAMbt/AI-OFFICE/issues/new?template=bug_report.yml) — versión, SO, pasos reproducibles |
+| **Recomendación, idea o propuesta** | [Recomendación](https://github.com/SOCRAMbt/AI-OFFICE/issues/new?template=recomendacion.yml) — mejoras, integraciones, casos de uso; no hace falta solución |
+| **Colaborar en el repo** | [PRs bienvenidos](https://github.com/SOCRAMbt/AI-OFFICE/compare) — setup en `DEVELOPING.md`, hooks y tests obligatorios |
+
+Ver también [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`SECURITY.md`](SECURITY.md) · [issues abiertos](https://github.com/SOCRAMbt/AI-OFFICE/issues).
+
 <a id="testing"></a>
 ## 🧪 Testing
 
 ```bash
-npm test           # 571 tests, 45 archivos
+npm test           # 574 tests, 46 archivos
 npm run coverage   # cobertura por línea
 npm run docs:check # la documentación coincide con el código
 npm run bench:selection  # el matcher le gana a las alternativas simples

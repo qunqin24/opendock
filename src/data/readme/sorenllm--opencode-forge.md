@@ -200,6 +200,7 @@ What this plugin touches, exhaustively:
 | `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
 | `<tmp>/opencode-forge/watchdog/log.jsonl` | watchdog interventions ledger (bounded: 200 entries, oldest rotated) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (dispatch records — including async orphans — live in the jobs ledger; this separate file dates from the retired `forge_dispatch` tool) | runtime debris — delete freely |
+| `<project>/.opencode/forge/dispatch-log.jsonl` | dispatch journal (fold E) — append-only per-workspace record of every async dispatch state transition (`dispatched` / `queued` / `started` / `retry-pending` / `terminal`); bounded by `FORGE_DISPATCH_JOURNAL_MAX` (default 200, terminal-first rotation); prompt text retained while a record is non-terminal, redacted on terminal; corrupt lines skipped. This is what restart recovery replays — a live child re-arms, a finished-while-down child wakes its owner exactly once, queued wishes re-enter the queue, retry chains resume | runtime data — deleting it only loses cross-restart recovery for in-flight dispatches; uninstall leaves it behind (add `.opencode/forge/` to your ignore file if you don't want it versioned) |
 | `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
 | `~/.cache/opencode/packages/...` | installed package copy | written by the `opencode plugin` installer, not the plugin |
 | `~/.config/opencode/opencode.json` | `plugin` array entry | written by the installer |
@@ -599,10 +600,17 @@ recursion policy of a non-forge child is that target's own config business).
   (native parity — the user is present at the panel, the child may ask).
   **Abort parity**: aborting the dispatching turn aborts the child via the
   SDK and the call resolves with the abort disclosed. A child that never
-  reaches terminal within the poll timeout (default 10 minutes) returns an
-  **honest timeout finding naming the child session id** — the child stays a
-  real session the user can inspect or abort natively; there is no
-  auto-convert to async (the dependency structure did not change).
+  reaches terminal within the poll timeout (default 10 minutes, tunable —
+  see the env knobs below) returns an **honest timeout finding naming the
+  child session id** — the child stays a real session the user can inspect
+  or abort natively. There is no auto-convert of the call (the finding
+  stays a throw — the dependency structure did not change), but before the
+  finding is returned the plugin **arms completion tracking** for the
+  already-running child: exactly one `[forge:dispatch-complete]` wake
+  carrying the final report arrives when the child eventually finishes
+  (self-healing — the result is never orphaned; do not poll or re-dispatch
+  in the meantime). The arming is unconditional: the async concurrency cap
+  governs new dispatch decisions, not an already-running child.
 - **`run_in_background: true` (async)** — the call returns a task handle
   immediately (task id, agent, child session id); when the child finishes,
   **exactly one `[forge:dispatch-complete]` message carrying the child's
@@ -617,6 +625,56 @@ recursion policy of a non-forge child is that target's own config business).
   aborts** by design (session-scoped); when the dispatching session ends,
   its live children are aborted via the SDK and recorded as orphans in the
   diagnostics ledger.
+
+**Long children are never dropped.** The completion tracker (async and
+sync-armed alike) has no wall-clock deadline: however long the child runs,
+the single `[forge:dispatch-complete]` wake with the final report arrives at
+true terminal. While the child runs past each notification interval
+(default 10 minutes, tunable — see the env knobs below), a non-terminal
+`[forge:dispatch-progress]` notice keeps the owner informed — informational
+and idle-only, it never replaces or consumes the completion wake. A child
+that stays continuously idle with no reportable final message across a full
+notification interval ends honestly as a no-reportable-final-message finding
+naming the child session id.
+
+**Dispatch poll env knobs** (read at call time; invalid values fall back to
+the default):
+
+| Knob | Default | Effect |
+| ---- | ------- | ------ |
+| `FORGE_DISPATCH_POLL_TIMEOUT_MS` | `600000` | The SYNC WAIT window in ms — a sync dispatch whose child does not finish within it gets the honest timeout finding with the armed completion wake. It does NOT bound the async/armed completion tracker (never-die tracking — see below). Clamped to `3600000` (1 h). |
+| `FORGE_DISPATCH_NOTIFY_INTERVAL_MS` | `600000` | The `[forge:dispatch-progress]` notification interval for the async/armed completion tracker, in ms — one informational notice per interval while the child runs; also the textless-idle floor window. Clamped to `3600000` (1 h). |
+| `FORGE_DISPATCH_POLL_INTERVAL_MS` | `1000` | Poll interval for the sync loop and the async completion poller's slices, in ms. |
+| `FORGE_DISPATCH_POLL_SLICE_MS` | `5000` | Length of one async poller watch slice, in ms (registry kills take effect at slice boundaries). |
+| `FORGE_HEADLESS` | auto-detect | Overrides the headless host property for the `forge_shell` ask gate: `1` forces headless, `0` forces interactive. Unset/auto-detect reads the host process argv — `opencode serve` is headless; the TUI and `opencode run` are NOT (run mode keeps its ask auto-reject posture). Invalid values fall back to auto-detect. |
+| `FORGE_DISPATCH_STALE_MS` | `2700000` | The activity-stale reap threshold, in ms — a RUNNING dispatch child whose `session.get` `time.updated` has not advanced for this long past the 60 s runtime floor is reaped (`kill` mode aborts it with the honest `stale: aborted after N min without activity` wake). Values below the 60 s floor clamp UP to it; invalid values fall back to the default. (The runtime floor itself is fixed at 60 s; `FORGE_DISPATCH_STALE_FLOOR_MS` overrides it for tests.) |
+| `FORGE_DISPATCH_STALE_MODE` | `kill` | `kill` aborts a stale child (honest terminal wake); `observe` emits ONE `[forge:dispatch-progress]` notice per threshold crossing and never aborts. Anything unrecognized falls back to `kill`. |
+| `FORGE_DISPATCH_MAX_ATTEMPTS` | `2` | Total attempts per dispatch (1 original + N-1 automatic retries). A child that dies in a RETRYABLE error (transient transport/5xx/overload/rate-limit) respawns after a fixed 10 s backoff with the original prompt plus an inspect-then-continue resume preamble; deterministic errors (provider config/auth/model-not-supported/contract — and anything unrecognized), stale kills, user aborts, and floor findings NEVER retry. Invalid or sub-1 values fall back to the default; ceiling 10. (`FORGE_DISPATCH_RETRY_BACKOFF_MS` overrides the backoff for tests.) |
+| `FORGE_DISPATCH_DEBUG` | unset | When `1`, the sync dispatch wait emits `[forge-dbg]` diagnostic lines to stderr (slice status, stale probes with anchor values, resolved thresholds and sweep decisions). Diagnostics only — never changes behavior. |
+| `FORGE_DISPATCH_QUEUE_MAX` | `10` | Per-session FIFO queue bound (fold D): a wish that arrives while the dispatch cap (3) is full queues instead of refusing; beyond this bound the call is refused listing every in-flight AND queued task id. Queued wishes spawn FIFO as slots free; an owner session that ends flushes its queue without spawning (honest aborted records). Invalid or sub-1 values fall back to the default. |
+| `FORGE_DISPATCH_JOURNAL_MAX` | `200` | Per-workspace dispatch journal bound (fold E): the append-only `.opencode/forge/dispatch-log.jsonl` rotates by compacting TERMINAL records oldest-first; non-terminal records (running/queued/retry-pending) are never dropped — all-live overflow beats the bound. This journal is what restart recovery replays: a child that finished while the host was down wakes its owner exactly once with the fetched report, a still-running child re-arms, a queued wish re-enters the queue for a live owner, a retry-pending chain resumes while attempts remain. Invalid or sub-1 values fall back to the default. |
+
+**Headless ask liveness (dispatch-resilience fold A).** On a headless host
+(`opencode serve`, or `FORGE_HEADLESS=1`) a `forge_shell` call whose posture
+would ask no longer hangs forever on a dialog nobody can answer: the command
+is classified by the same pure classifier as the readonly exec seal —
+**READ-CLASS commands run** (no dialog awaited) and **WRITE-CLASS commands
+are refused** with an honest `[forge:headless-denied]` error naming the
+command head, so the calling worker can adapt or report. An **explicit user
+`permission.forge_shell: "allow"`** skips the ask and runs in every mode
+(interactive, headless, and run alike — captured by a pre-rewrite config
+snapshot, the single documented respect in which interactive behavior
+changes); an explicit `deny` always wins. The 7 user-confirmation doors
+(`plan_approve`, `plan_close`, `goal_write (arm)`, `goal_complete`,
+`goal_resume`, `goal_discard`, `crew_close`) are **never** auto-resolved
+headlessly — they remain real dialogs. When both the readonly-exec-seal and
+the headless classifier would refuse, the seal finding lands first. **Bypass
+surface disclosure:** in headless mode the classifier is the effective
+enforcement boundary for write-shape workers — commands the classifier reads
+as READ-CLASS but that write internally (mutating scripts, process spawning
+via `Start-Process` writers, encoded payloads — the same README-disclosed
+bypass surface as the seal) run without confirmation. That boundary is
+accepted as part of this change.
 
 **Question policy is mode-keyed.** Sync dispatches keep questions available
 (native parity — the user is watching the panel). Async dispatches create

@@ -14,6 +14,8 @@ An [OpenCode](https://opencode.ai) plugin for managing your prompt cache. Keep t
 
 Pick a cache TTL per session (5 minutes, 1 hour, or a hybrid of the two). Pings are timed to land just before it expires.
 
+For a short overview with the install steps, see the [OpenCode Cache Manager page](https://toolkit.noppu.com/opencode/opencode-cache-manager) on Noppu Labs' AI Toolkit site.
+
 <p align="center">
   <img src="docs/images/sidebar.svg" alt="The Cache section of the OpenCode sidebar: status warm, cached 92% · 141k / 153k, expires 14:52 (52m), ttl 1h (detected), next ping 14:42 (42m), pings 2/5 ✓ hit ($0.05), saved $0.42 · 2 rewrites, return 9× ping cost" width="420">
 </p>
@@ -329,3 +331,7 @@ Turn the rows off with `savings` in the plugin options, in the picker, or with `
 ## Contributing
 
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the local setup, the checks CI runs and how releases are cut.
+
+---
+
+Maintained by [Noppu Labs](https://noppu.com).

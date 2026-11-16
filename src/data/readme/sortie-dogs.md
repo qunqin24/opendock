@@ -1,14 +1,21 @@
 # Sortie-dogs
 
+**Keep AI-assisted work focused on your goal, with evidence before calling it done.**
+
+When agents lose context, repeat work or declare victory too early, Sortie-dogs helps
+carry the original request through implementation, validation, review and delivery.
+It is an adaptive execution harness for OpenCode and Codex that works with your existing
+host setup and permissions, rather than taking them over. Use your host normally and
+invoke Sortie when a task needs coordinated execution and an evidence-backed result.
+
+[Quick start](#quick-start) · [When to use](#when-to-use-sortie-dogs) ·
+[Workflow](#mission-workflow) · [Models](#default-models) ·
+[Recorded Mission result](#codex-end-to-end-completion) · [Evidence and limitations](#measured-results) · [Vision history](#vision-history) ·
+[Configuration](#configuration) · [Documentation](#documentation)
+
 <p align="center">
   <img src="docs/assets/sortie-dogs-logo.jpg" alt="Sortie-dogs logo" width="640">
 </p>
-
-**An adaptive execution harness for OpenCode and Codex: preserve the goal,
-implement, validate, review, and deliver without taking over your setup.**
-
-Use your host normally. Invoke Sortie when a task needs coordinated execution and an
-evidence-backed result, not more agents for their own sake.
 
 [![GitHub Release](https://img.shields.io/github/v/release/zufall-upon/Sortie-dogs)](https://github.com/zufall-upon/Sortie-dogs/releases/latest)
 [![npm](https://img.shields.io/npm/v/sortie-dogs?label=npm)](https://www.npmjs.com/package/sortie-dogs)
@@ -19,15 +26,13 @@ evidence-backed result, not more agents for their own sake.
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
-**Release notes: [v0.16.26](docs/releases/v0.16.26.md)**
+**Release notes: [v0.16.27](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.16.27)**
 · [GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases)
 · [Execution vision](docs/v0.14.0-execution-vision.md)
 
-The npm examples below target v0.16.25, the published npm version at release preparation time.
-Publication of v0.16.26 to npm is a separate manual step; use its fixed GitHub Release archive once available.
-
-[When to use](#when-to-use-sortie-dogs) · [Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
-[Measured results](#measured-results) · [Configuration](#configuration) · [Documentation](#documentation)
+The npm examples below target v0.16.27. The [release routine](docs/release-batch.md#release-completion)
+includes npm publication; local installation or a GitHub Release alone does not complete it.
+Installing a package also does not imply a running host has reloaded it.
 
 > **Beta:** the package is still stabilizing before 1.0. Both host integrations are
 > implemented; Codex Missions have completed implementation, validation, correction and acceptance.
@@ -37,18 +42,16 @@ Publication of v0.16.26 to npm is a separate manual step; use its fixed GitHub R
 
 ## Why Sortie
 
-- **Autonomy:** retain the original request across delegation, correction, compaction and restart.
-  Finish in-request work through the existing host authority instead of routine approval round trips.
-- **Efficiency:** Operator recommends an initial author from the instruction and known context.
-  Coordinator can implement substantial work directly or delegate remaining work as execution makes
-  that useful. Continue the same unit with its edits, valid evidence and cumulative budget.
-- **Visibility:** show real commands, exits, timing, model routes, review disposition and final
-  acceptance. Unknown execution or cost stays unknown, not an invented success or zero.
-- **Quality:** meaningful formal checks and risk-based review establish completion, not model prose.
-  Worker instructions carry a concise goal, explicit constraints and completion criteria;
-  the harness owns bookkeeping. [Instruction design](docs/worker-instruction-design.md).
-- **Coexistence:** explicit invocation, existing authentication and host settings, one shared
-  Mission lifecycle. Normal OpenCode/Codex use and user-owned files remain yours.
+Sortie keeps a bounded request and its constraints connected to the work and evidence
+needed for delivery. Depending on the task and its risks, it can:
+
+- Execute directly or delegate bounded work while retaining context, edits, valid checks
+  and cumulative budget across handoffs.
+- Run registered checks and use risk-based review, separating evidence from final acceptance.
+- Report observed commands, exits and timing; unknown outcomes and costs stay unknown.
+
+It works within the host's existing permissions and ordinary workflows.
+[Instruction design](docs/worker-instruction-design.md).
 
 ## When to use Sortie-dogs
 
@@ -81,7 +84,7 @@ Use an existing Codex CLI signed in with **ChatGPT**. On Windows, PowerShell **7
 available; POSIX uses bash. Sortie does not install Codex, start login or use a metered API fallback.
 
 ```sh
-npm install --save-dev sortie-dogs@0.16.25
+npm install --save-dev sortie-dogs@0.16.27
 npx --no-install sortie-dogs codex init .
 ```
 
@@ -110,7 +113,7 @@ bridge. [Codex guide: SDK, permissions, progress, resume and manifest route](doc
 Use **OpenCode V2**. In the target project:
 
 ```sh
-npm install --save-dev sortie-dogs@0.16.25
+npm install --save-dev sortie-dogs@0.16.27
 npx --no-install sortie-dogs init .
 ```
 
@@ -128,9 +131,11 @@ The `v010` command, profile and configuration names remain for compatibility; th
 v0.10 is installed. [OpenCode setup and configuration](docs/configuration.md) ·
 [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md).
 
-### Project Memory (OpenCode v010, opt-in)
+<a id="project-memory-opencode-v010-opt-in"></a>
+<details>
+<summary>Optional: Project Memory (OpenCode v010)</summary>
 
-With v0.16.25 installed, run `sortie-dogs memory on .` once and reload
+After installing the version above, run `sortie-dogs memory on .` once and reload
 the project plugin. Ordinary public turns then become pending sources; the existing
 Operator records semantic additions, corrections, withdrawals and decisions without
 another save request or a dedicated model call per turn. New sessions recall the
@@ -139,6 +144,80 @@ current project vision and constraints as well as relevant decisions and source 
 This is not a Codex natural-capture feature, execution permission, Review PASS or proof
 of completion. Existing reflection defaults and explicit settings are unchanged.
 [Scope, attachment retrieval, limits and recovery](docs/v0150-project-memory.md).
+
+</details>
+
+## Vision History
+
+These are directions visible in contemporary records, not formal names for every release
+or a guarantee that a proposed effect was achieved. Linked historical instructions and
+model choices are not current setup instructions.
+
+- **v0.1:** The earlier [contract-checking prototype](https://github.com/zufall-upon/Sortie-dogs/blob/bc2da00/README.md)
+  preceded the formal plugin: [v0.1.0](https://github.com/zufall-upon/Sortie-dogs/blob/v0.1.0/README.md)
+  packaged the Mk2A2 workflow for OpenCode with a coordinator, bounded workers, write-scope
+  checks and handoff validation while retaining ordinary roles and settings.
+- **v0.2:** To keep a batch from stopping after its first attempted unit, bounded
+  continuation compacted and resumed the same root session across independent units.
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.2.0)
+- **v0.3:** Bounded, opt-in reflection targeted recurring process defects, while redundant
+  coordinator checkpoint and probe dispatches were removed.
+  [README](https://github.com/zufall-upon/Sortie-dogs/blob/v0.3.0/README.md) ·
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.3.0)
+- **v0.4:** An experimental single-worker fast lane and bounded backlog drain explored
+  simpler execution while tightening the write-authorization lifecycle.
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.4.0)
+- **v0.5:** The release combined validated parallel worktree orchestration and autonomous
+  sequential coordinator flow with safer dispatch and shell gates; the README described
+  optional evidence gathering and bounded implementation.
+  [README](https://github.com/zufall-upon/Sortie-dogs/blob/v0.5.0/README.md) ·
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.0)
+- **v0.6:** Host-reported pre-terminal run metrics were added to the coordinator's DONE
+  output, making observed run information available in the result.
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.6.0)
+- **v0.7:** Warning-only retained-state observability and richer per-role metrics made
+  continuity and run information more visible; retained state was not completion authority.
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.7.0) ·
+  [Retained state](https://github.com/zufall-upon/Sortie-dogs/blob/v0.7.0/src/core/retained-state.ts)
+- **v0.8:** The five-lane proposal aimed to shorten the critical path using distinct
+  independent units, not duplicate attempts. The release describes a bounded DAG fabric
+  and one matched WSL comparison, not a general speed guarantee; a later v0.8.3 roadmap
+  deferred runtime performance qualification. [Proposal](docs/speculative-execution-v0.8.md) ·
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.8.0) ·
+  [Roadmap](docs/v0.8-evidence-runtime-roadmap.md)
+- **v0.9:** Goal-bound delivery, cumulative budgets and criterion evidence addressed the
+  difference between a passing unit and the user's complete goal.
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.0) ·
+  [Dispatch history](docs/dispatch-constraints-history.md)
+- **v0.10:** An operator protected accepted outcomes while adaptive execution aimed to
+  balance cost, time and proof. The proposed operator/dogs model split was explicitly
+  under validation, not a demonstrated benchmark result.
+  [README](https://github.com/zufall-upon/Sortie-dogs/blob/v0.10.0/README.md) ·
+  [Release](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.10.0)
+- **v0.11:** The native user-proxy approach tried direct execution with one implementer
+  and retained original intent and evidence; qualification records retain earlier failures
+  and the incomplete final-main case, not a general speedup claim.
+  [Release and qualification](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.11.0)
+- **v0.12:** Rather than continuing the v0.11 execution-first runtime, this release restored
+  the v0.10.23 foundation and gave Coordinator routine investigation, planning and correction
+  to reduce per-unit approval handoffs. [Release](docs/release-v0.12.0.md)
+- **v0.13:** Eligible single-unit work could go directly from Operator to Worker, with
+  validation failures and review findings recoverable in the same Mission; Coordinator
+  remained available when coordination was needed. [Release](docs/release-v0.13.0.md)
+- **v0.14:** Start useful work from known context to reduce routing-only investigation and
+  handoffs while retaining the original requirements, validation and review.
+  [Vision](docs/v0.14.0-execution-vision.md) · [Release](docs/release-v0.14.0.md)
+- **v0.15:** Opt-in Project Memory for OpenCode v010 carries project vision, constraints
+  and decisions into later sessions, without treating memory as authority.
+  [Design](docs/v0150-project-memory.md) · [Release](docs/release-v0.15.0.md)
+- **v0.16:** Purpose-aligned autonomy compares actual outcomes with the goal when a method
+  stalls, allowing a method to change without dropping required work or checks.
+  [Design](docs/purpose-aligned-autonomy.md) · [Release](docs/releases/v0.16.0.md) ·
+  [Recovery](docs/releases/v0.16.3.md)
+- **v0.17.x (planned):** Prevent unnecessary test growth in ordinary Missions, automatically
+  apply and validate safe test debt cleanup at milestones, and assess long-running full tests
+  before execution while preventing duplicate concurrent runs. Not implemented or measured.
+  [Vision](docs/v0.17.x-test-optimization-vision.md) · [Details](#test-optimization-vision)
 
 ## Mission workflow
 
@@ -162,6 +241,9 @@ Handoff:    Coordinator → Worker (same unit, retained edits/context/checks/bud
 
 The default Mission profile is serial. Background responsiveness and status observations do not
 add parallel writers, replay unknown commands or imply completion. More agents are not the goal.
+
+<details>
+<summary>Advanced workflow: parallel work, storage and run-once operations</summary>
 
 For two genuinely independent implementation units, a Coordinator can request `plan_units parallel=true`.
 The host returns exact foreground `tasks[]` for separate managed worktrees and Luna Fast/max Workers.
@@ -200,9 +282,40 @@ validate and report it without an unauthorized repair/rerun loop. Acceptance pre
 operation exit and `execution-failed` outcome; it never turns a failed benchmark into a successful
 one. Required success checks, missing commands and active/unstarted operations still block completion.
 
+</details>
+
 [Mission tools and validation policy](docs/configuration.md#mission-tools) ·
 [Operation efficiency](docs/mission-operation-efficiency.md) ·
 [Review policy](docs/quality-first-review.md)
+
+## Test optimization vision
+
+The v0.17.x direction is to make test optimization part of ordinary Missions, without
+requiring a separate cleanup Mission or an additional request from the user. This is a
+**future vision, not yet implemented**. Its effects on test count, execution time and
+defect detection have not been measured.
+
+- **Test Gate:** during normal test changes, prefer improving or combining existing
+  checks when they provide the needed regression value. Keep essential behavior,
+  boundaries, public API and security coverage; review test value as part of the
+  existing workflow rather than adding an agent or review round for every test.
+- **Test Debt Audit:** at suitable milestones or signs of test growth, inventory tests,
+  identify evidence-backed cleanup candidates and protect important checks. Safely
+  consolidating or removing tests includes applying and validating the changes, not
+  merely producing a report. Work should normally be lightweight and deepen when needed.
+- **Full Test Guard:** immediately before managed long-running tests, assess whether
+  execution is needed, a narrower check is sufficient, or compatible current evidence
+  can be reused. Equivalent in-flight executions should be joined instead of started
+  twice. Required platform, integration, security and release checks remain in place.
+
+The intended order is cleanup, candidate freeze, then the guard and required
+validation. Changed candidates need their own applicable evidence; neither stale PASS
+results nor unchecked reuse establish success. Avoid self-triggering audit loops and
+unconditional repeated full runs. Existing focused-testing guidance and validation
+evidence handling are useful foundations, but they do not implement this vision by
+themselves. Compatibility, licensing and suitability of possible external tools remain
+to be verified; no specific tool or performance improvement is promised.
+[Full planned scope and evaluation](docs/v0.17.x-test-optimization-vision.md).
 
 ## Default models
 
@@ -315,8 +428,9 @@ Install the desired package version and rerun **your host's** initializer:
 
 An OpenCode config-local bridge may resolve a separate package; npm-global update alone does not
 update it. [Global/update instructions](docs/configuration.md#global-availability).
-The v0.16.26 Mission asset marker is `0.16.26-nested-validation-scratch-v1`; v0.16.25 uses
-`0.16.25-execution-recovery-v1`. The Codex skill marker is `0.14.6-codex-skill-v1`.
+The v0.16.27 Mission asset marker is `0.16.27-git-review-boundaries-v1`; v0.16.26 uses
+`0.16.26-nested-validation-scratch-v1`, and v0.16.25 uses `0.16.25-execution-recovery-v1`.
+The Codex skill marker is `0.14.6-codex-skill-v1`.
 Installed markers alone do not prove a running host reloaded the new version.
 
 There is no supported uninstall command. Remove the dependency and only known Sortie-owned paths;
@@ -332,14 +446,19 @@ follow the [manual removal guide](docs/uninstall.md), never delete the entire `.
   [SWE-bench history](docs/benchmarks/swebench-lite-history.md) · [Historical local case study](docs/benchmark-reference.md).
 - **Development:** [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md) ·
   [Windows tests](docs/windows-tests.md) · [Release routine](docs/release-batch.md).
-- **Release notes:** [v0.16.26](docs/releases/v0.16.26.md) · [v0.16.25](docs/releases/v0.16.25.md) · [v0.16.24](docs/releases/v0.16.24.md).
+- **Release notes:** [v0.16.27](docs/releases/v0.16.27.md) · [v0.16.26](docs/releases/v0.16.26.md) · [v0.16.25](docs/releases/v0.16.25.md) · [v0.16.24](docs/releases/v0.16.24.md).
+
+<details>
+<summary>Earlier release notes</summary>
+
 - **Releases:** [v0.15.2](docs/release-v0.15.2.md) · [v0.15.1](docs/v0.15.1-migration.md) · [v0.15.0](docs/release-v0.15.0.md) · [v0.14.9](docs/release-v0.14.9.md) · [v0.14.8](docs/release-v0.14.8.md) · [v0.14.7](docs/release-v0.14.7.md) · [v0.14.6](docs/release-v0.14.6.md) · [v0.14.5](docs/release-v0.14.5.md) · [v0.14.4](docs/release-v0.14.4.md) · [v0.14.3](docs/release-v0.14.3.md) · [v0.14.2](docs/release-v0.14.2.md) · [v0.14.1](docs/release-v0.14.1.md) · [v0.14.0](docs/release-v0.14.0.md) · [v0.13.22](docs/release-v0.13.22.md) · [v0.13.21](docs/release-v0.13.21.md) · [v0.13.20](docs/release-v0.13.20.md) · [v0.13.19](docs/release-v0.13.19.md) · [v0.13.18](docs/release-v0.13.18.md) · [v0.13.17](docs/release-v0.13.17.md) · [v0.13.16](docs/release-v0.13.16.md) · [v0.13.15](docs/release-v0.13.15.md) · [v0.13.14](docs/release-v0.13.14.md) · [v0.13.13](docs/release-v0.13.13.md) · [v0.13.12](docs/release-v0.13.12.md) · [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
   [v0.13.9](docs/release-v0.13.9.md) · [All GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases).
 
+</details>
+
 ## Support
 
-[GitHub Sponsors](https://github.com/sponsors/zufall-upon) — sponsorships become available
-once the maintainer's Sponsors profile is approved and published.
+[GitHub Sponsors](https://github.com/sponsors/zufall-upon) — optional support for ongoing development.
 
 [☕ Support development / 開発を応援する](https://ko-fi.com/zufallupon)
 

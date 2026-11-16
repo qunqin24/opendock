@@ -91,7 +91,7 @@ a chat-with-your-agent relay, it never injects text into your sessions.
 
 ## Requirements
 
-- OpenCode **v2** (tested on 2.2.7; the 2.0.x line is also supported) or **v1.18+**
+- OpenCode **v2** (tested on 2.3.0; the 2.0.x line is also supported) or **v1.18+**
   (the hooks-based `@opencode-ai/plugin` contract, e.g. the 1.18/1.19 line).
   v1 has no per-plugin options, so its configuration is environment-driven only.
 - A Telegram bot token (via [@BotFather] — takes one minute) and the chat id of

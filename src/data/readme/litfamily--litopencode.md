@@ -5,7 +5,7 @@
 **LitOpenCode is a workflow plugin for OpenCode. Add `lit` to a prompt and the work gets planned, built, checked and written down, so the next session knows where you stopped.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.45" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.46" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="npm downloads per month" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT license" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub stars" /></a>
@@ -198,7 +198,7 @@ OpenCode 2.2 added `/goal`, which keeps a session going until a reviewer agrees 
 
 ## Automatic handoff
 
-A long conversation eventually fills the model's context window, and whatever falls out is forgotten. Automatic handoff saves your place first; it stays off until you turn it on, at a percent you choose. Send one of these as a message on its own: LitOpenCode answers with the new setting, and the model passes it on in a sentence or two.
+A long conversation eventually fills the model's context window, and whatever falls out is forgotten. Automatic handoff saves your place first; it is on from the start at 70% of the window, and you can move the percent or turn it off. Send one of these as a message on its own: LitOpenCode answers with the new setting, and the model passes it on in a sentence or two.
 
 | Message | What it does |
 | --- | --- |

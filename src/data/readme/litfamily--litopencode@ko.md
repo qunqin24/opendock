@@ -5,7 +5,7 @@
 **LitOpenCode는 OpenCode용 워크플로 플러그인입니다. 프롬프트에 `lit`만 붙이면 계획하고, 만들고, 확인하고, 기록까지 남겨서 다음 세션이 어디서 멈췄는지 바로 압니다.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.45" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.46" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="월간 npm 다운로드 수" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT 라이선스" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub 스타" /></a>
@@ -198,7 +198,7 @@ OpenCode 2.2가 추가한 `/goal`은 평가자가 목표를 이뤘다고 볼 때
 
 ## 자동 인수인계
 
-대화가 길어지면 모델의 컨텍스트 창이 차고, 넘친 내용은 잊힙니다. 자동 인수인계는 그 전에 지금 자리를 저장하며, 직접 켜기 전까지는 꺼져 있고 시작할 퍼센트도 직접 정합니다. 아래 메시지 중 하나만 담아 보내면 LitOpenCode가 바뀐 설정을 답하고, 모델이 그 내용을 한두 문장으로 전해 줍니다.
+대화가 길어지면 모델의 컨텍스트 창이 차고, 넘친 내용은 잊힙니다. 자동 인수인계는 그 전에 지금 자리를 저장하며, 처음부터 창의 70%에서 켜져 있고, 퍼센트를 바꾸거나 끌 수 있습니다. 아래 메시지 중 하나만 담아 보내면 LitOpenCode가 바뀐 설정을 답하고, 모델이 그 내용을 한두 문장으로 전해 줍니다.
 
 | 메시지 | 하는 일 |
 | --- | --- |

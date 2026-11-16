@@ -35,7 +35,7 @@ opencode plugin add opencode-rtk-plugin
 ### From GitHub
 
 ```bash
-opencode plugin add github:nabheet/opencode-rtk-plugin
+opencode plugin add github:singlebarrellabs/opencode-rtk-plugin
 ```
 
 Or add it to `opencode.json(c)` directly:

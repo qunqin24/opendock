@@ -284,6 +284,11 @@ REASONING_ROUTER_CLASSIFIER=sglang reasoning-router
 经过校准的决策检查点之间的区别，请参阅 [docs/classifiers/sglang.md](docs/classifiers/sglang.md)。
 目前只验证了 API 兼容性，尚未验证推理强度决策的质量。
 
+<a id="gemini-decision-1"></a>
+### Gemini Decision 1
+
+设置 `provider: "gemini-decision"`，即可通过 Vercel AI Gateway 使用 Gemini Decision 1。设置和使用方法参见[分类器 README](packages/classifiers/README_CN.md#gemini-decision-1)。仅发送有长度限制的文本状态。模拟测试覆盖 API 兼容性；推理强度选择的质量尚未验证，现有默认设置保持不变。
+
 <a id="supported-models"></a>
 ## 支持的模型
 

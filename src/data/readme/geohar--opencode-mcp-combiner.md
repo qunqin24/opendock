@@ -101,6 +101,8 @@ mcp-combiner enable <server>           # mount + connect
 mcp-combiner disable <server>          # unmount + disconnect
 mcp-combiner restart-server <server>   # hard bounce one upstream (like :MCPRestartServer)
 mcp-combiner reload                    # re-read config, apply the diff
+mcp-combiner authorize <server> [--open]   # start OAuth, print (or open) the link
+mcp-combiner profile list|enable|disable [name]   # server profiles
 mcp-combiner tools                     # list advertised tools
 mcp-combiner call myserver_echo --args '{"message": "hi"}'
 mcp-combiner session status                              # list sessions
@@ -456,6 +458,52 @@ their downstream sessions, nvim binds, and the isolated live/parked tiers.
   "isolate": true        // each chat gets its own document/session state
 }
 ```
+
+### profiles — groups of servers by machine or purpose
+
+A **profile** is a named group of servers. Profiles make one config file
+portable (servers that only make sense on a Mac, or at work) and let you
+switch a set of servers on or off together.
+
+```json
+{
+  "profiles": {
+    "mac":    { "when": { "platforms": ["darwin"] } },
+    "work":   { "when": { "hosts": ["work-laptop"] } },
+    "music":  { "enabled": false },
+    "google": {}
+  },
+  "mcpServers": {
+    "ableton-osc":      { "command": "...", "profiles": ["mac", "music"] },
+    "gws_georgeharker": { "url": "...",     "profiles": ["google"] },
+    "github":           { "url": "..." }
+  }
+}
+```
+
+- **Where a profile loads** — `when` (every condition given must match;
+  none means everywhere):
+  - `platforms`: `darwin`, `linux`, `win32`;
+  - `hosts`: short host names (case-insensitive);
+  - `env`: a list of variables that must be set, or an object of variable →
+    required value.
+
+  A server whose profiles all fail to load is skipped entirely on this
+  machine: no process, not listed anywhere.
+- **Whether it's on** — a loaded profile is on unless `"enabled": false`. A
+  server runs if **any** of its loaded profiles is on, and it isn't itself
+  `"disabled": true`. A server with no `profiles` isn't affected by them.
+- **Switching at runtime** — `combiner__enable_profile` /
+  `combiner__disable_profile` (or `mcp-combiner profile enable <name>`)
+  start or stop the profile's servers; a server another enabled profile
+  still needs keeps running. `combiner__profiles` (`mcp-combiner profile
+  list`) shows each profile and its servers. Runtime changes last until the
+  combiner restarts or reloads its config, like `combiner__enable_server`.
+- **At startup** — `MCP_COMBINER_PROFILES=+music,-google` turns profiles on
+  (`+name` or bare `name`) or off (`-name`), overriding `enabled`.
+
+Unknown profile names, platforms or keys fail the config load rather than
+being ignored.
 
 ### sharedServer — per-server process management
 
@@ -817,7 +865,10 @@ A server that has never been authorized mounts no tools, so there is no call
 to route to it. `combiner__authorize_server(server_name)` — always available —
 starts its authorization on demand and fails with the same `-32042` link (or
 the text fallback); a server already connected says so. This is the way in for
-headless deployments.
+headless deployments. From a shell, `mcp-combiner authorize <server>` does the
+same and prints the link (`--open` also opens it in a browser on this
+machine); it exits 0 with a link or when the server is already authorized, 1
+on an error such as an unknown server.
 
 `elicit` without `public_url` still works, with a startup warning: the link
 redirects to the loopback callback, so it only completes from a browser on the

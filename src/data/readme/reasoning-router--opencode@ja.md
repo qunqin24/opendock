@@ -237,6 +237,11 @@ REASONING_ROUTER_CLASSIFIER=sglang reasoning-router
 
 デフォルトのベース URL は `http://127.0.0.1:30000` です。`REASONING_ROUTER_CLASSIFIER_API_KEY` は、サーバーを `--api-key` 付きで起動している場合にのみ設定してください。固定バージョン、モデルとテンプレートの制限、およびチャットモデルの次トークンスコアと較正済みの判断チェックポイントの違いについては [docs/classifiers/sglang.md](docs/classifiers/sglang.md) を参照してください。検証したのは API の互換性のみで、推論強度の判断品質は検証していません。
 
+<a id="gemini-decision-1"></a>
+### Gemini Decision 1
+
+`provider: "gemini-decision"` を選択すると、Vercel AI Gateway 経由で Gemini Decision 1 を利用できます。設定と使い方は[分類器 README](packages/classifiers/README_JA.md#gemini-decision-1)を参照してください。長さに上限のあるテキスト状態のみを送ります。モックテストで API 互換性を確認しており、推論強度の選択品質は未検証です。既存のデフォルト設定は変更しません。
+
 <a id="supported-models"></a>
 
 ## 対応モデル

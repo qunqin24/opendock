@@ -31,18 +31,18 @@
 
 ```sh
 opencode --version
-opencode plugin add opencode2-cliproxyapi-provider@0.1.1
+opencode plugin add opencode2-cliproxyapi-provider@0.1.2
 opencode plugin list
 ```
 
-这样会固定使用 `0.1.1`，直到你手动升级。无需执行 `npm install -g`，也无需下载本仓库源码。
+这样会固定使用 `0.1.2`，直到你手动升级。无需执行 `npm install -g`，也无需下载本仓库源码。
 
 也可以在现有 `opencode.json(c)` 的 `plugins` 数组中添加：
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode2-cliproxyapi-provider@0.1.1"]
+  "plugins": ["opencode2-cliproxyapi-provider@0.1.2"]
 }
 ```
 
@@ -90,7 +90,7 @@ TPS 按整轮对话的耗时计算，包含工具调用和重试时间，不等�
 ```jsonc
 {
   "plugins": [{
-    "package": "opencode2-cliproxyapi-provider@0.1.1",
+    "package": "opencode2-cliproxyapi-provider@0.1.2",
     "options": {
       "transport": "auto",
       "compaction": "summary",
@@ -113,7 +113,7 @@ TPS 按整轮对话的耗时计算，包含工具调用和重试时间，不等�
 卸载命令：
 
 ```sh
-opencode plugin remove opencode2-cliproxyapi-provider@0.1.1
+opencode plugin remove opencode2-cliproxyapi-provider@0.1.2
 ```
 
 如果曾手动添加项目配置，也请移除对应的插件项。凭证、会话和插件数据由 OpenCode 单独管理，卸载插件不保证同时删除这些数据。

@@ -61,7 +61,7 @@ object form:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `intervalMs` | `number` | `60000` | Minimum gap between marks in one session. Values below `1000` are ignored. |
+| `intervalMs` | `number` | `60000` | Minimum gap between marks in one session. Values below `1000` or non-finite fall back to `60000`. |
 
 ## 🧠 How it works
 

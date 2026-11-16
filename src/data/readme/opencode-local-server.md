@@ -1,98 +1,102 @@
+<div align="center">
+
 # pi-local-server
 
-Pi extension that auto-discovers local LLM servers on your LAN first, then Tailscale, and registers each as its own Pi provider with dynamic models + context windows.
+**Your local LLM servers, found automatically, with their real context window.**
 
-Solves the new-laptop problem: instead of hand-coding a temporary provider that points at your main PC, install this extension and your local servers show up in `/model` automatically.
+Plug-and-play discovery of llama.cpp, LM Studio, Strata, Ollama, vLLM, SGLang and more on this machine, your LAN and your Tailscale network, for **[Pi](https://github.com/earendil-works/pi)** and **[OpenCode](https://opencode.ai)**.
 
-> **Using OpenCode?** The same discovery is available as an OpenCode plugin: see [opencode/README.md](opencode/README.md).
+[![npm pi-local-server](https://img.shields.io/npm/v/pi-local-server?label=pi-local-server&color=cb3837)](https://www.npmjs.com/package/pi-local-server)
+[![npm opencode-local-server](https://img.shields.io/npm/v/opencode-local-server?label=opencode-local-server&color=cb3837)](https://www.npmjs.com/package/opencode-local-server)
+[![CI](https://github.com/Leo00703/pi-local-server/actions/workflows/ci.yml/badge.svg)](https://github.com/Leo00703/pi-local-server/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Leo00703/pi-local-server)](LICENSE)
 
-## How it works
+</div>
 
-1. **Startup (fast, blocking):** restores last session from cache (`~/.pi/agent/pi-local-server-cache.json`), then probes `127.0.0.1` + `PI_LOCAL_SERVER_HOSTS` on all known ports.
-2. **Background (`session_start`):** full sweep — configured hosts, ARP LAN hosts (all ports), `/24` sweep fallback (common ports), Tailscale peers (always, even if LAN already hit; one address per online peer, CLI found in its default macOS/Windows/Linux install paths). Each live origin becomes one provider: `local-<type>-<host>-<port>`.
-3. **Always current:** the context window is never trusted from an earlier run. Right before the agent uses a local model (`before_agent_start` / `turn_start`, at most every 5 s) and when you select it (`model_select`), the server is re-read; if the context size or the model list changed (server restarted with another `--ctx-size`, model reloaded in LM Studio, ...) the provider is re-registered and Pi's active model is updated, with a notice like `m context window 8192 → 4096`. An unreachable server keeps the last known values. `/model` also triggers `refreshModels()` on every provider.
+---
 
-Probing per origin (`discovery.ts`):
+You run models on a big PC, and code from a laptop. Without this, every new machine means hand-writing a provider that points at the right IP and guessing a context size. Guess it too high and the agent hits truncation or a failed compaction; too low and you waste the model.
 
-- `GET /v1/models` (OpenAI-compatible, with `Authorization: Bearer <key>`; dummy `local` key sent so Jan-style auth doesn't hide a live server)
-- Every probe checks the *shape* of the answer, not just "HTTP 200 + JSON": LM Studio answers unknown paths with `200 {"error": ...}`, which used to make it look like Ollama.
-- On live origins only: `GET /props` (llama.cpp) and `GET /api/v0/models` (LM Studio) to identify the engine.
-- `GET /api/tags` (Ollama, on every port — catches Ollama on custom ports)
-- `GET /props` fallback (llama.cpp single-model with empty `/v1/models`)
+**pi-local-server finds your servers and asks each one what it is really running with**, so `/model` just lists them, with the right context window, and keeps it right when you reload a model with another `--ctx-size`.
 
-Fingerprint (`detectors.ts`): LM Studio native list → LM Studio, `/props` → llama.cpp, Ollama `/api/tags` (with a `models` array) → Ollama, else `owned_by` (`sglang`, `llama-swap`, `tgi`, `tabby`, `aphrodite`), `max_model_len` → vLLM/SGLang, else port map.
+## Quick start
 
-Context windows (never hardcoded):
-
-| Server | Source |
-|---|---|
-| llama.cpp / llamafile, single model | `GET /props` → `default_generation_settings.n_ctx` (the real per-slot context) |
-| llama.cpp **router mode** (new `llama-server`, Llama-macOS app) | loaded model: `GET /props?model=<id>`; otherwise the `--ctx-size` / preset in the model's `status.args` (split by slots when `-np` > 1 without `--kv-unified`). The `context_length` in `/v1/models` is the *training* context and is only used as a last resort, marked `model-max` |
-| Strata | Same as single-model llama.cpp: `/props` → `n_ctx` (= the context the engine runs with), image input from `/props` modalities, thinking from the chat template. Recognised by `build_info: "Strata …"` |
-| llama-swap |  `/v1/models` entry if advertised, else default |
-| Ollama | `POST /api/show` → `details.context_length` / `model_info.*.context_length` |
-| vLLM / SGLang | `/v1/models` entry `max_model_len` |
-| LM Studio | `GET /api/v0/models`: loaded model → `loaded_context_length` (exact, follows reloads); not loaded → `PI_LOCAL_SERVER_DEFAULT_CTX` capped at the model's max, marked `estimated` (LM Studio decides at load time and doesn't say). Embedding models are skipped, `vlm` models get image input |
-| Jan / MLX / KoboldCpp / textgen / Xinference / LiteLLM / GPT4All / TGI / TabbyAPI / Aphrodite / generic | `/v1/models` entry if advertised, else `PI_LOCAL_SERVER_DEFAULT_CTX` (marked `estimated`, overridable) |
-
-Every model records where its context came from. `server`, `native-api` and `launch-args` are exact; `model-max` (training maximum, the server may run with less) and `estimated` (nothing advertised) are shown as *not verified* in `/local-server status`.
-
-`maxTokens` = `min(PI_LOCAL_SERVER_DEFAULT_MAX_TOKENS, ctx / 2)`, so it is always below the context window.
-
-Image input is enabled for models the server advertises as vision-capable (llama.cpp `architecture.input_modalities` / `/props` modalities).
-
-## Supported servers
-
-llama.cpp (`8080`), Strata (`8080`, `8095`), LM Studio (`1234`), Ollama (`11434`), vLLM (`8000`), SGLang (`30000`, `30010`), Jan (`1337`), MLX-LM (`8080`), Unsloth Desktop (`1234`, `8000`), Atomic Chat (`1234`, `8000`), llama-swap (`8080`), LocalAI (`8080`), llamafile (`8080`), KoboldCpp (`5001`), text-generation-webui (`5000`), Xinference (`9997`), LiteLLM proxy (`4000`), GPT4All (`48950`), HuggingFace TGI (`8080`), TabbyAPI (`5000`), Aphrodite (`2242`), generic OpenAI-compatible.
-
-Shared ports (e.g. `8080`) are distinguished best-effort via `owned_by` / native endpoints; functionality is identical either way since all speak OpenAI-compatible `/v1`.
-
-## Commands
-
-- `/local-server` or `/local-server status` — list registered providers, models, which contexts are `estimated`.
-- `/local-server rescan` — full LAN + Tailscale sweep now (reports `found N provider(s), M new, K hosts scanned`).
-- `/local-server hosts` — show configured hosts; hint to set `PI_LOCAL_SERVER_HOSTS`.
-
-## Configuration (env vars)
-
-| Var | Default | Meaning |
-|---|---|---|
-| `PI_LOCAL_SERVER_HOSTS` | — | Comma list of extra hosts always probed, e.g. `main-pc,main-pc.tailnet.ts.net,192.168.1.10`. Use for Tailscale names. |
-| `PI_LOCAL_SERVER_API_KEY` | `local` | Global key. Only sent to loopback and to hosts listed in `PI_LOCAL_SERVER_HOSTS`; every other discovered host gets the dummy `local`. |
-| `PI_LOCAL_SERVER_API_KEYS` | — | Per-server map `host:port=key,...`, e.g. `100.64.0.2:8080=sk-...`. The host must be written as discovery finds it (Tailscale IP, or the name you put in `PI_LOCAL_SERVER_HOSTS`). Only needed if the server enforces a key. |
-| `PI_LOCAL_SERVER_CTX_OVERRIDES` | — | Per-model map `model=ctx` or `host:port/model=ctx`, e.g. `llama-3.1-8b=131072,192.168.1.10:8080/model=32768`. |
-| `PI_LOCAL_SERVER_DEFAULT_CTX` | `32768` | Fallback when server doesn't advertise (flagged `estimated` in status). |
-| `PI_LOCAL_SERVER_DEFAULT_MAX_TOKENS` | `32768` | Upper cap for `maxTokens` (effective value is `min(cap, ctx/2)`). |
-| `PI_LOCAL_SERVER_TIMEOUT_MS` | `700` | Per-probe timeout for sweep. |
-| `PI_LOCAL_SERVER_DETAIL_TIMEOUT_MS` | `4000` | Timeout for detail calls (`/api/show`, `/props`, native ctx). |
-| `PI_LOCAL_SERVER_DISABLE` | — | Comma list of types to skip, e.g. `ollama,jan`. |
-| `PI_LOCAL_SERVER_NO_LAN` | — | Set `1` to skip LAN/ARP/sweep. |
-| `PI_LOCAL_SERVER_NO_TAILSCALE` | — | Set `1` to skip Tailscale. |
-
-Cache: `~/.pi/agent/pi-local-server-cache.json` (override dir with `PI_CODING_AGENT_DIR`). It is versioned: a cache written by an older release is ignored. Each entry remembers when the server was last really seen: one not seen for 7 days is forgotten, and a machine remembered at two addresses (LAN and Tailscale) is kept once. Delete the file for a clean slate.
-
-## Install
+**Pi**
 
 ```bash
 pi install npm:pi-local-server
 ```
 
-Verify with `pi list`, update with `pi update npm:pi-local-server`. Alternative from source: `pi install git:github.com/Leo00703/pi-local-server`.
+**OpenCode** (1.x and 2.x), in `opencode.json` / `opencode.jsonc`:
 
-## Strata
+```json
+{ "plugin": ["opencode-local-server"] }
+```
 
-Strata listens on `127.0.0.1` only unless told otherwise, so other devices (Mac, phone) cannot reach it. Its run scripts (`run-<model>.bat`) start `serve\server.py`; add `"--host" "0.0.0.0"` to that command (or `"host": "0.0.0.0"` in the model's `strata-<model>.json`), and allow the port in the Windows Firewall for the Tailscale range. An API key is optional (Strata only warns); if you set one, give it to this extension with `PI_LOCAL_SERVER_API_KEYS="<tailscale-ip>:8080=<key>"`.
+Restart, start your server, open the model list. That is all: no hosts, ports or context sizes to configure. Details for OpenCode are in [opencode/README.md](opencode/README.md).
 
-## Security
+## What you get
 
-- Auto-discovery only probes private addresses (loopback, RFC1918, link-local, Tailscale `100.64.0.0/10`, MagicDNS / `.local` / bare LAN names). A public host is only contacted if you list it in `PI_LOCAL_SERVER_HOSTS`.
-- A real API key is only sent where you pointed it (see the two key variables above). Auto-discovered neighbours — ARP hosts, other Tailscale peers — only ever see the placeholder `local`.
-- Redirects are never followed, and multicast addresses are dropped from the ARP sweep.
-- The cache stores server addresses and model metadata, never keys.
+- **Zero configuration.** Finds servers on this machine, on your LAN (ARP table) and on every online Tailscale peer. One provider per machine, even when it is reachable at two addresses.
+- **The context window the server actually runs with**, never a hardcoded guess, and re-read before the agent uses the model. If the server was restarted with a different size, the model is updated and you are told (`m context window 8192 → 4096`).
+- **Honest about what it knows.** Every model records where its context came from. Values the server did not state are marked as *not verified* instead of being presented as fact.
+- **Right capabilities.** Vision input and reasoning are picked up from what the server advertises; `maxTokens` is always kept below the window.
+- **Safe by default.** Only private addresses are probed, API keys only go where you configured them, redirects are never followed. See [docs/security.md](docs/security.md).
+- **Cross-platform.** macOS, Windows and Linux, tested in CI on all three.
 
-## Notes / limits
+## How it works
 
-- Origins are always `http://`. Local LAN / Tailscale servers are plain HTTP; HTTPS remotes aren't supported.
-- `/24` blind sweep only runs when ARP + configured hosts found nothing, and only on common ports (`8080, 1234, 11434, 8000, 1337, 30000, 4000, 5000, 2242`) to keep rescans ~15–30s. ARP-discovered hosts are always probed on all ports.
-- Reasoning flag is heuristic (`r1-distill`, `deepseek-r1`, `reasoning`, `thinking`, `qwq`, `gpt-oss`, `magistral`); `supportsReasoningEffort` stays off since no local server implements OpenAI's `reasoning_effort` param.
-- `supportsDeveloperRole` stays off (safe mapping to system/user on local backends).
+```mermaid
+flowchart LR
+    A[Cache of last run] --> B[localhost + configured hosts]
+    B --> C[LAN: ARP table]
+    B --> D[Tailscale peers]
+    C --> E{Identify the engine}
+    D --> E
+    E --> F[Ask the server for its real context window]
+    F --> G[Provider + models in Pi / OpenCode]
+    G -. before each turn .-> F
+```
+
+1. **Instant start:** providers from the last run are restored from a small cache so a new session is usable at once, and `localhost` plus any configured hosts are probed.
+2. **Background sweep:** the LAN and every online Tailscale peer are scanned, each live server is identified by the *shape* of its answers (not just an open port) and registered.
+3. **Always current:** the window is re-read from the server before the agent uses a local model. An unreachable server keeps its last known values.
+
+How each engine reports its context is in [docs/engines.md](docs/engines.md).
+
+## Supported engines
+
+| Engine | Context window source | Status |
+|---|---|---|
+| llama.cpp (single model and router mode, Llama-macOS app) | `/props`, per-model launch args | Live-tested |
+| Strata | `/props` (`n_ctx`) | Live-tested |
+| LM Studio | native API (`loaded_context_length`) | Live-tested |
+| Ollama | `/api/show` | Implemented, not live-tested |
+| vLLM, SGLang | `max_model_len` | Implemented, not live-tested |
+| llama-swap, Jan, MLX-LM, KoboldCpp, text-generation-webui, LocalAI, Xinference, LiteLLM, GPT4All, TGI, TabbyAPI, Aphrodite, any OpenAI-compatible server | advertised in `/v1/models`, otherwise a configurable default (marked *estimated*) | Detected by API shape |
+
+Ports, fingerprints and caveats are in [docs/engines.md](docs/engines.md). **Using an engine that is marked "not live-tested"?** A [report](https://github.com/Leo00703/pi-local-server/issues/new/choose), good or bad, is very welcome.
+
+## Pi commands
+
+| Command | What it does |
+|---|---|
+| `/local-server` or `/local-server status` | Registered providers and models, and which contexts are not verified |
+| `/local-server rescan` | Full LAN + Tailscale sweep now |
+| `/local-server hosts` | Show the extra hosts you configured |
+
+## Configuration
+
+Nothing is required. Everything is optional environment variables: extra hosts, API keys, per-model context overrides, timeouts, switching LAN or Tailscale discovery off. See [docs/configuration.md](docs/configuration.md).
+
+## Making your server reachable
+
+Discovery can only find what other devices can reach. Most engines listen on `127.0.0.1` by default; see [docs/engines.md](docs/engines.md#making-a-server-reachable) for the one flag or setting per engine (llama.cpp, LM Studio, Strata) and the firewall note for Tailscale.
+
+## Contributing
+
+Bug reports, engine reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Notable changes are listed in the [changelog](CHANGELOG.md). Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)

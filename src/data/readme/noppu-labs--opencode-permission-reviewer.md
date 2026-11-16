@@ -19,6 +19,10 @@ You can use any LLM or [System One model](docs/REVIEWER-MODELS.md#system-one-rev
 reviewer, or even a combination of both, with System One handing its hard calls to an LLM
 ([Reviewer models](docs/REVIEWER-MODELS.md#system-one-with-selective-reasoning-escalation)).
 
+For a short overview with the install steps, see the
+[OpenCode Permission Reviewer page](https://toolkit.noppu.com/opencode/opencode-permission-reviewer)
+on Noppu Labs' AI Toolkit site.
+
 ## What it does
 
 - Leaves your existing policy alone: `allow` rules continue and `deny` rules stay blocked
@@ -168,3 +172,7 @@ and long commands.
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md). Report security issues privately as described in
 [SECURITY.md](docs/SECURITY.md).
+
+---
+
+Maintained by [Noppu Labs](https://noppu.com).

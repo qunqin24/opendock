@@ -57,6 +57,21 @@ From the CLI:
 opencode run --model devin/swe-2-max "Refactor the auth module"
 ```
 
+### Reasoning effort
+
+Cognition lists one model UID per reasoning effort (`claude-opus-5-5-low`,
+`claude-opus-5-5-high`, ...). The plugin publishes each family once, as
+`devin/claude-opus-5-5`, with the efforts as variants:
+
+- In the TUI, cycle the effort with `ctrl+t` (`variant.cycle`).
+- From the CLI or config, append it: `devin/claude-opus-5-5#high`.
+- With no variant selected, the family runs at medium, or at high when it has
+  no medium.
+
+Speed and context modifiers are separate families (`devin/claude-opus-5-5-fast`,
+`devin/glm-5-2-1m`). The per-effort UIDs are still accepted, so an existing
+`devin/claude-opus-5-5-high` keeps working; they are only hidden from the picker.
+
 ## How it works
 
 ```mermaid

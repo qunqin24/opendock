@@ -76,7 +76,7 @@ code-mentor skill install --project
 
 - `code-mentor` skill（你已用 `skill install` 裝過時，以你裝的為準）。
 - `code_mentor` 工具：`collect`、`show`、`check`、`build`。AI 直接呼叫，不必另外裝 CLI。
-- `/code-mentor` 指令：例如 `/code-mentor 導讀 MR !123`。它會先偵測本機有沒有 `implementation-understanding-tutor`、`change-understanding-review`、`diagram-design`，有的話用它們決定怎麼講，沒有就用內建規則。
+- `/code-mentor` 指令：例如 `/code-mentor 概覽 MR 123`；`/code-mentor --help` 列出怎麼下 prompt。它會先偵測本機有沒有 `implementation-understanding-tutor`、`change-understanding-review`、`diagram-design`，有的話用它們決定怎麼講，沒有就用內建規則。
 
 想要專門的導讀模式，再裝 primary agent。npm 套件無法自動新增 agent，所以要手動跑一次：
 
@@ -123,6 +123,38 @@ AI 會依序做這些事：比對修改 → 讀 diff → 寫講解 → 檢查到
 
 看不懂某一站時，直接跟它說「第 3 站看不懂」。它只會重寫那一站，不會整份重來。
 
+### 講多深：三個等級
+
+後一級包含前一級。不說就是「導讀」。
+
+| 等級 | 這樣說 | AI 會寫 | 適合 |
+|---|---|---|---|
+| 概覽 | `/code-mentor 概覽`，或「概覽這個分支」 | 情境、每站做了什麼、每個檔案一句摘要。不寫行註解 | 先知道改了什麼；分支很大 |
+| 導讀（預設） | `/code-mentor`，或「導讀這個分支」 | 概覽，加上核心程式逐段行註解 | 一般情況 |
+| 教學 | `/code-mentor 教學`，或「用教學等級導讀這個分支」 | 導讀，加上機制圖、「邏輯導讀」分頁、語法說明 | 要完全讀懂 |
+
+- 等級可以往上加：先跑概覽，之後說「加深成導讀」或「加深成教學」。AI 在同一份 `guide.json` 上補內容，已寫的站不重來。
+- 等級記在 `guide.json` 的 `depth`。`check` 在概覽等級不會警告「這站沒有註解」；教學等級沒有 `logic` 時會警告。
+- 最花時間的是 AI 讀程式、寫講解。分支很大時先跑概覽最省時間。
+
+### 忘了怎麼說：`--help`
+
+```text
+/code-mentor --help
+```
+
+AI 會直接列出怎麼下 prompt：三個等級、怎麼指定範圍、範例，以及「不要報告檔」時該用哪個 skill。它不會開始分析程式。在終端機跑 `code-mentor --help` 也會在指令說明後面印出同一份內容。
+
+### 不是要報告檔的時候
+
+| 你想要 | 這樣說 | 會用到 |
+|---|---|---|
+| 整個分支／MR 的 HTML 報告 | 「導讀這個分支」 | code-mentor |
+| 在對話裡看改了什麼，不產生檔案 | 「這次改了什麼」 | `change-understanding-review` |
+| 一站一站被帶著讀 | 「帶我讀這次的 code」 | `implementation-understanding-tutor` |
+
+後兩個是另外的 skill，沒安裝就沒有；code-mentor 不需要它們也能用。
+
 ## 比較範圍
 
 | 你要看的 | 指令 |
@@ -152,6 +184,19 @@ code-mentor show f3#2        # 2. 看某個 hunk（f3 = 第 3 個檔案，#2 = �
 code-mentor check            # 4. 檢查漏講、錯誤參照，修到 0 個錯誤
 code-mentor build            # 5. 產生 .code-mentor/out/index.html 和 guide.md
 ```
+
+### 即時預覽（serve）
+
+```bash
+code-mentor serve            # 開 http://127.0.0.1:4173/，guide.json 存檔就自動重建並重新整理
+code-mentor serve --port 5000
+```
+
+- 寫導讀時開著它，AI 每寫一段你就能看到，不用一直重跑 `build`。重新整理後停在原本位置。
+- 一律 `--force` 重建，check 的錯誤和警告印在終端機，不擋預覽；正式交付前仍要跑 `check`。
+- `guide.json` 存到一半格式壞掉時，頁面頂端顯示紅色錯誤列，繼續顯示上一次成功的版本。
+- 只監看 `guide.json`；重新 `collect` 後要重開 `serve`。
+- 只聽 `127.0.0.1`，區網其他電腦看不到。port 4173 被占用時自動往後找；用 `--port` 指定則不換。Ctrl+C 停止。
 
 `check` 遇到下面這些情況會報錯：
 - 有改過的檔案或 hunk 沒被任何一站講到。要略過的話，必須在 `files` 寫明原因。
@@ -189,6 +234,20 @@ code-mentor build            # 5. 產生 .code-mentor/out/index.html 和 guide.m
 }
 ```
 
+選填的 `logic` 會在報告多一個「邏輯導讀」分頁：一個問題、依執行順序的幾步，每步左邊是說明，右邊是只框那段程式的面板，捲到哪一步就換哪段。
+
+```json
+"logic": [{
+  "id": "l1", "station": "s1",
+  "question": "送出申請時，系統怎麼產生並保存臨時密碼？",
+  "input": "已通過前端檢核的表單",
+  "steps": [{ "title": "後端再檢核一次", "text": "前端檢核可以被繞過。", "hunk": "f2#1", "line": 12, "to": 18 }],
+  "result": "寫入 Draft 申請，回傳臨時密碼一次。",
+  "handoff": "前端導到上傳頁。",
+  "failure": "名稱重複回 400。"
+}]
+```
+
 完整欄位和寫作規則見 [`skill/code-mentor/SKILL.md`](skill/code-mentor/SKILL.md)。
 
 ## 常見問題
@@ -218,17 +277,17 @@ npm rm -g @edemilorhea/code-mentor   # 移除工具
 ## 規劃中
 
 - 用 `diagram-design` 產生架構圖、sequence 圖並嵌進報告。
-- `serve` 模式：本機開服務即時預覽，改 `guide.json` 自動重建。
 - 排除已 commit 但不想導讀的路徑（例如文件、產出檔），不必寫進 `.gitignore`。
 
 ## 開發
 
 ```bash
 node lib/sbs.mjs --selftest   # 並排配對與註解放置的自我檢查
+node lib/selftest.mjs         # check 與 logic（邏輯導讀）驗證、HTML／Markdown 輸出的自我檢查
 npm i -g .                    # 從原始碼安裝
 ```
 
-結構：`lib/run.mjs` 是四個指令的主體，CLI（`bin/`）和 OpenCode plugin（`plugin/index.mjs`）共用。本機測 plugin 可在 `opencode.json` 用 `{ "package": "<repo 絕對路徑>" }` 載入。
+結構：`lib/run.mjs` 是四個指令的主體，CLI（`bin/`）和 OpenCode plugin（`plugin/index.mjs`）共用。報告整頁由 `templates/js-*.js` 在瀏覽器渲染，分頁有依情境、依檔案、機制／架構，以及有 `logic` 時才出現的邏輯導讀；`lib/serve.mjs` 是即時預覽。本機測 plugin 可在 `opencode.json` 用 `{ "package": "<repo 絕對路徑>" }` 載入。
 
 ## License
 

@@ -11,8 +11,8 @@ Dictation inside the **opencode v2** TUI: press `alt+v`, speak, press `alt+v` ag
 The take goes to Groq (`whisper-large-v3-turbo` by default) and the transcript is
 pasted into the prompt, ready to edit. `esc` throws a take away without uploading it.
 
-The sidebar carries the state, the model, the language, the spend and the request
-count, so you can see what the plugin is doing and what it costs while you dictate.
+The sidebar carries the state, the model and language on one row, and the request
+count; the spend is one click away behind `totals +`.
 
 ## Why a plugin and not a global shortcut
 
@@ -74,6 +74,7 @@ clone out of `~/.config/opencode/plugins/` before installing from npm.
 | `esc` | cancel the take: no upload, no request, no cost |
 | `/dictate` | same as `alt+v`, from the command palette |
 | `settings` next to the title | open the settings panel |
+| `totals +` next to the title | show/hide today's and total spend |
 
 A take stops on its own after 60 seconds. Everything else is in the palette under
 **Voice**: `Dictate (Groq) and submit`, `Dictation model`, `Dictation language`,
@@ -117,11 +118,11 @@ decoration: every row is clickable and does something.
 |-----|-------|-------|
 | `Groq Dictate` (title) | the panel name, muted | start / stop a take |
 | `state` | `idle`, `● rec 12s`, `transcribing…` | start / stop a take |
-| `model` | `large-v3-turbo` or `large-v3` | model dialog |
-| `lang` | `it`, `en`, `auto`, … | language dialog |
-| `today` | `$0.0032 · 13` takes | quota dialog |
-| `total` | `$0.0093` since the log began | quota dialog |
-| `last` | `7.3s · $0.0001` of the last take | — |
+| `totals +` / `totals -` | header link: shows or hides the spend rows | — |
+| `model · lang` | `large-v3-turbo · it` | model dialog (click the model) / language dialog (click the code) |
+| `today` | shown when totals are on: `$0.0032 · 13` takes | quota dialog |
+| `total` | shown when totals are on: `$0.0093` since the log began | quota dialog |
+| `last` | shown when totals are on: `7.3s · $0.0001` of the last take | — |
 | `rpm` | `1/20` requests in the last minute | quota dialog |
 
 The state row is green when idle, red while recording, amber while the text is in
@@ -134,7 +135,7 @@ while the text is in flight.
 
 ![Quota dialog](assets/quota.png)
 
-The quota dialog, also reachable by clicking `today`, `total` or `rpm`: model, language,
+The quota dialog, also reachable by clicking `rpm` (or `today`/`total` when the spend rows are visible): model, language,
 requests left today (from the Groq headers), local RPM, spend today with the number of
 takes, spend in total.
 

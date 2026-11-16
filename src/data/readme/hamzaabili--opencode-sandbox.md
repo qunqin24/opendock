@@ -93,7 +93,7 @@ are not preserved. The V1 tool guard checks file arguments (including
 `apply_patch`) and the initial `webfetch` URL, but V1 has no redirect hook.
 Use V2 when permission-rule fidelity matters. The adapter is tested against
 OpenCode 1.19.5. The V2 path is contract-checked against the OpenCode v2 plugin
-API (tested on 2.2.7; the package declares `>=1.19 <2 || >=2.0`).
+API (tested on 2.3.0; the package declares `>=1.19 <2 || >=2.0`).
 
 ## Options
 

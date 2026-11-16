@@ -338,6 +338,10 @@ between a chat model's next-token scores and a calibrated decision
 checkpoint. Only API compatibility has been verified. Effort-decision quality
 has not.
 
+### Gemini Decision 1
+
+Select `provider: "gemini-decision"` to use Gemini Decision 1 through Vercel AI Gateway. See the [classifiers README](packages/classifiers/README.md#gemini-decision-1) for settings and setup. Only bounded text state is sent. Mocked tests cover API compatibility; effort-selection quality is unvalidated and existing defaults are unchanged.
+
 ## Supported models
 
 The router rejects any other model locally. Whether your upstream account can

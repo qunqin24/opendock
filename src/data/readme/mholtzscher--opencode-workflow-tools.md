@@ -1,6 +1,6 @@
 # OpenCode plugins
 
-Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
+Six independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
 
 ## Plugins
 
@@ -9,6 +9,7 @@ Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies
 | [Classify](./classify/README.md) | Typed judgments with OpenAI Decisions, TypeSafe AI, Cloudflare Clef, Laya, or Ollama; file/code/diff evidence | Namespaced decision tool and backend-selection command; TUI picker/status. Requires explicit backend configuration. |
 | [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes the root session and its subagents by default. |
 | [Quota usage](./quota-usage/README.md) | Remaining Codex and OpenCode Go account quotas | Web/TUI chat tool and automatically refreshed TUI sidebar. Uses active provider accounts on the server. |
+| [Mise daemons](./mise-daemons/README.md) | Running daemons in the current workspace | TUI sidebar and keyboard picker; opens web URLs, copies endpoints, and confirms workspace Stop All. Requires OpenCode V2.3.0+ and Mise on the server. |
 | [Tab shortcuts](./tab-shortcuts/README.md) | Close all or other session tabs | TUI-only commands with configurable shortcuts. |
 | [Workflow tools](./workflow-tools/README.md) | Spec planning/refinement/implementation, PR publication/metadata, feedback delivery and check investigation | Server commands; see [package.json](./workflow-tools/package.json) for OpenCode requirements. External skills and server-side authenticated `gh` as needed; no TUI entry. |
 
@@ -22,7 +23,7 @@ Add the plugins you want to the `plugins` array in `opencode.jsonc`. Use a proje
 
 Use the install target in each plugin's README. The example below uses Git for most packages; Classify, Workflow tools, Quota usage, and Cache metrics also document npm targets.
 
-This example lists all four packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
+This example loads four server plugins. Keep only those you want; follow the Mise daemons README to add it. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
 
 ```jsonc
 {
@@ -44,7 +45,7 @@ This example lists all four packages. Keep only those you want. Classify uses Ty
 
 OpenCode installs the packages and loads their exported TUI entries alongside the server entries. `workflow-tools` is server-only. Git installs need no checkout or manual `bun install`; cache metrics includes its prebuilt TUI bundle.
 
-Load one copy of each plugin. When switching sources, replace the existing entry and retain its options. See the [OpenCode V2 plugin guide](https://opencode.ai/v2/docs/plugins) for CLI installation, updates, and reload behavior. Plugin READMEs cover runtime dependencies and usage.
+Load one copy of each plugin. When switching sources, replace the existing entry and retain its options. See the [OpenCode V2 plugin guide](https://opencode.ai/docs/build/plugins) for installation, updates, and reload behavior. Plugin READMEs cover runtime dependencies and usage.
 
 ## Development
 
@@ -61,7 +62,7 @@ mise run check
 
 [`mise.toml`](./mise.toml) pins Bun and Node for local development and CI. CI uses `mise-action` to install only the runtimes needed by each job; publishing uses Node's bundled npm. The configuration also retains the lint tools, uv, Pitchfork, and optional Laya daemon configuration. `mise install` installs tools; `mise run install` installs locked dependencies separately in the root and each plugin, without creating a workspace. Neither command starts Laya.
 
-Use `mise run lint`, `mise run fix`, `mise run typecheck`, or `mise run test` for individual checks. After Cache metrics TUI changes, run `mise run build:tui` before `mise run check` and commit `cache-metrics/dist/tui.js`; checks do not rebuild it automatically. Tasks run from the repository root even when invoked inside a plugin.
+Use `mise run lint`, `mise run fix`, `mise run typecheck`, or `mise run test` for individual checks. After Cache metrics or Mise daemons TUI changes, run `mise run build:tui` before `mise run check` and commit the affected plugin's `dist/tui.js`; checks do not rebuild it automatically. Tasks run from the repository root even when invoked inside a plugin.
 
 For direct `bun` commands, [activate mise in your shell](https://mise.jdx.dev/getting-started.html#activate-mise) or prefix them with `mise exec --`.
 
@@ -69,7 +70,7 @@ For direct `bun` commands, [activate mise in your shell](https://mise.jdx.dev/ge
 
 Run `bun install` inside each plugin you work on. Add its directory to `plugins`. Relative paths resolve from the containing config file. You can also use an absolute path from another project. TUI-only Tab shortcuts uses `cli.json` as documented in its README. The root install supplies lint tooling only.
 
-The repository's [`opencode.jsonc`](./opencode.jsonc) loads all four local plugins and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
+The repository's [`opencode.jsonc`](./opencode.jsonc) loads all five server/TUI plugins locally and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
 
 Run plain `opencode` from this repository to use the local plugins while retaining global MCP servers, permissions, providers, and CLI settings. The project config merges over the global config, but plugin arrays accumulate rather than replace one another.
 
@@ -79,21 +80,22 @@ On OpenCode V2.0.26, a global package plus its local checkout produces `Duplicat
 
 Root `opencode.jsonc` uses experimental `integration.use` policies with `plugin:<package-target>` resources to block installed Git and npm sources in this project. If global package targets change, update these policies to match. Preserve local path entries and their options. This behavior was verified against V2.0.26, whose public policies guide did not document `integration.use`.
 
-After changing plugin sources, open `/plugins` and confirm all four repository plugins are **active, local**, with no duplicate failures. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
+After changing plugin sources, open `/plugins` and confirm all five server/TUI repository plugins are **active, local**, with no duplicate failures. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
 
 ### Verification
 
-Run `bun run typecheck` in each affected plugin. Full repository validation covers all five typechecks and test suites: run `bun test` in every plugin. Additional details:
+Run `bun run typecheck` in each affected plugin. Full repository validation covers all six typechecks and test suites: run `bun test` in every plugin. Additional details:
 
 | Plugin guide | Notes |
 | --- | --- |
 | [Classify development](./classify/docs/DEVELOPMENT.md) | Typecheck covers server/TUI entries, providers, and tests. Live checks are opt-in; use the [smoke-testing guide](./classify/docs/SMOKE_TESTING.md). |
 | [Cache metrics development](./cache-metrics/docs/DEVELOPMENT.md) | Rebuild with `bun run build:tui` before testing TUI changes and commit `dist/tui.js`. Keep host runtimes external and avoid install/build lifecycle hooks. |
 | [Quota usage development](./quota-usage/docs/DEVELOPMENT.md) | Shared server/TUI RPC and provider parsing. |
+| [Mise daemons development](./mise-daemons/docs/DEVELOPMENT.md) | Server-side Mise discovery and client actions. Rebuild and commit `mise-daemons/dist/tui.js`. |
 | [Workflow tools development](./workflow-tools/docs/DEVELOPMENT.md) | Scoped server services, strict spec paths, PR snapshots and external smoke checklist. |
 
 From the repository root, run `bun install`, then `bun run check` for Ultracite's Oxlint, anti-slop, and Oxfmt checks. `bun run fix` applies fixes and formatting; generated/build output is excluded.
 
 ## Releases
 
-Release Please manages independent versions, changelogs, tags, and GitHub releases for all five plugins. Each has an npm publishing job using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.
+Release Please manages independent versions, changelogs, tags, and GitHub releases for the five npm-enabled plugins. Mise daemons initially uses Git or local installs; it has no npm publishing job. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.

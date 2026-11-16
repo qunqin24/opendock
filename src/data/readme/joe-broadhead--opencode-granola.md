@@ -5,9 +5,11 @@ Granola's official MCP server.
 
 Unofficial; not affiliated with Granola.
 
+Granola is a trademark of Granola, Inc.; this unofficial plugin is not endorsed by them.
+
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release inside that range runs, and status
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Another release inside that range runs, and status
   calls it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`; see
   [Troubleshooting](#troubleshooting).
 - macOS or Linux.
@@ -17,7 +19,7 @@ Unofficial; not affiliated with Granola.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-granola#v0.0.4
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -28,7 +30,7 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.3" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.4" }] }
 ```
 
 ### Update
@@ -115,7 +117,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.3", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.4", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -199,7 +201,7 @@ plugin in the system config, which outranks each member's own config: `/etc/open
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.3",
+      "package": "github:joe-broadhead/opencode-granola#v0.0.4",
       "options": { "exportDirectory": "<an absolute path>/Granola" }
     }
   ]
@@ -223,7 +225,7 @@ exactly one `Next step`. Every error the plugin raises has a code and a next ste
 | `CONNECTION_FAILED` | The connection failed. | Reconnect Granola from `/mcps`, and if it keeps failing, run `/connect` and choose Granola to sign in again. |
 | `DISABLED` | `granola` is disabled in OpenCode. | Enable `granola` in `/mcps`, or remove `"disabled": true` from `mcp.servers.granola` in your OpenCode config. |
 | `TOOL_UNAVAILABLE` | Granola does not offer that tool for this account. | Your Granola plan may not include it; `/granola-status` lists the tools Granola offers you. |
-| `HOST_UNTESTED` | OpenCode is outside `>=2.2.3 <2.3.0`. | Use OpenCode `>=2.2.3 <2.3.0`, or set `allowUntestedHost: true` to run anyway. |
+| `HOST_UNTESTED` | OpenCode is outside `>=2.2.3 <2.4.0`. | Use OpenCode `>=2.2.3 <2.4.0`, or set `allowUntestedHost: true` to run anyway. |
 | `OPTIONS_INVALID` | A plugin option has an unknown name or a wrong type. | The message names the option; fix the Granola plugin options in `opencode.json`. |
 | `STATUS_UNAVAILABLE` | Status could not be read. | Run `/granola-status` again in a few seconds. |
 | `SKILLS_INVALID` | A bundled skill file is missing or broken. | Reinstall the plugin. |
@@ -252,10 +254,10 @@ loading for a few seconds. Run it again, or use `/connect`, which updates live.
 **A tool says your Granola plan does not include it, or `TOOL_UNAVAILABLE`.** Granola's free plan has no
 transcripts or folders.
 
-**`HOST_UNTESTED`.** The plugin does not start on an OpenCode version outside `>=2.2.3 <2.3.0`, including
-development builds. Use OpenCode `>=2.2.3 <2.3.0`, or set the plugin option `allowUntestedHost: true` to run anyway;
+**`HOST_UNTESTED`.** The plugin does not start on an OpenCode version outside `>=2.2.3 <2.4.0`, including
+development builds. Use OpenCode `>=2.2.3 <2.4.0`, or set the plugin option `allowUntestedHost: true` to run anyway;
 the `OpenCode` row then says `host untested`, and when nothing else is needed the next step says to use a tested
-release if Granola misbehaves. A release inside the range other than 2.2.3, 2.2.4, 2.2.5 and 2.2.6 runs normally: only the
+release if Granola misbehaves. A release inside the range other than 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 runs normally: only the
 `OpenCode` row calls it untested.
 
 **`OPTIONS_INVALID`.** A plugin option has an unknown name or a wrong type. The message names the option.
@@ -282,7 +284,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.3`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.4`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 
@@ -297,7 +299,7 @@ Files you exported stay in your export folder.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
 - **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, and a listing cannot tell when the plan hides older meetings, so it never reports a gap: a cursor older than 30 days on the free plan lists only what the plan still shows. Switching the active workspace changes what a listing reads under the same account.
 - **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. Its report is incomplete on one check, the expired cursor, because the source never answers `CURSOR_EXPIRED`.
-- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6, and runs on macOS or Linux. A later 2.2 release starts and is reported as untested.
+- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
 - In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
   older Jelly refuses the plugin's whole declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

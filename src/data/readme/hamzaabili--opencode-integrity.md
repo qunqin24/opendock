@@ -48,7 +48,7 @@ Code Mode, and covers plugins and skills too.
 }
 ```
 
-The V2 runtime requires OpenCode 2.2.1 or newer and is tested on 2.2.7; the V1
+The V2 runtime requires OpenCode 2.2.1 or newer and is tested on 2.3.0; the V1
 adapter requires 1.19.5 or newer.
 
 ## Install (OpenCode V1)
@@ -197,6 +197,11 @@ Read [SECURITY.md](SECURITY.md) before enabling `enforce` on a shared machine.
 ```sh
 bun install
 bun run ci        # biome + tsc + tests + build + smoke
+bun run compat    # ci + live smoke against a real OpenCode binary
 ```
+
+`bun run compat` starts an ephemeral `opencode serve` in an isolated
+HOME/XDG, so it needs an OpenCode binary on `PATH` (`OPENCODE_BIN=/path`
+overrides it) and no model or API key.
 
 MIT. Zero runtime dependencies.

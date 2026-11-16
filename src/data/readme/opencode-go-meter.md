@@ -57,6 +57,7 @@ Sidebar, one "Context & Go" block:
 ```
 Context & Go
 context ████████   6% 56.8K $0.08
+hit     ████████ 98.5% ↓0.9% · 84.7%
 5h      ████████  20% 2h 16m
 weekly  ████████  17% 5d 14h
 monthly ████████  14% 28d 3h (!)
@@ -64,6 +65,9 @@ monthly ████████  14% 28d 3h (!)
 
 - The first row is the session's context: a bar, the percentage, the tokens used and, on the sidebar,
   the session cost.
+- The second row is the cache hit of the last assistant message: the same bar and label column as the
+  plan rows, the percentage, the delta against the previous message, and the session total when
+  `columns.hitTotal` is on. A high hit is good, so its colour is not the Go-plan threshold colour.
 - One row per plan window: the bar and the percentage in the threshold colour, the countdown to that
   window's reset, and `(!)` when the pace seen so far would saturate the window before it resets.
 - A window that is only *forecasting* a breach already takes the alert colour: 14% used but heading
@@ -153,6 +157,8 @@ re-read on a timer, so neither a click nor an edit needs a restart.
 | `columns.cost` | `true` | The session cost on the context row |
 | `columns.reset` | `true` | The reset countdown on each plan row |
 | `columns.flag` | `true` | The `(!)` forecast flag |
+| `columns.hit` | `true` | The cache-hit row |
+| `columns.hitTotal` | `true` | The session cache total after the hit trend |
 | `order` | `"fixed"` | `"fixed"` (5h, weekly, monthly) or `"projection"` (worst forecast first) |
 | `accentLabels` | `true` | Section headers in the theme accent instead of grey |
 | `refresh.contextMs` | `3000` | How often the context figures are recomputed |

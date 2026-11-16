@@ -59,6 +59,7 @@ npx opencode-github-bot init
 ```
 
 Detects repo type, writes `.github/workflows/opencode.yml`, lists any missing secrets/vars (`AGENT_GITHUB_TOKEN`, `OPENCODE_API_KEY`, `OPENCODE_MODEL`) instead of skipping them, and reminds about `.github/repo-role.yml` (needed for intake triage; review/fix work without it).
+Full 5-minute guide (secrets table, private-repo caveat, verify steps): [`docs/setup.md`](docs/setup.md).
 ## Plugin
 
 Add to `opencode.json(c)`:

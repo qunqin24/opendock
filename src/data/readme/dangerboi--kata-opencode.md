@@ -17,6 +17,8 @@ omp plugin marketplace add Dangerboi/kata-plugin
 omp plugin install kata@kata-plugin
 ```
 
+Or from npm, as listed on [omp packages](https://omppackages.com): `omp plugin install @dangerboi/kata-omp`. Use one install or the other; see the [install guide](docs/how-to/install.md#oh-my-pi).
+
 That is the whole setup. The plugin replaces omp's built-in `todo` with Kata in every folder, with no configuration. A repo with no Kata project plans in the project named by `KATA_DEFAULT_PROJECT` (labeled with the repo), or else in its inferred project, which the plugin registers in the daemon without writing files into the repo.
 
 Kata inbox requests reach a session when `KATA_INBOX_USER` names a session address, `<actor>/<name>`. A bare `<actor>` is that person's own inbox, so sessions don't read it. On OMP the main session gets each new request from that actor live, even while idle or mid-run (`KATA_OMP_LIVE_INBOX=0` turns it off); Pi reads per turn.

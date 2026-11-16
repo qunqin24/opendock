@@ -105,7 +105,8 @@ Pi uses `~/.pi/agent/memory`, OpenCode uses `$XDG_DATA_HOME/opencode/memory`.
 | `inject.ts` | byte-stable, middle-truncated snapshot block, nested banks included |
 | `discover.ts` | bounded, cached search for child workspaces with a bank of their own |
 | `delta.ts` | the frozen baseline of a session and the `<system_reminder>` block for a later change |
-| `workspace.ts` | root validation, store resolution, initialization |
+| `text.ts` | the tool descriptions, prompts and section wording every adapter shares |
+| `workspace.ts` | root validation, store resolution, initialization, the write guard |
 | `migration.ts` | `remember.json` version marker; refuses unmarked content instead of adopting it |
 
 Nothing in `core` imports a coding-agent SDK, and nothing writes outside the
@@ -123,7 +124,10 @@ directories it is handed.
 ```
 
 `dirName` is configurable; every adapter defaults to `.agents`, so the workspace
-store is shared. A session's snapshot is rendered once and then held
+store is shared. A workspace with no store at all is not a dead end: the first
+write creates the store, and a read treats it as empty instead of failing, so
+global memory stays reachable and a first attempt never teaches the model that
+the tool is broken (`REMEMBER_AUTO_INIT=0` restores an explicit `memory_init`). A session's snapshot is rendered once and then held
 byte-identical: a later change arrives as a `<system_reminder>` appended at the
 end of the conversation, never as a rewrite of the system prompt. See
 [Nested banks and cache-safe injection](#nested-banks-and-cache-safe-injection). A store with content but no `remember.json` is never adopted
@@ -144,6 +148,17 @@ A workspace can hold child workspaces with stores of their own
 them — path, fact count, note count — under `## Nested workspace memory`. Their
 facts are never merged into the parent block; the model reads one on purpose
 with `memory_read({root: "repos/<name>"})`.
+
+The section header is an instruction, not a syntax note: it names the trigger
+("before you change code in one") and the exact call. The Pi adapter also
+announces a bank just in time: when a tool touches a path inside one, a single
+`<system_reminder>` names that bank and its counts, once per session, and it
+disappears after the session reads the bank. A model does not read a bank it was
+never told it is inside.
+
+Because the tools are billed on every request, all copy lives in one place
+(`packages/core/src/text.ts`) that every adapter imports: one wording change
+reaches all hosts, and no two adapters can drift apart.
 
 The walk is bounded on every axis, because it runs inside prompt injection:
 depth 2, 256 directories, 50 ms, 8 banks, one `stat` per directory, dot
@@ -237,7 +252,7 @@ CLI adds exactly one, `@earendil-works/pi-tui`, loaded lazily only by `browse`, 
 
 ```sh
 npm run build     # or: node scripts/build.mjs
-npm test          # 255 tests: core, migrators, CLI, Pi and OpenCode adapters
+npm test          # 331 tests: core, migrators, CLI, Pi and OpenCode adapters
 npm run check       # build, then the same tests
 npm run test:packed # isolated tarball install + compiled adapter integration tests
 npm run pack        # validated release tarballs in artifacts/
@@ -286,7 +301,7 @@ npm run build && npm run smoke
   consent.
 - **Command** — `/memory [status|migrate]`.
 - **Config** — `dirName` (`.agents`), `globalDir` (`$DSH_HOME/memory` when empty),
-  `injectCharsGlobal`, `injectCharsLocal`, `autoInject`.
+  `injectCharsGlobal`, `injectCharsLocal`, `autoInject`, `autoInit`.
 
 ```yaml
 - id: remember
@@ -336,7 +351,7 @@ channel.
   review prompt as a follow-up turn.
 - **Config** — `REMEMBER_DIR_NAME` (`.agents`), `REMEMBER_GLOBAL_DIR`
   (`~/.pi/agent/memory`), `REMEMBER_INJECT_CHARS_GLOBAL`, `REMEMBER_INJECT_CHARS_LOCAL`,
-  `REMEMBER_AUTO_INJECT` (`1` by default).
+  `REMEMBER_AUTO_INJECT` (`1` by default), `REMEMBER_AUTO_INIT` (`1` by default).
 
 ```sh
 pnpm install
@@ -370,11 +385,11 @@ object; `@opencode/plugin` supplies types only.
   no model turn starts.
 - **Config** — plugin options in `opencode.json(c)`: `dirName` (`.agents`),
   `globalDir` (`$XDG_DATA_HOME/opencode/memory`), `injectCharsGlobal`,
-  `injectCharsLocal`, `autoInject`.
+  `injectCharsLocal`, `autoInject`, `autoInit`.
 
 ## Status
 
-- 255 tests pass (187 core, 6 migrators, 35 CLI, 12 Pi adapter, 15 OpenCode adapter).
+- 331 tests pass (249 core, 6 migrators, 37 CLI, 20 Pi adapter, 19 OpenCode adapter).
 - Adapter suites pass end to end against fake hosts: all ten tools, duplicate
   handling, update → forget → restore round-trip, workspace/root isolation,
   snapshot injection and stability, legacy detection, dry-run migration,

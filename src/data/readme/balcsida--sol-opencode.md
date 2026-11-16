@@ -98,7 +98,7 @@ The TUI companion (`tui.tsx`, in the same directory) loads automatically: OpenCo
 
 ## Storage and security
 
-- **Archives:** ObservationPack and the reducer archive originals under `<OpenCode data>/sol-opencode/<sessionID>/`, normally `~/.local/share/opencode/sol-opencode/`. The archives stay local and are not deleted automatically.
+- **Archives:** ObservationPack and the reducer archive originals under `<OpenCode data>/sol-opencode/<sessionID>/`, normally `~/.local/share/opencode/sol-opencode/`. The archives stay local, readable only by their owner, and are removed when OpenCode deletes the session while the plugin is loaded.
 - **State:** Online Context Compact keeps its per-session state in OpenCode's plugin storage.
 - **Remote reduction:** the reducer may send eligible diagnostic logs to its configured model.
 
@@ -124,7 +124,9 @@ scripts/live/verify.sh af-op      # real OpenCode session, Action Fusion + Obser
 scripts/live/verify.sh all        # real OpenCode session, all four mechanisms
 ```
 
-The live checks need `opencode` 2.2.6 on `PATH`. They use a scripted local endpoint, so they need no credentials and cost nothing. `./upstream/` is an optional, git-ignored clone of SoL-Pi kept for reference.
+The live checks pack the plugin, load the tarball in a real OpenCode session, and fail unless every enabled mechanism did its job. They need `opencode` 2.2.6 on `PATH`; `PATH="$(scripts/live/opencode-cli.sh):$PATH"` fetches it from npm when it is not installed. They use a scripted local endpoint, so they need no credentials and cost nothing. CI runs all of the above on every pull request.
+
+To release, set `version` in `package.json` on `main` and publish a GitHub release tagged `v<version>`. The stage workflow runs the same checks on the packed tarball and stages that file on npm, where it is not public until a maintainer approves it with 2FA (`npm stage list @balcsida/sol-opencode`, then `npm stage approve <stage-id>`); see [docs/verification.md](docs/verification.md#what-gates-a-release). Run by hand before that, the workflow rehearses the release without uploading anything. `./upstream/` is an optional, git-ignored clone of SoL-Pi kept for reference.
 
 `bench/` measures the savings on real benchmark tasks and spends API credit; see [bench/README.md](bench/README.md).
 

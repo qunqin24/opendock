@@ -52,6 +52,29 @@ on success** (the reply files are the durable record; failed votes keep their
 DB rows for salvage). `sibyl_review` roles run fully isolated under /tmp with
 their own HOME/DB (`src/lane/isolated.ts`), never touching yours.
 
+### Retention and anti-bloat (engine 2.x)
+
+Since 2.0 the same rule covers **every** persona session a done run created —
+votes, workers, planner, judge, parented or not. Their durable evidence is the
+run's spaceDir, so Sibyl deletes those engine sessions **after hashing the
+evidence**: `SESSIONS.json` (one row per session: artifact paths + sha256 +
+delete outcome) and `CHECKSUMS.txt` are written and read back before the first
+delete, in reverse creation order so children die before parents. A failed
+delete lands in `DEAD-LETTER.jsonl` and never changes the verdict; a re-apply
+that finds the row already gone counts it deleted (idempotent). The calling
+(convener) session is never touched — it is not registered by construction.
+Failed runs keep everything for salvage. Set `retainSessions: true` to opt out
+per deployment: the run then records `reclaim:{ran:false,reason:"retainSessions"}`
+and its rows age into the reap tiers instead.
+
+Ops surface (all dry-run by default; deletion stays explicit):
+
+| Command | What it does |
+|---------|--------------|
+| `node scripts/session-reap.mjs [--apply]` | tiered sweep of `sibyl:*` rows (tier A: parented persona children > 7d; tier B audit roots need `--tier-b-days=N --owner-ruling` — receipt law is the owner's call) |
+| `node scripts/session-reap.mjs --manifest=<f> [--apply]` | frozen-set mode: deletes exactly the adjudicated ids, revalidating every gate per row (Sibyl-family title, audit-root ruling, `--keep`); rows already gone are recorded `absent`, not errors; deletion walks child-first; accepts `DEAD-LETTER.jsonl` as input — the named recovery path for reclaim failures |
+| `node scripts/gc-run-dirs.mjs [--apply]` | archives sealed + terminal run dirs out of the run root to `~/.sibyl/chamber-archive` (move, not delete — /tmp is volatile); ownership + realpath + terminal-record predicates are fail-closed; crontab line in the script header is for the owner to install |
+
 ## The review chamber (democratic centralism)
 
 The name is the design: broad internal deliberation, one unified external
@@ -175,6 +198,7 @@ defaults.
 | `timeoutMs` | `240000` | Per-child-session timeout (create + prompt share the budget). Integer ≥ 1. |
 | `concurrencyK` | `4` | Cap on parallel workers per wave (also capped by the schema's own `concurrency`). Integer 1–8. |
 | `staggerMs` | `2000` | Delay between worker launches within a wave, to avoid rate-limit bursts. Integer ≥ 0. |
+| `retainSessions` | `false` | Anti-bloat opt-out. Default `false` = evidence-first reclaim: on a successful run the engine sessions it created are deleted after `SESSIONS.json` + `CHECKSUMS.txt` land in the run's spaceDir (see Session hygiene). `true` = keep them; the run records `reclaim:{ran:false,reason:"retainSessions"}` and its rows age into the `scripts/session-reap.mjs` tiers instead. |
 | `lane` | see below | Isolated-lane mechanics for `sibyl_review` / `sibyl-chamber` (`src/lane/isolated.ts`). Sub-keys: `runRoot` (string, default `"/tmp"`) — parent dir for run dirs; `opencodeBin` (non-empty string; discovery order: `$OPENCODE_BIN` → `~/.local/bin/opencode` → `/usr/local/bin/opencode` → `/usr/bin/opencode` → bare PATH name `"opencode"`; never empty, a wrong guess fails loud at spawn naming the bin; a bare name is resolved host-side against `$PATH` BEFORE sandboxing, so the sandbox execs exactly that resolved binary regardless of the sandbox's pinned PATH) — the binary launched for each isolated role; `configSource` (default `~/.config/opencode/opencode.jsonc`) — read-copied only when `credentialProxy` is absent, never written back; `roleTimeoutMs` (integer ≥ 5000, default `1200000`) — per-role wall-clock budget; `roleSalvageGraceMs` (integer ≥ 0, default `900000`) — grace window after the deadline: a role still finishing within grace is kept and disclosed (`SALVAGED … past its deadline` on the ledger/notes, verdict demoted through the normal gap channel); grace exhausted still SIGKILLs with timedOut=true, so a hung role dies — fail-closed unchanged; `examMaskDirs` (array of absolute paths, default `[]`) — dirs tmpfs-masked from exam candidates (grader files, other runs); empty = an unsandboxed venue that says so plainly in its final report. A mask whose subtree contains the lane binary never kills the lane: the sandbox builder re-binds the binary's parent directory (and its resolved realpath's parent, or the file itself if it hangs directly on the masking root) read-only on top of the tmpfs, leaving the rest of the masked tree hidden. |
 | `modelPolicy` | `{ allowedPrefixes: ["local-"] }` | Model seating allow-list: only pool models whose `providerID/modelID` starts with one of these prefixes may take a seat; everything else is denied at launch. Array of non-empty strings, **at least 1 entry** (an empty list is rejected as a deny-everything typo). Set this to your own machine's providers — the shipped default is a prefix pattern, not a specific model. |
 | `credentialProxy` | absent | Optional loopback credential relay for isolated roles. When configured, every seated provider must appear in `providers`; Sibyl refuses an undeclared seat rather than falling back to host config. Each provider declares `baseUrl`, exactly one of `keyFile`, `keyEnv`, or `keyless: true`, optional OpenAI-compatible `npm`, and allowed `models`. `maxRequestsPerRole` defaults to `2000`. |

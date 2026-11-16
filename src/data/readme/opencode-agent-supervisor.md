@@ -45,6 +45,10 @@ while it happens.
   elements) are repaired before the tool executes: deterministic
   structure fixes first, then a bounded repair-model side session.
   Run standalone with `mode: "repair-only"`.
+- **[Text tool-call recovery](#47-text-tool-calls)** — a turn that
+  ends with a tool call written into the reply as text (no call
+  made) gets a short correction asking for the real call, bounded
+  to two in a row.
 
 ---
 
@@ -73,7 +77,7 @@ Requires OpenCode **1.19.0** or later.
 ### 3.1 Install for yourself
 
 ```bash
-opencode plugin opencode-agent-supervisor@2.10.0 --global
+opencode plugin opencode-agent-supervisor@2.12.0 --global
 ```
 
 OpenCode downloads the package and adds it to the `plugin` array of
@@ -89,7 +93,7 @@ the repository runs the same supervisor version:
 
 ```json
 {
-  "plugin": ["opencode-agent-supervisor@2.10.0"]
+  "plugin": ["opencode-agent-supervisor@2.12.0"]
 }
 ```
 
@@ -339,7 +343,7 @@ tuple registration — Section 6):
 
 | Hook | Purpose |
 | :--- | :--- |
-| `event` | Observes completed reasoning parts (`message.part.updated`), deduplicates them, strips narrative, runs the invariants and the side-session peer audit, records steps in the verified trace (passed, or minor deterministic findings marked unpassed), and routes failures to critique delivery. |
+| `event` | Observes completed reasoning parts (`message.part.updated`), deduplicates them, strips narrative, runs the invariants and the side-session peer audit, records steps in the verified trace (passed, or minor deterministic findings marked unpassed), and routes failures to critique delivery. On session idle, checks the last assistant message for a tool call written as text and steers the session to make it (Section 4.7). |
 | `chat.message` | Captures the session's model identity (drives the tool-arg repair schema lookup) and the first user message of the session as the goal. The goal is never replaced. Also records the session's agent — the `agent` of the latest user message (Section 7.2). |
 | `tool.execute.before` | Tool-arg repair first: validates raw arguments against the tool's JSON schema and repairs malformed ones in place (Section 4.5). Then the tool guard: blocks reward-hacking tool calls, engineer-directive violations, and file paths absent from the verified trace (never blocks when the trace is empty; a trace block with an audit in flight waits up to 10 s for the settled trace, failing open up to the per-session `maxTimeoutFailOpens` cap — Section 4.2); holds approve-gated calls for engineer approval and review-gated calls for a passed peer audit (agent-console tools are exempt so `request_audit` stays reachable); records directive triggers. With external access enabled, gates external writes (and reads under `readPolicy: "gate"`) on an engineer grant (Section 4.6). A global guard profile matching the session's slash command or agent (or an ancestor session's) may exempt a tool from the trace check only (Section 7.2). |
 | `tool.execute.after` | Appends a solved item (tool name + short outcome) to a bounded log. With external access enabled, mints grants from the engineer's answers to relayed `request_access` questions (Section 4.6). |
@@ -475,6 +479,51 @@ is logged.
 ```
 
 ---
+
+### 4.7 Text Tool Calls
+
+Some models (GLM 5.3 so far) sometimes end a turn by writing a tool
+call into the reply as text instead of making it:
+
+```text
+<invoke name="question">
+<parameter name="questions">[{"question": "Item 12 of 18 …"}]</parameter>
+</invoke>
+```
+
+No call happens, so tool-arg repair never sees it, the session goes
+idle, and the run looks finished. When a session goes idle, the
+supervisor reads its last message. If that is an assistant turn
+whose last text names a registered tool in one of these shapes,
+with no tool part after it, it sends one synthetic message:
+*"Your last message wrote a `question` tool call as text, so it
+never ran. Make the actual tool call now; don't repeat the text."*
+
+- **Shapes:** `<invoke name="…">` (alone or inside
+  `<function_calls>`), `<tool_call>` with a JSON body or a leading
+  tool name, and a bare `{"name": "…", "arguments": …}` object.
+  Anything inside fenced code blocks or inline code is ignored, and
+  a name that is not a registered tool never matches.
+- **Bound:** at most `textToolCall.maxPerSession` corrections in a
+  row (default 2). A turn that ends cleanly or a message you type
+  resets the count. At the bound a warning is logged and the
+  session stays idle, so whatever dispatched it can notice.
+- **Subagents:** a subagent's final text becomes its parent's
+  `task` result the moment it goes idle, so subagents are corrected
+  at that boundary instead: when a foreground `task` call
+  completes, the supervisor checks the subagent's last turn, prompts
+  it with the same message (under its own agent and model) and
+  waits for the new turn, within the same bound. The parent then
+  gets the corrected final text. If the subagent still ends with a
+  text tool call, the parent's result keeps it and gains a note
+  saying the call never ran. Background tasks are not corrected.
+- **Not corrected:** the plugin's own side sessions, aborted or
+  failed turns, and `repair-only` mode.
+- The supervisor never runs the parsed call itself: the agent makes
+  it, so the guard and arg repair see it as usual.
+
+Turn it off with `{ "textToolCall": { "enabled": false } }` or
+`OPENCODE_SUPERVISOR_TEXT_TOOL_CALL=false`.
 
 ## 5. The Agent Console
 
@@ -685,6 +734,8 @@ when unset, the side-session prompt omits it.
 | `lockGuards` | *(global config file only)* | `false` | When `true`, `blockRewardHacking: false`, `requireStepReferenceInTools: false`, `mode: "repair-only"`, `externalAccess.enabled: false`, and `externalAccess.readPolicy: "allow"` from the project config file, plugin options, or the environment are ignored with a warning, so a committed project config or per-directory env file cannot turn the guards off or unregister them. Fails closed (Section 7.2). |
 | `externalAccess.enabled` | `OPENCODE_SUPERVISOR_EXTERNAL_ACCESS` | `false` | Gate tool calls outside the project root on engineer grants (Section 4.6). `request_access` registers only when this resolves `true` at plugin load. |
 | `externalAccess.readPolicy` | `OPENCODE_SUPERVISOR_EXTERNAL_ACCESS_READ_POLICY` | `allow` | `allow` lets external reads pass; `gate` requires a grant for them too (a `read` grant suffices). |
+| `textToolCall.enabled` | `OPENCODE_SUPERVISOR_TEXT_TOOL_CALL` | `true` | Correct turns that end with a tool call written as text (Section 4.7). |
+| `textToolCall.maxPerSession` | `OPENCODE_SUPERVISOR_TEXT_TOOL_CALL_MAX` | `2` | Corrections allowed in a row per session; a clean turn or a typed message resets the count. `0` still detects and logs but never steers — use `textToolCall.enabled: false` to turn the check off. |
 | `profiles` | *(global config file only)* | *(none)* | Task-scoped grants, matched on slash command and/or agent, that narrow where a guard applies (Section 7.2). |
 
 Gate approvals are not a knob: `approve` rules read the approvals file

@@ -14,7 +14,7 @@ vendor service and makes its requests. The packages work in OpenCode and in
 | [agnes](packages/agnes) | Agnes AI international (agnes-ai.com), with Chrome browser sign-in, live text models, plan usage and USD balance | `agnes` |
 | [agnes-code](packages/agnes-code) | Agnes AI's Agnes Code desktop, with the desktop's saved session (Windows) or a pasted access token: live models, daily credit check-in and points balance (unofficial) | `agnes-code` |
 | [agy-cli](packages/agy-cli) | Antigravity on your installed agy CLI through ACP (`agy acp`), with agy's own Google sign-in: only the models agy offers this client, a process pool, MCP tool bridge and session resume (unofficial) | `agy-cli` |
-| [antigravity](packages/antigravity) | Antigravity with a Google account (AI Pro, Ultra, free): Gemini, and the Claude and GPT-OSS models Google hosts for it, with Google sign-in or an imported refresh token | `antigravity` |
+| [antigravity](packages/antigravity) | Withdrawn for new users: Google suspends accounts it sees used this way. Kept working for whoever has it; use agy-cli instead | `antigravity` |
 | [astudio](packages/astudio) | iFlytek's AStudio (科大讯飞 Astron Studio desktop), with the desktop's saved credentials or a pasted model token: live model catalog, daily login-points check-in and points balance (unofficial) | `astudio` |
 | [atomcode](packages/atomcode) | AtomGit CodingPlan, with browser OAuth or the local AtomCode CLI's sign-in, signed requests, live models, quota windows and a read-only diagnostics page (unofficial) | `atomcode` |
 | [catpaw](packages/catpaw) | Meituan's 妙手 CatPaw (ai.catpaw.meituan.com), with a browser web sign-in or the desktop client's saved credentials | `catpaw` |
@@ -185,6 +185,7 @@ These add a page to magpie's window, in the app and in `magpie web`, under Plugi
 
 | Package | Page | Reads |
 |---|---|---|
+| [feishu-sidebar](packages/feishu-sidebar) | Generate an AppLink to open Magpie Web in Feishu desktop’s left sidebar | none |
 | [usage](packages/usage) | Usage glance: calls, errors, tokens and cost for today, 7 or 30 days, and the models behind them | `usage:summary` |
 | [free-tokens](packages/free-tokens) | AIHOT's Token freebies in three tiers (already configured and usable / needs one more plugin / no plugin yet), with the plugin to install or the exact login step for each | none; its host part reads magpie's folder (providers/checkin) and fetches aihot.news/free-tokens.data once each time the plugin host starts |
 | [amp-usage](packages/amp-usage) | Amp usage: requests, input/output tokens, cache reads and writes and cache hit rate from Amp's cloud exports and legacy local threads, synced in the background into Magpie's usage ledger for its usage pages and Day card | none; its host part runs the Amp CLI, reads Amp's local thread files and reports usage to the local Magpie |
@@ -287,6 +288,7 @@ it off puts the config back.
 | [kilo](packages/kilo) | [Kilo Code](https://kilo.ai): `~/.config/kilo/kilo.jsonc`, through an OpenAI-compatible provider |
 | [junie](packages/junie) | [Junie CLI](https://junie.jetbrains.com/): an explicit `/v1/models` seed for its full picker and Magpie's selected model as the launch default; no LiteLLM |
 | [kimi-desktop](packages/kimi-desktop) | Ordinary [Kimi desktop](https://www.kimi.com/) Work, through its authenticated local runtime; not Kimi Code CLI |
+| [pi-desktop](packages/pi-desktop) | Pi-Desktop (the desktop app, not the Pi CLI): magpie keeps a Pi-Desktop plugin folder, `~/.config/magpie-pi-desktop/plugin`, that adds it as a model provider with its current models and their thinking levels; load it once in Pi-Desktop, choose the model there |
 | [pig](packages/pig) | [PiG](https://github.com/MichaelKinsy/PiG): Magpie's endpoint and model catalog in `~/.pig/agent/models.json`, and the model PiG starts on (`defaultProvider`/`defaultModel` in `settings.json`) picked on the Agents page |
 | [type4me](packages/type4me) | [Type4Me](https://github.com/joewongjc/type4me), macOS voice input: `~/Library/Application Support/Type4Me/magpie-agent.json`, for its LLM post-processing |
 | [opencodereview](packages/opencodereview) | [Open Code Review](https://github.com/alibaba/open-code-review) (`ocr`): `~/.opencodereview/config.json` as a custom Anthropic provider, so `ocr review` / `ocr scan` run on magpie's models |

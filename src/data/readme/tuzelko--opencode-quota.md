@@ -27,7 +27,7 @@ the context indicator and opens the full picture in a side tab.
 - 🗂️ **Panel tab, not a dialog** — every connected provider collapses into an accordion,
   with the current provider expanded; opening another closes the previous one.
 - 📈 **Every window, not just one** — percent, absolute usage and the reset countdown for
-  5 hours, week and month, whatever the provider reports.
+  5 hours, week, month and top-up packs, whatever the provider reports.
 - 🟠 **Threshold colors** — orange at 70%, red at 90%, on the ring, the bars, the numbers
   and the composer pill.
 - ⏳ **Per-provider progress** — each provider's ring spins while its own request is in
@@ -49,6 +49,8 @@ the context indicator and opens the full picture in a side tab.
 | Zhipu AI Coding Plan (CN) | the same payload on the China platform |
 | Kimi For Coding (global) | 5-hour and monthly pools |
 | Kimi For Coding (CN) | the same on the China host |
+| StepFun Step Plan (global) | monthly Credit pool and top-up packs, or 5-hour and weekly windows on the older coding plans |
+| StepFun Step Plan (CN) | the same on the China host |
 
 The ring follows the model you run; the panel lists every connected provider.
 
@@ -94,8 +96,8 @@ localized.
 
 - **OpenCode Go** comes from the app's own usage store — the numbers behind the Console,
   one shared allowance across models.
-- **Z.AI and Kimi** are queried by the server part with the key OpenCode already stores in
-  the integration. Answers are cached for a minute.
+- **Z.AI, Kimi and StepFun** are queried by the server part with the key OpenCode already
+  stores in the integration. Answers are cached for five minutes.
 - A provider with no connection is skipped entirely. A connected provider that fails keeps
   its last numbers and shows the error instead of disappearing.
 - The desktop GUI plugin API is experimental; the plugin uses only documented surfaces.
@@ -103,7 +105,7 @@ localized.
 ## 📝 Notes
 
 - Quota windows are a subscription metric. Pay-as-you-go providers report a balance
-  instead, and are not shown.
+  instead, and are not shown; a Step Plan top-up pack is its own window.
 - The panel does not switch models; the model picker still does that.
 - The header pill is also available in a subagent session, where it reads the model from
   the session itself.
