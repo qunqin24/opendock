@@ -58,10 +58,10 @@ Because the log lives outside the plugin package directory, upgrading or reinsta
 Each line is one JSON object (JSONL):
 
 ```
-{"timestamp":"2026/08/10 23:28:22","skill":"tech-briefing","directory":"/Users/showlotus/Desktop/MyCode/xxx","call_type":"manual"}
+{"timestamp":"2026/08/10 23:28:22","skill":"tech-briefing","directory":"/Users/showlotus/Desktop/MyCode/xxx","call_type":"manual","session_id":"ses_abc123"}
 ```
 
-The timestamp is local time in `YYYY/MM/DD HH:MM:SS` format. The call_type is manual (user slash-command) or auto (agent-initiated).
+The timestamp is local time in `YYYY/MM/DD HH:MM:SS` format. The call_type is manual (user slash-command) or auto (agent-initiated). The session_id is the opencode session the invocation happened in (`unknown` when unavailable).
 
 ## Manual aggregation
 

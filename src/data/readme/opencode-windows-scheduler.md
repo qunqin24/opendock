@@ -1,6 +1,6 @@
 # opencode-windows-scheduler
 
-> OpenCode v2 plugin for scheduling and orchestrating AI agent jobs — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. Runs on Windows, macOS and Linux. Free and open source (MIT).
+> OpenCode V1 (≥ 1.18.29) and V2 plugin for scheduling and orchestrating AI agent jobs — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. Runs on Windows, macOS and Linux. Free and open source (MIT).
 
 [![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
@@ -8,9 +8,18 @@
 [![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](package.json)
 
-Русская версия: [docs/README.ru.md](docs/README.ru.md).
+Translations: [Russian](docs/README.ru.md) · [中文](docs/README.zh.md).
 
 ---
+
+## Quickstart
+
+1. Install the plugin (see [Install](#install)) and restart OpenCode.
+2. Ask the agent to schedule your first job — one call is enough:
+
+   > Schedule a task "morning-report" that runs every day at 09:00 with the prompt: "Summarize yesterday's git commits and write the report to ~/reports/".
+
+3. Open the dashboard to watch it run: the agent prints the URL when the task is created (default `http://localhost:4380`), or ask for it later with the `get_dashboard_info` tool. Prefer a preview without installing anything? `node scripts/demo-dashboard.mjs` starts a demo dashboard at `http://localhost:4380`.
 
 ## Why
 
@@ -20,7 +29,7 @@ Most schedulers for AI agents are cron wrappers: they run a prompt on a timer an
 - **Matrix builds** — one template, N repositories, parallel or sequential, with concurrency limits and per-workspace overrides.
 - **Quality gates** — a job is marked successful only if `npm test` (or any command) passes.
 - **Observability** — SQLite history, metrics, logs, and a local web dashboard.
-- **Runs without OpenCode open** - jobs are registered with the native OS scheduler (Windows Task Scheduler, launchd, crontab) and survive reboots.
+- **Runs without OpenCode open** - cron and one-shot jobs are registered with the native OS scheduler (Windows Task Scheduler, launchd, crontab) and survive reboots. File, git and MCP-event triggers are watched inside the plugin process, so they need OpenCode running.
 
 Everything runs on your machine. No SaaS, no telemetry, no accounts.
 
@@ -32,7 +41,7 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 
 | Area | What you get |
 |---|---|
-| Scheduling | cron expressions, one-shot runs via `runAt` / `delaySeconds`, native OS scheduler (Windows / macOS / Linux), timezone-free local time, pause/resume, session continuity (`new` / `reuse` / `last` with `sessionMaxRuns` cleanup) |
+| Scheduling | cron expressions, one-shot runs via `runAt` / `delaySeconds`, native OS scheduler (Windows / macOS / Linux), IANA timezones (native where possible, minute-poll + gate otherwise), pause/resume, session continuity (`new` / `reuse` / `last` with `sessionMaxRuns` cleanup) |
 | Reliability | lock-file no-overlap protection, timeouts with hard kill, retries with delay, crash recovery |
 | Quality | Quality Gate command, before/after hooks, per-task allowed/denied tool lists |
 | Orchestration | `dependsOn` DAG, `nextTaskOnSuccess` / `nextTaskOnError` chains, matrix fan-out (parallel/sequential, `continue`/`stop`, concurrency, per-workspace overrides, aggregator task) |
@@ -40,28 +49,56 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 24 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 25 agent tools, built-in agent skill |
 
 ### Language
 
-The interface ships in Russian (default) and English. Switch it in the sidebar settings
-(Settings → Language) or with the `manage_settings` tool (`action: "update"`,
-`locale: "en"`). The change applies immediately to the GUI, notifications and digest,
-the dashboard and agent tool results — no restart. Agent tool descriptions and schemas
-stay English by design, and diagnostics printed to the console stay Russian.
+The interface ships in Russian (default), English and Simplified Chinese. The language
+selector sits in the scheduler panel header (🌐 Auto / Русский / English / 中文) and is
+also available through the `manage_settings` tool (`action: "update"`, `locale: "zh"`).
+`locale: "auto"` (the "Auto" option) follows the OpenCode interface language: the panel
+reacts to language changes immediately, and the resolved locale is sent to the server so
+notifications, digests and the dashboard use the same language. The switch applies
+without a restart. Dashboard localization is still being rolled out: some client-side
+strings remain Russian for now. Agent tool descriptions and schemas stay English by
+design, and diagnostics printed to the console stay Russian.
 
-Catalogs live in `locales/ru.json` and `locales/en.json`; every key must exist in both,
-otherwise CI fails.
+Catalogs live in `locales/ru.json`, `locales/en.json` and `locales/zh.json`; every key
+must exist in all three, otherwise CI fails.
+
+Documentation is separate from the interface locale: the English docs are the primary
+source, with Russian (`docs/README.ru.md`) and Simplified Chinese (`docs/README.zh.md`,
+`docs/FEATURES.zh.md`, `docs/FAQ.zh.md`, `docs/SAVINGS.zh.md`,
+`docs/CROSS_PLATFORM.zh.md`) translations. Translations may lag behind the English
+originals.
 
 ## Install
 
-Requires OpenCode v2 and Node.js 20+.
+Requires OpenCode V1 ≥ 1.18.29 or V2, and Node.js 22.22+ (node:sqlite and chokidar 6 require Node.js 22.22+). See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for version support and the V1/V2 surface (GUI and RPC are V2-only; TUI works on both).
+
+The config key differs between lines:
+
+| OpenCode line | Key in `opencode.jsonc` |
+|---|---|
+| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["opencode-windows-scheduler"]` |
+| V2 (`≥ 2.2.7`) | `"plugins": ["opencode-windows-scheduler"]` |
+
+Use the key of your line; there is no need to add both. On V2 the CLI does it for you:
 
 ```bash
 opencode plugin add opencode-windows-scheduler
 ```
 
-Or add the plugin to `opencode.jsonc` manually:
+V1 — manual config:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-windows-scheduler"]
+}
+```
+
+V2 — equivalent manual config:
 
 ```jsonc
 {
@@ -73,13 +110,7 @@ Or add the plugin to `opencode.jsonc` manually:
 }
 ```
 
-`experimental.schedules: false` disables the built-in OpenCode scheduler so the agent does not confuse built-in job tools with this plugin's tools. Restart OpenCode after changing the config.
-
-Alternatively, install globally with npm:
-
-```bash
-npm install -g opencode-windows-scheduler
-```
+`experimental.schedules: false` disables the built-in OpenCode scheduler so the agent does not confuse built-in job tools with this plugin's tools. Restart OpenCode after changing the config. The TUI panel is part of the same package (`exports["./tui"]`), so it is enabled by the same entry on both lines.
 
 From source:
 
@@ -92,11 +123,11 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 24 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 26 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
-| `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType` (`cron`/`file`/`git`/`mcp-event`/`once`), `mcpEvent`, `watchPath`, `watchGlobs`, `watchIgnore`, `gitBranch`, `gitPaths`, `gitIgnore`, `gitPollSeconds`, `activeDays`, `windowPolicy` (`skip`/`postpone`/`run`), `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file, git or MCP-event trigger) |
+| `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType` (`cron`/`file`/`git`/`mcp-event`/`once`), `mcpEvent`, `watchPath`, `watchGlobs`, `watchIgnore`, `gitBranch`, `gitPaths`, `gitIgnore`, `gitPollSeconds`, `activeDays`, `windowPolicy` (`skip`/`postpone`/`run`), `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `legacyShell`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file, git or MCP-event trigger) |
 | `list_tasks` | — | Returns jobs with schedule, status, next run, chains, workspace and matrix summary |
 | `update_task` | `name` + any field to change | Partial update; omitted fields keep their values, empty values clear them, `matrix: null` removes the matrix |
 | `delete_task` | `name` | Deletes a job (a matrix parent deletes clones and aggregator) |
@@ -111,19 +142,38 @@ The agent gets the full feature set — 24 tools covering scheduling, pipelines,
 | `get_metrics` | — | Aggregate runs, successes and failures |
 | `get_analytics` | `days?`, `topLimit?` | Period report: counts, success rate, duration, tokens, cost, top tasks |
 | `manage_settings` | `action`, `maxConcurrent?`, `winterMode?`, `notifications?`, `history?` | Read/update global settings (concurrency, notifications, retention) |
+| `manage_local_ai` | `action` (`get`/`update`/`test`), `mode?`, `baseUrl?`, `model?`, `timeoutMs?`, `fallback?`, `confidenceThreshold?`, `shadow?` | Read, update or test the local triage assistant; `test` sends one synthetic notification and reports latency and verdict |
 | `manage_templates` | `action`, template fields | List, save or delete reusable task templates |
 | `manage_profiles` | `action`, `name?`, `port?` | List, create, switch or delete isolated profiles |
 | `transfer_tasks` | `action`, `data?` | Export all tasks to JSON or import them back |
 | `send_notification` | `action` (`test`/`digest`), `channel?` (`all`/`webhook`/`telegram`/`native`) | Test the notification channels or send the digest |
 | `get_dashboard_info` | — | Dashboard port/URL, platform, title, active profile |
 | `cleanup_history` | `retentionDays?`, `maxRecords?` | Delete old history by age and/or record cap |
+| `manage_secrets` | `action`, `name?`, `value?` | Create, list or delete AES-256-GCM encrypted secrets used in task `env` |
+| `get_audit_log` | `action?`, `target?`, `actor?`, `since?`, `until?`, `limit?` | Mutation audit journal: who changed what, when and via which interface |
 | `emit_event` | `eventName`, `payload?` | Start tasks subscribed to an MCP event |
 
 `schedule_task` also accepts the full matrix configuration (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
 
+## Permissions
+
+Agent jobs run with `opencode run --auto`, so their tool policy must be explicit. The global `permissions.defaultPolicy` setting (GUI → Settings, or `manage_settings`) chooses the baseline:
+
+| Policy | Allowed by default | Denied by default |
+|---|---|---|
+| `hybrid` (default) | read, edit, glob, grep, subagent, skill, webfetch, websearch | shell, question |
+| `secure` | read, glob, grep, skill | edit, shell, question, webfetch, websearch, subagent |
+| `legacy` | all ten actions | — |
+
+`deniedTools` always wins. A non-empty `allowedTools` is an allowlist: it denies every action that is not listed, and can explicitly re-enable an action denied by the policy (for example `shell`). `legacyShell: true` re-enables `shell` only under `hybrid`, for tasks migrated from older versions.
+
+Blocked actions are written to the audit journal as `tool.blocked` with `reason: "default-policy"` and a `hint`, and each run logs the active policy.
+
+Recommended pattern: keep `git commit`/`push`, builds and tests outside the agent, in `qualityGate` or `afterScript` (the wrapper runs them with `bash -c`), and leave the agent with `read`/`edit`. Most jobs then need no `shell` at all.
+
 ## Agent skill
 
-The plugin registers a built-in skill, `scheduled-job-best-practices`, so the agent loads guidance only when it is relevant: cron design, self-contained prompts, Quality Gates, matrix concurrency, DAG rules and post-incident diagnosis. No manual `.opencode/skills` setup is needed. The skill ships with `references/recipes.md` — seven copy-ready configurations.
+The plugin registers a built-in skill, `scheduled-job-best-practices`, so the agent loads guidance only when it is relevant: cron design, self-contained prompts, Quality Gates, matrix concurrency, DAG rules and post-incident diagnosis. No manual `.opencode/skills` setup is needed. The skill ships with `references/recipes.md` — eight copy-ready configurations.
 
 ## Matrix builds
 
@@ -188,7 +238,7 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 38 test suites, 600+ checks
+npm test             # 58 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
@@ -200,14 +250,30 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — process model, modules, backends, data model.
+- [docs/CONCEPT.md](docs/CONCEPT.md) — north-star concept: verifiable local-first orchestration (in Russian).
 - [docs/FEATURES.md](docs/FEATURES.md) — full feature catalog with examples.
+- [docs/FAQ.md](docs/FAQ.md) — recovery scenarios, webhook replay, operational answers.
 - [docs/MIGRATION.md](docs/MIGRATION.md) — moving from cron, systemd, launchd or Task Scheduler.
+- [docs/SAVINGS.md](docs/SAVINGS.md) — how the "Saved $" estimate is calculated.
 - [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
+
+Translations: [Русский](docs/README.ru.md) · [中文](docs/README.zh.md).
 
 ## FAQ
 
 **Does it work when OpenCode is closed?**
-Yes. Jobs are registered with the native OS scheduler, so they run without an open OpenCode window.
+Yes, for cron and one-shot jobs. They are registered with the native OS scheduler, so they run without an open OpenCode window.
+
+File (`file`), git (`git`) and MCP-event (`mcp-event`) triggers are watched by the plugin process (chokidar / git polling / the MCP event bus), so OpenCode must be running for those triggers to fire.
+
+| Trigger | Runs without OpenCode? | Mechanism |
+|---|---|---|
+| `cron` | ✅ Yes | Native OS scheduler (Task Scheduler / launchd / crontab) |
+| `once` | ✅ Yes | Native OS scheduler, one-shot registration |
+| `file` | ❌ No | chokidar watcher inside the plugin process |
+| `git` | ❌ No | Git polling inside the plugin process |
+| `mcp-event` | ❌ No | MCP event bus inside the plugin process |
+| `webhook` (`/api/hooks/:name`) | ❌ No | HTTP server inside the plugin process |
 
 **Do jobs run when nobody is logged on?**
 On Windows, only if you opt in with `runWhenLoggedOff: true`: the task is then registered as `schtasks /ru SYSTEM` and runs in session 0 without your profile, mapped drives or saved credentials. The default is interactive only — the job runs while the user is logged on. Linux crontab always runs without a login; a macOS launchd agent runs only inside a user session.
@@ -228,10 +294,10 @@ No. Windows Toast (PowerShell/WinRT), macOS Notification Center (`osascript`) an
 Yes. Set `notifications.quietHours` (`enabled`, `from`, `to` in `HH:MM`). During the window successful and `partial` runs are suppressed, while failures and timeouts are always delivered.
 
 **How do I store secrets?**
-Use `manage_secrets` (or the «🔐 Секреты» panel in the sidebar) to create an encrypted secret. Secrets are stored in `<PLUGIN_DIR>/secrets.json` with AES-256-GCM and a key file (`secrets.key`, rights 0600). In task `env`, reference a secret as `${secret:NAME}` — the value is substituted at run time and masked in logs, history and audit. The secret name can also be set via `manage_settings` → `notifications.telegram.botToken` left empty and `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` env var instead.
+Use `manage_secrets` (or the **🔐 Secrets** panel in the sidebar) to create an encrypted secret. Secrets are stored in `<PLUGIN_DIR>/secrets.json` with AES-256-GCM and a key file (`secrets.key`; mode 0600 on POSIX, an ACL granting only the current Windows user on Windows). In task `env`, reference a secret as `${secret:NAME}` — the value is substituted at run time and masked in logs, history and audit. The secret name can also be set via `manage_settings` → `notifications.telegram.botToken` left empty and `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` env var instead.
 
 **Can I see who changed what?**
-Yes. The audit log (`get_audit_log` tool, «📜 Журнал аудита» panel, `GET /api/audit`) records every mutation — task create/update/delete/run, settings, templates, profiles, workspaces, secrets, import, history cleanup — with actor (mcp/gui/http), source, timestamp and redacted details. Retention defaults to 90 days / 10 000 records.
+Yes. The audit log (`get_audit_log` tool, **Audit log** panel, `GET /api/audit`) records every mutation — task create/update/delete/run, settings, templates, profiles, workspaces, secrets, import, history cleanup — with actor (mcp/gui/http), source, timestamp and redacted details. Retention defaults to 90 days / 10 000 records.
 
 **How is this different from `experimental.schedules`?**
 The built-in scheduler runs jobs while OpenCode is open. This plugin uses the native OS scheduler and adds DAG pipelines, matrix builds, quality gates, webhooks and observability.

@@ -83,7 +83,17 @@ OpenCode installs the npm package automatically on startup. Then `opencode servi
 | `writeProtectPaths` | `[]` | read ok, write blocked |
 | `exemptPaths` | `[]` | exceptions (fixtures with legitimate keys) |
 | `disabledPatterns` | `[]` | disable patterns by id |
+| `piiEmailAllowDomains` | `[]` | email domains never masked (exact, case-insensitive; subdomains not included) |
 | `audit` | `{enabled:true, dir:~/.local/share/opencode/guard}` | audit log |
+
+## Context-safe PII email masking (v1.2)
+
+Corporate machines often have an email-shaped login, so absolute paths contain an address (`/home/<login>@corp/...`). Blunt masking there breaks the command, and replacing a whole env value that merely *contains* a match breaks child shells (a masked `$HOME` breaks everything). Since v1.2:
+
+- an email-shaped PII match is **not masked when it is a path segment** — a `/` or `\` touching the match boundary (secrets are still masked inside paths);
+- **env handling**: secrets fully replace the value (`<REDACTED:env>`) as before; PII in critical vars (`HOME`, `PATH`, `USER`, …16 keys) is left untouched; PII elsewhere masks only the matched substring;
+- `piiEmailAllowDomains` treats listed domains as public identifiers — such emails are never masked (exact domain only, no subdomains).
+- Skips of PII in critical env vars are not audited (by design — otherwise every shell would spam the log); in enforce mode such PII reaches child processes with no trace.
 
 ## Known limitations
 
@@ -91,12 +101,13 @@ OpenCode installs the npm package automatically on startup. Then `opencode servi
 - `opencode run` may admit a prompt before plugins are ready — the context scrub covers that window
 - ФИО <REDACTED:pii-name> requires an explicit marker (too many false positives otherwise)
 - The shell hook cannot throw a veto (API limitation) — the command is replaced with `echo … && exit 1`
+- pre-v1.2.1: the pii-email regex could stall ~19s on ≥100K-char runs of its character class (base64 dumps) — fixed in v1.2.1 via RFC-length bounds (64/255)
 
 ## Development
 
 ```bash
 npm install
-npm test          # node --test (111 tests)
+npm test          # node --test (175 tests)
 npm run typecheck # tsc --noEmit
 ```
 
@@ -109,7 +120,7 @@ The OpenCode server watches `src/**` and reloads the plugin on save — no servi
 **After changes, make sure nothing broke:**
 
 ```bash
-npm test   # expect: pass 111, fail 0
+npm test   # expect: pass 175, fail 0
 ```
 
 **If anything misbehaves (plugin failed to load, config changed outside the watched files):**
@@ -216,13 +227,23 @@ OpenCode сам установит npm-пакет при старте. Зате�
 | `writeProtectPaths` | `[]` | read ok, write blocked |
 | `exemptPaths` | `[]` | исключения (фикстуры с легитимными ключами) |
 | `disabledPatterns` | `[]` | отключить паттерны по id |
+| `piiEmailAllowDomains` | `[]` | домены email, которые никогда не маскируются (точное совпадение, без поддоменов) |
 | `audit` | `{enabled:true, dir:~/.local/share/opencode/guard}` | аудит-лог |
+
+## Контекстно-безопасное маскирование email (v1.2)
+
+В корпоративных средах логин часто = email, и абсолютные пути его содержат (`/home/<login>@corp/...`). Грубая маска там ломает команду, а полная замена env-значения ломает дочерние шеллы (замаскированный `$HOME` ломает всё). С v1.2:
+
+- email-подобный PII-матч **не маскируется внутри пути** — `/` или `\`, примыкающий к границе матча (секреты внутри путей маскируются по-прежнему);
+- **env**: секреты по-прежнему полностью заменяют значение (`<REDACTED:env>`); PII в критических переменных (`HOME`, `PATH`, `USER`, …16 штук) не трогается; PII в остальных маскирует только подстроку матча;
+- `piiEmailAllowDomains` — перечисленные домены считаются публичными идентификаторами, такие email не маскируются нигде (точный домен, без поддоменов).
 
 ## Ограничения (известные)
 
 - `~`, `$VAR`, шелл-глобы в командах не раскрываются при статической проверке — команда нейтрализуется только если токен буквально совпадает с blocked-путём
 - `opencode run` может адмитить промпт до готовности плагинов — защиту в этом окне догоняет context-скраб
 - ФИО — только с явным маркером (без него — слишком много ложных срабатываний)
+- до v1.2.1: regex pii-email мог блокировать хук ~19с на ране ≥100К символов класса (base64-дампы) — исправлено в v1.2.1 границами RFC-длины (64/255)
 - shell-хук не может кидать вето (API так не умеет) — команда заменяется на `echo … && exit 1`
 - decode-and-scan не ловит: path-эвейжен (`.[e]nv`-глобы), chunk-splitting (`cut -c`), вложенный энкодинг (глубина 1), блобы >8192 символов. От случайных утечек, не от целенаправленного агента
 
@@ -230,7 +251,7 @@ OpenCode сам установит npm-пакет при старте. Зате�
 
 ```bash
 npm install
-npm test          # node --test (111 тестов)
+npm test          # node --test (164 теста)
 npm run typecheck # tsc --noEmit
 ```
 
@@ -240,7 +261,7 @@ npm run typecheck # tsc --noEmit
 
 **Правки кода:** сохранил файл — сервер сам перезагрузил плагин (file watcher). Никаких команд не требуется.
 
-**Проверка, что не сломано:** `npm test` — ожидается `pass 111, fail 0`.
+**Проверка, что не сломано:** `npm test` — ожидается `pass 175, fail 0`.
 
 **Если что-то пошло не так (плагин не загрузился, правки вне зоны watcher'а):** `opencode service restart` — эта одна команда универсальный «сброс/апдейт».
 

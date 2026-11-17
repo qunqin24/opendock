@@ -4,9 +4,11 @@
 [![CI](https://github.com/daika7ana/opencode-zenmux-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/daika7ana/opencode-zenmux-plugin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An [OpenCode](https://opencode.ai) plugin that keeps the ZenMux model catalog up to date by fetching it live from `https://zenmux.ai/api/v1/models` on every `opencode models --refresh`.
+An [OpenCode](https://opencode.ai) plugin that keeps the ZenMux model catalog up to date by fetching it live from `https://zenmux.ai/api/v1/models` and serving it to OpenCode's model catalog.
 
 It also provides a non-duplicative way to force ZenMux provider routing via the `model:provider` syntax using a user-controlled routing table.
+
+The instructions below target **OpenCode 2.x**. The same package also runs on OpenCode 1.18.x through a V1 entrypoint; those differences are called out inline and collected under [OpenCode 1.x](#opencode-1x).
 
 ## Prerequisites
 
@@ -17,22 +19,19 @@ It also provides a non-duplicative way to force ZenMux provider routing via the 
 
 1. **Install:**
    ```bash
-   opencode plugin --global @daika7ana/opencode-zenmux-plugin@latest
+   opencode plugin add @daika7ana/opencode-zenmux-plugin@latest
    ```
 2. **Authenticate:**
    ```bash
    export ZENMUX_API_KEY="your-key"
    ```
    Or run `/connect zenmux` inside OpenCode to store the key in its auth system.
-3. **Refresh:**
-   ```bash
-   opencode models --refresh
-   ```
+3. **Use it:** run `/models` and pick a `zenmux/...` entry. The catalog is fetched when the plugin loads and cached on disk for `catalogCacheTTL` (60 minutes by default). On a first run there is no cache yet, so the model list fills in a few seconds after startup.
 
 ## Features
 
-- **Live model refresh** — fetches the public ZenMux catalog on startup and on `opencode models --refresh`.
-- **Provider routing** — rewrite `api.id` to `modelId:providerSlug` for any model without cluttering the model list.
+- **Live model refresh** — fetches the public ZenMux catalog when the plugin loads and refreshes it every `catalogCacheTTL` minutes. OpenCode 2.x has no manual refresh command; on 1.x, `opencode models --refresh` forces a refetch.
+- **Provider routing** — rewrite the request model ID to `modelId:providerSlug` for any model without cluttering the model list.
 - **Anthropic Messages API** — route specific models through ZenMux's Anthropic endpoint for extended features (extended thinking, prompt caching, etc.).
 - **Auth hook** — adds `/connect zenmux` for storing an API key in OpenCode's auth system.
 - **JSONC support** — both the plugin config file and routing files can include comments.
@@ -42,35 +41,31 @@ It also provides a non-duplicative way to force ZenMux provider routing via the 
 
 ### From npm
 
-This plugin is meant to be installed **globally**, not per-project. Use the `--global` flag and the `@latest` tag so OpenCode always resolves the newest published version:
+This plugin is meant to be installed **globally**, not per-project. Use the `@latest` tag so OpenCode always resolves the newest published version:
 
 ```bash
-opencode plugin --global @daika7ana/opencode-zenmux-plugin@latest
+opencode plugin add @daika7ana/opencode-zenmux-plugin@latest
 ```
 
-> The command above uses the current OpenCode CLI syntax. If your version of OpenCode uses a different plugin command, adjust accordingly.
+> The command above uses the OpenCode 2.x CLI syntax. On 1.x, use `opencode plugin --global @daika7ana/opencode-zenmux-plugin@latest`.
 
 This adds the plugin to your global OpenCode config (`~/.config/opencode/opencode.json`) and installs it into the OpenCode plugin cache.
 
-After installing, refresh the model catalog so OpenCode picks up the ZenMux models:
-
-```bash
-opencode models --refresh
-```
+The plugin fetches the ZenMux catalog when OpenCode loads it, so there is no manual refresh step on OpenCode 2.x.
 
 #### Force an update
 
-Use the `--force` flag to replace the existing cached version:
+Update the installed package:
 
 ```bash
-opencode plugin --global --force @daika7ana/opencode-zenmux-plugin@latest
+opencode plugin update @daika7ana/opencode-zenmux-plugin
 ```
 
 If a stale cache still prevents the update from being applied, delete the cached package and reinstall:
 
 ```bash
 rm -rf ~/.cache/opencode/packages/@daika7ana/opencode-zenmux-plugin@latest
-opencode plugin --global @daika7ana/opencode-zenmux-plugin@latest
+opencode plugin add @daika7ana/opencode-zenmux-plugin@latest
 ```
 
 **Next:** [Configure authentication](#authentication) and optionally set up [provider routing](#provider-routing).
@@ -87,44 +82,40 @@ pnpm install
 pnpm build
 ```
 
-Then add it to your global OpenCode config (`~/.config/opencode/opencode.json`):
+Then add the plugin directory to your global OpenCode config (`~/.config/opencode/opencode.json`):
 
 ```json
 {
-  "plugin": ["file:///path/to/opencode-zenmux-plugin/dist/index.js"]
+  "plugins": ["/path/to/opencode-zenmux-plugin"]
 }
 ```
 
-After installing from source, refresh the model catalog so OpenCode picks up the ZenMux models:
+> OpenCode 2.x requires local plugin paths to name a directory. On 1.x, use the singular key with the built file: `"plugin": ["file:///path/to/opencode-zenmux-plugin/dist/index.js"]`.
 
-```bash
-opencode models --refresh
-```
+The catalog is fetched when the plugin loads; no refresh command is needed.
 
 **Next:** [Configure authentication](#authentication) and optionally set up [provider routing](#provider-routing).
 
 </details>
 
-### OpenCode V2
+### OpenCode 1.x
 
-The plugin is a **dual V1/V2 plugin**: its default export is `{ id, setup, server }`. OpenCode 1.18.x calls `server()`; OpenCode 2.x calls `setup()`. One install covers both — no separate package.
+OpenCode 1.18.x reads the singular `plugin` key and calls the plugin's `server()` entrypoint instead of `setup()`. The V1 CLI installs and updates with the flags form:
 
-Under V2, declare the plugin with the plural `plugins` key and an object entry rather than the V1 tuple:
+```bash
+opencode plugin --global @daika7ana/opencode-zenmux-plugin@latest
+opencode plugin --global --force @daika7ana/opencode-zenmux-plugin@latest
+```
+
+Declare it with a tuple to pass options:
 
 ```json
 {
-  "plugins": [
-    {
-      "package": "@daika7ana/opencode-zenmux-plugin",
-      "options": { "baseURL": "https://zenmux.ai/api/v1" }
-    }
-  ]
+  "plugin": [["@daika7ana/opencode-zenmux-plugin", { "baseURL": "https://zenmux.ai/api/v1" }]]
 }
 ```
 
-Options behave exactly as in the V1 tuple form. V2 registers the provider and models through the provider/model plugin API — including per-model `package` and `settings.baseURL` so models routed with `sdk: "anthropic"` keep using `anthropicBaseURL` — and registers the API key as both an `env` method (`ZENMUX_API_KEY`) and a stored-key method.
-
-> **Status:** V2 plugins are supported by the `@opencode/cli` 2.x line (the binary it installs is named `opencode2`, e.g. `2.0.12`), which reads the plural `plugins` key and calls `setup()`. The V1 line (`opencode-ai`, up to `1.19.x`) reads only the singular `plugin` key — its config schema has no `plugins` entry, so it silently ignores one. Both entrypoints are implemented, and each CLI picks the matching one.
+On 1.x the catalog is fetched when models are listed, and `opencode models --refresh` bypasses the disk cache and refetches. There is no background refresh interval on 1.x; the provider and models are registered through the `config` and `provider.models` hooks rather than a transform.
 
 ## Configuration
 
@@ -179,40 +170,41 @@ Example:
 }
 ```
 
-### Plugin tuple override
+### Plugin options in `opencode.json`
 
-You can also pass options directly in the plugin tuple in `opencode.json`. Those override the config file:
+You can also pass options in the `plugins` entry in `opencode.json`. Those override the config file:
 
 ```json
 {
-  "plugin": [
-    [
-      "@daika7ana/opencode-zenmux-plugin",
-      {
-        "baseURL": "https://zenmux.ai/api/v1"
-      }
-    ]
+  "plugins": [
+    {
+      "package": "@daika7ana/opencode-zenmux-plugin",
+      "options": { "baseURL": "https://zenmux.ai/api/v1" }
+    }
   ]
 }
 ```
 
+On OpenCode 1.x, pass the same options object as the second item of the `plugin` tuple instead.
+
 ### Configuration options
 
-All options can be set in `zenmux-plugin.json` (or `zenmux-plugin.jsonc`). All options except `routing` can also be passed directly in the plugin tuple in `opencode.json`. The `routing` option can only be set in the config file because it belongs in a dedicated routing table. Plugin tuple options override the config file.
+All options can be set in `zenmux-plugin.json` (or `zenmux-plugin.jsonc`). All options except `routing` can also be passed in the `plugins` entry's `options` in `opencode.json`. The `routing` option can only be set in the config file because it belongs in a dedicated routing table. Options in `opencode.json` override the config file.
 
-| Option                   | Type                    | Default                                          | Description                                                                                                                                                                                                                                                                            |
-| ------------------------ | ----------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `baseURL`                | `string`                | `https://zenmux.ai/api/v1`                       | Base URL for actual ZenMux API calls.                                                                                                                                                                                                                                                  |
-| `anthropicBaseURL`       | `string`                | `https://zenmux.ai/api/anthropic/v1`             | Base URL for Anthropic Messages API calls (used when a routing entry has `sdk: "anthropic"`).                                                                                                                                                                                          |
-| `modelsURL`              | `string`                | `https://zenmux.ai/api/v1/models`                | URL to fetch the public model catalog.                                                                                                                                                                                                                                                 |
-| `routingFile`            | `string \| null`        | `null`                                           | Explicit path to the routing file; overrides the default search order.                                                                                                                                                                                                                 |
-| `routing`                | `array`                 | —                                                | In-file routing table. See [Provider routing](#provider-routing).                                                                                                                                                                                                                      |
-| `defaultOutputTokens`    | `number`                | `16384`                                          | Fallback `limit.output` when the catalog has no `max_completion_tokens`.                                                                                                                                                                                                               |
-| `excludeNonChat`         | `boolean`               | `true`                                           | Exclude models whose output modality is not `text`.                                                                                                                                                                                                                                    |
-| `catalogCacheTTL`        | `number`                | `60`                                             | Minutes to cache the ZenMux catalog (models + frontend enrichment) on disk so startups skip the network calls. `0` disables the cache. `opencode models --refresh` bypasses the cache and refetches.                                                                                   |
-| `pricingTieBreak`        | `"lowest" \| "highest"` | `"lowest"`                                       | Which price to use when ZenMux returns several prices for the same token threshold (time-of-day, cache-type or output-length variants OpenCode cannot represent). `"lowest"` matches the models.dev catalog; `"highest"` reports the most conservative (list/peak) price.              |
-| `routedModelIds`         | `boolean`               | `false`                                          | Put the provider suffix into the model `id` itself (see [below](#routed-model-ids)).                                                                                                                                                                                                   |
-| `reasoningContentModels` | `array`                 | `["deepseek", "glm", "minimax", "kimi", "mimo"]` | Model ids (substring match) that must pass `reasoning_content` back to the API on subsequent turns; enables OpenCode's `interleaved` capability for them. The plugin also unions in models that OpenCode's cached models.dev catalog marks as needing `reasoning_content` passthrough. |
+| Option                   | Type                    | Default                                             | Description                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ----------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseURL`                | `string`                | `https://zenmux.ai/api/v1`                          | Base URL for actual ZenMux API calls.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `anthropicBaseURL`       | `string`                | `https://zenmux.ai/api/anthropic/v1`                | Base URL for Anthropic Messages API calls (used when a routing entry has `sdk: "anthropic"`).                                                                                                                                                                                                                                                                                                                         |
+| `modelsURL`              | `string`                | `https://zenmux.ai/api/v1/models`                   | URL to fetch the public model catalog.                                                                                                                                                                                                                                                                                                                                                                                |
+| `frontendURL`            | `string`                | `https://zenmux.ai/api/frontend/model/listByFilter` | URL for the ZenMux frontend catalog used to enrich output limits and capabilities.                                                                                                                                                                                                                                                                                                                                    |
+| `routingFile`            | `string \| null`        | `null`                                              | Explicit path to the routing file; overrides the default search order.                                                                                                                                                                                                                                                                                                                                                |
+| `routing`                | `array`                 | —                                                   | In-file routing table. See [Provider routing](#provider-routing).                                                                                                                                                                                                                                                                                                                                                     |
+| `defaultOutputTokens`    | `number`                | `16384`                                             | Fallback `limit.output` when the catalog has no `max_completion_tokens`.                                                                                                                                                                                                                                                                                                                                              |
+| `excludeNonChat`         | `boolean`               | `true`                                              | Drop models that cannot serve chat completions: entries whose `suitable_api` omits `chat.completions`, or — when frontend data is absent — whose output modalities omit `text`.                                                                                                                                                                                                                                       |
+| `catalogCacheTTL`        | `number`                | `60`                                                | Minutes to cache the ZenMux catalog (models + frontend enrichment) on disk so startups skip the network calls, and the interval between background refreshes on 2.x. `0` disables the cache and the refresh interval (2.x still fetches once per session). To force a refetch on 2.x, delete `$XDG_CACHE_HOME/opencode/zenmux-models-*.json` (default `~/.cache/opencode/`); on 1.x, run `opencode models --refresh`. |
+| `pricingTieBreak`        | `"lowest" \| "highest"` | `"lowest"`                                          | Which price to use when ZenMux returns several prices for the same token threshold (time-of-day, cache-type or output-length variants OpenCode cannot represent). `"lowest"` matches the models.dev catalog; `"highest"` reports the most conservative (list/peak) price.                                                                                                                                             |
+| `routedModelIds`         | `boolean`               | `false`                                             | Put the provider suffix into the model `id` itself (see [below](#routed-model-ids)).                                                                                                                                                                                                                                                                                                                                  |
+| `reasoningContentModels` | `array`                 | `["deepseek", "glm", "minimax", "kimi", "mimo"]`    | Model ids (substring match) that return `reasoning_content` and must pass it back on later turns; enables OpenCode's `interleaved` capability on 1.x and `compatibility.reasoningField` on 2.x. Not applied to models routed with `sdk: "anthropic"`. The plugin also unions in models that OpenCode's cached models.dev catalog marks as needing `reasoning_content` passthrough.                                    |
 
 ### Option precedence
 
@@ -220,9 +212,9 @@ Options are merged in this order (later wins):
 
 1. Plugin defaults
 2. `zenmux-plugin.json` / `zenmux-plugin.jsonc`
-3. Options passed directly in the plugin tuple in `opencode.json` (does not include `routing`)
+3. `options` in the `plugins` entry in `opencode.json` (the `plugin` tuple on 1.x), which does not include `routing`
 
-That means plugin tuple options always override the config file, and the config file overrides the built-in defaults. The `routing` field can only be set in the config file.
+That means options in `opencode.json` always override the config file, and the config file overrides the built-in defaults. The `routing` field can only be set in the config file.
 
 ## Authentication
 
@@ -248,7 +240,7 @@ Then enter your API key. It will be stored in OpenCode's auth system and used au
 
 ZenMux supports forced routing by sending `modelId:providerSlug` as the model id. The plugin applies this via a routing table, which can live in `zenmux-plugin.json` under the `routing` field or in a separate routing file. You do not need both.
 
-When a routing entry exists with a `provider`, the plugin sets `api.id = "modelId:providerSlug"` for that model. If `provider` is omitted (for example when only swapping the SDK), `api.id` is left as the plain model id. The OpenCode model list still shows the model once.
+When a routing entry exists with a `provider`, the plugin sets the ID sent to ZenMux to `"modelId:providerSlug"` (`modelID` on 2.x, `api.id` on 1.x) for that model. If `provider` is omitted (for example when only swapping the SDK), the sent ID is left as the plain model id. The OpenCode model list still shows the model once.
 
 ### Routing precedence
 
@@ -258,7 +250,7 @@ If multiple routing sources are present, they are checked in this order and the 
 2. **`routing` field** in `zenmux-plugin.json` / `zenmux-plugin.jsonc`.
 3. **Default routing file search** (see below).
 
-If `routingFile` is set but the file does not exist, routing is disabled for that refresh; the plugin does **not** fall back to the inline `routing` field or the default file search.
+If `routingFile` is set but the file does not exist, routing is disabled for that load; the plugin does **not** fall back to the inline `routing` field or the default file search.
 
 ### Routing file names
 
@@ -299,15 +291,15 @@ Some models expose additional features through the Anthropic Messages API format
 
 When `sdk` is `"anthropic"`:
 
-- The model uses `@ai-sdk/anthropic` instead of `@ai-sdk/openai-compatible`
-- Requests go to `anthropicBaseURL` (default: `https://zenmux.ai/api/anthropic/v1`) instead of `baseURL`
+- The model uses `@opencode/ai/providers/anthropic` instead of `@opencode/ai/providers/openai-compatible` (on 1.x: `@ai-sdk/anthropic` instead of `@ai-sdk/openai-compatible`)
+- Requests go to `anthropicBaseURL` (default: `https://zenmux.ai/api/anthropic/v1`) instead of `baseURL`; on 2.x this is applied per model through `settings.baseURL`
 - Auth uses the same `ZENMUX_API_KEY` (sent as `x-api-key` header)
 
 The `sdk` and `provider` fields are both optional. `sdk` defaults to `"openai"`; existing routing files without `sdk` continue to work unchanged. When `provider` is omitted alongside an SDK swap, the model id is left as-is and only the SDK + base URL change.
 
 ### Routed model ids
 
-By default, routing only affects `api.id`. OpenCode's manual model selection uses `api.id`, so routing works there. Some tools (e.g., oh-my-opencode-slim) resolve models from their own JSON config and use the raw model `id` instead of `api.id`.
+By default, routing only affects the ID sent to ZenMux, not the catalog ID you select in OpenCode. Some tools (e.g., oh-my-opencode-slim) resolve models from their own JSON config and use the raw catalog `id`, so they cannot address a routed variant.
 
 Set `routedModelIds: true` in `zenmux-plugin.json` to include the provider suffix in the model `id` itself:
 
@@ -354,13 +346,13 @@ pnpm format:check
 
 ## How it works
 
-The plugin default-exports a dual entrypoint, an object `{ id, setup, server }`. OpenCode 1.18.x calls `server()`, which registers three hooks:
+The plugin default-exports `{ id, setup, server }`. OpenCode 2.x calls `setup(ctx)`, which:
 
-1. **`config`** — registers the `zenmux` provider with `@ai-sdk/openai-compatible` and the configured `baseURL`.
-2. **`auth`** — adds an API key auth method for `/connect zenmux`.
-3. **`provider.models`** — fetches the live ZenMux catalog, loads the routing table, maps records to OpenCode's `ModelV2` shape, and applies routing. Models with `sdk: "anthropic"` in the routing table use `@ai-sdk/anthropic` and point to `anthropicBaseURL`.
+1. Registers the `zenmux` provider and its models through `ctx.provider.transform`, using `@opencode/ai/providers/openai-compatible` and the configured `baseURL`. Models routed with `sdk: "anthropic"` get `@opencode/ai/providers/anthropic` plus a per-model `settings.baseURL`; models that need `reasoning_content` passthrough set `compatibility.reasoningField`.
+2. Registers the API key through `ctx.integration.transform` as both an `env` method (`ZENMUX_API_KEY`) and a stored-key method (`/connect zenmux`).
+3. Seeds the catalog from the on-disk cache and registers it **before the first `await`** — a Location's first catalog read returns only what is registered at that moment, so the config, routing, cache and models.dev reads are synchronous. It then fetches the live catalog in the background, replays the transform via `provider.reload()`, and repeats on the `catalogCacheTTL` interval. The cleanup returned from `setup()` stops the timer when the plugin unloads. With no cache yet (fresh install), the provider starts with an empty model list and models appear once the first background fetch finishes.
 
-OpenCode 2.x calls `setup(ctx)` instead, which registers the same provider and models through the V2 provider/model plugin API. It registers from the on-disk catalog cache first — the host awaits `setup()` only briefly, and V2 transforms must stay synchronous — then fetches the live catalog in the background, replays the transform via `provider.reload()`, and repeats on the `catalogCacheTTL` interval. It also registers the API key as an integration method.
+OpenCode 1.18.x calls `server()` instead, which registers the same provider and models through three hooks: `config` (provider with `@ai-sdk/openai-compatible` and `baseURL`), `auth` (API key for `/connect zenmux`), and `provider.models` (live catalog plus routing, with `@ai-sdk/anthropic` and `anthropicBaseURL` for `sdk: "anthropic"`).
 
 The public models endpoint does not require authentication. The API key is only used by the actual provider for chat/completion requests.
 

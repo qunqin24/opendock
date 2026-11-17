@@ -1,15 +1,15 @@
 # micromanager
 
 An [OpenCode](https://opencode.ai) v2 plugin that turns one agent into an orchestrator of sub-agents: the
-**micromanager** splits your request into small tasks and starts a worker per task, and the plugin plus
-[TypeSafe Jev](https://typesafe.ai), a decision model, secure every one of them.
+**micromanager** splits your request into small tasks and starts a worker per task, and the plugin plus its
+[decision client](https://typesafe.ai) secure every one of them.
 
 - **Isolation:** every worker that writes gets its own git worktree and branch; your checkout is never touched. Its
   shell commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS).
 - **Checks before merge:** a writer's change is merged only when its checks pass (`Checks: npm test`), through a merge
   train onto the session's branch `jev/<job>`; you merge that into your checkout when you say so.
-- **Decisions by Jev:** which role, model and skills a task gets, how hard it is, and which permission requests are
-  answered on your behalf; the rest is paused and put to you.
+- **Decisions by the decision client:** which role, model and skills a task gets, how hard it is, and which permission
+  requests are answered on your behalf; the rest is paused and put to you.
 - **Hard tasks run as trials:** several attempts at once on different model families; the best one is merged, by its
   checks, a review and cost, and a design draft is yours to pick from a comparison. Every attempt's outcome and cost
   is logged, the data for a router that learns.
@@ -29,8 +29,10 @@ and research [docs/plan.md](docs/plan.md). Development happens on the branch `om
   `user.email` (the plugin no longer forces `micromanager <micromanager@localhost>`), so without one git fails with
   its own author-identity error. The plugin's private memory repository under its state directory is internal and
   unchanged.
-- A Jev API key, as `JEV_API_KEY` or, on Linux, in the keyring (`secret-tool`, service `typesafe`, key `jev`; macOS
-  has no `secret-tool`, so there the variable is the way). Without a key, every decision goes to you.
+- A key for the cloud decision client, only if you switch the decider to `"decider": { "mode": "cloud" }`: as
+  `JEV_API_KEY` or, on Linux, in the keyring (`secret-tool`, service `typesafe`, key `jev`; macOS has no
+  `secret-tool`, so there the variable is the way). The default mode is `local`, which reads neither the key nor a
+  cloud URL; in `cloud` without a key, every decision goes to you.
 - For the sandbox: on Linux `bubblewrap`, `socat` and `ripgrep`; on macOS nothing extra (Seatbelt). Without them
   commands run unwrapped, and the plugin says so.
 - Optional: the local embedding service for the memory (`./install.sh --embedding`, a systemd user unit), and `uv`
@@ -77,7 +79,7 @@ needed to start (see the optional settings under "Use").
 ## Use
 
 Pick the agent **micromanager** in OpenCode and tell it what you want. It works like oh-my-openagent's orchestrator, with
-Jev and the plugin securing every task:
+the decision client and the plugin securing every task:
 
 1. **The micromanager orchestrates.** It splits your request into small tasks, keeps a todo list and starts a worker
    per task with OpenCode's own `subagent` tool, in the background: the role as agent (`coder`, `tester`, `writer`,
@@ -97,25 +99,36 @@ Jev and the plugin securing every task:
 3. **Isolation fails loud.** A session that is a child of a micromanager session but is not a claimed worker has its
    write tools denied, with a journal record naming the job, session, directory and reason. Reads stay allowed so the
    situation stays diagnosable. A role agent you pick by hand in your own checkout is not a child and is untouched.
-4. **Jev and the plugin secure each task:**
+4. **The decision client and the plugin secure each task:**
+   - **Two modes: `local` or `cloud`, no hybrid.** `"decider": { "mode": "local" }` (the default) answers every
+     decision on this machine and reads neither a key nor a cloud URL. `"decider": { "mode": "cloud" }` may send one to
+     the cloud decision client — after a deterministic redaction and, per call, a preview you confirm. A session that
+     has not opted in never reaches that gate at all: its decisions are answered locally and the journal records the
+     mode, the backend and that nothing was sent. The opt-in is asked once per session, through a form, and remembered
+     for that session only; it is asked again after 12 hours or when the session's first cloud ask belongs to another
+     job. The same form decides whether the guards may go along — the default is that they stay here — and that answer
+     too cannot outlive the session. A payload that carries the `sensitive` guard flag is never sent, whatever the
+     session allowed. Without a local name detector, `cloud` costs you a confirmation round trip per call, which can be
+     worse than `local` plus the one question a low-confidence decision asks.
    - **Guards.** A check looks at each delegation, at web content and at workers' permission requests. Keys and
-     tokens are masked.
-   - **Private data stays here.** Every request to a model, the micromanager's, a worker's, a helper's, the
-     summarizer's and Jev's, has its private data swapped for placeholders first: keys and tokens (some twenty
-     formats, private keys, URL passwords, secret-looking assignments, and the actual values of the server's secret
-     variables, the project's `.env` files and the Jev key), e-mail addresses, phone numbers, IBANs and card numbers
-     (checked by checksum), and, with `"redact": { "names": true }`, people's names and street addresses found by the
-     local GLiNER server (`/v1/entities`; code is read for its comments and strings only). One value always gets the
-     same placeholder (`PERSON_1`, `SECRET_2`, `email3@redacted.invalid`), so a model can still reason about it and
-     the prompt cache holds. The model's tool calls get the real values back: files all of them, so an edit keeps a
-     file's key; commands everything but secrets; web tools nothing. The vault lives in
+     tokens are masked. The guards — injection, harmful, sensitive — run on this machine in both modes unless the
+     session's user explicitly let them go.
+   - **Private data stays here.** Every request to a model — the micromanager's, a worker's, a helper's, the
+     summarizer's and the decision client's — has its private data swapped for placeholders first: keys and tokens
+     (some twenty formats, private keys, URL passwords, secret-looking assignments, and the actual values of the
+     server's secret variables, the project's `.env` files and the cloud client's key), e-mail addresses, phone numbers,
+     IBANs and card numbers (checked by checksum), and, with `"redact": { "names": true }`, people's names and street
+     addresses found by the local GLiNER server (`/v1/entities`; code is read for its comments and strings only). One
+     value always gets the same placeholder (`PERSON_1`, `SECRET_2`, `email3@redacted.invalid`), so a model can still
+     reason about it and the prompt cache holds. The model's tool calls get the real values back: files all of them, so
+     an edit keeps a file's key; commands everything but secrets; web tools nothing. The vault lives in
      `~/.local/state/micromanager/vault.json` (mode 600, out of every sandbox); OpenCode's database and the TUI keep the
      real text, so a model's reply to you can show a placeholder. Your git name and e-mail and the values in
      `"redact": { "allow": [...] }` are never replaced. With the GLiNER server down, names go unchecked and the
      journal says so (`redact.names-unavailable`); `redact.new` records each new placeholder, never its value.
    - **Model and skills.** The plugin routes each role to its model and names the skills in the worker's brief.
-   - **Permissions (N13).** Workers' permission requests go to Jev. What Jev is not sure about, what it says only
-     you can decide, and what a hard rule sends to you is **paused, not refused**: the worker waits, and the
+   - **Permissions (N13).** Workers' permission requests go to the decision client. What it is not sure about, what it
+     says only you can decide, and what a hard rule sends to you is **paused, not refused**: the worker waits, and the
      micromanager is woken with the request (`A1`, `A2`, …), what it is for and why it was not decided. It answers a
      request that clearly serves the task itself with `answer_permission` (`once`, `job` for the same request for the
      rest of the job, or `refuse`), and puts anything else to you. You answer in your own words — "yes", "yes always",
@@ -136,24 +149,27 @@ Jev and the plugin securing every task:
        profiles, the plugin's journal or the project's `.env` files (`.env.example` stays readable);
      - the network reaches the package registries (npm, PyPI, crates.io, Go) and nothing else;
      - the environment is an allowlist: `PATH`, `HOME`, the locale and the usual toolchain variables, plus `CI=1`.
-       The desktop's sockets (D-Bus, Hyprland, Wayland, the SSH and GPG agents) and the credentials of the hub, Jev
-       and Claude Code are never handed on, whatever is granted.
+       The desktop's sockets (D-Bus, Hyprland, Wayland, the SSH and GPG agents) and the credentials of the hub, the
+       decision client and Claude Code are never handed on, whatever is granted.
 
-     Inside the sandbox a writer's command that stays in its worktree is allowed without Jev: no path outside the
+     Inside the sandbox a writer's command that stays in its worktree is allowed without a decision: no path outside the
      worktree, no home directory, no program that reaches past the tree (`kill`, `systemctl`, `curl`, `ssh`,
      publishing, …) and no git command that moves shared refs (`commit`, `checkout`, `stash`, `reset`, …). The hard
      rules still come first. The sidebar shows `sandbox ✓` under the job's switches. Without the sandbox (the setting
      `"sandbox": false`, an unsupported platform, or bubblewrap, socat or ripgrep missing) the commands run unwrapped
-     with the cleaned environment, a writer's commands go to Jev again, and the sidebar says `no sandbox` and why.
+     with the cleaned environment, a writer's commands go to the decision client again, and the sidebar says
+     `no sandbox` and why.
    - **Workers ask for a variable or a host.** A command that fails because a variable is not set, or a host is
      unreachable, is no dead end: the worker calls `request_env` (every worker) or `request_network` (writers and
      researchers) with the name and why, and its call waits for the decision. The never list, a variable that is not
      set where the server runs, and anything you refused earlier in the job are refused at once. A setting
-     (`NODE_ENV`, `RUST_LOG`) or a public host is granted by Jev when it is sure. A secret-looking variable (`*_TOKEN`,
-     `*_KEY`, a URL with credentials, …), and a host asked for while the job's commands hold such a secret, come to you
+     (`NODE_ENV`, `RUST_LOG`) or a public host is granted by the decision client when it is sure. A secret-looking
+     variable (`*_TOKEN`, `*_KEY`, a URL with credentials, …), and a host asked for while the job's commands hold such a
+     secret, come to you
      as a form through the micromanager (`Grant G1`: allow for this job, or refuse); the host form names the secret,
      because the two together are what it takes to send it away. A grant holds for the job and lands in its control
-     file, names only: no model ever sees a value (Jev gets its length and kinds of characters). Workers are told
+     file, names only: no model ever sees a value (the decision client gets its length and kinds of characters).
+     Workers are told
      never to fill in a missing variable with a value they made up.
    - **Designers can look.** No browser can run in the sandbox (its own sandbox needs user namespaces, and it needs
      Unix sockets, which the sandbox blocks for every worker), so a designer has `look`: a page, an svg, an image or a
@@ -196,16 +212,18 @@ Jev and the plugin securing every task:
      `finish_task` and counts as a failing check.
    - **A wrong check can be changed, not dodged.** A writer that finds a check or a frozen test wrong calls
      `request_check_change` with the evidence and a proposal, and waits. A broken check (a wrong path, a typo) goes
-     through Jev's prefilter to the micromanager (`decide_change`); a test that contradicts the task is checked by a
+     through the decision client's prefilter to the micromanager (`decide_change`); a test that contradicts the task is
+     checked by a
      reviewer of another model family first; a gap in the spec or a change to the fitness contract is always yours, as
      a form. The plugin applies an accepted change itself, to every attempt of a trial. Two requests per task, and a
      refused change stays refused.
    - **A task that changed nothing does not merge.** A gate that passes over an empty diff verified nothing, so it is
      reported as unverified instead. Failing checks come back at most twice; then the worker stops and says the
      check is the likely problem, because an unsatisfiable one otherwise burns the whole session.
-   - **Limits.** The watchdog stops loops and stalled workers, and Jev reviews a worker's progress at an interval that
+   - **Limits.** The watchdog stops loops and stalled workers, and the decision client reviews a worker's progress at an
+    interval that
      adapts: first about the steps merged tasks of its kind needed (60 by default), sooner when it stops writing or keeps
-     failing, then longer or shorter by how sure Jev is that it gets on. A
+     failing, then longer or shorter by how sure the decision client is that it gets on. A
      command that ran and did not fail is progress, so a worker verifying its work is not mistaken for a stuck one.
 5. **Reports come back.** The plugin's note "T… merged into …" lands in the micromanager's session, then OpenCode
    adds the worker's report and wakes the micromanager. It decides what comes next, continues a worker by its
@@ -263,7 +281,8 @@ Jev and the plugin securing every task:
    deleted, and the next session asks again). Nothing happens before you answer.
 
 7. **Fitness contracts.** A task that asks to make something better with no fixed end (faster, smaller, more
-   reliable) is refused until it has a fitness contract: Jev's N5 ask, which estimates the difficulty anyway, also
+   reliable) is refused until it has a fitness contract: the decision client's N5 ask, which estimates the difficulty
+  anyway, also
    asks whether the task is open-ended. The micromanager works the contract out with you through `contract_round`:
    a planner drafts it from the code, tests and data, you pick in a form what decides, which guards stay and the
    target, a red team on another model tries to raise the score without improving the goal (its change is measured,
@@ -308,7 +327,8 @@ requests and cost. The sidebar puts each task's cost after its line too. In a te
 node ~/Fun/Projects/Repos/micromanager/packages/micromanager/src/cli.ts status --watch   # redraws every 2 s; --all for every job
 ```
 
-**Memory.** In planned jobs (`plan_job`), workers report what they learned about the project (`LEARNED:`); Jev keeps the lasting, new facts in
+**Memory.** In planned jobs (`plan_job`), workers report what they learned about the project (`LEARNED:`); the decision
+client keeps the lasting, new facts in
 `.opencode/memory/jev-project.md` (opencode-agent-memory's format) and picks the ones that help each task's brief.
 
 Models come from a registry of the OpenCode Go models and your local ones (llama-swap, iGPU, NPU), local
@@ -360,14 +380,17 @@ one). The picks go to `~/.config/opencode/micromanager-models.json`, which the s
 they hold from the next task on without a restart; they win over `models` in `micromanager.jsonc`, and the journal's
 `routing` record says `picked: true`. The micromanager itself runs on the session's model: change that with `/model`.
 
-Permission requests go to Jev first and to you when Jev is not sure (`src/decide.ts`). Some phases of the design
+Permission requests go to the decision client first and to you when it is not sure (`src/decide.ts`). Some phases of the
+design
 are still to come: see docs/plan.md.
 
 Optional settings in `~/.config/opencode/micromanager.jsonc`:
 
 ```jsonc
 {
-  // presets per decision: "auto" (the decision model), "ask" (always you), "rule", or "fixed:<value>"
+  // the decider's mode: "local" (the default: nothing leaves this machine) or "cloud" (per session, after a redacted preview)
+  "decider": { "mode": "local" },
+  // presets per decision: "auto" (the decision client), "ask" (always you), "rule", or "fixed:<value>"
   "decisions": {
     "N5.model": "fixed:opencode-go/deepseek-v4.1-flash", // every worker on one model
     "N13.shell": "fixed:allow"                            // shell commands of workers without asking
@@ -442,7 +465,7 @@ the rest uncached once. The context manager therefore collects what can go and a
 and between epochs the prompt stays the same bytes:
 1. Rules, no model: a read that a later read covers, or that the file's later edit made stale, a repeated call, old
    shell output (cut to its last 10 lines), the content of old `write`/`edit` calls (the file has it), old web pages.
-2. Jev's "still needed?" on the older large results (the micromanager's of any tool, a worker's reads and web results).
+2. The decision client's "still needed?" on the older large results (the micromanager's of any tool, a worker's reads and web results).
 3. Near the ceiling (80% of 120k tokens, the micromanager's 100k), the turns before the last six are summarized by
    DeepSeek V4.1 Flash in a hidden, tool-less session (the `summarizer` agent); the facts it lists go to the memory first.
 
@@ -456,11 +479,13 @@ the rules alone). The journal records `context.epoch` and `context.summary`.
 by hand; the SQLite index next to it is rebuilt from the files whenever it falls behind. Entries belong to the user
 (preferences), to every project (tool pitfalls) or to one project. Pinned entries are core memory: they stand in every
 session's system prompt, within a budget, and change there only at the session's next epoch.
-- A worker's brief gets the entries that help its task: keyword and vector search fused by rank, Jev per entry, no two
+- A worker's brief gets the entries that help its task: keyword and vector search fused by rank, the decision client per
+  entry, no two
   saying the same, within a budget per role. The micromanager gets the same at each user turn, for that request only,
   without what it got in its last three turns.
 - Workers end their report with `LEARNED:` lines. The micromanager has `memory_set`, `memory_replace`, `memory_list` and
-  `memory_get`; readers have `memory_search`. Every write is searched against the memory first, and Jev says whether it
+  `memory_get`; readers have `memory_search`. Every write is searched against the memory first, and the decision client
+  says whether it
   is new, a duplicate, a refinement of an entry (which it replaces) or a contradiction (reported back to ask the user).
 - Vectors come from Qwen3-Embedding on the CPU (`./install.sh --embedding 4b`: downloads the model and runs
   `micromanager-embedding.service` on port 8093). Without the service the memory searches by keywords and fills in
@@ -479,7 +504,8 @@ descriptions, so it reads about 2k tokens low.
 ## Flow chart
 
 `docs/flow.html` is a self-contained page (no server) that shows how the plugin decides: the model routing lane
-(role → needs → model) and the permission lane (hard rules → deleted paths → Jev → the floors → allow / deny /
+(role → needs → model) and the permission lane (hard rules → deleted paths → the decision client → the floors → allow /
+deny /
 user). Open it in a browser and load `~/.local/state/micromanager/decisions.jsonl` with the button or by dropping
 it on the page; over http a `decisions.jsonl` next to the page is picked up automatically. Each decision is
 listed, and selecting one highlights the exact path it took through the chart.
@@ -502,7 +528,9 @@ in the job file. `delegation-unrecognised` means a delegation the hook will not 
 backstop caught a worker that was not placed in a worktree.
 
 The journal also holds `permission` entries (from `src/decide.ts`), `routing` (delegations), `finish`, `watchdog`,
-`checkpoint` and `graph`.
+`checkpoint` and `graph`. Every `decision` entry names its `mode`, its `backend`, the `rulebook` version and whether
+text left (`sentText`, with `sent` and the gate's `egress` when it did), and, in cloud mode, the session's `consent`
+answer; `cloud-opt-in` entries show when a session was asked and what it said.
 
 ## Develop
 

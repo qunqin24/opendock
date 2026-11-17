@@ -2,7 +2,7 @@
 
 Per-agent reminders, request settings and safe-command auto-allow for [OpenCode](https://opencode.ai) v2.
 
-Set `chat_template_kwargs` (like `enable_thinking`), sampling settings (`temperature`, `top_p`, `top_k`, `min_p`,
+Set `chat_template_kwargs` (like `enable_thinking`), sampling settings (`temperature`, `top_p`, `min_p`,
 penalties) and a system reminder for each OpenCode agent. Works with llama.cpp, LiteLLM and other OpenAI-compatible
 servers, and with thinking models like Qwen.
 
@@ -11,8 +11,6 @@ with `shell: ask` in your permissions you get no prompt window for them — ever
 
 OpenCode v2 drops request settings such as `temperature` for OpenAI-compatible providers, and has no per-agent
 reminder. agent-plus reads extra keys from the agent's `.md` file and applies them to every model request.
-
-Tested with OpenCode 2.2.0 and llama.cpp behind LiteLLM.
 
 ![agent-plus settings in the OpenCode sidebar](screenshot.png)
 
@@ -83,22 +81,20 @@ You help the user write and edit text.
 | `reminder` | `concise`, `ultra-concise`, `creative`, `off`, or text (one line or a `\|` block) | Preset or custom reminder, added as the last message of every model request |
 | `on_error_command` | shell command, one line or a `\|` block | Run when a request fails with a connection error (server off), then retry |
 | `safe_commands` | `none` (default: on) | Turn safe-command auto-allow off for this agent |
-| `anti_repetition` | `on` or `off` (default: off) | Stop the reply when the model repeats the same text |
-| `max_same_tool` | whole number | Max times the same tool call may repeat in a row |
+| `max_word_repeat` | `on` or `off` (default: off) | Stop the reply when the model repeats the same text |
+| `max_tool_repeat` | whole number | Max times the same tool call may repeat in a row |
 | `manual_green_light` | `on` or `off` (default: off) | Tools run only when your message ends with an approval word |
 | `manual_green_light_words` | comma-separated words | The approval words for `manual_green_light` |
 | `auto_green_light` | `on` or `off` (default: off) | The model checks itself before the first tool call of each turn |
 | `temperature` | number | Request body |
-| `top_p` | number | Request body |
-| `top_k` | whole number | Request body |
-| `min_p` | number | Request body |
-| `presence_penalty` | number | Request body |
-| `repeat_penalty` | number | Request body (llama.cpp) |
-| `repetition_penalty` | number | Request body (vLLM, HF) |
 | `max_completion_tokens` | whole number | Request body |
-| `reasoning_budget_tokens` | whole number | Request body (llama.cpp) |
+| `reasoning_budget_tokens` | whole number | Request body |
 | `reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high` or `xhigh` | Request body |
 | `enable_thinking` | `true` or `false` | Request body, under `chat_template_kwargs` |
+| `tools_override` | path to a JSON file (relative to the agent file) | Replace tool descriptions with your own |
+| `pondering` | `on` or `off` (default: off) | Run a quiet thinking request when the session goes idle |
+| `misplaced_tag_filter` | `on` or `off` (default: off) | Replace leaked tag signs in thinking/message text |
+| `clockwork` | `on` or `off` (default: off) | Run the agent hands-off with auto-continue |
 
 Names are sent as written. A setting with a wrong value is not sent.
 
@@ -145,7 +141,7 @@ chunks, like llama.cpp with `--cache-reuse`, may recover part of it.
 At start, a toast lists problems in agent files:
 
 - misspelled keys, like `temprature → temperature`
-- wrong values, like `top_k: must be a whole number`
+- wrong values, like `max_completion_tokens: must be a whole number`
 
 Unknown keys that don't look like a misspelling are left alone, so other plugins can add their own keys.
 With no problems, the toast says "agent-plus is loaded".
@@ -190,12 +186,12 @@ Turn it off for one agent with `safe_commands: none` in its frontmatter.
 
 ## Anti-repetition
 
-With `anti_repetition: on`, agent-plus watches the model's reply as it streams. When the same stretch of text
+With `max_word_repeat: on`, agent-plus watches the model's reply as it streams. When the same stretch of text
 repeats 5 or more times, the reply is cut and the session is interrupted, instead of filling up with garbage.
 
 ## Anti-loop
 
-With `max_same_tool: 5`, the same tool call (same tool, same arguments) may repeat at most 5 times in a row.
+With `max_tool_repeat: 5`, the same tool call (same tool, same arguments) may repeat at most 5 times in a row.
 The 6th is denied with a message telling the model to stop. The count resets when you send a new message.
 
 ## Pondering
@@ -222,13 +218,37 @@ is always allowed. Set your own words with `manual_green_light_words: yes, do, g
 With `auto_green_light: on`, the model checks itself before the first tool call of each turn: it must allow the call
 and state its plan, or explain why it cannot. The check fires once per turn and is not saved in the chat history.
 
+## Tool overrides
+
+With `tools_override: ＜file＞.json` (relative to the agent file), tool
+descriptions are replaced with the ones from that file. The file maps tool
+names to replacement descriptions:
+
+```json
+{
+  "bash": "Run a shell command.",
+  "read": "Read a file."
+}
+```
+
+Tools not listed keep their original description. The file is re-read only when
+it changes on disk, so the prompt cache stays warm.
+
 ## Clockwork
 
-With `clockwork: on`, the agent runs hands-off. Every permission ask is denied,
-and after each finished turn the plugin runs one quiet thinking request (like
-pondering) to write a fresh "keep going" message, then sends it. The session
-keeps working on its own until you stop it. Only agents with `clockwork: on` are
-affected.
+With `clockwork: on`, the agent runs hands-off. Every permission ask is denied.
+After each finished turn a judge request reads the plan and the work so far and
+replies with one word:
+
+- `CONTINUE` — the plugin sends a fresh "keep going" message. Every 7–10 turns
+  it instead nudges the agent to re-read its plan document (PLAN.md, TODO.md,
+  etc.) and list remaining work.
+- `WAIT` — the agent is waiting on a background job, so the plugin waits 30s
+  and judges again.
+- `DONE` — the plugin sends a wrap-up message. The next `DONE` sends a final
+  "JOB COMPLETED" line and stops the loop.
+
+Only agents with `clockwork: on` are affected.
 
 ## Notes
 

@@ -138,7 +138,7 @@ Most of the crew runs inside your conversation. The exception is review: on Clau
 
 | Claim | Status |
 |---|---|
-| Skill routing | Retrieval routing rank-1 **96.7%**, 268 probes (174 of the 180 positive cases route to the right skill), checked in CI |
+| Skill routing | Retrieval routing rank-1 **95.7%**, 225 probes (134 of the 140 positive cases route to the right skill), checked in CI. Duplicate probes were removed from the suite on 2026-11-17; the earlier published figure counted 43 copies and overstated rank-1 by one point |
 | Reference pointers resolve | **300/300**, 10 targets, checked in CI |
 | Lane budgets match the content they load | verified in CI |
 | Independent review | Claude Code only: on the full lane or a sensitive path, `mugiwara archive` refuses to close unless a hook ledger shows Robin and Jinbe ran as separate agents (`--force` closes anyway, labeled inline). The label proves a separate agent ran, not that the review was good. Stage order is not enforced. Other hosts have no ledger |

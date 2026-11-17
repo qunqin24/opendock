@@ -26,7 +26,8 @@ nothing until the first tool call.
 
 - `computer_use.*` — macOS desktop control: `list_apps`, `get_app_state`,
   `click`, `type_text`, `press_key`, `paste`, `scroll`, `drag`, `select_text`,
-  `set_value`, `perform_secondary_action`.
+  `set_value`, `perform_secondary_action`, `stop`. The `stop` tool releases
+  both Computer Use and Chrome sessions early; release also runs at turn end.
 - `chrome.*` — the real Chrome: `list_tabs`, `new_tab`, `navigate`, `page_info`,
   `read_page`, `read_dom`, `screenshot`, `click`, `type_text`, `press_key`,
   `scroll`, `set_value`, `select_text`, `perform_secondary_action`, `drag`,

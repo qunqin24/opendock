@@ -94,5 +94,6 @@ bun run check
 ```
 
 `check` is the complete everyday gate; `check:release` is the uncached release gate. All packages share one version.
-Releases go through `npm run release -- --release-type=<type>`. See [AGENTS.md](AGENTS.md) for the full workflow and
-release rules.
+Releases go through `npm run release -- --release-type=<type>`. Local releases pause at each npm browser-auth link and
+print a `--resume <session-id>` command; authorize in the browser and run that command. See [AGENTS.md](AGENTS.md) for
+the full workflow and release rules.

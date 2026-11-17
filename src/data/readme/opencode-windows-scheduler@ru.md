@@ -1,19 +1,26 @@
 # opencode-windows-scheduler
 
-> Плагин для планирования и оркестрации задач AI-агентов в OpenCode v2: cron, одноразовые запуски, DAG-пайплайны, матричные сборки, Quality Gates и наблюдаемость. Бесплатно, с открытым кодом (MIT).
+> Плагин для планирования и оркестрации задач AI-агентов в OpenCode V1 (≥ 1.18.29) и V2: cron, одноразовые запуски, DAG-пайплайны, матричные сборки, Quality Gates и наблюдаемость. Бесплатно, с открытым кодом (MIT).
 
 [![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
 [![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](../LICENSE)
 [![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](../package.json)
 
-English version: [README.md](../README.md).
+Translations: [English](../README.md) · [中文](README.zh.md).
 
 ---
 
-![Локальный веб-дашборд: матричные сборки, граф DAG, метрики и история запусков](dashboard.png)
+## Быстрый старт
 
-Хотите посмотреть без установки OpenCode? `node scripts/demo-dashboard.mjs` поднимет дашборд с демо-данными на http://localhost:4380.
+1. Установите плагин (см. [Установка](#установка)) и перезапустите OpenCode.
+2. Попросите агента поставить первую задачу — достаточно одного вызова:
+
+   > Поставь задачу «утренний-отчёт»: каждый день в 09:00 с промптом «Просуммаризируй вчерашние git-коммиты и запиши отчёт в ~/reports/».
+
+3. Откройте дашборд: агент печатает ссылку при создании задачи (по умолчанию `http://localhost:4380`), позже её можно получить инструментом `get_dashboard_info`. Посмотреть демо без установки: `node scripts/demo-dashboard.mjs` — дашборд с демо-данными на `http://localhost:4380`.
+
+![Локальный веб-дашборд: матричные сборки, граф DAG, метрики и история запусков](dashboard.png)
 
 ## Зачем
 
@@ -38,24 +45,43 @@ English version: [README.md](../README.md).
 | Триггеры | cron, одноразовый запуск (`triggerType: "once"`), git-коммиты (`triggerType: "git"`, фильтры ветки/путей/игнорирования), изменение файла (chokidar, glob-маски `watchGlobs`/`watchIgnore`), MCP-события, входящие webhooks (`POST /api/hooks/:task` с HMAC) |
 | Мультирепо | workspaces с валидацией путей, запуски по workspace, матрица поверх родительской задачи |
 | Наблюдаемость | история SQLite (success / error / timeout / partial / running), метрики (длительность, токены, стоимость), JSONL-логи с `/api/logs`, Prometheus `/metrics`, экспорт OTLP, логи по задачам, веб-дашборд с аналитикой за 14 дней, ретеншн истории и экспорт CSV/JSON |
-| Эксплуатация | dry-run, экспорт/импорт JSON, шаблоны, уведомления по нескольким каналам (webhook, Telegram, нативные toast), тихие часы, дайджест, зашифрованные секреты (`${secret:NAME}`), журнал аудита, настройки |
-| Интерфейсы | панель OpenCode GUI, веб-дашборд, 24 инструмента для агента, встроенный скилл |
+| Эксплуатация | dry-run, экспорт/импорт JSON, шаблоны, уведомления по нескольким каналам (webhook, Telegram, нативные toast), тихие часы, дайджест, локальный ассистент для триажа уведомлений (fail-open, shadow-режим), зашифрованные секреты (`${secret:NAME}`), журнал аудита, настройки |
+| Интерфейсы | панель OpenCode GUI, веб-дашборд, 26 инструментов для агента, встроенный скилл |
 
 ### Язык интерфейса
 
-Интерфейс доступен на русском (по умолчанию) и английском. Язык переключается в настройках сайдбара (Настройки → Язык) или инструментом `manage_settings` (`action: "update"`, `locale: "en"`). Изменение применяется сразу к панели, уведомлениям и дайджесту, дашборду и результатам инструментов агента — перезапуск не нужен. Описания и схемы инструментов агента остаются английскими, диагностика в консоли — русской.
+Интерфейс доступен на русском (по умолчанию), английском и китайском (упрощённом). Переключатель языка находится в шапке панели планировщика (🌐 Авто / Русский / English / 中文), а также доступен через инструмент `manage_settings` (`action: "update"`, `locale: "zh"`). Значение `locale: "auto"` («Авто») следует за языком интерфейса OpenCode: панель реагирует на смену языка сразу, а разрешённая локаль отправляется на сервер, чтобы уведомления, дайджест и дашборд использовали тот же язык. Переключение применяется без перезапуска. Локализация дашборда ещё не завершена: часть строк на стороне клиента пока остаётся русской. Описания и схемы инструментов агента остаются английскими, диагностика в консоли — русской.
 
-Каталоги лежат в `locales/ru.json` и `locales/en.json`; набор ключей в них должен совпадать, иначе CI падает.
+Каталоги лежат в `locales/ru.json`, `locales/en.json` и `locales/zh.json`; набор ключей в них должен совпадать, иначе CI падает.
 
 ## Установка
 
-Нужны OpenCode v2 и Node.js 20+.
+Нужны OpenCode V1 ≥ 1.18.29 или V2, и Node.js 22.22+. Матрица версий и различия
+поверхностей — в [COMPATIBILITY.md](COMPATIBILITY.md) (GUI и RPC — только V2, TUI — обе линии).
+
+Ключ конфигурации зависит от линии:
+
+| Линия OpenCode | Ключ в `opencode.jsonc` |
+|---|---|
+| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["opencode-windows-scheduler"]` |
+| V2 (`≥ 2.2.7`) | `"plugins": ["opencode-windows-scheduler"]` |
+
+Используйте ключ своей линии; добавлять оба не нужно. В V2 проще через CLI:
 
 ```bash
 opencode plugin add opencode-windows-scheduler
 ```
 
-Или добавьте плагин в `opencode.jsonc` вручную:
+V1 — вручную:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-windows-scheduler"]
+}
+```
+
+V2 — тот же плагин вручную:
 
 ```jsonc
 {
@@ -67,13 +93,7 @@ opencode plugin add opencode-windows-scheduler
 }
 ```
 
-`experimental.schedules: false` отключает встроенный планировщик OpenCode, чтобы агент не путал встроенные инструменты расписаний с инструментами этого плагина. После изменения конфигурации перезапустите OpenCode.
-
-Альтернатива — глобальная установка через npm:
-
-```bash
-npm install -g opencode-windows-scheduler
-```
+`experimental.schedules: false` отключает встроенный планировщик OpenCode, чтобы агент не путал встроенные инструменты расписаний с инструментами этого плагина. После изменения конфигурации перезапустите OpenCode. Панель TUI входит в тот же пакет (`exports["./tui"]`), поэтому включается той же записью на обеих линиях.
 
 Из исходников:
 
@@ -86,7 +106,7 @@ npm run build && npm run build:gui
 
 ## Инструменты для агента
 
-Агенту доступен весь функционал — 24 инструмента: расписание, пайплайны, эксплуатация, аналитика и администрирование.
+Агенту доступен весь функционал — 26 инструментов: расписание, пайплайны, эксплуатация, аналитика и администрирование.
 
 | Инструмент | Аргументы | Что делает |
 |---|---|---|
@@ -105,6 +125,7 @@ npm run build && npm run build:gui
 | `get_metrics` | — | Всего запусков, успехов и падений |
 | `get_analytics` | `days?`, `topLimit?` | Отчёт за период: запуски, успешность, длительность, токены, стоимость, топ задач |
 | `manage_settings` | `action`, `maxConcurrent?`, `winterMode?`, `notifications?`, `history?` | Чтение и изменение глобальных настроек (параллелизм, уведомления, retention) |
+| `manage_local_ai` | `action` (`get`/`update`/`test`), `mode?`, `baseUrl?`, `model?`, `timeoutMs?`, `fallback?`, `confidenceThreshold?`, `shadow?` | Настройки локального ассистента для триажа уведомлений и проверка модели одним запросом (см. [LOCAL-AI.md](LOCAL-AI.md)) |
 | `manage_templates` | `action`, поля шаблона | Список, сохранение и удаление шаблонов задач |
 | `manage_profiles` | `action`, `name?`, `port?` | Список, создание, переключение и удаление изолированных профилей |
 | `transfer_tasks` | `action`, `data?` | Экспорт всех задач в JSON и импорт обратно |
@@ -184,7 +205,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 38 сюит, 600+ проверок
+npm test             # 58 сюит, 600+ проверок
 npm run test:en      # те же сюиты с английской локалью
 ```
 
@@ -195,8 +216,12 @@ npm run test:en      # те же сюиты с английской локаль
 ## Документация
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — модель процессов, модули, бэкенды, модель данных.
+- [CONCEPT.md](CONCEPT.md) — north star: верифицируемая локально-первая оркестрация.
 - [FEATURES.md](FEATURES.md) — полный каталог возможностей с примерами.
+- [FAQ.md](FAQ.md) — сценарии восстановления и ответы по эксплуатации (English).
 - [MIGRATION.md](MIGRATION.md) — переезд с cron, systemd, launchd или Планировщика Windows.
+- [SAVINGS.md](SAVINGS.md) — как считается оценка «Сэкономлено $» (English).
+- [../CROSS_PLATFORM.md](../CROSS_PLATFORM.md) — различия и бэкенды Windows / macOS / Linux.
 
 ## FAQ
 

@@ -199,6 +199,7 @@ What this plugin touches, exhaustively:
 | `<tmp>/opencode-forge/jobs/ledger.jsonl` | job registry ledger (bounded: 1 MB reset, 200 entries) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
 | `<tmp>/opencode-forge/watchdog/log.jsonl` | watchdog interventions ledger (bounded: 200 entries, oldest rotated) | runtime debris — delete freely, also after uninstall |
+| `<tmp>/opencode-forge/session-anchors.jsonl` | session-anchor ledger — persisted evidence of the pooled worktrees where live activity bound sessions (pooled binds only, FIFO-capped to 200, fail-soft IO); a restart-resumed session whose record is pool-less and whose in-memory map is empty re-binds its OWN pool from here, only while the recorded pool file still exists on disk | runtime debris — delete freely; losing it only costs the restart-resume own-pool re-bind (sessions re-learn their pool from live activity) |
 | `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (dispatch records — including async orphans — live in the jobs ledger; this separate file dates from the retired `forge_dispatch` tool) | runtime debris — delete freely |
 | `<project>/.opencode/forge/dispatch-log.jsonl` | dispatch journal (fold E) — append-only per-workspace record of every async dispatch state transition (`dispatched` / `queued` / `started` / `retry-pending` / `terminal`); bounded by `FORGE_DISPATCH_JOURNAL_MAX` (default 200, terminal-first rotation); prompt text retained while a record is non-terminal, redacted on terminal; corrupt lines skipped. This is what restart recovery replays — a live child re-arms, a finished-while-down child wakes its owner exactly once, queued wishes re-enter the queue, retry chains resume | runtime data — deleting it only loses cross-restart recovery for in-flight dispatches; uninstall leaves it behind (add `.opencode/forge/` to your ignore file if you don't want it versioned) |
 | `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
@@ -271,7 +272,7 @@ goals (inert, no dialog). When the live goal reaches a terminal state,
 debounce fires, so the autonomous loop effectively requires a TUI/serve
 session. Arming, checks, completion, pause/resume, and queueing all work in
 run mode; `--auto` approves the gates, without it they auto-reject
-(headless cannot silently pass a gate).
+(run mode never silently passes a gate).
 
 **Security boundary.** Verification shell commands run on your host, in the
 workspace, via the plugin — that is the point (host-verified completion).
@@ -523,6 +524,14 @@ workspace-ownership strictness as opencode's native MCP config):
    pool resolves to the POOLED binding (one bounded console disclosure per
    session names both paths) — own-pool dispatch rights survive both
    degeneration directions (the degraded map, and the rebound record).
+   When BOTH degenerate at once — the map empty (no live activity yet after
+   a host restart) and the record rebound pool-less — the plugin consults
+   its **persisted session-anchor ledger** (a bounded plugin-namespaced
+   JSONL in the OS temp dir recording ONLY pooled binds — FIFO-capped,
+   fail-soft IO) and re-binds the session from that recorded evidence, but
+   only while the recorded worktree still owns its pool file on disk (a
+   deleted pool stays deleted); one bounded console disclosure per session
+   names the re-bind.
 2. the **global layer**: `~/.config/opencode/forge.json` — a **fallback
    ONLY**: when the workspace has no pool file, the global layer serves as
    the whole roster; when the workspace has one, the global layer is NOT
@@ -646,7 +655,6 @@ the default):
 | `FORGE_DISPATCH_NOTIFY_INTERVAL_MS` | `600000` | The `[forge:dispatch-progress]` notification interval for the async/armed completion tracker, in ms — one informational notice per interval while the child runs; also the textless-idle floor window. Clamped to `3600000` (1 h). |
 | `FORGE_DISPATCH_POLL_INTERVAL_MS` | `1000` | Poll interval for the sync loop and the async completion poller's slices, in ms. |
 | `FORGE_DISPATCH_POLL_SLICE_MS` | `5000` | Length of one async poller watch slice, in ms (registry kills take effect at slice boundaries). |
-| `FORGE_HEADLESS` | auto-detect | Overrides the headless host property for the `forge_shell` ask gate: `1` forces headless, `0` forces interactive. Unset/auto-detect reads the host process argv — `opencode serve` is headless; the TUI and `opencode run` are NOT (run mode keeps its ask auto-reject posture). Invalid values fall back to auto-detect. |
 | `FORGE_DISPATCH_STALE_MS` | `2700000` | The activity-stale reap threshold, in ms — a RUNNING dispatch child whose `session.get` `time.updated` has not advanced for this long past the 60 s runtime floor is reaped (`kill` mode aborts it with the honest `stale: aborted after N min without activity` wake). Values below the 60 s floor clamp UP to it; invalid values fall back to the default. (The runtime floor itself is fixed at 60 s; `FORGE_DISPATCH_STALE_FLOOR_MS` overrides it for tests.) |
 | `FORGE_DISPATCH_STALE_MODE` | `kill` | `kill` aborts a stale child (honest terminal wake); `observe` emits ONE `[forge:dispatch-progress]` notice per threshold crossing and never aborts. Anything unrecognized falls back to `kill`. |
 | `FORGE_DISPATCH_MAX_ATTEMPTS` | `2` | Total attempts per dispatch (1 original + N-1 automatic retries). A child that dies in a RETRYABLE error (transient transport/5xx/overload/rate-limit) respawns after a fixed 10 s backoff with the original prompt plus an inspect-then-continue resume preamble; deterministic errors (provider config/auth/model-not-supported/contract — and anything unrecognized), stale kills, user aborts, and floor findings NEVER retry. Invalid or sub-1 values fall back to the default; ceiling 10. (`FORGE_DISPATCH_RETRY_BACKOFF_MS` overrides the backoff for tests.) |
@@ -654,27 +662,38 @@ the default):
 | `FORGE_DISPATCH_QUEUE_MAX` | `10` | Per-session FIFO queue bound (fold D): a wish that arrives while the dispatch cap (3) is full queues instead of refusing; beyond this bound the call is refused listing every in-flight AND queued task id. Queued wishes spawn FIFO as slots free; an owner session that ends flushes its queue without spawning (honest aborted records). Invalid or sub-1 values fall back to the default. |
 | `FORGE_DISPATCH_JOURNAL_MAX` | `200` | Per-workspace dispatch journal bound (fold E): the append-only `.opencode/forge/dispatch-log.jsonl` rotates by compacting TERMINAL records oldest-first; non-terminal records (running/queued/retry-pending) are never dropped — all-live overflow beats the bound. This journal is what restart recovery replays: a child that finished while the host was down wakes its owner exactly once with the fetched report, a still-running child re-arms, a queued wish re-enters the queue for a live owner, a retry-pending chain resumes while attempts remain. Invalid or sub-1 values fall back to the default. |
 
-**Headless ask liveness (dispatch-resilience fold A).** On a headless host
-(`opencode serve`, or `FORGE_HEADLESS=1`) a `forge_shell` call whose posture
-would ask no longer hangs forever on a dialog nobody can answer: the command
-is classified by the same pure classifier as the readonly exec seal —
-**READ-CLASS commands run** (no dialog awaited) and **WRITE-CLASS commands
-are refused** with an honest `[forge:headless-denied]` error naming the
-command head, so the calling worker can adapt or report. An **explicit user
-`permission.forge_shell: "allow"`** skips the ask and runs in every mode
-(interactive, headless, and run alike — captured by a pre-rewrite config
-snapshot, the single documented respect in which interactive behavior
-changes); an explicit `deny` always wins. The 7 user-confirmation doors
-(`plan_approve`, `plan_close`, `goal_write (arm)`, `goal_complete`,
-`goal_resume`, `goal_discard`, `crew_close`) are **never** auto-resolved
-headlessly — they remain real dialogs. When both the readonly-exec-seal and
-the headless classifier would refuse, the seal finding lands first. **Bypass
-surface disclosure:** in headless mode the classifier is the effective
-enforcement boundary for write-shape workers — commands the classifier reads
-as READ-CLASS but that write internally (mutating scripts, process spawning
-via `Start-Process` writers, encoded payloads — the same README-disclosed
-bypass surface as the seal) run without confirmation. That boundary is
-accepted as part of this change.
+**Exec posture pass-through + non-interactive hygiene
+(shell-defang-default-open).** The plugin performs NO command classification
+on the `forge_shell` posture path and injects NO default permission rule —
+full omo parity, the plugin is not smarter than the host. With no explicit
+permission configured, `forge_shell` behaves exactly like the native shell
+tool in every mode (TUI, serve, `opencode run`): **any command runs without
+a plugin-added confirmation** — this default-open surface is the documented,
+accepted product decision. An explicit user value stands verbatim for the
+host to resolve: `allow` runs without the ask everywhere; `deny` refuses
+everywhere; `ask` asks exactly like the native tool's ask in that mode (TUI
+dialog / run-mode auto-reject / a pending ask on serve that you answer via
+the host API — **if you run serve and want confirmations, answer asks over
+the API or don't configure ask**; the plugin adds no rescue). The
+`readonly-exec-seal` (below) remains the ONLY plugin-side exec refusal and
+is posture-independent. The 7 user-confirmation doors (`plan_approve`,
+`plan_close`, `goal_write (arm)`, `goal_complete`, `goal_resume`,
+`goal_discard`, `crew_close`) are **never** auto-resolved in any mode — they
+remain real dialogs.
+
+**Non-interactive exec hygiene (the omo port, forge-improved).** Every
+`forge_shell` spawn merges a defang env set into the child process —
+`GIT_EDITOR=:`, `EDITOR=:`, `GIT_PAGER=cat`, `PAGER=cat`,
+`GIT_MERGE_AUTOEDIT=no` (injection at spawn time; the command string is
+never rewritten, and a value you pass explicitly still wins) — so no
+command can hang on an editor or pager prompt, git or not. Commands
+matching an enumerated known-interactive list (package/platform logins like
+`npm login`/`docker login`/`gh auth login`, identity prompts like
+`sudo`/`ssh`/`passwd`, primary full-screen programs like `vim`/`less`/`man`)
+attach a **non-blocking** `[forge:interactive]` warning line to the tool
+result naming the match; the warning never refuses, never retries, and
+never mutates the command — the permission posture and the seal are the
+only refusers.
 
 **Question policy is mode-keyed.** Sync dispatches keep questions available
 (native parity — the user is watching the panel). Async dispatches create

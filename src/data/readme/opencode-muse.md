@@ -16,7 +16,7 @@ Add the published package to your project-level `opencode.jsonc` (or
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-muse@1.0.0"],
+  "plugins": ["opencode-muse@1.1.0"],
 }
 ```
 
@@ -45,9 +45,9 @@ ID: opencode-muse` and mark it failed (observed on 2.2.5).
 
 The locally packed package passed provider discovery and a text-turn smoke
 test. Muse models and a text turn were also confirmed in OpenChamber after
-restarting it. Verified Muse CLI versions are 1.4.12 through 1.4.14;
-the 1.4.14 SDK pin matches the 1.4.14 CLI fingerprint exactly, so no
-startup warning is recorded. See
+restarting it. Verified Muse CLI versions are 1.4.12, 1.4.13, 1.4.14, and
+1.4.20; the 1.4.14 SDK pin matches the 1.4.14 CLI fingerprint exactly, and
+newer CLIs (1.4.20 verified) start under the recorded fingerprint warning. See
 [#21](https://github.com/pgquiles/opencode-muse/issues/21).
 
 ## Authentication
@@ -119,6 +119,35 @@ permissions become the only fence. Private state lives under the XDG data
 directory; your real Muse config is never read or modified. See
 [#37](https://github.com/pgquiles/opencode-muse/issues/37).
 
+### Approval mode (Muse backend)
+
+By default the bridge selects `approvalMode: "onRequest"` for every Muse
+session, so Muse asks through the bridge before side-effectful actions.
+That forced mode overrides the permission profile you configured in Muse
+itself (`permissions.default_profile`): selecting `:unrestricted` in Muse
+had no effect on bridge sessions, and every network destination or shell
+command prompted again. `OPENCODE_MUSE_APPROVAL_MODE` makes the posture
+explicit. Like the other knobs it is read once when the plugin loads:
+
+| Value | Meaning |
+|---|---|
+| unset (default) | `onRequest` — the historical forced mode, unchanged |
+| `host-default` | Omit `approvalMode`; the Muse host's configured permission profile applies, exactly as in the native TUI |
+| `onRequest` / `allowAll` / `promptUnmatched` / `denyUnmatched` | Select that host-defined mode explicitly ("select, never create") |
+
+```sh
+# Let your Muse permission profile (e.g. :unrestricted) apply to bridge sessions:
+OPENCODE_MUSE_APPROVAL_MODE=host-default opencode
+```
+
+Restart after changing it. Anything else fails setup with a clear error
+instead of silently running the wrong approval posture. The `opencode`
+tool backend ignores this knob: OpenCode's native permission evaluation
+stays its only fence. Approval prompts now also show what is being
+approved — the destination (`protocol://host:port`), shell command, file
+path, or process target — plus each choice's `rulePreview`, so distinct
+approvals no longer look like the same prompt repeated.
+
 ## Features
 
 - Use Muse Code models from OpenCode or OpenChamber after adding the package to
@@ -154,7 +183,10 @@ directory; your real Muse config is never read or modified. See
   [#28](https://github.com/pgquiles/opencode-muse/issues/28).
 - Answer Muse's permission prompts conversationally: Muse's exact options are
   shown as a lettered list and your next message picks one (fuzzy match on
-  letter, number, or name). Anything unrecognized is asked once more, then
+  letter, number, or name). Each prompt names its subject — the network
+  destination, shell command, file path, or process target — and shows every
+  choice's `rulePreview`, so distinct approvals are distinguishable at a
+  glance. Anything unrecognized is asked once more, then
   denied — ambiguity never approves — and your message still runs as a
   fresh turn instead of being eaten, so a re-asking model can never trap
   the conversation. Queued prompts are answered

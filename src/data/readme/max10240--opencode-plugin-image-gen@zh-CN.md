@@ -91,4 +91,5 @@ bun run check
 ```
 
 `check` 是日常使用的完整检查；`check:release` 是无缓存的发布检查。所有包共享同一个版本。发布统一通过
-`npm run release -- --release-type=<type>` 进行。完整流程和发布规则见 [AGENTS.md](AGENTS.md)。
+`npm run release -- --release-type=<type>` 进行。本地发布遇到 npm 浏览器认证时会暂停，并输出
+`--resume <session-id>` 命令；在浏览器完成授权后运行该命令。完整流程和发布规则见 [AGENTS.md](AGENTS.md)。

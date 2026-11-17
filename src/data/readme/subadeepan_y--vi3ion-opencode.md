@@ -17,6 +17,12 @@ screenshot.
 One `pip install`, one small config block. No cloud, no API key, no image
 ever leaves your machine.
 
+**Made for modest hardware.** Have an older laptop, no GPU, or 8 GB of RAM?
+You cannot run a vision model — that is exactly who this is for. VI3ION does
+the looking on your CPU and tells your text-only local model what it found in
+a few hundred tokens. Bigger machines can still use VI3ION as a second opinion.
+See [LOCAL_MODELS.md](LOCAL_MODELS.md).
+
 ---
 
 ## Install (about a minute)
@@ -113,6 +119,21 @@ measurements** back.
 Everything is labelled as **observed** (read from pixels), **inferred**, or
 **unknown**. It never quietly corrects a reading.
 
+### Recreating an image
+
+Give VI3ION a picture of three circles and ask for a blueprint. It returns a
+simple recipe: canvas size, background colour, and each circle's position,
+size and colour as percentages. An image-generating model can follow that
+recipe without ever seeing the picture.
+
+```bash
+vi3ion blueprint drawing.png
+```
+
+Simple shapes are measured exactly. Fine detail — faces, textures, handwriting
+— is described, not reproduced: expect roughly 70–80% there. The tool is a
+measurement, not a promise of a perfect copy.
+
 ## Works with
 
 **Agents:** Claude Code, Cursor, Windsurf, Continue, Zed, Antigravity,
@@ -129,7 +150,7 @@ running and which role fits.
   right"*, never *"a button"* — that keeps the evidence auditable, and naming
   things is the model's job.
 - Very faint decorative lettering is not transcribed, and the output says so.
-- OCR is the weak spot, not the geometry: 91.9% average fidelity across the
+- OCR is the weak spot, not the geometry: 95.2% average fidelity across the
   bundled ground-truth fixtures (numbers below).
 
 ---
@@ -141,11 +162,44 @@ network, ~5s on a 1919x949 screenshot:
 
 | Component | Score | What it measures |
 |---|---|---|
-| **Brief fidelity** | **91.9%** | weighted mean across the three bundled fixtures |
-| Text recall | 85.0% | share of real text that reached the brief |
-| Text precision | 92.4% | share of the brief's quoted text that is really in the image |
-| Region accuracy | 99.0% | matched text filed under the right region |
+| **Brief fidelity** | **95.2%** | average across the three bundled fixtures |
+| Text recall | 94.0% | share of readable text that reached the brief |
+| Text precision | 91.4% | share of the brief's quoted text that is really in the image |
+| Region accuracy | 98.9% | matched text filed under the right region |
 | Structure | 100% | composition line, colour map, shape sentences, honesty note |
+
+Scores are reproducible: `vi3ion score --all`. Ground-truth entries marked
+*uncertain* (garbled glyphs a human could not confidently transcribe) are not
+used as pass/fail targets. The difficult fixture still loses points on OCR:
+index digits read as `84/85/88` instead of `04/05/08`, and some Japanese labels
+are garbled. Geometry, colour and layout stay above 96% throughout.
+
+### Before and after
+
+The last few changes were measured on the same three images every time. The
+middle column is a contrast-enhancement experiment that made things worse and
+was switched off by default (it is still available with `VI3ION_OCR_CLAHE=1`).
+
+| Fixture | Earlier | Experiment | Now |
+|---|---:|---:|---:|
+| Difficult dark screenshot | 80.4% | 75.3% | **90.7%** |
+| Settings screenshot | 95.2% | 90.1% | **95.0%** |
+| Clean settings dialog | 100% | 100% | **100%** |
+| **Average** | **91.9%** | **88.7%** | **95.2%** |
+
+```mermaid
+xychart-beta
+    title "Fidelity by fixture (%) - earlier vs now"
+    x-axis ["dark screenshot", "settings shot", "clean dialog"]
+    y-axis "fidelity %" 70 --> 100
+    bar [80.4, 95.2, 100]
+    line [95.2, 95.0, 100]
+```
+
+The gain came from four small fixes: uncertain ground-truth guesses stop
+counting against recall, keyboard markers like `[M]` no longer count as text,
+grammar fixes in the brief, and OCR preprocessing that no longer lifts
+contrast on images that were already readable.
 
 ```bash
 vi3ion brief screenshot.png    # the brief itself
@@ -187,6 +241,8 @@ vi3ion mcp-check                   # real MCP handshake: does the server start?
 vi3ion version                     # installed vs latest (PyPI/npm) + update commands
 vi3ion updates auto on|off         # auto-update consent (off by default)
 vi3ion analyze screenshot.png      # full analysis as JSON
+vi3ion screenshot                  # capture the current screen and analyse it
+vi3ion blueprint drawing.png       # measured recipe for recreating an image
 vi3ion brief screenshot.png        # text-only brief for a vision-less model
 vi3ion score screenshot.png        # brief fidelity vs the ground truth
 vi3ion local                       # local LLM runtimes + the recommended role
@@ -252,7 +308,9 @@ Agents must preserve that distinction when reporting to users.
 
 | Tool | Purpose |
 |---|---|
-| `inspect_image` | Ingest + analyse an image (by `path` or `image_id`). |
+| `inspect_image` | Ingest + analyse an image (by `path`, `path="clipboard"`, or `image_id`). |
+| `screenshot` | Capture the current screen and analyse it — no path needed. Fails soft on headless machines. |
+| `reconstruction_blueprint` | A measured recipe (canvas, shapes, colours, percentages) so a generator can recreate a simple image. |
 | `inspect_region` | Deep-dive on `[x0,y0,x1,y1]`; coordinates mapped back to original. |
 | `query_evidence` | Query stored evidence by kind/text/region/confidence without re-analysis. |
 | `verify_claim` | Check a claim ("Save is aligned with Cancel") against measurements. |
@@ -344,7 +402,17 @@ VI3ION_SEMANTIC_PROVIDER=florence,owlvit,clip vi3ion analyze shot.png
 npm --prefix dashboard install
 npm --prefix dashboard run build     # TS + Vite; dist/ mounts at server root
 pytest                                # full suite
+vi3ion score --all                    # fidelity on every bundled fixture
+python scripts/stress_images.py "<folder>"   # sample a real screenshot folder
 ```
+
+The stress script measures real folders without uploading anything. It samples
+across the folder, adds the smallest and largest files, and reports failures,
+slow analyses and images with no detected text. Use `--all` for a full pass.
 
 The dashboard proxies `/api` to the server and is only mounted when
 `dashboard/dist` exists.
+
+## Stress test on real screenshots
+
+Measured on `698` screenshots from one real folder (1971s total, 6594ms and 396 tokens per image on this PC). Failures: 6 (tiny or corrupt images, now rejected with a clear message). Full data: `docs/full-analysis-report.json` and `docs/full-analysis-progress.jsonl`.

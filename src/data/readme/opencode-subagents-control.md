@@ -26,9 +26,26 @@ Keep any existing plugin entries. OpenCode loads the plugin's server and TUI par
 
 To receive the latest published version instead, use `"opencode-subagents-control"` without the version suffix.
 
+### Options
+
+OpenCode highlights the first row when you open the **Subagents** list. By default the plugin does not act on that highlight: Enter shows a hint until you move the selection with ↑/↓. Set `autoSelectFirst` to `true` to let Enter open the highlighted row immediately.
+
+```json title="cli.json"
+{
+  "plugins": [
+    {
+      "package": "opencode-subagents-control",
+      "options": { "autoSelectFirst": true }
+    }
+  ]
+}
+```
+
+OpenCode 2.3.0 passes TUI plugin options only to entries in the CLI configuration (`cli.json`, or `$XDG_CONFIG_HOME/opencode/cli.json`). Keep the `opencode.jsonc` entry above; add the object entry to `cli.json` to supply the option.
+
 ## Use
 
-Open a subagent in OpenCode's **Subagents** view. The plugin focuses its prompt when you open a child. Type an instruction and press Enter to steer it; use Shift+Enter for a newline and Escape to return to the subagent list. Click the prompt or press `Ctrl+Alt+I` to focus it again. Enter `/model` to choose its model and variant, or `/command arguments` to run a server command. Start typing a slash command and press Tab to complete the first suggestion. If submission fails, the input is preserved and an error is shown.
+Open a subagent in OpenCode's **Subagents** view. The plugin focuses its prompt when you open a child. Type an instruction and press Enter to steer it; use Shift+Enter for a newline and Escape to return to the subagent list. When that list opens, OpenCode highlights its first row; by default Enter opens a subagent only after you move the selection with ↑/↓ (see [Options](#options)). Click the prompt or press `Ctrl+Alt+I` to focus it again. Enter `/model` to choose its model and variant, or `/command arguments` to run a server command. Start typing a slash command and press Tab to complete the first suggestion. If submission fails, the input is preserved and an error is shown.
 
 The plugin prompt is not OpenCode's native prompt: it does not support attachments, file or agent mentions, or general TUI-only slash commands. The model picker and server commands are provided by OpenCode and availability depends on the connected server.
 

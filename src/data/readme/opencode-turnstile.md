@@ -165,15 +165,20 @@ false` opts out (telemetry continues).
 
 ## Waivers and approvals
 
-Turnstile reads a waiver or a human plan approval only from the user's own
-prompt — the plugin checks which channel the marker arrived through, never
-what an agent's dispatch prompt says.
+Turnstile reads a waiver, a human plan approval, or an explicit task-retirement
+marker only from the user's own prompt — the plugin checks which channel the
+marker arrived through, never what an agent's dispatch prompt says.
 
 - **`USER WAIVER:`** in your prompt waives gates; naming agent stages scopes
   it. The landing gate is not waiver-released: `git push` always needs the
   credited reviewer verdict or your permission reply.
 - **`PLAN APPROVED:`** in your prompt approves the plan like a reviewer
   verdict, with human provenance; it replays across restart.
+- **`TASK DONE:`** in your prompt retires the session's active task — the
+  next admitted prompt starts a fresh task scope. Child results and dispatch
+  prompts never retire a task; only your prompt does. Config:
+  `taskDoneMarker` renames the literal. Full semantics:
+  [`docs/usage/configuration.md`](docs/usage/configuration.md).
 - **Permission escalation.** A retried landing or hands-on attempt escalates
   to you through OpenCode's permission surface — reply `always`, `once`, or
   `reject`. Turnstile assumes a human answers these asks; an auto-accepting
@@ -362,7 +367,15 @@ lines, and shas, never session IDs or prompts:
 
 Commit the JSON and Markdown and a GitHub Action upserts one sticky comment
 per PR. `evidence --validate` re-checks a committed artifact in CI. The
-comment states what it is: a correlated claim, not proof. One workflow
+comment states what it is: a correlated claim, not proof. Re-emit and commit
+both files before every push to a PR: the journal is per-machine, so CI can
+post the committed badge but never refresh it. To keep a stale badge from
+reading as current, the posting job compares the committed evidence's newest
+journaled timestamp with the latest commit that could have changed code — the
+PR head, or its parent when the head commit touches only `.turnstile/` files,
+which is exactly what a normal re-emit → commit → push looks like — and
+appends an amber "Stale" notice when the evidence predates it. A normal emit →
+commit → push cycle is therefore never flagged. One workflow
 detail: validation runs on the pull request itself, while the comment posts
 from a trusted `pull_request_target` run; GitHub asks a maintainer to approve
 that run for a first-time contributor's fork PR, so an outside

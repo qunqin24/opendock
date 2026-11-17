@@ -34,6 +34,10 @@ you don't need an Open WebUI API key.
   catalog. Models without a control keep their own variants. Non-admin users need the
   `chat.controls` and `chat.params` permissions; otherwise Open WebUI ignores the choice and
   uses the default.
+- A model list in LiteLLM's `/model_group/info` shape works too, for a server that puts LiteLLM
+  behind the same authentik setup. Each level in a model's `supported_reasoning_efforts`
+  (LiteLLM's `model_info.reasoning_effort_levels`) becomes a variant that sends
+  `reasoning_effort`.
 - Tokens refresh automatically. If authentik rejects a request, the plugin asks authentik
   whether the token is still valid. Only a dead token marks the login as needing a new
   sign-in; a passing glitch is retried once and clears itself.

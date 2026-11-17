@@ -8,19 +8,19 @@ OpenCode Turn Stats adds one line to the OpenCode sidebar:
 This turn 13k processed
 ```
 
-It counts uncached work reported for the current user turn. The count includes
-input, cache writes, visible output, and reasoning across tool-call
+The number is the uncached work reported for the current user turn. It includes
+input, cache writes, visible output, and reasoning, summed across tool-call
 continuations. It excludes cache reads.
 
 The plugin uses only synchronised OpenCode host state. It makes no provider
 requests, reads no transcript files, starts no subprocesses, and stores no
-usage history. If the host records cannot support the number, the row is
-omitted instead of estimated.
+usage history. If the host records cannot support the number, the plugin omits
+the row instead of estimating.
 
 OpenCode exposes synchronised, bounded snapshots without a completeness
-marker. The plugin omits the row when a missing or inconsistent record is
-detectable. A pathological snapshot that loses an earlier step while retaining
-a matching latest step is indistinguishable from complete host state.
+marker. The plugin omits the row when it can detect a missing or inconsistent
+record. One case is undetectable: a pathological snapshot that loses an earlier
+step but keeps a matching latest step looks the same as complete host state.
 
 OpenCode 1.18.30 or later is required.
 
@@ -32,18 +32,18 @@ Install the published package:
 opencode plugin opencode-turn-stats --global
 ```
 
-Restart OpenCode. Show the sidebar. The row appears below built-in Context and
-above MCP. OpenCode does not currently expose an insertion point inside the
-built-in Context component.
+Restart OpenCode and show the sidebar. The row appears below the built-in
+Context section and above MCP. OpenCode does not currently expose an insertion
+point inside the built-in Context component.
 
-For an unpublished checkout:
+To use an unpublished checkout, build it:
 
 ```sh
 bun install --frozen-lockfile
 bun run build
 ```
 
-Add the built entry to the `plugin` array in `~/.config/opencode/tui.json`:
+Then add the built entry to the `plugin` array in `~/.config/opencode/tui.json`:
 
 ```json
 {

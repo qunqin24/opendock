@@ -54,35 +54,36 @@ workflow-сессий: стадии, переходы, консент (одоб�
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Plugin entry                                                         │
 │ src/index.ts                                                         │
-│  ├─ SessionGuardPluginV1 (@opencode-ai/plugin, серверные hooks V1) │
+│  ├─ SessionGuardPluginV1 (@opencode-ai/plugin, серверные hooks V1)   │
 │  └─ SessionGuardPluginV2 (@opencode/plugin, setup/cleanup hooks)     │
 │                                                                      │
 │ Runtime / application                                                │
 │ src/app/runtime.ts                                                   │
+│ app/v2-plugin-adapter.ts: shared V2 RuleMatchContextProvider         │
 │  ├─ config: sm-status, sm-list, sm-session, sm-profile               │
 │  ├─ tools: workflow-*                                                │
-│  ├─ chat.message                                                      │
+│  ├─ chat.message                                                     │
 │  ├─ tool.execute.before / after                                      │
-│  ├─ event                                                             │
+│  ├─ event                                                            │
 │  ├─ experimental.chat.system.transform                               │
 │  ├─ experimental.session.compacting                                  │
 │  ├─ experimental.chat.messages.transform                             │
-│  └─ dispose                                                           │
+│  └─ dispose                                                          │
 └──────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Application services                                                  │
+│ Application services                                                 │
 │ SessionExecutor + SessionQueue + WorkflowStore                       │
-│ MutationOrchestrator + ConsentOrchestrator + TaskApi                  │
-│ guardrails + invariants + change-scope + profile-agent sync           │
-│ OpenCodeRulesRuntime                                                  │
+│ MutationOrchestrator + ConsentOrchestrator + TaskApi                 │
+│ guardrails + invariants + change-scope + profile-agent sync          │
+│ OpenCodeRulesRuntime + RuleMatchContextProvider (shared in V2)       │
 └──────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Domain / schema / infrastructure                                      │
-│ domain/*  schema/*  session/*  rules/*  dashboard/*                   │
+│ Domain / schema / infrastructure                                     │
+│ domain/*  schema/*  session/*  rules/*  dashboard/*                  │
 │ workflow schemas: profiles/*/*.yaml                                  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -91,6 +92,8 @@ workflow-сессий: стадии, переходы, консент (одоб�
 корневую сессию, выполняет действие под файловой блокировкой и сохраняет новую
 ревизию. `SessionQueue` сериализует in-process вызовы по root session ID, а
 `WorkflowStore` отвечает за чтение, Zod-валидацию, атомарную запись и архив.
+В V2 один `RuleMatchContextProvider` разделяет контекст rules и workflow
+auto-start; V1 не запускает workflow по новому формату `autoStartTrigger`.
 
 ### Схема потоков данных
 
@@ -133,13 +136,15 @@ OpenCode hook
 | **Слой плагина**            | `src/index.ts`, `src/app/runtime.ts`                                                                                    | Регистрация двух SDK-вариантов плагина, hooks, tools, cleanup                    |
 | **Прикладной слой**         | `src/app/session-executor.ts`, `session-queue.ts`, `mutation-orchestrator.ts`, `consent-orchestrator.ts`, `task-api.ts` | Транзакции сессии, lifecycle операций, согласие, задачи и координация            |
 | **Доменный слой**           | `src/domain/*`, `src/schema/*`, `src/session/*`                                                                         | Переходы, guards, approvals, evidence, task movement, схема и persistence-модель |
-| **Правила / представление** | `src/rules/*`, `src/tui/*`, `src/dashboard/*`                                                                           | Доставка правил, TUI-панели, dashboard только для чтения и SSE/API               |
+| **Правила / представление** | `src/rules/*`, `src/tui/*`                                                                                              | Доставка правил и TUI-панели                                                     |
 
 ### Внешние сервисы (опционально)
 
-Dashboard не загружается как часть plugin hooks: это отдельный Bun-процесс
-`src/dashboard/dashboard-server.ts`, который читает тот же session store и
-профили, что plugin и TUI. Task provider (`src/app/provider.ts`) — отдельная
+Dashboard не загружается как часть plugin hooks и находится в приватном пакете
+`packages/dashboard`, который не публикуется. Он запускает собственный Bun-процесс и
+получает сессии и схемы через JSON CLI-контракт `session-guard`, не читая внутренний
+session store.
+Task provider (`src/app/provider.ts`) — отдельная
 абстракция CLI/Beads для интеграций; workflow runtime не требует внешнего
 issue-tracker для базовой работы.
 
@@ -1007,7 +1012,7 @@ interface ShellExecutor {
 - `escapeArg()` — экранирование `"$\\``
 - Создаёт `Bun.spawn` executor через `createBunExecutor(command)`
 
-### Мост Beads (src/dashboard/beads-bridge.ts)
+### Мост Beads (packages/dashboard/src/beads-bridge.ts)
 
 Обёртка над `bd` CLI для использования в дашборде:
 
@@ -1048,12 +1053,14 @@ retry budgets. Единственный отказ — пустой `currentStag
 `formatDetailsLines(rawText)` форматирует подробности сессии и ограничивает
 длинные коллекции. Точные rendering/lifecycle тесты находятся в `test/tui/`.
 
-## Сервер dashboard (src/dashboard/dashboard-server.ts)
+## Пакет dashboard (`packages/dashboard`)
 
 ### Отдельный процесс
 
-Сервер не внутри плагина — запускается как независимый процесс:
-`bun run src/dashboard/dashboard-server.ts`
+Сервер не входит в пакет плагина. В checkout-е его можно запустить командой
+`mise run dashboard`; отдельно пакет устанавливается как
+`@eanekrasov/session-guard-dashboard` и требует Bun и пакет `@eanekrasov/session-guard`.
+Сервер получает данные о сессиях и профилях через `session-guard --json`.
 
 ### Конечные точки API
 
@@ -1079,7 +1086,7 @@ retry budgets. Единственный отказ — пустой `currentStag
 - CORS через `ALLOWED_ORIGIN` env
 - Хост через `DASHBOARD_HOST` (по умолчанию: 127.0.0.1)
 
-### Контракт dashboard (src/dashboard/dashboard-contract.ts)
+### Контракт dashboard (`packages/dashboard/src/dashboard-contract.ts`)
 
 Чистые функции для построения сериализуемого представления стейт-машины:
 
@@ -1100,7 +1107,7 @@ type SSESessionEvent =
   | { type: 'gate'; sessionId: string; gate: string; status: string; ts: number };
 ```
 
-Сессии отслеживаются через `fs.watch` и polling с интервалом 500 ms.
+Сессии опрашиваются через CLI с интервалом 1 s.
 Изменение `metrics.jsonl` проверяется отдельным polling с интервалом 2 s и
 публикуется в dashboard UI, но не является типом `SSESessionEvent` из contract.
 
@@ -1137,7 +1144,7 @@ type SSESessionEvent =
 async function resolveConfig(profileId: string, profilesDir: string): Promise<ResolvedProfile>;
 async function listProfiles(profilesDir: string): Promise<ProfileMetadata[]>;
 // Также экспортируются session-file readers и listProfileAgents().
-// Они предназначены для интеграций TUI/dashboard только для чтения.
+// Они предназначены для интеграций TUI только для чтения.
 ```
 
 ## Переменные окружения
@@ -1216,7 +1223,7 @@ dist/                          — сгенерированный runtime, TUI, 
 | `mise run build`                      | Bun runtime + TUI + declarations + JSON schemas в `dist/` и verify-build |
 | `mise run dev`                        | Сборка для разработки с sourcemaps и разделением vendor-кода             |
 | `mise run smoke`                      | Smoke-набор для живого OpenCode                                          |
-| `mise run dashboard`                  | Запуск автономного dashboard только для чтения на порту 3456             |
+| `mise run dashboard`                  | Запуск dashboard-пакета с CLI из исходников на порту 3456                |
 
 ---
 

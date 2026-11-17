@@ -73,7 +73,8 @@ From a local checkout (useful while developing):
 ```bash
 git clone https://github.com/PentSec/opencode-go-usage-meter.git
 cd opencode-go-usage-meter
-npm install   # installs the plugin dependency and peer dependencies
+npm install    # plugin dependency, peer dependencies and build tools
+npm run build  # only after editing tui.tsx; a fresh clone ships tui.js
 ```
 
 ```jsonc
@@ -126,22 +127,42 @@ when it is absent or rejected, so a working environment key never opens the
 database or `auth.json`.
 
 The plugin does not test a credential in advance. It tries the candidates in the
-order above and moves to the next one only when the endpoint returns HTTP 401.
-Any other outcome stops the chain, because a network error, a rate limit or a
-malformed response would not improve with another credential. Once a credential
-works, later polls try it first, and a credential rejected by every poll stops
-being preferred.
+order above and moves to the next one when the endpoint rejects the key (HTTP
+401) or accepts it but reports no Go subscription (HTTP 403 with an
+`EntitlementError` body). Any other outcome stops the chain, because a network
+error, a rate limit or a malformed response would not improve with another
+credential. Once a credential works, later polls try it first, and a credential
+rejected by every poll stops being preferred.
 
-When every candidate is rejected the panel shows `credential rejected`; when
-the list is empty it shows `no credential found`.
+When every candidate is rejected the panel shows `credential rejected`; when at
+least one candidate is valid but has no Go plan it shows `no Go subscription`;
+when the list is empty it shows `no credential found`.
 
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
 | `✗ credential rejected` | The usage API returned 401. Reconnect OpenCode Go, or set `OPENCODE_GO_API_KEY` to a key created in the Console. |
+| `✗ no Go subscription` | The key is valid but its account has no active Go plan, or the plan lapsed. Subscribe in the Console, or point `OPENCODE_GO_API_KEY` at a key from a subscribed account. |
 | Nothing rendered | The sidebar is hidden, or you are not inside a session. Sidebar slots only exist within a session. |
 | Plugin does not load | Check `/plugins` in the TUI. The configured path must be a directory containing `package.json`. |
+
+## Why the TUI entry is compiled before publishing
+
+OpenCode installs plugins under `node_modules`, and its Solid JSX loader skips
+paths that contain `node_modules`. A `.tsx` entry therefore reaches the host
+untransformed, and the generic JSX runtime evaluates every expression as an
+eager prop: the panel would paint the loading state (`Go usage` + `…`) once and
+never update.
+
+The package ships `tui.js` instead, the Solid output that
+`scripts/build-tui.mjs` compiles from `tui.tsx` with `babel-preset-solid` for
+the `@opentui/solid` runtime. The compiled entry carries the reactive code
+itself, so the panel repaints on every state change from a single slot claim,
+whether or not the host runs the transform.
+
+Edit `tui.tsx` only and run `npm run build` to regenerate `tui.js`. `npm test`
+builds first, and CI fails when the committed `tui.js` no longer matches.
 
 ## Plugin package layout
 
@@ -152,7 +173,7 @@ The package follows the OpenCode v2 CLI plugin contract:
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./tui": "./tui.tsx"
+    "./tui": "./tui.js"
   },
   "dependencies": {
     "@opencode/plugin": "latest"
@@ -169,7 +190,7 @@ The package follows the OpenCode v2 CLI plugin contract:
   imports: loading `@opentui/solid` outside the renderer fails with
   `OPENTUI_FORCE_WCWIDTH is already registered`.
 - `"./tui"` is the TUI entry, built with `Plugin.define` from
-  `@opencode/plugin/tui`.
+  `@opencode/plugin/tui` and published as the precompiled `tui.js`.
 
 ### Remote servers
 

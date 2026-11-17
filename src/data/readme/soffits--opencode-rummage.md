@@ -63,7 +63,7 @@ TOML reads without escapes:
 data_dir = "~/.local/share/rummage"   # index, runtime files, logs (Windows default: %LOCALAPPDATA%\rummage)
 
 [runtime]
-threads = 2                           # CPU threads for llama.cpp
+threads = 2                           # CPU threads for llama.cpp while indexing (searches use one)
 # max_threads = "auto"                # while indexing, use up to cores - 1 when the machine is otherwise idle
 # background_threads = "auto"         # reading (OCR, pictures) and making vectors together (auto: cores - 1);
 #                                     # vectors get `threads`, reading the rest; searches aren't counted
@@ -289,7 +289,7 @@ settings for the speaker labels.
 | `codex` | `dsh-sessions` | [Codex CLI](https://github.com/openai/codex) sessions (`~/.codex/sessions`, archived and compressed ones too), the same way. Off until enabled. |
 | `gemini-cli` | | [Gemini CLI](https://github.com/google-gemini/gemini-cli) sessions (`~/.gemini/tmp/*/chats`), the same way. Off until enabled. |
 | `opencode` | | [OpenCode](https://github.com/anomalyco/opencode) 2 sessions in its `opencode.db`, the same way. Off until enabled. |
-| `dsh-sessions` | `dsh-sessions` | Chats in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) session logs: one item per message a person wrote, with the reply after it. Config: optional `projects` (default: all), `people` (a JSON map of sender ids to names), `assistant_name`. Off until enabled. |
+| `dsh-sessions` | `dsh-sessions` | Chats in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) session logs: one item per message a person wrote, with the reply after it. Config: optional `projects` (default: all), `people` (a JSON map of sender ids to names), `assistant_name`, `principals_since` (when every channel began recording its sender as `source.principal`; from then the principal alone decides, and a message without one is no person's), `web_senders_since` (for older history: when the Web login began recording every sender; later Web prompts with no sender are an agent's). Messages agents send each other, and the replies to them, are left out. Off until enabled. |
 | `hermes` | | Chats in a [Hermes Agent](https://github.com/NousResearch/hermes-agent) `state.db`, the same way. Config: `db` (default: Hermes's home), optional `people`, `exclude_sessions`, `frontends`. Off until enabled. |
 | `mail` | | Mail in a Maildir, an mbox, an IMAP or a JMAP account (read-only: nothing is marked read). One item per message: subject, sender, recipients, date, body, and the text of attached documents. Every folder but junk, trash and drafts by default. Config: `maildir` or `mbox`, or `imap_host` + `imap_user`, or `jmap_session` + `jmap_user`; `password_env`, `password_file` or `password_command` (or `oauth_token_command` for OAuth/XOAUTH2 IMAP); optional `folders`, `since` (`2024-01-01`, `2y`). |
 | `memory-export` | | Memories exported from another memory system, one item per memory with its time, user, agent and origin, embedded again with rummage's model (vectors in the file are not used). Config: `format` (`mem0`, `letta`, `zep` or `lines`), `path` (a file or a folder of them), optional `user` and `agent` for files that don't say, `origin` for a `lines` file. See [Coming from another memory system](#coming-from-another-memory-system). |

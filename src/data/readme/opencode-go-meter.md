@@ -66,8 +66,10 @@ monthly ████████  14% 28d 3h (!)
 - The first row is the session's context: a bar, the percentage, the tokens used and, on the sidebar,
   the session cost.
 - The second row is the cache hit of the last assistant message: the same bar and label column as the
-  plan rows, the percentage, the delta against the previous message, and the session total when
-  `columns.hitTotal` is on. A high hit is good, so its colour is not the Go-plan threshold colour.
+  plan rows, the percentage, the delta against the previous message, and the session total when the
+  sidebar has room for it. The slot reports no width, so the terminal width is used as a proxy and
+  the total stays off on narrow terminals. A high hit is good, so its colour is not the Go-plan
+  threshold colour.
 - One row per plan window: the bar and the percentage in the threshold colour, the countdown to that
   window's reset, and `(!)` when the pace seen so far would saturate the window before it resets.
 - A window that is only *forecasting* a breach already takes the alert colour: 14% used but heading
@@ -77,7 +79,7 @@ Prompt footer row: the same context figures in compact form, then ` | 5h:20% w:1
 
 Clicking the title or any row opens one detail dialog: every window with how much of it has elapsed
 and where the pace lands by the reset, the model, the used tokens against the context window, the
-cost, and a **Settings** row. The dialog also opens by itself the first time a window starts
+cache hit with its trend and session total, the cost, and a **Settings** row. The dialog also opens by itself the first time a window starts
 forecasting past the threshold — once per alert, not on every refresh.
 
 ### Where the numbers come from
@@ -158,12 +160,13 @@ re-read on a timer, so neither a click nor an edit needs a restart.
 | `columns.reset` | `true` | The reset countdown on each plan row |
 | `columns.flag` | `true` | The `(!)` forecast flag |
 | `columns.hit` | `true` | The cache-hit row |
-| `columns.hitTotal` | `true` | The session cache total after the hit trend |
 | `order` | `"fixed"` | `"fixed"` (5h, weekly, monthly) or `"projection"` (worst forecast first) |
 | `accentLabels` | `true` | Section headers in the theme accent instead of grey |
 | `refresh.contextMs` | `3000` | How often the context figures are recomputed |
 | `refresh.planMs` | `60000` | How often the plan windows are fetched |
 | `projectionMinElapsed` | `5` | Below this much of a window elapsed, no forecast is attempted |
+
+The cache total is not an option: it disappears when the estimated sidebar width cannot hold it.
 
 One option is not in the file: with `sidebar`, `footer` and `autoOpen` all `false` nothing can show or
 announce the figures, and the endpoint is never called.

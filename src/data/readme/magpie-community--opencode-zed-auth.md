@@ -135,6 +135,7 @@ A tools package can also give magpie a web search API. It is listed in Settings 
 
 | Package | Search APIs |
 |---|---|
+| [search1api](packages/search1api) | Search1API, signed in with the plugin's Search1API OAuth or API key (no key of its own); also gives the tools above |
 | [magpie-websearch](https://github.com/guotree/magpie-websearch) | AnySearch, Bocha, Jina, Kagi, Keenable, Linkup, Metaso, Moonshot, Moonshot CN, Ollama, Parallel, Perplexity, Querit, SerpApi, Serper, StepFun, TinyFish, Z.ai and Zhipu; published as `@guotree/magpie-websearch` and maintained in its own repository |
 | [magpie-search-mix](https://github.com/mdwsk88/magpie-search-mix) | magpie-search-mix, which asks two (or more) of Tavily, Brave, Exa, Firecrawl, You.com, DeepSeek, Doubao Search, Yuanbao Search and SearXNG at once, the ones you name in its key field, and gives their pages in turn, deduplicated; published as `magpie-search-mix` and maintained in its own repository |
 
@@ -298,6 +299,7 @@ it off puts the config back.
 | [rhino9-ai](packages/rhino9-ai) | [Magpie-Rhino](https://github.com/mikidaren/Magpie-Rhino) for Rhino 9 on Windows, with Magpie models, custom groups and routing strategies through Rhino MCP. Install the companion `.yak`, restart Rhino once, then open its AI panel and choose **Magpie**; no command required |
 | [zycode](packages/zycode) | [zycode](https://github.com/zy1233/pi-python) (`zypi`, the VS Code extension, the ACP agent): Magpie's model in the `[model]` table of `~/.pi-python/agent.toml`, set by a host part that follows `local.env` and puts the file back byte for byte; restart zycode after choosing a model |
 | [meowcode](packages/meowcode) | [MeowCode](https://github.com/MuLiuSaMa/MeowCode): magpie's models in MeowCode's own model list, written to an overlay file beside its settings that MeowCode reads at start-up; restart MeowCode after choosing a model |
+| [lorca](packages/lorca) | [Lorca](https://lorca.app): `~/.lorca/credentials.json` as a custom provider, mirroring Magpie's models with thinking levels and MCP support via `~/.lorca/mcp.json` |
 
 ```sh
 magpie plugin add @magpie-community/agent-<name>
@@ -325,12 +327,14 @@ Agent skills for magpie users, in `skills/<name>/SKILL.md`.
 |---|---|
 | [magpie-setup](skills/magpie-setup) | Lets an agent set magpie up as the user asks, through its own `magpie` commands: keys and subscriptions, an agent's model, routing groups with fallbacks and time-of-day rules, gateway keys with budgets, and MCP servers and instructions shared with every agent |
 | [magpie-quota](skills/magpie-quota) | Lets an agent check what is left of every subscription, coding plan and key balance magpie has (`magpie quota --json`), and wait for allowance to come back |
+| [magpie-sessions](skills/magpie-sessions) | Lets an agent search what was said in every coding agent's sessions on this computer (`magpie sessions search`) and read the session a hit is in (`magpie sessions show`) |
 
 In magpie, they are first under Library › Market › Skills. Elsewhere:
 
 ```sh
 npx skills add magpie-community/plugins --skill magpie-setup
 npx skills add magpie-community/plugins --skill magpie-quota
+npx skills add magpie-community/plugins --skill magpie-sessions
 ```
 
 ## Use

@@ -70,7 +70,8 @@ coding agent.
 > [!WARNING]
 > JevGuard is in active development. The OpenCode plugin targets OpenCode `2.2.x`
 > (minimum `2.2.2`, `>=2.2.2 <2.3`) through the V2 plugin API and evaluates every rule
-> block declared in `.jev/rules.md` plus the `SCOPE-CREEP` and `COMPLEXITY` built-ins.
+> block declared in `.jev/rules.md` plus the `SCOPE-CREEP`, `COMPLEXITY`, and
+> `TEST-ADEQUACY` built-ins.
 > Reviews are background and observe-only: they report results but never alter the
 > agent context or block a task. When remediation is enabled and a review has any
 > `FAIL`, the plugin asks for a proposal in an isolated, deny-all child session; the
@@ -190,11 +191,11 @@ remaining budget. Any failed, blocked, or out-of-range slice makes the whole rul
 `UNAVAILABLE`, and no sibling probability is presented as a verdict. The built-ins do
 not slice.
 
-JevGuard also runs two product-owned built-ins on every attributed turn,
-`SCOPE-CREEP` and `COMPLEXITY`. Both receive the turn's complete, safe attributed
-patch with no scope filtering, and both are answered by a **single** Jev request
-that carries two independent questions. Each answer is validated on its own, so a
-malformed answer fails only its own check.
+JevGuard also runs three product-owned built-ins on every attributed turn,
+`SCOPE-CREEP`, `COMPLEXITY`, and `TEST-ADEQUACY`. All receive the turn's complete,
+safe attributed patch with no scope filtering, and all are answered by a **single**
+Jev request that carries three independent questions. Each answer is validated on its
+own, so a malformed answer fails only its own check.
 
 `SCOPE-CREEP` asks whether the change contains material functional, behavioral,
 architectural, dependency, configuration, documentation, or refactoring work the task
@@ -208,10 +209,17 @@ without a clear need, excessive configuration, premature generalization, or stru
 materially larger than the problem requires. It is advisory: it warns at `50%` and
 can never fail.
 
+`TEST-ADEQUACY` asks whether the change adds or changes behavior that no test it adds
+or updates exercises. Changes with no behavior — documentation, comments, formatting,
+type-only edits, or a behavior-preserving refactor — and changes whose behavior is
+already covered by tests they do not need to touch do not count. It is advisory too:
+it warns at `60%` and can never fail, because judging what is absent from a patch is
+the least reliable of the three.
+
 The rule lane and the built-in batch are launched together. One shared FIFO
 concurrency limit caps the plugin instance at two Jev requests in flight, counting the
 built-in batch as a single request. Results join the same aggregate in a fixed order:
-rules in source order, then `SCOPE-CREEP`, then `COMPLEXITY`.
+rules in source order, then `SCOPE-CREEP`, `COMPLEXITY`, and `TEST-ADEQUACY`.
 
 Reviews run in the background. The unit of review is one session execution, from
 `session.execution.started` to `session.execution.succeeded`; the event handler returns
@@ -617,9 +625,13 @@ The current release implements the full local review path:
   complete, safe attributed patch. It uses a fixed advisory threshold of `0.50`,
   independent of `.jev/config.yaml`, and can produce `PASS` or `WARN` but never
   `FAIL`.
-- Both built-ins are sent as one batch request with two independent named answers.
-  One malformed or missing answer fails only its own check; the valid sibling still
-  gates. A failed or malformed batch envelope makes both checks `UNAVAILABLE`.
+- The product-owned `TEST-ADEQUACY` built-in runs on every attributed turn over the
+  same complete, safe attributed patch. It asks whether the change adds or changes
+  behavior that no test it adds or updates exercises, uses a fixed advisory threshold
+  of `0.60`, and can produce `PASS` or `WARN` but never `FAIL`.
+- The built-ins are sent as one batch request with three independent named answers.
+  One malformed or missing answer fails only its own check; the valid siblings still
+  gate. A failed or malformed batch envelope makes every check `UNAVAILABLE`.
 - The built-in batch runs concurrently with the rule lane. The rule lane dispatches
   one batched request for all of the turn's planned slices with a bounded adapter
   concurrency cap of four; the built-in batch keeps its own single request. One shared
@@ -627,7 +639,7 @@ The current release implements the full local review path:
   instance, counting the rule batch and the built-in batch as one entry each. With no
   attributed patch a built-in is `SKIPPED`; blocked or oversized evidence is
   `UNAVAILABLE`; a rule, policy-load, or config failure never suppresses the batch, and
-  one built-in's answer never suppresses the other.
+  one built-in's answer never suppresses another's.
 - Reviews run in the background. The `session.execution.succeeded` handler returns
   as soon as the serialized attribution step is scheduled, so policy reads, Jev calls,
   and presentation do not block the agent.
@@ -638,7 +650,8 @@ The current release implements the full local review path:
   channel). The log
   carries every entry's outcome, raw probability, or reason, including the built-in
   results and the synthetic review-level entry when there is one. The fixed result
-  order is rules in source order, then `SCOPE-CREEP`, then `COMPLEXITY`.
+  order is rules in source order, then `SCOPE-CREEP`, `COMPLEXITY`, and
+  `TEST-ADEQUACY`.
 - After presentation, when remediation is enabled and the review contains any `FAIL`,
   at most one aggregate proposal request is sent to an isolated, deny-all child
   session parented to the source session, with an explicit model. The request carries every `FAIL` finding
@@ -653,13 +666,13 @@ ordinary turn is reviewed normally.
 
 ## Roadmap
 
-Implemented so far: multi-rule reviews, the `SCOPE-CREEP` and `COMPLEXITY`
-built-ins, the `jev-init` policy bootstrap, local review history with feedback and
-calibration (`jevguard report`, `jevguard feedback`), on-demand checks
+Implemented so far: multi-rule reviews, the `SCOPE-CREEP`, `COMPLEXITY`, and
+`TEST-ADEQUACY` built-ins, the `jev-init` policy bootstrap, local review history with
+feedback and calibration (`jevguard report`, `jevguard feedback`), on-demand checks
 (`jevguard rules check`, `jevguard doctor`), and the Claude Code plugin. Planned work:
 
 ```text
-V0.3  Remaining built-in semantic check: test adequacy        planned
+V0.3  Remaining built-in semantic check: test adequacy        done
 V0.4  jev-init: evidence-based policy bootstrap               done
 V0.5  On-demand evidence and explanations                     partial (rules check)
 V0.6  Opt-in, bounded auto-remediation                        planned
@@ -707,10 +720,10 @@ claude-code-plugin → claude-code-adapter → node-infra → core
 The multi-rule, multi-built-in, background and observe-only review is implemented. It
 loads in OpenCode, attributes one completed turn, parses every rule block in
 `.jev/rules.md`, asks Jev once per applicable rule and once per built-in batch, runs
-the `SCOPE-CREEP`
-and `COMPLEXITY` built-ins over the complete attributed patch behind one shared
-concurrency limit, applies the local gate to each, and presents one aggregate result
-as a structured log entry.
+the `SCOPE-CREEP`,
+`COMPLEXITY`, and `TEST-ADEQUACY` built-ins over the complete attributed patch behind
+one shared concurrency limit, applies the local gate to each, and presents one
+aggregate result as a structured log entry.
 
 The local, private tarball (`pnpm artifact:build`, `pnpm artifact:pack`) packages
 that slice so a clean consumer can install it without workspace links.

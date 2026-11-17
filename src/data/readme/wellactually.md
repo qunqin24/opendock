@@ -112,12 +112,12 @@ So they are contained.
   What an expert on your advisory board releases runs from your next sync, so follow the experts you trust.
   You can switch off any single principle, or unfollow the expert.
 
-The code that does this is public: [`packages/core/src/detector/sandbox.ts`](packages/core/src/detector/sandbox.ts) is the isolate, and [`packages/cli/src/board/board.ts`](packages/cli/src/board/board.ts) runs an advisory board.
+The code that does this is public: [`packages/core/src/detector/sandbox.ts`](packages/core/src/detector/sandbox.ts) is the isolate, and [`packages/board/src/board.ts`](packages/board/src/board.ts) runs an advisory board.
 
 ## What leaves your machine
 
 - How often each principle fired: a day, a hash and a count.
-- A rating, when your agent gives one: the principle's hash and `up`, `down` or `not_applicable`.
+- A rating, when your agent gives one: the principle's hash, the outcome (`not_relevant`, `adjust`, `keep`, `noted`, `unclear` or `wrong`), and the random id of a rating it replaces.
 - Review selections, suggestions and completed fixes: the principle and pinned
   revision, event time, an opaque deduplication ID, and priority for suggestions
   and fixes. Reviews do not send helpfulness ratings.
@@ -143,7 +143,7 @@ Posting accepted findings to the PR is a separate explicit action.
 All four hosts install the same prebuilt npm package. The marketplace pins a
 published version; installation does not build source or run lifecycle scripts.
 Existing OpenCode/pi Git install sources remain supported through small adapters
-that depend on that same npm package. [Release process](docs/releasing-review.md).
+that depend on that same npm package. [Release process](packages/connector/PUBLISHING.md).
 
 ## Write a principle
 
@@ -166,12 +166,12 @@ The plugin gives it tools to create a principle, run its tests, try it on a file
 Building a principle needs esbuild, which the plugin does not carry, so install the SDK in the repository that holds your principles, which brings it:
 
 ```bash
-npm install --save-dev github:passsy/wellactually#sdk vitest
+npm install --save-dev @wellactually/detector-sdk vitest
 ```
 
 `npm test` then runs the principles' tests with vitest.
 
-A detector may import `@wellactually/sdk/v4`, which is in `packages/sdk`, its own files, and packages from npm that its `package.json` names.
+A detector may import `@wellactually/detector-sdk/v4`, which is in `packages/detector-sdk`, its own files, and packages from npm that its `package.json` names.
 The `v4` is the detector API version it is written against.
 Version 4 added the lines a write removed, `event.removed`, and `onDelete` for a deleted file.
 A principle written against `v3` keeps running as it was.
@@ -182,16 +182,23 @@ A principle written against `v3` keeps running as it was.
 | ----------------- | ------------------------------------------------------------------------------------- |
 | `hooks`, `skills` | The plugin: when the hook runs, and the skills such as `login`, `sync` and `audit`.   |
 | `dist`            | Ignored development build output; install payloads are published to npm.             |
+| [`compat`](compat/README.md) | pi adapter for existing Git installs, loading the pinned npm runtime. |
 | `opencode`        | Compatibility adapters for existing Git installs, loading the npm runtime.           |
 | `packages/core`   | Builds, checks and runs principles: the isolate, the bundler and the tests.           |
-| `packages/sdk`    | The types and helpers a detector may import.                                          |
-| `packages/cli`    | The command the plugin runs: the hook, the advisory board and the MCP server.         |
+| `packages/detector-sdk`    | The types and helpers a detector may import.                                          |
+| `packages/connector` | Connects agent hosts: the hooks, the host adapters, the MCP server and the `wellactually` command. |
+| `packages/board`  | The advisory board on this machine: which principles run, their detectors and the registry sync. |
+| `packages/review-inbox` | Review sessions, findings and verdicts, and the Review Inbox and review card that show them. |
 | `evaluator`       | Checks with real agents that the framing around advice moves them the right way.      |
-| `scripts`         | Builds `dist` and `opencode`, sets the version of a release, writes the `sdk` branch. |
+| `scripts`         | Builds `dist` and `opencode`, sets the version of a release, packs the detector SDK. |
 
 The registry is not in this repository.
 
 ## Build it yourself
+
+Testing and release procedures live with each package: [plugin](packages/connector/PUBLISHING.md)
+and [detector SDK](packages/detector-sdk/PUBLISHING.md). Keep documentation current;
+plans, proposals and historical reports belong in issues and pull requests.
 
 Development tooling needs Node >=22.18. The prebuilt product supports Node >=20.
 CI builds on the latest LTS and checks the package on Node 20.0.0, the latest
@@ -219,27 +226,30 @@ npm run install:local -- --host codex
 
 This builds a private local tarball and switches the selected host to it. Use
 `npm run package:local` to prepare it without changing host configuration.
-See [local testing and restoring npm installs](docs/releasing-review.md#local-testing-without-publishing).
+See [local testing and restoring npm installs](packages/connector/PUBLISHING.md#local-testing-without-publishing).
+To let users test an exact published npm version before the public marketplace
+pins change, follow [published-package testing](packages/connector/PUBLISHING.md#test-a-published-npm-version-before-marketplace-promotion).
 
 ## Release
 
-Build and test a new exact version with `npm run package -- --version <version>`.
-The manual `publish.yaml` workflow can publish the tested tarball using npm trusted
-publishing. Verify registry availability and integrity before promoting installer
-pointers with `node scripts/version.mjs <published-version>`, refreshing the lockfile
-and committing the source changes. See [the release process](docs/releasing-review.md).
+Test local changes as plugins first. Run **Release npm plugin** on `main` with a
+new version and `publish` enabled to build, test and stage the archive. Approve
+it on npm with 2FA; all versions use `latest`. Optionally let users test that
+exact npm version through a local catalog while the public marketplace stays
+pinned to the previous release. After artifact verification and testing, promote
+the exact marketplace and compatibility pins in a separate PR. npm approval does
+not automatically promote them. See the [maintainer release process](packages/connector/PUBLISHING.md#maintainer-release-process).
 
-The SDK is released to the `sdk` branch, from a checkout of it next to this one:
+The detector authoring package, `@wellactually/detector-sdk`, has an independent
+release workflow and version. Build and test its npm archive with:
 
 ```bash
-git worktree add ../wellactually-sdk sdk
+npm run package:sdk -- --version 0.1.0
+npm run test:package:sdk
 ```
 
-```bash
-node scripts/release-sdk.mjs ../wellactually-sdk
-```
-
-Then commit it there as `Release 0.9.29` and push the `sdk` branch.
+Use **Release detector SDK** to stage it separately; publication still requires
+npm 2FA approval. See [SDK publishing and first-release setup](packages/detector-sdk/PUBLISHING.md).
 
 ## License
 

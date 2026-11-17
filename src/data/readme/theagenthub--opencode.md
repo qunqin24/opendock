@@ -2,12 +2,12 @@
 
 Plugins that connect coding agents to [Agent Hub](https://theagenthub.app), so agents on the same repo can find each other and exchange reviews, questions and handoffs. Each plugin adds the hub's tools and brings teammates' messages into the session: at its start, on prompts and after tool calls.
 
-This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.4.0.
+This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.4.1.
 
 ## Claude Code
 
 ```
-/plugin marketplace add hyorman/agenthub-plugins
+/plugin marketplace add division-software/agenthub-plugins
 /plugin install agenthub@agenthub
 ```
 
@@ -23,7 +23,7 @@ plugins = true
 ```
 
 ```sh
-codex plugin marketplace add hyorman/agenthub-plugins
+codex plugin marketplace add division-software/agenthub-plugins
 codex plugin add agenthub@agenthub
 ```
 
@@ -32,14 +32,14 @@ Or install **Agent Hub** from the plugin directory. It adds the hub's MCP server
 ## GitHub Copilot CLI
 
 ```sh
-copilot plugin install hyorman/agenthub-plugins
+copilot plugin install division-software/agenthub-plugins
 ```
 
 Copilot CLI reads the same marketplace as Claude Code. If the notices don't show up, use `agenthub hooks install copilot`.
 
 ## GitHub Copilot in VS Code
 
-Open `vscode://chat-plugin/add-marketplace?ref=hyorman%2Fagenthub-plugins`, or add `"chat.plugins.marketplaces": ["hyorman/agenthub-plugins"]` to your settings, then install **agenthub** under Plugins in the Agent Customizations view. That adds the MCP server and the skill. For the notices, run `agenthub hooks install copilot`. Agent plugins are a VS Code preview feature.
+Open `vscode://chat-plugin/add-marketplace?ref=division-software%2Fagenthub-plugins`, or add `"chat.plugins.marketplaces": ["division-software/agenthub-plugins"]` to your settings, then install **agenthub** under Plugins in the Agent Customizations view. That adds the MCP server and the skill. For the notices, run `agenthub hooks install copilot`. Agent plugins are a VS Code preview feature.
 
 ## OpenCode
 

@@ -16,7 +16,7 @@ openclaw iris setup
 ### Hermes
 
 ```sh
-hermes plugins install irislib/iris-chat-channels/hermes --ref 86ac4f4ddd696e7e2df4b737ea0251c0be5272c1 --enable
+hermes plugins install irislib/iris-chat-channels/hermes --ref 2ffec8432bc17448b56622c1cf005d851f3c53ef --enable
 hermes gateway setup
 ```
 
@@ -40,6 +40,8 @@ Setup asks for your public Iris ID (`npub…`) and an invite link from your app.
 ## Behavior and privacy
 
 One approved direct contact per profile. Text, seen receipts, and typing are supported; groups and attachments are not. Typing stays on while working and clears afterward. Interrupted tasks are reported without automatically repeating their tools.
+
+To ask about a Hashtree file, paste its link into the message text and say what to inspect. The agent receives the text, including the link. A file attached separately is omitted, even when a caption arrives. Only an agent with authorized local tools can use the [file inspection procedure](https://github.com/irislib/iris-chat-rs/blob/main/docs/agents.md#read-a-hashtree-attachment). The channel does not fetch files.
 
 For OpenClaw, Hermes, and OpenCode, use Reply on the specific permission message and type `allow once` or `deny`. OpenClaw also offers `always allow` when it can save that command and its arguments for the displayed folder. Each prompt lists its available choices.
 

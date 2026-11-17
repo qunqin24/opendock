@@ -75,6 +75,34 @@ Prefer not to use plugins? The same skill is also published as an [HTTP skills c
 
 The site's root is a human-readable landing page (install snippets, MCP table, file links); the machine-readable catalog OpenCode fetches is at [`index.json`](https://viksaaskool.github.io/opencode-motion-video-director/index.json).
 
+## Example prompts
+
+Copy one into OpenCode after installing the plugin:
+
+**Reel with a hook**
+
+```text
+Make a 15-second vertical reel (9:16) for shweep.lol, an app for counting sheep instead of doomscrolling. Open with a 2-second hook — "still scrolling at 2am?" — then three quick beats: the problem, the app, the calm. Indigo/cream palette with pastel-yellow accents, kinetic type, a soft lo-fi bed and burned-in captions. Write the voiceover script first, generate the MP3 locally with make_vo.py, then build the scenes and render a 1080x1920 MP4.
+```
+
+**Product explainer**
+
+```text
+Create a 30-second product explainer for the same app: hook → problem → solution → CTA. Pastel night-sky look, a gentle 2D sheep animation that multiplies as the scrolling settles, warm local voiceover mixed to -14 LUFS. Deliver a 1080p MP4 plus the credits/licence list.
+```
+
+**Three hook variants**
+
+```text
+Give me three 6-second hook variants for this video — different opening line and visual metaphor each, same brand colors. Show contact-sheet previews first, then render only the one I pick.
+```
+
+**Reference-driven style**
+
+```text
+Match the pacing and shot rhythm of this reference video [paste link], but rebuild it in our style with SVG + GSAP. Keep the same beat count and use the 60-30-10 palette from our brand.
+```
+
 ## What the skill covers
 
 - **Preflight & project tracking** — tool checks, `.env` key handling, `PROGRESS.md`/`LOG.md`/`manifest.json` so any session can resume.
@@ -82,6 +110,16 @@ The site's root is a human-readable landing page (install snippets, MCP table, f
 - **ElevenLabs voiceover** — paste-ready script blocks (model, voice, settings, audio tags), word budgets per length, pronunciation and retake guidance. *You* generate the MP3 on elevenlabs.io; nothing is built before it arrives.
 - **Code-drawn production** — deterministic `drawFrame(t)` rendering, the fast preview-loop (`preview.mjs` contact sheets), 2D↔3D moves, kinetic type, cutouts (RVM/rembg/SAM2), Demucs stem separation, reference-video reverse-engineering.
 - **Visual asset hunting** — the agent browses sites itself with the Playwright MCP and logs every asset's source and licence in `manifest.json`.
+
+## Examples
+
+All three videos below are promo spots for [🐑 shweep.lol](https://shweep.lol) — an app for counting sheep instead of doomscrolling. Each was made end-to-end with this plugin, from the voiceover script through code-drawn scenes to the final ffmpeg render — just with a different model behind the director.
+
+[![Promo made with Deepseek V4.1 Flash](https://img.youtube.com/vi/RvGp99hqeic/hqdefault.jpg)](https://www.youtube.com/watch?v=RvGp99hqeic) — *model: Deepseek V4.1 Flash*
+
+[![Promo made with GPT Astra 6.1](https://img.youtube.com/vi/mTPeMRbde4A/hqdefault.jpg)](https://www.youtube.com/watch?v=mTPeMRbde4A) — *model: GPT Astra 6.1*
+
+[![Promo with voiceover made with GLM-5.3-Flash Free](https://img.youtube.com/vi/Pf5HHPDstNU/hqdefault.jpg)](https://www.youtube.com/shorts/Pf5HHPDstNU) — *with voiceover · model: GLM-5.3-Flash Free*
 
 ## Development
 
@@ -109,6 +147,10 @@ mkdir /tmp/packtest && cd /tmp/packtest && npm i /path/to/opencode-motion-video-
 ```
 
 Then check `/api/skill`, `/api/command` and `/api/mcp` (or just ask the agent to load `motion-video-director`), and run `/mvd-setup` in the scratch project.
+
+## Created a video with the plugin?
+
+Want something added — a feature, a preset, a fix? Tell me at [contact@viktorarsovski.xyz](mailto:contact@viktorarsovski.xyz).
 
 ## License
 

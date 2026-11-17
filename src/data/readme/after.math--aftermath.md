@@ -31,6 +31,20 @@ Most agent skills teach how to build. Aftermath teaches how to **stop and recove
 
 The npm scope is the publisher's npm account (`after.math`); the GitHub org is `moah0911`. They are different namespaces — use the npm scope for npm commands and the GitHub org for marketplace/source commands.
 
+> **Version status: use ≥ 0.7.0.**
+> npm versions are immutable, so older releases stay visible on the
+> [versions tab](https://www.npmjs.com/package/@after.math/aftermath?activeTab=versions)
+> (along with npm's `0.0.0-stage` placeholder from the first publish).
+> - `0.5.1` — project wiring pointed into the ephemeral npx cache; a real
+>   `init` crashed after wiring.
+> - `0.5.2`–`0.5.3` — wiring fixed, but before the npm install hooks existed.
+> - `0.6.x` — `npm i` wires the agents, but the Claude enable entry was
+>   written into `node_modules` instead of the project.
+> - `0.7.0` — current: project-scoped wiring, host auto-detection, no
+>   cross-agent installs.
+>
+> Full history: [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Install
 
 ```bash
@@ -259,17 +273,22 @@ npm run check         # rule-copy + version alignment
 ## Release
 
 Versions are kept in lockstep across `package.json`, `.claude-plugin/plugin.json`,
-`.claude-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, and
-`src/afm/__init__.py` — `npm run check` fails if they drift.
+`.claude-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `pyproject.toml`,
+and `src/afm/__init__.py` — `npm run check` fails if they drift.
 
 ```bash
-npm version patch     # bump everywhere, then npm run check
+npm test              # gate: prepublishOnly runs this automatically
 npm publish --access public
 ```
 
-The GitHub Actions workflows (`.github/workflows/npm-publish*.yml`) publish on GitHub
-release events when the `npm_token` repository secret is present; without it, publish
-locally as above.
+Publishing happens from a local checkout by default. The GitHub Actions
+workflow (`.github/workflows/npm-publish.yml`) is armed as a fallback: it
+publishes on release events, but **skips** when the version is already on npm
+or when no `npm_token` repository secret is configured — so it never turns a
+release red.
+
+GitHub releases carry the same version numbers; the git tag maps each release
+to the exact commit that was published.
 
 ## License
 

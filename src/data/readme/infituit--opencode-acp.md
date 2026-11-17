@@ -199,6 +199,10 @@ ACP 暴露六个可编辑的 prompt：
 
 **维护原则：不继承历史债务。** 不会为了维持历史兼容性而保留已知问题或延续不合理设计；必要时接受不兼容变更。
 
+## 开发与维护
+
+- [依赖管理政策](./docs/developer/dependency-management.md)：人工升级、Dependabot 边界、验证与回滚要求。
+
 ## 许可证
 
 本项目采用 AGPL-3.0-or-later 许可证，见 [LICENSE](./LICENSE)。历史作者及第三方组件的版权和许可声明予以保留，见 [LICENSE](./LICENSE) 和 [NOTICE](./NOTICE)。

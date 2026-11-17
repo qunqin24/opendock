@@ -61,15 +61,17 @@ magpie quota                   # 积分卡片
 
 登录后 `loomy` provider 自动出现；在那之前它不显示——隐藏正是设计，
 防的就是死模型。模型清单实时读取自网关的 `/api/v1/models`，登录状态
-变化时自动刷新；网关不可达时回落到内置的 2026-10-28 快照（仅聊天
+变化时自动刷新；网关不可达时回落到内置的 2026-11-17 快照（仅聊天
 模型）。网关调用上的 Bearer 认证由宿主自动注入。模型行用各厂商官方
 拼写的展示名（名字表不认识的模型保留清洗后的网关名，仅把开头的
-品牌词纠正为官方拼写），reasoning 档位取各厂商官方文档真实枚举与
-网关每行 `reasoning_efforts` 声明的交集（网关给每个思考模型都声明
-同样的五档，但厂商官方页面另有说法：DeepSeek 的 medium/xhigh 是
-high 的别名、Qwen 的 high 是 xhigh 的别名、Kimi K2.6 根本没有
-effort 参数——只有 none 的关思考是真的）。picker 的 Default 不发
-字段，落到网关自己的默认档。
+品牌词纠正为官方拼写），reasoning 档位按厂商文档策展的逐模型表：网关给
+每行盖的通用五档 `reasoning_efforts` 戳（2026-11-17 六个在售思考模型都
+声明 none/low/medium/high/xhigh）对六款模型全是错的——DeepSeek 与 GLM
+为 low/high/max（DeepSeek 另有桌面选择器实测佐证），qwen 为
+low/medium/xhigh，MiMo 无任何挡位（官方以 thinking.type 开关控制思考），
+Spark 为 none/low/high。表内没有的
+行仍按各行声明原样透传。不声明的行——`auto`——兜底 low/medium/high 三档。
+picker 的 Default 不发字段，落到网关自己的默认档。
 
 ### 积分面板与每日续满
 
@@ -121,8 +123,11 @@ TUI 里。v2 侧的插件是手机验证码登录、实时模型清单、网关�
 ## 模型
 
 登录后，模型清单实时读取自 `GET /api/v1/models`：capabilities 变成
-工具 / 思考 / 图片位，上下文与输出上限原样透传，每个模型都带
-low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展示名尾部
+工具 / 思考 / 图片位，上下文与输出上限原样透传，reasoning-effort 变体
+按厂商文档策展的逐模型表（DeepSeek 与 GLM 为 low/high/max，qwen 为
+low/medium/xhigh，MiMo 无挡位，Spark 为 none/low/high），表内没有
+的行按该行 `reasoning_efforts` 声明原样透传，只有不声明的行才兜底
+low/medium/high 三档。网关把积分倍率拼在展示名尾部
 （`MiniMax M3 （x4.0）`——半角全角括号都出现）；插件把后缀拆下来——
 名字保持干净，倍率挂到模型记录上，宿主选择器读的正是这个字段。
 上游自己声明免费的模型——名字里带「免费」二字，或倍率恰为零——
@@ -132,7 +137,9 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 也照排不误：跟它聊天就是一次失败。
 
 生图模型由插件自己的花名册放回清单旁边——插件为下面三个背书，各自用
-花名册给的展示名，线上行自己的事实（上下文与输出上限、能力位）随行。
+花名册给的展示名，线上行自己的事实（上下文与输出上限、能力位）随行，
+记录的 `api.url` 指向网关自己的图像路由 `{apiBase}/images/generations`，
+不是 chat 那条。
 一条目只在实时目录还认它 id 的时候在表里：Loomy 下架某个生图模型，
 下一次应答它就消失，不需要发版；Loomy 新增的，则等把它写进花名册的
 那一版。兜底表里没有生图条目——没有实时应答就无法证明它还在，
@@ -143,7 +150,7 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 形式留在模型列表里：不勾选即可，没有 agent 会跟它们对话。
 
 实时清单是唯一事实来源，一应答即生效。没有会话、应答为空或请求失败时，
-插件回落到代码里的内置表——2026-10-28 同一份目录文本模型的快照，
+插件回落到代码里的内置表——2026-11-17 同一份目录文本模型的快照，
 只随网关目录自身的变迁而过期；快照里的倍率与 free 位随表一并发回宿主，
 请求失败也会如实标注，让编辑器知道这份清单是插件的默认表、不是账号的。
 下表是网关当天实际返回的目录，
@@ -152,11 +159,8 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 | 模型 | 展示名 | 倍率 | 备注 |
 |---|---|---|---|
 | `spark-x2.6` | Spark-X2.6 正式版(限时免费) | x0.0 | 思考 |
-| `spark-x` | Spark-X2.5（限时免费） | x0.0 | 思考 |
 | `DeepSeek-V4.1-Flash` | DeepSeek V4.1 Flash | x2.0 | 思考，图片 |
-| `MiniMax-M3` | MiniMax M3 | x4.0 | 思考，图片 |
-| `Kimi-k2.6` | Kimi k2.6 | x6.5 | 思考，图片 |
-| `qwen-3.8-max` | Qwen 3.8 Max | x12.0 | 思考 |
+| `deepseek-v4-flash-1017` | DeepSeek V4.1 Flash 1017 | x2.0 | 思考，图片 |
 | `GLM-5.3-Flash` | GLM 5.3 Flash | x0.8 | 思考，图片 |
 | `qwen3.8-flash` | qwen 3.8 flash | x0.8 | 思考，图片 |
 | `mimo-v2.5` | MiMo V2.5 | x3.3 | 思考，图片，音频 |
@@ -166,7 +170,10 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 | `qwen-image-3.0-pro` | qwen image 3.0 pro | — | 生图 |
 
 三个生图行声明了 `output_modalities: ["image"]`——它们画图而不是用文字
-回答，其应答如何走 chat 端点尚未验证。旧版清单时代勾过的一行，如今
+回答，因此走图像路由：2026-11-17 实测，chat 路由对它们一律 404
+（「该模型暂未开放」），而 `images/generations` 用 `{model, prompt, n}`
+出真图。记录上也不挂 reasoning-effort 变体——生图模型没有思考档位可言。
+旧版清单时代勾过的一行，如今
 就是花名册的条目回来了，不再是「清单已不再认识的勾选」。
 
 ## 用量
@@ -217,9 +224,12 @@ Settings → Usage → Plugins，随 **magpie ≥ v0.1.1083** 提供，**默认�
   `image_url`，喂标记反而坏。改写是计划中的第二迭代；落地之前，图片输入
   只有 GLM 家族可靠，而较新的 `DeepSeek-V4.1-Flash` 声明了图片输入，
   其形态在此网关上未经验证。
-- **`reasoning_effort` 在非思考模型上被忽略。** 每个模型都像客户端那样
-  挂着 low/medium/high 变体；上游对不思考的模型丢弃该字段——已知行为。
-  哪些模型思考以实时目录声明为准——2026-10-28 当天大多数文本模型都声明了，
+- **`reasoning_effort` 在非思考模型上被忽略。** 变体按厂商文档策展的逐模型
+  表（DeepSeek 与 GLM 为 low/high/max，qwen 为 low/medium/xhigh，MiMo 无
+  挡位，Spark 为 none/low/high）；表内没有的行跟随每行的
+  `reasoning_efforts` 声明原样透传，只有不声明的行才兜底 low/medium/high
+  三档；上游对不思考的模型丢弃该字段——已知行为。
+  哪些模型思考以实时目录声明为准——2026-11-17 当天大多数文本模型都声明了，
   不只 spark 两个。
 - **流式工具调用尚未在真实账号上验证。** 桌面网关的 tool_calls 流式
   没有真机运行的记录在案；这是你的 agent 工具循环第一件要验的事。

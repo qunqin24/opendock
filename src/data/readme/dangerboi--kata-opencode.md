@@ -36,6 +36,8 @@ pi install ./kata-plugin/plugins/pi
 
 OpenCode 2.2.7 or later:
 
+https://github.com/user-attachments/assets/740ec27e-1edb-479b-bd41-f00073ff748d
+
 ```json
 { "plugins": [{ "package": "@dangerboi/kata-opencode", "options": {} }] }
 ```
