@@ -134,7 +134,21 @@ src/
 sitemap 和 RSS 都由它派生。
 
 数据刷新走 `.github/workflows/refresh.yml`：每天 03:00 UTC 重新抓取、
-验证构建、提交快照，提交本身会触发 Vercel 重新部署。
+运行类型检查和测试、构建、提交快照，再通过受限 SSH 密钥直接发布到生产服务器。
+也可以在 GitHub Actions 页面手动运行该工作流。
+
+### 自托管自动部署
+
+- 工作流需要仓库 Secrets：`OPENDOCK_DEPLOY_HOST`、`OPENDOCK_DEPLOY_KEY`、
+  `OPENDOCK_DEPLOY_KNOWN_HOSTS`（固定服务器 SSH 主机公钥，禁止跳过校验）。
+- 服务器使用专用 `opendock-deploy` 用户；密钥通过 `restrict,command=...`
+  仅允许执行 `scripts/deploy-receive.py`，不能使用交互 shell、端口转发或执行任意命令。
+- 将该脚本安装为 `/usr/local/bin/opendock-deploy-receive`，由 root 持有；
+  发布用户需拥有 `/srv/opendock` 和 `/srv/opendock/releases` 的写权限。
+- Nginx 只读挂载 `/srv/opendock:/site:ro`，站点根目录为 `/site/current`。
+  上传完成并验证必要文件后，原子切换 `current`；线上检查失败自动回退。
+  保留最近版本以便回滚，部署过程不需要重启服务。
+- 工作流无数据变化时仍会部署，可用手动运行恢复线上版本。
 
 ## 已知偏差
 

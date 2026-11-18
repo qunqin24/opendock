@@ -14,5 +14,7 @@
     "test-opencode-plugin"
   ],
 
-  "overrides": {}
+  "overrides": {
+    "@hamzaabili/opencode-sandbox": { "category": "infra" }
+  }
 }

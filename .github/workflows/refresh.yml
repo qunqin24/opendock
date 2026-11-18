@@ -2,7 +2,7 @@ name: Refresh plugin data
 
 # The whole point of the site is that nobody maintains the list by hand:
 # this job re-crawls npm + GitHub daily and commits the new snapshot, which
-# in turn triggers a Vercel deploy.
+# is then deployed directly to the production static server.
 on:
   schedule:
     - cron: '0 3 * * *' # 03:00 UTC ≈ 11:00 Asia/Shanghai
@@ -64,7 +64,10 @@ jobs:
           key: crawler-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Verify the site still builds with the new data
-        run: pnpm build
+        run: |
+          pnpm check
+          pnpm test
+          pnpm build
 
       - name: Commit snapshot
         id: commit
@@ -79,6 +82,25 @@ jobs:
           git commit -m "chore(data): refresh plugin snapshot $(date -u +%F)"
           bash scripts/push-snapshot.sh "${GITHUB_REF_NAME}"
           echo 'pushed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Deploy verified static files to production
+        env:
+          DEPLOY_KEY: ${{ secrets.OPENDOCK_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.OPENDOCK_DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.OPENDOCK_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$RUNNER_TEMP/opendock-ssh"
+          trap 'rm -f "$RUNNER_TEMP/opendock-ssh/key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/opendock-ssh/key"
+          chmod 600 "$RUNNER_TEMP/opendock-ssh/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/opendock-ssh/known_hosts"
+          tar -C dist -czf - . | ssh -T \
+            -i "$RUNNER_TEMP/opendock-ssh/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/opendock-ssh/known_hosts" \
+            -o ConnectTimeout=30 -o ServerAliveInterval=30 \
+            "opendock-deploy@$DEPLOY_HOST"
 
       # Tells Bing & co. which pages changed, once the push has deployed.
       # Best effort: a failed ping never fails the refresh.
