@@ -83,6 +83,8 @@ as well so its server RPC is available. OpenCode 2.2.5 does not forward server
 plugin options to the automatically loaded TUI half; a matching CLI entry
 supplies its options without rendering a second sidebar section.
 
+For example, to hide the even-use marker:
+
 ```json
 {
   "$schema": "https://opencode.ai/v2/cli.json",
@@ -90,11 +92,6 @@ supplies its options without rendering a second sidebar section.
     {
       "package": "opencode-tavily-quota",
       "options": {
-        "colors": {
-          "enabled": true,
-          "warningBelow": 50,
-          "lowBelow": 20
-        },
         "evenUse": false
       }
     }
@@ -109,7 +106,7 @@ supplies its options without rendering a second sidebar section.
 | `colors.enabled` | `true` | Color the bar fill and percentage green, yellow, or red. Set to `false` for a monochrome line. |
 | `colors.warningBelow` | `50` | Percentage remaining below which the line turns yellow. Must be a number from `0` to `100`. |
 | `colors.lowBelow` | `20` | Percentage remaining below which the line turns red. Must be a number from `0` to `100` and no higher than `warningBelow`. |
-| `evenUse` | `false` | Show the `┃` even-use mark in the bar. |
+| `evenUse` | `true` | Show the `┃` even-use mark in the bar. Set to `false` to hide it. |
 
 If you need a plugin-specific key instead of OpenCode's saved Tavily connection,
 set `apiKey` on the **server** entry in `opencode.json(c)`, not `cli.json`:

@@ -30,7 +30,8 @@ you too.
   one needs nothing but your login.
 - **Attribution on every request.** Each LunaRoute request carries a
   per-session agent + session id so traffic is traceable on the LunaRoute
-  side.
+  side — plus, when the repository declares one, its
+  [`LUNAROUTE-PROJECT-ID`](#lunaroute-project--per-repo-attribution).
 
 ## Requirements
 
@@ -198,6 +199,37 @@ model turn. No `tui.json`/`cli.json` entry is needed: the same
 functional as the `lunaroute.json` file plus the env hatches above. Edit the
 file and restart (or trigger any config change) to apply registration-time
 gates; nothing depends on the TUI plugin.
+
+### `/lunaroute project` — per-repo attribution
+
+LunaRoute splits its usage ledger by *project*, an optional label sent as the
+`LUNAROUTE-PROJECT-ID` header. This extension reads that label from the
+repository itself, so a team shares one value by committing it:
+
+```bash
+/lunaroute project lunaroute-web    # writes <repo root>/.lunaroute.json
+/lunaroute project                  # shows the value + file, prompts to change it
+/lunaroute project clear            # or "off" — removes the value
+```
+
+- **Where it lives**: `<repo root>/.lunaroute.json` holding
+  `{"project": "<name>"}`, where the root is the nearest directory with a
+  `.git` entry. Commit it to share the label; `.gitignore` it to keep it
+  personal (both work). A directory with no `.git` uses the directory itself —
+  so the label applies only when OpenCode is launched *in* that directory.
+- **What carries it**: model requests (including titles and compaction),
+  hosted-MCP registration, and the first-class tools (`web_search`,
+  `image`/`convert`). Nothing else changes — no auth, routing or limits.
+- **Live apply**: the file is read per request, so a hand edit reaches the next
+  model request and the next first-class tool call with no restart. Only
+  `mcp.lunaroute` waits for the next reload, which the command performs.
+- **Names**: 1–128 printable ASCII, not `clear`/`off`, no `{` or `}` (OpenCode
+  config substitution delimiters — pi's extension accepts braces, this one
+  ignores such a name). A file that does not parse or validate is reported as
+  `(invalid file at <path>)` in the menu and ignored, never a request failure.
+- **Visible where you look**: the `/lunaroute` menu's first row shows the
+  effective value, so a committed label is one keystroke from being seen.
+- **Headless / no TUI**: write the file by hand, exactly as above.
 
 ## Web search (`web_search`)
 

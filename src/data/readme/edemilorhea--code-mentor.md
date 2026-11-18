@@ -45,7 +45,7 @@ npm i -g @edemilorhea/code-mentor
 | CLI | 全域 node_modules | 這台機器所有專案 |
 | skill | `~/.agents/skills/code-mentor` | 這台機器所有專案 |
 | agent | `~/.config/opencode/agent/code-mentor.md` | 這台機器所有專案 |
-| 產出 | 每個 repo 的 `.code-mentor/` | 只有那個 repo，自動被 git 忽略 |
+| 產出 | 每個 repo 的 `.code-mentor/output/docs/<來源>-<hash>/` | 只有那個 repo，自動被 git 忽略 |
 
 用 `--project` 裝的 skill／agent 只在該專案生效，而且會蓋過全域那份；升級時要在該專案重跑一次。
 
@@ -85,7 +85,7 @@ code-mentor agent install            # 裝到 ~/.config/opencode/agent/code-ment
 code-mentor agent install --project  # 裝到 ./.opencode/agent/code-mentor.md
 ```
 
-重開 OpenCode 後按 Tab 切到 `code-mentor`。這個 agent 只能寫 `.code-mentor/` 底下的檔案，不改程式、不 commit、不 push、不切分支；判斷不出比較基準時會停下來問你，不會自己猜。
+重開 OpenCode 後按 Tab 切到 `code-mentor`。這個 agent 只能寫 `.code-mentor/` 底下的檔案（實際寫在 `collect` 回報的工作資料夾），不改程式、不 commit、不 push、不切分支；判斷不出比較基準時會停下來問你，不會自己猜。
 
 不用 OpenCode 的話，照上面的 CLI 加 skill 方式用就好，兩種可以並存。
 
@@ -99,7 +99,7 @@ code-mentor 只負責 diff 的收集、渲染與覆蓋檢查。「怎麼理解�
 | 只有 `change-understanding-review` | review 負責分組與判斷，逐段講法用內建規則 |
 | 兩個都沒有 | 內建規則（`SKILL.md` 第 5 節），講解深度要求不變 |
 
-有 `diagram-design` 時，只在你要架構圖、sequence 圖，或機制用文字講不清楚時才用它畫圖，存在 `.code-mentor/out/diagrams/`。
+有 `diagram-design` 時，只在你要架構圖、sequence 圖，或機制用文字講不清楚時才用它畫圖，存在工作資料夾的 `diagrams/`。
 
 兩邊規則衝突時：格式、覆蓋、輸出位置聽 code-mentor；內容怎麼講聽大腦。
 
@@ -175,14 +175,28 @@ MR 模式會用 `git fetch` 抓 GitLab 的 `merge-requests/<iid>/head`，抓不�
 
 ## 手動流程
 
-所有檔案都放在目標 repo 的 `.code-mentor/`，這個資料夾會自動被 git 忽略。
+所有檔案都放在目標 repo 的 `.code-mentor/output/docs/<來源>-<hash>/`（`.code-mentor/` 會自動被 git 忽略）。每個分支／MR／range 一個資料夾，例如：
+
+```text
+.code-mentor/
+  current                          # 最近一次 collect 用的資料夾名稱
+  output/docs/
+    feature-login-3f2a9c/          # 分支 feature/login
+    feature-login-3f2a9c-2/        # 同分支用 --new 另開的副本
+    mr-123-8b1e04/                 # MR !123
+```
+
+- 同一個來源再跑 `collect`：沿用那個資料夾，`diff.json` 更新、`guide.json` 沿用，`build` 覆蓋報告。這樣 `serve` 一直看同一個位置。
+- 要保留舊的、另開一份：`collect --new`，會建 `-2`、`-3`。
+- `show`／`check`／`build`／`serve` 預設用最近一次 `collect` 的資料夾，`--dir <資料夾>` 可指定。
+- 舊版的 `.code-mentor/guide.json`、`.code-mentor/out/` 不再使用，不會被搬移或刪除。
 
 ```bash
-code-mentor collect          # 1. 產生 diff.json 和 guide.json 骨架，印出檔案表
+code-mentor collect          # 1. 產生 diff.json 和 guide.json 骨架，印出工作資料夾和檔案表
 code-mentor show f3#2        # 2. 看某個 hunk（f3 = 第 3 個檔案，#2 = 第 2 段）
-                             # 3. 編輯 .code-mentor/guide.json
+                             # 3. 編輯工作資料夾裡的 guide.json
 code-mentor check            # 4. 檢查漏講、錯誤參照，修到 0 個錯誤
-code-mentor build            # 5. 產生 .code-mentor/out/index.html 和 guide.md
+code-mentor build            # 5. 在工作資料夾產生 index.html 和 guide.md
 ```
 
 ### 即時預覽（serve）
@@ -195,7 +209,7 @@ code-mentor serve --port 5000
 - 寫導讀時開著它，AI 每寫一段你就能看到，不用一直重跑 `build`。重新整理後停在原本位置。
 - 一律 `--force` 重建，check 的錯誤和警告印在終端機，不擋預覽；正式交付前仍要跑 `check`。
 - `guide.json` 存到一半格式壞掉時，頁面頂端顯示紅色錯誤列，繼續顯示上一次成功的版本。
-- 只監看 `guide.json`；重新 `collect` 後要重開 `serve`。
+- 只監看啟動當下那個工作資料夾的 `guide.json`。之後在別的分支 `collect` 不會影響它；要看新分支就重開 `serve`。
 - 只聽 `127.0.0.1`，區網其他電腦看不到。port 4173 被占用時自動往後找；用 `--port` 指定則不換。Ctrl+C 停止。
 
 `check` 遇到下面這些情況會報錯：

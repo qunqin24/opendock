@@ -53,9 +53,9 @@ workflow-сессий: стадии, переходы, консент (одоб�
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Plugin entry                                                         │
-│ src/index.ts                                                         │
-│  ├─ SessionGuardPluginV1 (@opencode-ai/plugin, серверные hooks V1)   │
-│  └─ SessionGuardPluginV2 (@opencode/plugin, setup/cleanup hooks)     │
+│ src/plugin.ts  (гибрид: V2 setup + V1 server)                        │
+│  ├─ src/v1/plugin.ts  SessionGuardPluginV1 (@opencode-ai/plugin)     │
+│  └─ src/v2/plugin.ts  SessionGuardPluginV2 (@opencode/plugin)        │
 │                                                                      │
 │ Runtime / application                                                │
 │ src/app/runtime.ts                                                   │
@@ -83,7 +83,7 @@ workflow-сессий: стадии, переходы, консент (одоб�
                                   ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Domain / schema / infrastructure                                     │
-│ domain/*  schema/*  session/*  rules/*  dashboard/*                  │
+│ domain/*  schema/*  session/*  rules/*                               │
 │ workflow schemas: profiles/*/*.yaml                                  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -133,17 +133,17 @@ OpenCode hook
 
 | Слой                        | Текущие компоненты                                                                                                      | Ответственность                                                                  |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Слой плагина**            | `src/index.ts`, `src/app/runtime.ts`                                                                                    | Регистрация двух SDK-вариантов плагина, hooks, tools, cleanup                    |
+| **Слой плагина**            | `src/plugin.ts`, `src/v1/plugin.ts`, `src/v2/plugin.ts`, `src/app/runtime.ts`                                           | Регистрация двух SDK-вариантов плагина, hooks, tools, cleanup                    |
 | **Прикладной слой**         | `src/app/session-executor.ts`, `session-queue.ts`, `mutation-orchestrator.ts`, `consent-orchestrator.ts`, `task-api.ts` | Транзакции сессии, lifecycle операций, согласие, задачи и координация            |
 | **Доменный слой**           | `src/domain/*`, `src/schema/*`, `src/session/*`                                                                         | Переходы, guards, approvals, evidence, task movement, схема и persistence-модель |
 | **Правила / представление** | `src/rules/*`, `src/tui/*`                                                                                              | Доставка правил и TUI-панели                                                     |
 
 ### Внешние сервисы (опционально)
 
-Dashboard не загружается как часть plugin hooks и находится в приватном пакете
-`packages/dashboard`, который не публикуется. Он запускает собственный Bun-процесс и
-получает сессии и схемы через JSON CLI-контракт `session-guard`, не читая внутренний
-session store.
+Dashboard не загружается как часть plugin hooks; он живёт в отдельном
+репозитории и приватном пакете `@eanekrasov/session-guard-dashboard`, который не
+публикуется. Панель получает сессии и схемы через JSON CLI-контракт
+`session-guard`, не читая внутренний session store.
 Task provider (`src/app/provider.ts`) — отдельная
 абстракция CLI/Beads для интеграций; workflow runtime не требует внешнего
 issue-tracker для базовой работы.
@@ -374,8 +374,8 @@ interface SessionFacts {
 ## События сессии и границы сохранения
 
 Отдельного `src/session/session-events.ts` в текущем проекте нет. Событийная
-граница persistence находится в `WorkflowStore` и в API чтения файлов сессий;
-dashboard подписывается на собственный watcher/polling слой. Не импортируйте
+граница persistence находится в `WorkflowStore` и в API чтения файлов сессий.
+Не импортируйте
 `onSessionSaved`: такого callback нет в текущем runtime.
 
 Для чтения состояния используйте экспортируемые helpers из
@@ -1012,24 +1012,12 @@ interface ShellExecutor {
 - `escapeArg()` — экранирование `"$\\``
 - Создаёт `Bun.spawn` executor через `createBunExecutor(command)`
 
-### Мост Beads (packages/dashboard/src/beads-bridge.ts)
-
-Обёртка над `bd` CLI для использования в дашборде:
-
-- `getIssue(id)` — получение задачи
-- `getReady()` — список готовых задач
-- `postComment(issueId, text, author)` — комментарий
-- Кеширование 30 с
-- Мягкая деградация: если `bd` CLI недоступен → `{ error, degraded: true }`
-
 ## TUI (src/tui/tui.ts)
 
 TUI сейчас имеет два связанных, но отдельных слоя:
 
-- `src/tui.ts` — публичный entrypoint, экспортирующий `createStateSection`,
+- `src/tui.ts` — публичный entrypoint-гибрид (`./tui`), экспортирующий `createStateSection`,
   `createSessionGuardCoordinator` и `SectionApi`;
-- `src/tui/index.tsx` — JSX-монтаж workflow и rules sidebar, coordinator и
-  OpenCode `sidebar_content` lifecycle;
 - `src/tui/tui.ts` — чистая workflow-модель чтения и форматирования, без JSX;
 - `src/tui/slots/sidebar-content.tsx` и `src/tui/tui-panel/*` — общие панели и
   slot-композиция;
@@ -1052,64 +1040,6 @@ retry budgets. Единственный отказ — пустой `currentStag
 
 `formatDetailsLines(rawText)` форматирует подробности сессии и ограничивает
 длинные коллекции. Точные rendering/lifecycle тесты находятся в `test/tui/`.
-
-## Пакет dashboard (`packages/dashboard`)
-
-### Отдельный процесс
-
-Сервер не входит в пакет плагина. В checkout-е его можно запустить командой
-`mise run dashboard`; отдельно пакет устанавливается как
-`@eanekrasov/session-guard-dashboard` и требует Bun и пакет `@eanekrasov/session-guard`.
-Сервер получает данные о сессиях и профилях через `session-guard --json`.
-
-### Конечные точки API
-
-| Метод | Путь                                 | Описание                                                      |
-| ----- | ------------------------------------ | ------------------------------------------------------------- |
-| GET   | `/`                                  | HTML-интерфейс                                                |
-| GET   | `/events`                            | SSE snapshot при подключении и инкрементальные session events |
-| GET   | `/api/schema`                        | Контракт workflow/schema для текущего профиля                 |
-| GET   | `/api/dump`                          | Все активные и архивные сессии                                |
-| GET   | `/api/session/:id`                   | Одна сессия с вычисляемой стадией                             |
-| GET   | `/api/session/:id/timeline`          | Timeline transitions/gates                                    |
-| GET   | `/api/session/:id/invariants`        | `invariantViolations` сессии                                  |
-| GET   | `/api/metrics`                       | `.opencode/metrics.jsonl`, если файл существует               |
-| GET   | `/api/rag-eval`                      | `.opencode/rag/eval-results.json`, если файл существует       |
-| GET   | `/api/agents/:profile/:agent/prompt` | Prompt агента с явным profile ID                              |
-| GET   | `/api/agents/:agent/prompt`          | Prompt агента профиля текущей сессии                          |
-| GET   | `/api/beads/issue/:id`               | Issue через Beads Bridge                                      |
-| POST  | `/api/beads/comment`                 | Комментарий через Beads Bridge                                |
-
-### Аутентификация и CORS
-
-- Bearer token через `DASHBOARD_TOKEN` env
-- CORS через `ALLOWED_ORIGIN` env
-- Хост через `DASHBOARD_HOST` (по умолчанию: 127.0.0.1)
-
-### Контракт dashboard (`packages/dashboard/src/dashboard-contract.ts`)
-
-Чистые функции для построения сериализуемого представления стейт-машины:
-
-```typescript
-interface DashboardSchema {
-  states: DashboardState[]; // { id, label, description }
-  transitions: DashboardTransition[]; // { from, to, kind, gate }
-  gates: DashboardGate[]; // { id, label }
-  profile: DashboardProfile; // { id, version, invariants, ... }
-}
-```
-
-### SSE-события
-
-```typescript
-type SSESessionEvent =
-  | { type: 'transition'; sessionId: string; from: string; to: string; ts: number }
-  | { type: 'gate'; sessionId: string; gate: string; status: string; ts: number };
-```
-
-Сессии опрашиваются через CLI с интервалом 1 s.
-Изменение `metrics.jsonl` проверяется отдельным polling с интервалом 2 s и
-публикуется в dashboard UI, но не является типом `SSESessionEvent` из contract.
 
 ## АПИ
 
@@ -1149,18 +1079,17 @@ async function listProfiles(profilesDir: string): Promise<ProfileMetadata[]>;
 
 ## Переменные окружения
 
-| Переменная                   | По умолчанию                                    | Описание                                                |
-| ---------------------------- | ----------------------------------------------- | ------------------------------------------------------- |
-| `OPENCODE_HARNESS_DIR`       | `<project>/.opencode`                           | Корень project-local harness данных                     |
-| `SESSION_GUARD_PROFILES_DIR` | `$OPENCODE_HARNESS_DIR/profiles`                | Каталог profile.json/YAML/invariants                    |
-| `SESSION_GUARD_STORE_DIR`    | `$XDG_DATA_HOME/opencode/session-guard/runtime` | Активные session JSON и archive                         |
-| `SESSION_GUARD_LOG_LEVEL`    | `info`                                          | `debug`, `info`, `warn` или `error`                     |
-| `HARNESS_PROFILE`            | не задан                                        | Fallback profile/schema для workflow-create и dashboard |
-| `HARNESS_SCHEMA_ID`          | не задан                                        | Fallback schema ID для workflow-create                  |
-| `HARNESS_AUTO_APPROVE`       | не задан                                        | При `true` автоматически grant-ит запрошенное consent   |
-| `DASHBOARD_TOKEN`            | пусто                                           | Bearer token для dashboard API                          |
-| `DASHBOARD_HOST`             | `127.0.0.1`                                     | Хост привязки автономного dashboard                     |
-| `ALLOWED_ORIGIN`             | пусто                                           | CORS origin dashboard                                   |
+| Переменная                   | По умолчанию                                    | Описание                                               |
+| ---------------------------- | ----------------------------------------------- | ------------------------------------------------------ |
+| `OPENCODE_HARNESS_DIR`       | `<project>/.opencode`                           | Корень project-local harness данных                    |
+| `SESSION_GUARD_PROFILES_DIR` | `$OPENCODE_HARNESS_DIR/profiles`                | Каталог profile.json/YAML/invariants                   |
+| `SESSION_GUARD_STORE_DIR`    | `$XDG_DATA_HOME/opencode/session-guard/runtime` | Активные session JSON и archive                        |
+| `SESSION_GUARD_LOG_LEVEL`    | `info`                                          | `debug`, `info`, `warn` или `error`                    |
+| `HARNESS_PROFILE`            | не задан                                        | Fallback profile/schema для workflow-create            |
+| `HARNESS_SCHEMA_ID`          | не задан                                        | Fallback schema ID для workflow-create                 |
+| `HARNESS_AUTO_APPROVE`       | не задан                                        | При `true` автоматически grant-ит запрошенное consent  |
+| `DASHBOARD_TOKEN`            | пусто                                           | Bearer token для dashboard API (отдельный репозиторий) |
+| `ALLOWED_ORIGIN`             | пусто                                           | CORS origin dashboard                                  |
 
 ## Структура проекта
 
@@ -1191,7 +1120,6 @@ src/
   rules/                       — discovery, matching, delivery и runtime hooks
   tui.ts                       — public TUI entrypoint
   tui/                         — JSX sidebar, panels и data coordinators
-  dashboard/                   — автономный HTTP/SSE-сервер и контракт
 
 profiles/
   base/base.yaml, profile.json, invariants.ts, agents/
@@ -1202,7 +1130,7 @@ scripts/
   build-tui.ts, build-schema.ts, verify-build.ts
   host-smoke/                  — smoke-набор для живого OpenCode
 
-test/                          — domain, app, schema, session, rules, TUI, e2e, dashboard
+test/                          — domain, app, schema, session, rules, TUI, e2e
 
 dist/                          — сгенерированный runtime, TUI, объявления и JSON-схемы
 ```
@@ -1223,7 +1151,6 @@ dist/                          — сгенерированный runtime, TUI, 
 | `mise run build`                      | Bun runtime + TUI + declarations + JSON schemas в `dist/` и verify-build |
 | `mise run dev`                        | Сборка для разработки с sourcemaps и разделением vendor-кода             |
 | `mise run smoke`                      | Smoke-набор для живого OpenCode                                          |
-| `mise run dashboard`                  | Запуск dashboard-пакета с CLI из исходников на порту 3456                |
 
 ---
 

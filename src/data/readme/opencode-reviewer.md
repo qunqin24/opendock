@@ -21,25 +21,34 @@ For OpenCode V2 on Linux.
 
 ## Install and config
 
-Add the [npm package](https://www.npmjs.com/package/opencode-reviewer) and its options
-to the `plugins` array in global `opencode.json`, under `~/.config/opencode/` or
-`$XDG_CONFIG_HOME/opencode/`. OpenCode loads both the server companion and terminal
-component from this one entry.
+Add the [npm package](https://www.npmjs.com/package/opencode-reviewer) to two files
+in `~/.config/opencode/` (or `$XDG_CONFIG_HOME/opencode/`).
+For a remote connection, configure `opencode.json` on the server and `cli.json`
+on the machine running the terminal.
 
+**`opencode.json`** loads the server companion:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-reviewer@latest"]
+}
+```
+
+**`cli.json`** configures the reviewer. Choose a model available at your endpoint
+and set `OPENCODE_REVIEWER_API_KEY` in the terminal environment before launch.
+Only `baseURL` and `model` are required. Omit `apiKeyEnv` for an unauthenticated
+endpoint. The review and notification switches below show the defaults.
+
+```json
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-reviewer@latest",
       "options": {
         "baseURL": "https://openrouter.ai/api/v1",
         "model": "your-model",
-        "retrievalBaseURL": "https://openrouter.ai/api/v1",
-        "retrievalModel": "your-retrieval-model",
-        "apiKey": "your-api-key",
         "apiKeyEnv": "OPENCODE_REVIEWER_API_KEY",
-        "instructions": "/absolute/path/to/reviewer-prompts",
         "stream": false,
         "formatRetries": 1,
         "maxOutputTokens": 4096,
@@ -79,32 +88,28 @@ component from this one entry.
           "steered": { "banner": true, "sound": true },
           "error": { "banner": true, "sound": true },
           "ended": { "banner": true, "sound": true }
-        },
-        "notificationSoundDirectory": "/absolute/path/to/notification-sounds"
+        }
       }
     }
   ]
 }
 ```
 
-Rwo-entry setup is also supported: keep the companion in `opencode.json`
-and the reviewer options in `cli.json`. Nonempty terminal options take precedence
-as a complete override. To switch to one entry, move those options into the
-`opencode.json` entry and remove the reviewer entry from `cli.json`.
-Keep OpenCode's `keybinds` and other terminal preferences in `cli.json`.
-Configuration edits reload automatically.
+If you previously put reviewer options in `opencode.json`, move the whole
+`options` object to the reviewer entry in `cli.json`. Leave just the package
+name in `opencode.json`. Without valid terminal settings, review and automatic
+permission replies stay off. Configuration edits reload automatically.
 
-Only `baseURL` and `model` are required. Use any OpenAI-compatible Chat Completions
-endpoint: `/chat/completions` is appended to the base URL. Choose a model available
-at that endpoint. Retrieval uses non-streaming tool calls.
+Use an OpenAI-compatible Chat Completions endpoint. The reviewer appends
+`/chat/completions` to the base URL. Retrieval uses non-streaming tool calls.
 Optional `retrievalBaseURL` and `retrievalModel` select a separate retriever.
 Omit them to reuse the reviewer endpoint and model. A different retrieval endpoint
 uses its own `retrievalApiKey` or `retrievalApiKeyEnv`, or no authentication if both
 are omitted.
-Replace `apiKey`, or remove it and set the variable named by `apiKeyEnv` before
-launching OpenCode. The inline key takes precedence. Omit both for an unauthenticated
-endpoint. Remove `instructions` to use the built-in prompts and
-`notificationSoundDirectory` to use the bundled sounds.
+An inline `apiKey` takes precedence over `apiKeyEnv`. Omit both for an
+unauthenticated endpoint. The terminal sends operation evidence to the configured
+providers while the native permission is pending. Retrieval can include file
+contents in those requests, even when the native permission is later rejected.
 
 ### Opencode docs
 
@@ -113,7 +118,7 @@ endpoint. Remove `instructions` to use the built-in prompts and
 
 ## Options reference
 
-These are options inside the plugin's `options` object in global `opencode.json`.
+These are options inside the plugin's `options` object in the terminal's `cli.json`.
 Defaults apply only to omitted options. `null` is invalid. Boolean and integer
 options require JSON booleans and numbers, not quoted strings. Integer ranges are
 inclusive, fractions are invalid, and the maximum safe integer is
@@ -175,7 +180,7 @@ Normal retrieval turns are not counted as retries.
 
 | Option | Type | Default | Accepted values and behavior |
 | --- | --- | --- | --- |
-| `autoApprove` | boolean | `false` | Allow Safe reviews once automatically. Normally waits for completion, validation and the countdown. Works throughout the current conversation, including subagent browsing and hidden/covered reports. Home, dashboards, unrelated conversations and native permission decision editing wait without cancellation. |
+| `autoApprove` | boolean | `false` | Allow Safe reviews once automatically. Normally waits for completion, validation and the countdown. Works in the routed conversation or any open conversation tab, including hidden/covered reports. Native permission decision editing holds only that routed conversation. |
 | `autoRejectSteering` | boolean | `false` | Independent of `autoApprove`. Requires steering text with every Unsafe rating. Missing, null or blank steering triggers format-correction retries. Valid Unsafe reports start the same countdown, then answer the native prompt with Reject and a message the agent reads: the reason, the steering and a fixed closing sentence. See Automatic steering rejection. |
 | `maxSteeringRejections` | integer | `1` | `1`–`100`. Consecutive automatic rejections per session. After that, Unsafe requests in that session wait for you until any permission in it is approved. |
 | `fastMode` | boolean | `false` | Requires `autoApprove: true` for approvals. Approve an eligible, front-of-queue request as soon as a Safe rating is parsed, bypassing the countdown. With `autoRejectSteering: true`, also reject as soon as an Unsafe rating, its reason and its steering are parsed. Respects `stream`. With `stream: false`, waits for the complete validated response. Finish the report and save it in the background after the reply. |
@@ -252,9 +257,11 @@ messages.
   is reviewed separately from the operation that needs it.
 
 For tools called inside Code Mode, the reviewer gets the outer code, the pending
-permission and the captured inner calls. It is told when it can't know which
-inner call asked for the permission, and it may still rate the request Safe. A
-Safe rating approves only that one permission, not the whole program.
+permission and the calls captured while the program ran in the same session
+and message. Some of them may belong to another program running at the same
+time. It is told when it can't know which inner call asked for the permission,
+and it may still rate the request Safe. A Safe rating approves only that one
+permission, not the whole program.
 
 The reviewer assumes registered skill and tool definitions don't change while a
 permission is pending. It also assumes other plugins don't change what native
@@ -344,26 +351,29 @@ steering rejection, below.
 - Click the countdown to approve right away, or click Cancel to keep the request
   manual.
 - The request must be first in OpenCode's permission queue.
-- You must be viewing the request's conversation or one of its subagents. The
-  panel doesn't need to be visible.
-- Home, the dashboard and unrelated conversations hold approval. With OpenCode
-  tabs, an open background tab of the request's conversation is enough, even
-  when the active tab is in another directory. Its review runs in the
+- You must be viewing the request's conversation or one of its subagents, or
+  have a tab of that conversation open. The panel doesn't need to be visible.
+- An open conversation tab is enough on home, the dashboard or another
+  conversation, even when the active tab is in another directory. Its review runs in the
   background. A report that is still open shows when you return to that tab,
   and completed reports are saved to history.
 - The current directory and the directories of open tabs are reviewed at the
-  same time, up to eight. Requests in tabs past that limit stay manual.
+  same time. A subagent working in another directory, such as a git worktree it
+  moved into, is reviewed with its conversation. Up to eight directories are
+  covered in total. Requests past that limit stay manual.
 - A held countdown keeps its deadline. If it has expired, approval runs as soon
   as the request is eligible again.
-- Selecting Allow always or Reject in the native prompt, or typing a rejection
-  reason, holds approval. Moving back to Allow once resumes it.
+- Selecting Allow always or Reject in the routed conversation's native prompt,
+  or typing a rejection reason, holds that conversation's approval. Moving back
+  to Allow once resumes it. Other conversations' open tabs continue independently.
 - Cancel, `/reviewer-disable` and native rejection or interruption stop
   automation for that request. Returning or re-enabling review doesn't restart it.
 - If the plugin can't confirm that an approval went through, it never resends it.
   The request stays manual.
 
 The panel shows **Allowed in Ns** during the countdown, then **Checking…** and
-**Allowing…**. It shows **Auto-approval waiting** while approval is held and
+**Allowing…**. Before dispatch, waits retain a disabled **Checking…** button
+beside **Cancel**, including before the countdown first starts. It shows
 **Auto-approval canceled** after Cancel. If approval fails, it shows
 **Auto-approval unavailable. Use native controls.**
 
@@ -393,8 +403,8 @@ it normally appears red, but text matching native denial phrases such as
 `rejected permission` can appear muted.
 
 - The panel shows **Steering:** and the text in red italics while the rejection
-  is armed or sent, and **Rejected in Ns**, **Rejecting…**, **Auto-rejection
-  waiting**, **Auto-rejection canceled** or **Auto-rejection unavailable. Use
+  is armed or sent, and **Rejected in Ns**, **Checking…**, **Rejecting…**,
+  **Auto-rejection canceled** or **Auto-rejection unavailable. Use
   native controls.** like automatic approval.
 - Missing, null or blank steering on an Unsafe response triggers correction up to
   `formatRetries`. Exhausting those attempts shows Analysis unavailable and leaves
@@ -481,7 +491,8 @@ rejected by automatic steering shows **Auto rejected** and the steering that was
 sent.
 
 The model and provider identify the verdict request. Token and cost totals
-include retrieval.
+include retrieval. Costs are summed across requests, treating missing cost
+information as zero.
 
 A validated report is saved when its permission is approved or rejected. This
 includes Unsafe reports and repeated reviews of the same permission. Pending
@@ -495,8 +506,10 @@ Reports can contain private text. They are stored in
 `$XDG_STATE_HOME/opencode/opencode-reviewer/`, or under `~/.local/state` when
 `XDG_STATE_HOME` is unset. If that directory isn't private enough, the plugin
 uses its own `opencode-reviewer-state/opencode-reviewer/` next to it and keeps
-using it. Enable and disable settings stay in the OpenCode state directory. A
-settings file that is unreadable or has unsafe ownership suspends review.
+using it. Enable and disable settings stay in the OpenCode state directory.
+While permissions are pending, each terminal checks their conversation settings
+every two seconds. If a check fails or takes more than five seconds, review
+for that conversation is suspended, even if the disk read is still running.
 
 Deleting a conversation keeps its saved reports and totals. Terminals that share
 a state directory share history. Reports not yet saved can be lost on shutdown.

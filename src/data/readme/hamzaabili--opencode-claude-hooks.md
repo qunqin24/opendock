@@ -247,6 +247,15 @@ not control.
   must affect the turn.
 - V1 cannot continue a Stop/SubagentStop hook or prompt for trust; see the matrix above.
 
+## Other OpenCode plugins by the same author
+
+Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
+
+- [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permissions, questions and idle sessions, with tap-only inline buttons.
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: portable skills and MCP servers from standard directories and npm, trusted before enabled.
+- [opencode-integrity](https://github.com/Hamza-Abili/opencode-integrity) — lock plugins, MCP tool definitions and skills; detect drift, tool poisoning and rug pulls.
+
 ## Support
 
 - Bugs: [open an issue](https://github.com/Hamza-Abili/opencode-claude-hooks/issues/new/choose)
@@ -255,6 +264,8 @@ not control.
   not an issue.
 - Security: [private advisory](https://github.com/Hamza-Abili/opencode-claude-hooks/security/advisories/new),
   never a public issue.
+- If this saves you time, a [star](https://github.com/Hamza-Abili/opencode-claude-hooks/stargazers)
+  helps other OpenCode users find it.
 
 ## Development
 

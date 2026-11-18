@@ -73,7 +73,7 @@ gemini extensions install https://github.com/skatkov/posh-mcp
 The extension runs `posh mcp` locally. Ask the agent to pass your absolute Ruby
 project directory in tool calls if its working directory is not your project.
 
-### Agent plugins: Claude Code, Codex, and OpenCode
+### Agent plugins: Claude Code, Codex, OpenCode, and GitHub Copilot CLI
 
 An MCP server alone gets used late, because agents tend to reach for it only
 once they are stuck. These plugins connect the server and also tell the agent
@@ -101,10 +101,26 @@ OpenCode 2:
 opencode plugin add github:skatkov/posh-mcp#main
 ```
 
+GitHub Copilot CLI 1.0.112+:
+
+```sh
+copilot plugin marketplace add skatkov/posh-mcp
+copilot plugin install posh@skatkov
+```
+
+Start a new Copilot session after installing. The plugin reuses the existing
+marketplace, skill, and local MCP configuration. Its hooks require Node 18.3+.
+Older Copilot versions can install the skill but may silently ignore the hook
+used for mode commands; update Copilot before using this integration.
+
 The instructions come from [`skills/posh/SKILL.md`](skills/posh/SKILL.md).
 OpenCode adds them to the system prompt of every model request. Claude Code and
 Codex have no plugin API for the system prompt, so they receive them as hidden
 context at session start, after compaction, and when a subagent starts.
+Copilot receives them at session start/resume and when supported subagents start.
+Its built-in `general-purpose` agent does not emit the subagent-start hook, and
+there is no dedicated post-compaction hook. Ordinary prompts receive a short
+current-project directive, not another copy of the full ruleset.
 
 | Command | Effect |
 | --- | --- |
@@ -114,13 +130,15 @@ context at session start, after compaction, and when a subagent starts.
 | `/posh off` | Inactive everywhere |
 
 In Codex, use `$posh` in place of `/posh`. The mode is saved in
-`~/.config/posh/agent-mode` and shared by all three agents. These plugins are
-not a claim that Anthropic, OpenAI, or OpenCode has reviewed or listed them.
+`~/.config/posh/agent-mode` and shared by all four agents. Copilot uses its
+`userPromptTransformed` hook to apply mode changes and supply the confirmation
+instructions without replacing the user's original prompt. These plugins are
+not a claim that Anthropic, OpenAI, OpenCode, or GitHub has reviewed or listed them.
 
 #### Redirecting gem source reads
 
 Instructions are advisory, and an agent deep in a task tends to read the
-installed gem source anyway. In Claude Code, Codex, and OpenCode 2 the plugin declines that one
+installed gem source anyway. In Claude Code, Codex, OpenCode 2, and Copilot CLI the plugin declines that one
 call and says what to run instead: reading a gem's source, or fetching its
 documentation over HTTP, is declined once per gem per session when POSH has a
 docset for that gem in this project.
@@ -135,7 +153,7 @@ Gems with no local docs, git-sourced gems, non-Ruby projects in auto mode,
 and `/posh off` are left alone. A broad search of the gem tree gets one
 separate nudge when any locked gem has local docs.
 
-All three harnesses run the same JavaScript policy in [`shared/lookup-policy.mjs`](shared/lookup-policy.mjs).
+All four harnesses run the same JavaScript policy in [`shared/lookup-policy.mjs`](shared/lookup-policy.mjs).
 It owns lookup classification, mode and project checks, POSH discovery, redirect
 text, and atomic retry markers. The adapters only translate their host contracts:
 
@@ -145,6 +163,17 @@ text, and atomic retry markers. The adapters only translate their host contracts
 - [`opencode/posh.mjs`](opencode/posh.mjs) maps OpenCode's built-in tool inputs,
   resolves the session's current location (or a shell's explicit `workdir`),
   imports the policy directly, and turns its reason into the host SDK's `Tool.Error`.
+- [`hooks/posh-copilot-hook.mjs`](hooks/posh-copilot-hook.mjs) maps Copilot's native
+  tool inputs and hook responses, uses the payload's current working directory,
+  and shares lifecycle guidance and mode changes with OpenCode through
+  [`shared/agent-lifecycle.mjs`](shared/agent-lifecycle.mjs). The shell launcher
+  only preserves fail-open process behavior; lifecycle responses are serialized once.
+  Every transformed prompt refreshes the resolved Ruby project and supersedes
+  earlier project paths because Copilot starts plugin MCP servers in the plugin
+  directory by default. Leaving Ruby in auto mode revokes the earlier guidance;
+  forced-on mode without a resolved project asks the agent to locate one explicitly.
+  It emits a native denial for redirects. Its shell launcher exits successfully
+  even if Node fails, because Copilot otherwise denies calls on hook crashes.
 
 The policy uses Node's standard library, with no runtime parsing dependencies or
 Ruby subprocesses. Claude/Codex interception requires Node 18.3+ on the hook's PATH.
@@ -166,15 +195,16 @@ RubyGems path overrides are not detected.
 Web lookups use the actual URL host and path, not embedded links in a query or fragment.
 
 Claude Code alone supports `POSH_HOOK_DECISION=ask` to request approval instead
-of declining the lookup. Codex does not support that response; Codex and OpenCode
+of declining the lookup. Codex does not support that response; Codex, Copilot, and OpenCode
 always use a one-time denial followed by an allowed retry. In Codex, review the
 new hooks in `/hooks` after updating. Hosted tools such as Codex's web search
 do not pass through local tool hooks and are not intercepted.
 
 OpenCode requires the 2.3+ plugin SDK; it supplies the runtime SDK, while the
-repository pins a development copy for adapter tests. Claude and Codex hooks
-need Node but not the OpenCode SDK. Lifecycle guidance and mode commands still
-work without Node; only lookup interception is skipped when it is unavailable.
+repository pins a development copy for adapter tests. Claude, Codex, and Copilot
+hooks do not need the OpenCode SDK. Claude/Codex lifecycle guidance and mode
+commands still work without Node; only their lookup interception is skipped
+when it is unavailable. Copilot skips all hooks without Node.
 
 Session markers are scoped by project and gem, and live in the plugin's data
 directory (or `$XDG_CACHE_HOME/posh/nudged`, defaulting to
@@ -219,55 +249,18 @@ assume a tool call's project override persists to the next call.
 
 ## Testing
 
-Run the deterministic tests with `npm ci && npm test`. They use a fake POSH
-executable and temporary projects, not your license or synced documentation.
-
-### Mutation testing
-
-With a current Node 22 release (22.18+) or Node 24.11+, run:
+Use Node 22.18+ or Node 24.11+:
 
 ```sh
+npm ci
+npm test
 npm run test:mutation
 ```
 
-StrykerJS mutates `shared/lookup-policy.mjs` and runs `test/plugin.test.mjs`
-and `test/lookup-policy.test.mjs` against each mutant. These cover direct parsing
-and classification results, the Claude/Codex subprocess adapters, and the
-OpenCode adapter. It uses the existing Node test runner; no test-framework
-migration is needed. It works in disposable copies, not the original source.
-The HTML report is `reports/mutation/index.html`; the machine-readable report is
-`reports/mutation/mutation.json`. Both reports and temporary sandboxes are ignored
-by Git.
-
-Local runs are opt-in. [Mutation CI](.github/workflows/mutation.yml) runs on pull
-requests and pushes to `main`, or manually through GitHub Actions. Separate Node
-26 jobs mutate the shared policy and both JavaScript adapters, and upload HTML
-and JSON reports as `mutation-policy` and `mutation-adapters` artifacts for seven
-days. Local runs and both CI jobs require a **100% mutation score**: Stryker exits
-nonzero below that threshold. This is not a line-coverage requirement. Known
-survivors must be addressed before mutation CI passes; the release workflow is
-unchanged.
-
-The command runner cannot select tests by coverage, so it reruns the entire
-plugin test file for every mutant, including
-the real timeout test. Expect a much slower run than `npm test`; four workers run
-by default. The runner allows 30 seconds of extra timeout headroom for subprocess
-contention. Review timeouts as well as survivors before trusting the score:
-Stryker counts timed-out mutants as detected, even if machine load caused them.
-Review survivors for missing behavioral assertions or equivalent mutations;
-prefer useful tests or safe simplification over blanket exclusions. No mutation
-types are excluded.
-
-For a focused run or to check the JavaScript adapters themselves:
-
-```sh
-npm run test:mutation -- --mutate shared/lookup-policy.mjs:161-196
-npm run test:mutation -- --mutate opencode/posh.mjs,hooks/posh-pre-tool-use.mjs
-```
-
-The `--mutate` argument replaces the default target. Mutation testing does not
-cover `hooks/posh-hook.sh` or prove compatibility with actual agent hosts; those
-still need shell behavior tests and live-host smoke tests.
+Tests use a fake POSH executable and temporary projects, not your license or synced
+documentation. Mutation testing requires a 100% score; its HTML report is
+`reports/mutation/index.html`. Runs are incremental: add `-- --force` after
+changing dependencies, configuration, fixtures, or shared test helpers.
 
 ## Releasing
 
@@ -282,7 +275,7 @@ npm version patch   # or minor, major, or an exact 1.4.0
 ```
 
 `preversion` runs the tests, `version` mirrors the new number into the Claude,
-Codex, Cursor, and Gemini manifests and prepends the commits since the last
+Codex, Copilot, Cursor, and Gemini manifests and prepends the commits since the last
 release to [CHANGELOG.md](CHANGELOG.md), and `postversion` pushes the commit and
 its tag. There is no separate confirmation step, so run it only when the release
 should go out. npm's first publish of a package cannot use OIDC: publish once

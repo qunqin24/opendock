@@ -14,8 +14,9 @@ guess what it shows.
 colour things are, how they line up, and what changed since the last
 screenshot.
 
-One `pip install`, one small config block. No cloud, no API key, no image
-ever leaves your machine.
+One `pip install`, one small config block. Local by default, no API key needed;
+remote processing is opt-in. Private images stay on your machine unless you
+explicitly enable a remote provider.
 
 **Made for modest hardware.** Have an older laptop, no GPU, or 8 GB of RAM?
 You cannot run a vision model — that is exactly who this is for. VI3ION does
@@ -119,6 +120,25 @@ measurements** back.
 Everything is labelled as **observed** (read from pixels), **inferred**, or
 **unknown**. It never quietly corrects a reading.
 
+### Demo: the same blind model, with and without eyes
+
+Illustrative transcript — run it yourself with a text-only local model via
+`python scripts/task_benchmark.py` (add `--dry-run` to see the structure without
+calling a model).
+
+**Without VI3ION**
+> User: "What does this settings screen say?"  
+> Model: "I cannot see images. Please describe the screen in text."
+
+**With VI3ION**
+> User: "What does this settings screen say?"  
+> Evidence handed to the model: `"Settings" @[44,32,168,69]`; `"Save"` and
+> `"Cancel"` with measured boxes; blue `#2563eb` button.  
+> Model: "It is a Settings screen. The Save button is blue with white text, at
+> x 373–421, y 619–640; Cancel is to its right."
+
+That is the whole product: not prettier OCR, a blind model completing a task.
+
 ### Recreating an image
 
 Give VI3ION a picture of three circles and ask for a blueprint. It returns a
@@ -150,7 +170,7 @@ running and which role fits.
   right"*, never *"a button"* — that keeps the evidence auditable, and naming
   things is the model's job.
 - Very faint decorative lettering is not transcribed, and the output says so.
-- OCR is the weak spot, not the geometry: 95.2% average fidelity across the
+- OCR is the weak spot, not the geometry: 96.9% average fidelity across the
   bundled ground-truth fixtures (numbers below).
 
 ---
@@ -162,10 +182,10 @@ network, ~5s on a 1919x949 screenshot:
 
 | Component | Score | What it measures |
 |---|---|---|
-| **Brief fidelity** | **95.2%** | average across the three bundled fixtures |
-| Text recall | 94.0% | share of readable text that reached the brief |
-| Text precision | 91.4% | share of the brief's quoted text that is really in the image |
-| Region accuracy | 98.9% | matched text filed under the right region |
+| **Brief fidelity** | **96.9%** | average across the five bundled fixtures |
+| Text recall | 96.4% | share of readable text that reached the brief |
+| Text precision | 100% | share of the brief's confident quoted text that is really in the image |
+| Region accuracy | 99.4% | matched text filed under the right region |
 | Structure | 100% | composition line, colour map, shape sentences, honesty note |
 
 Scores are reproducible: `vi3ion score --all`. Ground-truth entries marked
@@ -176,25 +196,19 @@ are garbled. Geometry, colour and layout stay above 96% throughout.
 
 ### Before and after
 
-The last few changes were measured on the same three images every time. The
-middle column is a contrast-enhancement experiment that made things worse and
-was switched off by default (it is still available with `VI3ION_OCR_CLAHE=1`).
+Same three original fixtures, scored before and after. A contrast-enhancement
+experiment made things worse and was switched off by default (still available
+with `VI3ION_OCR_CLAHE=1`). Two more fixtures — a known-text card and a
+red-apple photo — were added later and are in the headline average above.
 
-| Fixture | Earlier | Experiment | Now |
-|---|---:|---:|---:|
-| Difficult dark screenshot | 80.4% | 75.3% | **90.7%** |
-| Settings screenshot | 95.2% | 90.1% | **95.0%** |
-| Clean settings dialog | 100% | 100% | **100%** |
-| **Average** | **91.9%** | **88.7%** | **95.2%** |
+![Brief fidelity before and after, by fixture](docs/assets/fidelity-before-after.svg)
 
-```mermaid
-xychart-beta
-    title "Fidelity by fixture (%) - earlier vs now"
-    x-axis ["dark screenshot", "settings shot", "clean dialog"]
-    y-axis "fidelity %" 70 --> 100
-    bar [80.4, 95.2, 100]
-    line [95.2, 95.0, 100]
-```
+| Fixture | Before | After |
+|---|---:|---:|
+| Difficult dark screenshot | 80.4% | **95.8%** |
+| Settings screenshot | 95.2% | **96.4%** |
+| Clean settings dialog | 100% | **100%** |
+| **Average (3 fixtures)** | **91.9%** | **97.4%** |
 
 The gain came from four small fixes: uncertain ground-truth guesses stop
 counting against recall, keyboard markers like `[M]` no longer count as text,
@@ -243,6 +257,11 @@ vi3ion updates auto on|off         # auto-update consent (off by default)
 vi3ion analyze screenshot.png      # full analysis as JSON
 vi3ion screenshot                  # capture the current screen and analyse it
 vi3ion blueprint drawing.png       # measured recipe for recreating an image
+vi3ion ask drawing.png "Where is Save?" --limit 5
+vi3ion graph img_123 --limit 20     # traceable evidence graph
+vi3ion audit image.png ground.expected.json
+vi3ion purge --days 7 --confirm    # delete old stored images
+python scripts/task_benchmark.py --dry-run
 vi3ion brief screenshot.png        # text-only brief for a vision-less model
 vi3ion score screenshot.png        # brief fidelity vs the ground truth
 vi3ion local                       # local LLM runtimes + the recommended role
@@ -310,7 +329,10 @@ Agents must preserve that distinction when reporting to users.
 |---|---|
 | `inspect_image` | Ingest + analyse an image (by `path`, `path="clipboard"`, or `image_id`). |
 | `screenshot` | Capture the current screen and analyse it — no path needed. Fails soft on headless machines. |
-| `reconstruction_blueprint` | A measured recipe (canvas, shapes, colours, percentages) so a generator can recreate a simple image. |
+| `reconstruction_blueprint` | A measured recipe (canvas, shapes, text, colours, percentages) so a generator can recreate a simple image. |
+| `ask` | Only the evidence relevant to a question, with stable IDs and UNCERTAIN flags. For small-context models. |
+| `evidence_graph` | Stable IDs, provenance, boxes and relationships — reference evidence instead of re-finding it. |
+| `confidence_audit` | False-confidence rate against ground truth: confident claims the image does not support. |
 | `inspect_region` | Deep-dive on `[x0,y0,x1,y1]`; coordinates mapped back to original. |
 | `query_evidence` | Query stored evidence by kind/text/region/confidence without re-analysis. |
 | `verify_claim` | Check a claim ("Save is aligned with Cancel") against measurements. |
@@ -415,4 +437,17 @@ The dashboard proxies `/api` to the server and is only mounted when
 
 ## Stress test on real screenshots
 
-Measured on `698` screenshots from one real folder (1971s total, 6594ms and 396 tokens per image on this PC). Failures: 6 (tiny or corrupt images, now rejected with a clear message). Full data: `docs/full-analysis-report.json` and `docs/full-analysis-progress.jsonl`.
+Measured on `698` screenshots from one real folder: 1,971 s total, 6,594 ms
+and 396 tokens per image **on the machine below**. Failures: 6 (tiny or
+corrupt captures, now rejected with a clear message). Full data:
+`docs/full-analysis-report.json` and `docs/full-analysis-progress.jsonl`.
+
+**Test machine:** AMD Ryzen 5 5500GT (6 cores / 12 threads), 15.3 GB RAM,
+AMD Radeon integrated graphics, Windows 11 Pro build 26200, Python 3.13.15,
+RapidOCR 1.2.3 / ONNX Runtime 1.31.1 / OpenCV 5.0.0.93. CPU-only OCR;
+`low_resource` was off.
+
+**Results will vary.** Speed scales with CPU, image resolution, text density
+and thermal throttling. A smaller laptop, a high-DPI 4K screen or a dense
+terminal screenshot will be slower and may use a different evidence tier.
+These numbers describe one machine, not a guaranteed baseline.

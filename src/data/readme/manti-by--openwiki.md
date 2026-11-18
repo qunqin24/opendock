@@ -2,9 +2,9 @@
 
 An [OpenCode](https://opencode.ai) plugin that scaffolds a per-project session wiki.
 
-On plugin load OpenWiki copies the bundled `/wiki-*` slash commands into your
-project's `.opencode/commands/` and writes the `wiki/` scaffold
-(`README.md`, `TEMPLATE.md`, `INDEX.md`, `QUESTIONS.md`) from the bundled
+On plugin load OpenWiki copies the bundled wiki skills into your
+project's `.opencode/skills/` and writes the `wiki/` scaffold
+(`README.md`, `TEMPLATE.md`, `index.md`, `log.md`, `QUESTIONS.md`) from the bundled
 templates with `<PROJECT_NAME>` substituted to the directory name. That's the
 whole plugin — no background agent, no event hooks, no automatic page creation.
 Fill in the wiki by hand or wire your own process up to the templates.
@@ -36,8 +36,8 @@ work.
 
 ```
 src/         TypeScript plugin source (compiled to dist/ by bun build)
-templates/   wiki/ scaffold: README.md, TEMPLATE.md, INDEX.md, QUESTIONS.md
-commands/    /wiki-consistency, /wiki-dedup, /wiki-update command definitions
+templates/   wiki/ scaffold: README.md, TEMPLATE.md, index.md, log.md, QUESTIONS.md
+skills/      wiki skills: wiki-sync, wiki-consistency, wiki-dedup, wiki-archive, wiki-agents-file
 dist/        Compiled plugin output (generated, not committed)
 ```
 

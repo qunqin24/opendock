@@ -6,7 +6,7 @@ descendants, steer or queue messages, and inject context.
 
 > Plugin ID: `subagent-tools`. Default tool namespace: `subagent`.
 
-Requires OpenCode 2.2.5+ with `ctx.session.list`.
+Requires OpenCode 2.3.0+.
 
 ## Quick start
 
@@ -25,15 +25,15 @@ For manual/local installation, see [installation](docs/installation.md).
 
 ## Tools
 
-| Tool                          | What it does                                                 |
-| ----------------------------- | ------------------------------------------------------------ |
-| `subagent_list`               | List child sessions with status, age, cost, and token usage. |
-| `subagent_usage`              | Read cost, tokens, and current context for a session.        |
-| `subagent_cancel`             | Stop one session.                                            |
-| `subagent_cancel_descendants` | Stop running descendants of the calling session.             |
-| `subagent_steer`              | Send an instruction at the child's next model request.       |
-| `subagent_queue`              | Queue a message as the next independent turn.                |
-| `subagent_context`            | Inject a synthetic context message without starting a turn.  |
+| Tool                          | What it does                                                            |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `subagent_list`               | List child sessions with status, activity, age, cost, and token usage.  |
+| `subagent_usage`              | Read cost, tokens, current context, status, and activity for a session. |
+| `subagent_cancel`             | Stop one session and report background work it cannot stop.             |
+| `subagent_cancel_descendants` | Stop running descendants and report idle background jobs.               |
+| `subagent_steer`              | Send an instruction at the child's next model request.                  |
+| `subagent_queue`              | Queue a message as the next independent turn.                           |
+| `subagent_context`            | Inject a synthetic context message without starting a turn.             |
 
 The plugin also registers a `subagent-tools` skill with operational guidance.
 See the [tool reference](docs/reference.md#text-vs-json) for output formats and
@@ -83,18 +83,23 @@ to be asked or blocked. See [security model](docs/security-model.md).
 
 ## Pitfalls
 
-- **Foreground children block the parent.** If you want to control a child while
-  it runs, launch it as a background subagent.
+- **`finished` is not task completion.** It means the last execution succeeded.
+  The child may still own a shell, image, or subagent job. Use `active` and
+  `subtreeActive` to find work that is still in progress.
 - **`cancel` is a soft interrupt.** It does not cascade. A long tool call may
-  finish first, and jobs owned by an idle session keep running.
+  finish first, and jobs owned by an idle session keep running. The result
+  reports observed background work, but this tool cannot stop it.
+- **`cancel_descendants` only targets running executions.** Idle descendants
+  that own background jobs are counted in `backgroundJobCount`, not interrupted.
+  It stops up to `maxCancelBatch` running descendants per call and only touches
+  the caller's subtree; use `cursor` to continue. Nested cancellation can wake an
+  intermediate parent.
 - **Discovery stops at 200 nodes, 8 levels, or 5 pages by default.** Raise them
   for large trees. An empty or partial list is not proof that no subagents
-  exist. See [limitations](docs/limitations.md).
-- **Usage can lag while a child is running.** Values are persisted at step
+  exist, and incomplete discovery can make `subtreeActive` false. See
+  [limitations](docs/limitations.md).
+- **Usage can lag while a child is active.** Values are persisted at step
   boundaries; `usageMayLag` means re-query after the step or after cancellation.
-- **`cancel_descendants` stops up to `maxCancelBatch` running descendants per
-  call.** It only touches the caller's subtree; use `cursor` to continue. Nested
-  cancellation can wake an intermediate parent.
 - **Permissions are not prompted by default.** Add an `ask` or `deny` rule for
   `subagent.control` if you rely on approval.
 

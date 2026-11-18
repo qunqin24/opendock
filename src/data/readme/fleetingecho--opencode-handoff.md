@@ -6,14 +6,23 @@ The extension records recent turns, periodically folds them into concise Markdow
 
 ## Install
 
-Add the plugin to `~/.config/opencode/opencode.json` (or a project's `opencode.json`) and restart OpenCode:
+Requires **OpenCode 2.3.0 or newer** and the native V2 plugin runtime. Install the package and restart the OpenCode service:
+
+```bash
+opencode plugin add github:FleetingEcho/opencode-handoff
+opencode service restart
+```
+
+For local development, register the checkout in `~/.config/opencode/opencode.jsonc` (`opencode plugin add` accepts npm/Git packages, not a local path):
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["git@github.com:FleetingEcho/opencode-handoff.git#v1.1.0"]
+  "plugins": ["/absolute/path/to/opencode-handoff"]
 }
 ```
+
+Then run `opencode service restart`. Project-local plugins can instead be placed under `.opencode/plugins/` for auto-discovery.
 
 ## How memory is organized
 
@@ -29,7 +38,7 @@ Each git branch has an independent `handoff.md`. Switching branches switches han
 
 ## Everyday use
 
-Normally, just work. A background refresh runs roughly every three turns, sooner when a large amount of material accumulates, and before context compaction. Buffered events are durable, so quitting does not need to wait for a model call.
+Normally, just work. By default, a background refresh runs every 20 turns or after about 24,000 new excerpt characters, whichever comes first; tune these with `OPENCODE_HANDOFF_THRESHOLD_TURNS` and `OPENCODE_HANDOFF_THRESHOLD_CHARS`. Compaction schedules a refresh afterward without blocking the agent. Buffered events are durable, so quitting does not need to wait for a model call.
 
 OpenCode exposes plugin control through the agent-facing `handoff` tool rather than plugin slash commands. Ask naturally—for example, “show handoff status”, “refresh the handoff now”, or “start a fresh handoff”—and the agent invokes the corresponding action.
 
@@ -118,7 +127,7 @@ Shared project knowledge is capped at roughly 16,000 characters because it is in
 
 | File/content | Limit | Cleanup behavior |
 |---|---:|---|
-| `handoff.md` | 24k characters / 96 KB | Oversized model output is compacted by section; oversized writes are rejected |
+| `handoff.md` | 16k characters / 96 KB | Oversized model output is compacted by section; oversized writes are rejected |
 | Project knowledge | 16k characters | Existing oversized sections are compacted; new facts are rejected at the limit |
 | Pinned rules | 200 rules, 500 characters each, 16k total | New pins are rejected; legacy duplicate/overflow pins are removed with a marker |
 | `project.md` | 128 KB | Enforced on every atomic write |
@@ -131,7 +140,8 @@ A collected turn contributes at most about 12k excerpt characters and 200 change
 
 ## Reliability and privacy
 
-- Events are appended synchronously before background summarization.
+- Background summaries use OpenCode 2.3 stateless generation: no side sessions, transcript polling, tools, or self-collected model events.
+- Turn records are session-scoped and retained until durable append succeeds; lock waits yield to OpenCode's event loop, and cleanup drains pending appends.
 - Document and metadata replacements use unique temporary files plus atomic rename.
 - Short-lived filesystem locks coordinate event, metadata, project knowledge, and proposal writes across OpenCode processes; model calls never hold a lock.
 - A background refresh refuses to overwrite a handoff edited while its model call was running.
@@ -142,13 +152,13 @@ A collected turn contributes at most about 12k excerpt characters and 200 change
 - Secret denylist redaction runs before excerpts touch disk, before model calls, and on model output. It is a safeguard, not a guarantee; never intentionally place secrets in handoffs or pins.
 - Malformed JSONL tail records are ignored rather than breaking startup.
 
-Two sessions on different branches are isolated. Sessions on the same branch coordinate short disk transactions with filesystem locks; competing summaries use revision checks and retry rather than overwriting a newer document. opencode-handoff still warns when it detects another live owner because simultaneous agents may produce noisier combined task history.
+Sessions maintain independent collectors, so interleaved sessions cannot merge each other's prompts, assistant text, or tools. Sessions on the same branch coordinate short disk transactions with filesystem locks; competing summaries use revision checks and retry rather than overwriting a newer document. opencode-handoff still warns when it detects another live owner because simultaneous agents may produce noisier combined project history.
 
 ## Troubleshooting
 
 **The handoff is not updating.** Ask the agent to show handoff status. A small pending buffer is normal. If refreshes fail, run with `OPENCODE_HANDOFF_DEBUG=1`; authentication is inherited from the active OpenCode model.
 
-**Quitting did not refresh.** This is intentional. In-flight work is aborted promptly, while buffered events remain in `events.jsonl` and are folded during a later session.
+**Quitting did not refresh.** This is intentional. Pending collector writes are drained within the bounded filesystem-lock wait, while in-flight generation is aborted promptly. Buffered events remain in `events.jsonl` and are folded during a later session.
 
 **The content is stale or wrong.** Edit the Markdown directly, ask for a fresh handoff, or use `project_forget` for incorrect shared knowledge. Pin only corrections that must remain permanent.
 
@@ -161,11 +171,12 @@ grep '"snapshot"' /path/to/events.jsonl | tail -1 | jq -r .doc
 ## Development
 
 ```bash
-npm install
-npm run typecheck
+bun install
+bun test
+bun run typecheck
 ```
 
-OpenCode runs the TypeScript source directly through Bun. `@opencode-ai/plugin` is the sole runtime dependency; the SDK types, Node types, and TypeScript compiler are development-only.
+OpenCode 2.3 loads the TypeScript source directly. `@opencode/plugin` is the sole runtime API dependency; Node types and the TypeScript compiler are development-only. Tests mock the V2 hook lifecycle and stateless generation, so they do not require credentials or a running OpenCode server.
 
 Main files:
 
@@ -173,8 +184,9 @@ Main files:
 |---|---|
 | `index.ts` | Lifecycle, refresh queue, hooks, and agent tool |
 | `store.ts` | Paths, migrations, project knowledge, events, and atomic persistence |
-| `collector.ts` | Deterministic redacted turn collection |
-| `summarizer.ts` | Branch refresh and project-knowledge extraction |
+| `collector.ts` | Deterministic redacted, failure-safe session collection |
+| `git.ts` | Fast repository and branch discovery shared with pi naming rules |
+| `summarizer.ts` | Stateless branch refresh and project-knowledge extraction |
 | `injector.ts` | Branch and project context injection |
 | `redact.ts` | Secret denylist |
 

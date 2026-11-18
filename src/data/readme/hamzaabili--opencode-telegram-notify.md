@@ -27,7 +27,7 @@ shell
         → tap ✅ → OpenCode continues. Nothing runs without you.
 ```
 
-## Why another Telegram plugin?
+## Why another OpenCode Telegram plugin?
 
 Since OpenCode v2 ({id, setup} plugin contract) landed, the Telegram extensions
 people know — `opencode-telegram-bot-plugin`, `opencode-channels-*`,
@@ -193,6 +193,8 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `events.error` | boolean | `true` | Failure and cancellation notifications (limit refusals included, with a friendly label) |
 | `events.usage` | boolean | `true` | Token and cost line on completion notifications (v2 only; v1 hosts report no usage and the line is omitted) |
 | `interactions` | boolean | `true` | When `false`, permissions go out as simple messages (no buttons) |
+| `ignore.titles` | string[] | `[]` | Sessions whose **title contains** one of these strings (case-insensitive) send no notifications - for background/automation runs (v2 only) |
+| `ignore.agents` | string[] | `[]` | Sessions whose **agent name equals** one of these strings (case-insensitive) send no notifications (v2 only) |
 | `idleDebounceMs` | number | 60000 | Wait after `execution.succeeded` before pinging you; any new activity cancels it |
 | `idleCooldownMs` | number | 600000 | Min gap between completion notifications for the same session — conversational pauses never spam (0 disables) |
 | `maxMessageChars` | number | 3800 | Max body length (Telegram hard limit is 4096) |
@@ -203,6 +205,53 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 contains Simplified Chinese; `zh-TW`/`zh-Hant` resolve to it until a
 Traditional Chinese catalog is added.
 
+## Muting background sessions
+
+Headless and scheduled runs share the event stream with your interactive work:
+a self-learning plugin, a nightly reviewer, a CI agent. They finish often with
+nobody watching the terminal — so their notifications are noise, and a
+permission request from one of them can never be answered in time.
+
+Unlike `/stop`, which silences the whole chat, `ignore` silences individual
+sessions. Match by title (case-insensitive substring, because hosts append
+suffixes such as `#2`) or by agent name (the stable identifier behind
+`opencode run --agent …`):
+
+```json
+{
+  "options": {
+    "ignore": {
+      "titles": ["autolearn review"],
+      "agents": ["autolearn-reviewer"]
+    }
+  }
+}
+```
+
+A matched session produces **no** messages at all: no completion, no failure, no
+permission request with buttons, no question. Muting only suppresses the
+Telegram message — it never answers or denies anything, so the run itself
+behaves exactly as if the plugin were not installed. Sessions that started
+before the plugin reloaded are resolved through `session.get` on their first
+event, those lookups are remembered, and renaming a session into a matching
+title cancels a completion notification that is still inside its debounce
+window.
+
+Titles are matched against the session's current title, which the host can
+rewrite (auto-titling, `/rename`). Agent names are the more stable selector:
+prefer `ignore.agents` when a run always starts with `--agent`.
+
+Both options take an array; a plain string is also accepted and split on commas
+(so `"ignore": { "titles": "autolearn review, nightly sweep" }` works, while an
+actual array keeps a multi-word title intact).
+
+Rules are inherited through the session's `parentID`: muting a parent also mutes
+the permissions, questions and lifecycle messages of its subagents. On v2,
+subagent sessions never produce completion, failure or cancellation messages
+themselves; their permission/question messages follow the same rules as the
+parent. `/status` lists the active title/agent rules so you can confirm what is
+muted.
+
 ## Commands
 
 Registered on the bot menu (☰); unknown commands and plain messages are
@@ -211,7 +260,7 @@ ignored — this is a notifier, not a chat relay.
 | Command | Effect |
 | --- | --- |
 | `/start` | Re-enables a silenced chat; echoes your chat id in a copy-block |
-| `/status` | Running state, project root, which event groups are on |
+| `/status` | Running state, project root, which event groups are on, active ignore rules |
 | `/setup` | Copy-paste-ready `opencode.jsonc` snippet (with placeholders, never your token) |
 | `/stop` | Silence notifications in this chat until `/start` |
 | `/help` | Short command list |
@@ -281,8 +330,10 @@ Deliberately not scheduled; revisit when they earn their complexity:
 
 Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
 
-- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: discovery from `.agents/plugins` and npm packages, native skills, trust-first MCP registration.
 - [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: portable skills and MCP servers from standard directories and npm, trusted before enabled.
+- [opencode-claude-hooks](https://github.com/Hamza-Abili/opencode-claude-hooks) — run existing Claude Code hooks natively in OpenCode, with trust, timeouts and a compatibility doctor.
+- [opencode-integrity](https://github.com/Hamza-Abili/opencode-integrity) — lock plugins, MCP tool definitions and skills; detect drift, tool poisoning and rug pulls.
 
 ## Support
 
@@ -292,6 +343,8 @@ Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
   [Discussions](https://github.com/Hamza-Abili/opencode-telegram-notify/discussions).
 - Security: [private advisory](https://github.com/Hamza-Abili/opencode-telegram-notify/security/advisories/new),
   never a public issue.
+- If this saves you time, a [star](https://github.com/Hamza-Abili/opencode-telegram-notify/stargazers)
+  helps other OpenCode users find it.
 
 ## Development
 

@@ -48,12 +48,12 @@ The last two commands require your API key in `FLASHDATA_API_KEY` and make only 
 
 Hermes users can install the [FlashData Hermes plugin](plugins/hermes/README.md), which connects the hosted MCP server and includes 15 task Skills. Its source release and official catalog approval are separate milestones. The plugin is free to install; data queries use the user's own FlashData Key and paid Credits.
 
-The [FlashData Skill](skills/flashdata/SKILL.md) helps an agent use an existing FlashData MCP connection for source-backed web and video research. It includes recipes for video research, comparing search snapshots, and preparing knowledge-base records.
+The [official FlashData MCP Skill](https://skills.sh/flashdatadev/flashdata-skills/flashdata-mcp) helps an agent use an existing FlashData MCP connection for source-backed web and video research. It includes recipes for video research, comparing search snapshots, and preparing knowledge-base records.
 
 Install the Skill into your project with the [skills CLI](https://skills.sh/docs):
 
 ```sh
-npx skills add rocosen/flashdata-mcp --skill flashdata
+npx skills add flashdatadev/flashdata-skills --skill flashdata-mcp
 ```
 
 Select your agent when prompted, or add `--agent codex` (or another supported agent). The default scope is the current project; use `--global` only if you want a user-wide installation. Review the Skill before installation.
@@ -70,35 +70,35 @@ The skills.sh directory uses aggregated installation telemetry for discovery; a 
 
 ### Task-specific Skills
 
-Choose a Skill for the capability you need. Each includes example requests, a terminal quick start, MCP usage, parameters and practical ways to use the results. The general `flashdata` research Skill remains available.
+Choose a Skill from the [official FlashData directory](https://skills.sh/flashdatadev/flashdata-skills). The 15 capabilities keep their names. The official `flashdata` Skill guides CLI setup; `flashdata-mcp` is for an existing MCP connection.
 
 | Capability | Skill | Examples |
 | --- | --- | --- |
-| Google Search | [google-search](skills/google-search/SKILL.md) | Web research, site searches, PDF discovery and localized SERPs. |
-| Google News | [google-news](skills/google-news/SKILL.md) | Topic coverage, company news and linked news briefings. |
-| Google Image Search | [google-image-search](skills/google-image-search/SKILL.md) | Image references, diagrams and filtering by returned dimensions. |
-| Google Shopping | [google-shopping](skills/google-shopping/SKILL.md) | Product discovery and comparing listed merchant offers. |
-| Google Video Search | [google-video-search](skills/google-video-search/SKILL.md) | Tutorials, demonstrations and video discovery across websites. |
-| Google Places Search | [google-places](skills/google-places/SKILL.md) | Local business lists with addresses and available ratings. |
-| YouTube Search | [youtube-search](skills/youtube-search/SKILL.md) | Video discovery using date, duration, subtitle and sorting filters. |
-| YouTube Extended Search | [youtube-extended-search](skills/youtube-extended-search/SKILL.md) | Larger video datasets and creator discovery, up to 700 requested results. |
-| YouTube Video Metadata | [youtube-metadata](skills/youtube-metadata/SKILL.md) | Video details, statistics, chapters and format inspection. |
-| YouTube Transcripts | [youtube-transcript](skills/youtube-transcript/SKILL.md) | Video summaries, timestamped quotes and transcript exports. |
-| YouTube Captions | [youtube-captions](skills/youtube-captions/SKILL.md) | Uploader captions and local SRT/WebVTT conversion. |
-| YouTube Channel Data | [youtube-channel](skills/youtube-channel/SKILL.md) | Channel profiles, recent uploads and video CSV exports. |
-| YouTube Autocomplete | [youtube-autocomplete](skills/youtube-autocomplete/SKILL.md) | Keyword ideas and suggestions by language and region. |
-| YouTube License Check | [youtube-license-check](skills/youtube-license-check/SKILL.md) | Creative Commons license-label classification and its interpretation. |
-| YouTube Video and Audio Download | [youtube-download](skills/youtube-download/SKILL.md) | Video, audio or clips delivered to customer cloud storage. |
+| Google Search | [google-search](https://skills.sh/flashdatadev/flashdata-skills/google-search) | Web research, site searches, PDF discovery and localized SERPs. |
+| Google News | [google-news](https://skills.sh/flashdatadev/flashdata-skills/google-news) | Topic coverage, company news and linked news briefings. |
+| Google Image Search | [google-image-search](https://skills.sh/flashdatadev/flashdata-skills/google-image-search) | Image references, diagrams and filtering by returned dimensions. |
+| Google Shopping | [google-shopping](https://skills.sh/flashdatadev/flashdata-skills/google-shopping) | Product discovery and comparing listed merchant offers. |
+| Google Video Search | [google-video-search](https://skills.sh/flashdatadev/flashdata-skills/google-video-search) | Tutorials, demonstrations and video discovery across websites. |
+| Google Places Search | [google-places](https://skills.sh/flashdatadev/flashdata-skills/google-places) | Local business lists with addresses and available ratings. |
+| YouTube Search | [youtube-search](https://skills.sh/flashdatadev/flashdata-skills/youtube-search) | Video discovery using date, duration, subtitle and sorting filters. |
+| YouTube Extended Search | [youtube-extended-search](https://skills.sh/flashdatadev/flashdata-skills/youtube-extended-search) | Larger video datasets and creator discovery, up to 700 requested results. |
+| YouTube Video Metadata | [youtube-metadata](https://skills.sh/flashdatadev/flashdata-skills/youtube-metadata) | Video details, statistics, chapters and format inspection. |
+| YouTube Transcripts | [youtube-transcript](https://skills.sh/flashdatadev/flashdata-skills/youtube-transcript) | Video summaries, timestamped quotes and transcript exports. |
+| YouTube Captions | [youtube-captions](https://skills.sh/flashdatadev/flashdata-skills/youtube-captions) | Uploader captions and local SRT/WebVTT conversion. |
+| YouTube Channel Data | [youtube-channel](https://skills.sh/flashdatadev/flashdata-skills/youtube-channel) | Channel profiles, recent uploads and video CSV exports. |
+| YouTube Autocomplete | [youtube-autocomplete](https://skills.sh/flashdatadev/flashdata-skills/youtube-autocomplete) | Keyword ideas and suggestions by language and region. |
+| YouTube License Check | [youtube-license-check](https://skills.sh/flashdatadev/flashdata-skills/youtube-license-check) | Creative Commons license-label classification and its interpretation. |
+| YouTube Video and Audio Download | [youtube-download](https://skills.sh/flashdatadev/flashdata-skills/youtube-download) | Video, audio or clips delivered to customer cloud storage. |
 
 Install only the task Skills you want, for example:
 
 ```sh
-npx skills add rocosen/flashdata-mcp --skill google-search --skill youtube-transcript
+npx skills add flashdatadev/flashdata-skills --skill google-search --skill youtube-transcript
 ```
 
 The CLI's `--list` option lists available Skills before installing. Each selected Skill is self-contained; sibling Skills are not required. Skill names are shared across the ecosystem, so review an existing installation before replacing a same-named Skill from another publisher. Public source, installation and skills.sh indexing are separate milestones. Instructions are free; FlashData API queries are paid.
 
-These new top-level Skills are also discoverable by clients that scan the repository's `skills/` directory. This source update is not a new Cursor or Gemini marketplace approval. The contained Claude plugin continues to bundle its existing shared research Skill.
+The local `skills/flashdata/` directory is retained for existing plugin clients. For standalone Skill installs and updates, use the official repository above.
 
 ## Cursor plugin
 

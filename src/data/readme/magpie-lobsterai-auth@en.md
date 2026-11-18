@@ -7,6 +7,9 @@
 An **unofficial** Magpie / OpenCode provider plugin for **NetEase Youdao LobsterAI**
 (有道龙虾).
 
+LobsterAI's account restriction notice expressly warns against routing account credits
+through third-party plugins. Using this plugin can result in account restrictions.
+
 [中文](README.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Issues](https://github.com/BowlongRise/magpie-lobsterai-auth/issues)
 
 Provider id: `lobsterai`. After sign-in, models appear as `lobsterai/<model>`.

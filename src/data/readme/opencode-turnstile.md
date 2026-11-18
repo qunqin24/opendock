@@ -368,14 +368,20 @@ lines, and shas, never session IDs or prompts:
 Commit the JSON and Markdown and a GitHub Action upserts one sticky comment
 per PR. `evidence --validate` re-checks a committed artifact in CI. The
 comment states what it is: a correlated claim, not proof. Re-emit and commit
-both files before every push to a PR: the journal is per-machine, so CI can
-post the committed badge but never refresh it. To keep a stale badge from
+both files after every code push to a PR: the journal is per-machine, so CI
+can post the committed badge but never refresh it. To keep a stale badge from
 reading as current, the posting job compares the committed evidence's newest
-journaled timestamp with the latest commit that could have changed code — the
-PR head, or its parent when the head commit touches only `.turnstile/` files,
-which is exactly what a normal re-emit → commit → push looks like — and
-appends an amber "Stale" notice when the evidence predates it. A normal emit →
-commit → push cycle is therefore never flagged. One workflow
+journaled timestamp (the plan/verdict, tests, or emit-time event — every
+artifact write journals an `event:"emit"` row that lands in the artifact as
+`emittedAt`) with the latest commit that could have changed code, found by
+walking back from the PR head to the first commit touching anything outside
+`.turnstile/`. Badge staleness therefore means exactly one thing: a code
+commit landed and nobody has re-emitted since — the normal re-emit → commit →
+push cycle is never flagged, on merge commits and mixed commits included.
+The emitter scopes its read to the task's session tree, so another agent's
+journal activity on the same machine cannot refresh the badge's freshness
+signal. One
+workflow
 detail: validation runs on the pull request itself, while the comment posts
 from a trusted `pull_request_target` run; GitHub asks a maintainer to approve
 that run for a first-time contributor's fork PR, so an outside

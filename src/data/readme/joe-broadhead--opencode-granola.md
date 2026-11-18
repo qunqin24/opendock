@@ -19,7 +19,7 @@ Granola is a trademark of Granola, Inc.; this unofficial plugin is not endorsed 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-granola#v0.0.5
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -30,7 +30,7 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.4" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.5" }] }
 ```
 
 ### Update
@@ -117,7 +117,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.4", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -201,7 +201,7 @@ plugin in the system config, which outranks each member's own config: `/etc/open
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.4",
+      "package": "github:joe-broadhead/opencode-granola#v0.0.5",
       "options": { "exportDirectory": "<an absolute path>/Granola" }
     }
   ]
@@ -284,7 +284,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.4`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.5`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 
@@ -297,8 +297,8 @@ Files you exported stay in your export folder.
 - **Exports are bounded.** An export takes 1 to 20 meetings and at most 8 MB; a transcript that does not fit is cut with a note. The file goes outside the project, so OpenCode also asks for `external_directory`.
 - **`give_feedback` reaches Granola's team.** It is allowed by default, and the skill tells the model to send it only when the user asks.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
-- **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, and a listing cannot tell when the plan hides older meetings, so it never reports a gap: a cursor older than 30 days on the free plan lists only what the plan still shows. Switching the active workspace changes what a listing reads under the same account.
-- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. Its report is incomplete on one check, the expired cursor, because the source never answers `CURSOR_EXPIRED`.
+- **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, but the free plan's history does: `probe` records the plan `get_account_info` names, for a day, and on the free plan, or with no plan recorded in the last day, a listing whose cursor or `since` is more than 29 days old answers a `window-truncated` gap once and lists from there, so a consumer knows to resync; later pages of that read neither repeat the gap nor skip a meeting the plan still shows. A paid plan has no window and no gap. A move to the free plan within a day of `probe`, with a cursor more than 29 days behind, is still listed without a gap: re-probe after a plan change. The v0.0.3 and v0.0.4 sources listed only what the plan still showed, with no gap. Switching the active workspace changes what a listing reads under the same account.
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. The synthetic account is on the free plan and the first listing starts before its 30 days, so the kit checks the `window-truncated` gap is answered once per read. Its report is complete and ok: two checks do not apply, each with its reason in the report, because no meeting fails on its own (a failed read fails the whole listing) and no cursor is ever refused as expired (the source never answers `CURSOR_EXPIRED`; the free plan's lost history is the window gap).
 - **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
 - In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
   older Jelly refuses the plugin's whole declaration.

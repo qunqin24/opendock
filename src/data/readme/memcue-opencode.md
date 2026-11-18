@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.39.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.0`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.0 | 9 | 0.40.0 | 0.40.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.0 (`hermes-agent` >=0.17.0) |
 | 0.39.0 | 9 | 0.39.0 | 0.39.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.39.0 (`hermes-agent` >=0.17.0) |
 | 0.38.0 | 9 | 0.38.0 | 0.38.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.38.0 (`hermes-agent` >=0.17.0) |
 | 0.37.1 | 9 | 0.37.1 | 0.37.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.1 (`hermes-agent` >=0.17.0) |
@@ -326,6 +327,25 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.0: a bounded helper log, the OpenCode TUI, and evidence for a change (#777, #757, #771)
+
+- **The tailnet helper's output is bounded.** It writes `helper.log` beside its identity (0600, rotates at 1 MiB into
+  one backup); `connect serve -log PATH` puts the log where a service manager wants it. Tailscale lines above the
+  default verbosity are dropped, at most 20 lines are written per 5 minutes, a failure a retry loop repeats is
+  written once and counted, and the rest becomes one line naming the count and the last message. A helper started by
+  a session no longer writes to `/dev/null`, so an outage leaves a trace.
+- **A helper without a control connection for 15 minutes exits** with one line in that log and a non-zero status; a
+  node that never reached its first connection counts the same way. The next session start or `memcue connect up`
+  starts a new helper. Where the helper is not supervised today, give it a service with a restart policy if it must
+  stay up through a long outage.
+- **`connect status` reports `online`** beside `running` and `state`: a running helper in a control outage is
+  `"online": false`.
+- **The OpenCode plugin draws a memory indicator** in the prompt footer, says why memory is off before any session
+  exists, and keeps `/memcue off` in plugin storage, so every loaded instance applies it.
+- **`correct` and `retire` need evidence**: the session note of every host now says that a change follows the user's
+  words, or a command or file of this session, and that a newer fact on its own is not that evidence.
+- The other CLI flags and the fact-base schema (9) are unchanged; `connect status` only gains a field.
 
 ### 0.39.0: the npm plugins on the transport of their release (#772)
 

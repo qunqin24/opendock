@@ -7,11 +7,15 @@ script runs in the background, and its result comes back to your session when it
 [![CI](https://github.com/rphang/opencode-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/rphang/opencode-workflows/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@rphang/opencode-workflows)](https://www.npmjs.com/package/@rphang/opencode-workflows)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![opencode 2.0.15](https://img.shields.io/badge/opencode-2.0.15-black)](#requirements)
+[![opencode 2.3.0](https://img.shields.io/badge/opencode-2.3.0-black)](#requirements)
 
 ```sh
 opencode plugin add @rphang/opencode-workflows
 ```
+
+| In the desktop app | In the terminal |
+|---|---|
+| [![A workflow running in the opencode desktop app: the session on the left, and the live tree in the side panel with the run, its phases and each agent's status, model and buttons](docs/assets/desktop-tree-panel.png)](#desktop-app-experimental) | [![A workflow running in the opencode TUI: the live progress tree next to the session, with each agent's status, tokens, model and current tool call](docs/assets/live-tree-running.png)](#live-progress-tree-tui) |
 
 ---
 
@@ -79,6 +83,10 @@ run (6 agents, under a minute) is in [`demo/DEMO-OUTPUT.md`](demo/DEMO-OUTPUT.md
 
 - **`workflow` tool** with the same script API as Claude Code's workflow tool: `agent()`,
   `parallel()`, `pipeline()`, `phase()`, `log()`, `args`, `budget` and nested `workflow()`.
+- **Raw-text scripts (extension).** On models whose capabilities list freeform text input (opencode
+  2.3+), a `workflow_script` tool takes a new inline script as plain text instead of a JSON-escaped
+  string. It is the `workflow` tool with only `{script}`, under the same permission; the `workflow`
+  tool itself is unchanged. Turn it off with `freeformTool: false` or `OPENCODE_WORKFLOW_FREEFORM=0`.
 - **Structured output.** `agent(prompt, { schema })` resolves to a JSON object validated against
   your JSON Schema, and the agent retries when its output doesn't match.
 - **Background runs.** The tool returns immediately. The result comes back as a task notification
@@ -99,6 +107,8 @@ run (6 agents, under a minute) is in [`demo/DEMO-OUTPUT.md`](demo/DEMO-OUTPUT.md
 - **Live progress tree (extension, TUI).** `ctrl+x o` opens a live tree of the session's runs:
   phases with their model labels, every agent with its status, the model it runs on, tokens,
   elapsed time and what it is doing right now. Enter opens an agent's session, `x` stops, `p` pauses, `m` messages it.
+  In the desktop app (experimental), a composer pill and a side panel show the same tree
+  ([Desktop app](#desktop-app-experimental)).
 - **The model each agent really ran on (extension).** Every agent records its actual model as
   `provider/model#variant` (from the script's `model`, else the parent session's model, plus the
   `effort` variant). It is shown in the tree, in `/workflows <runId>` and `workflow_control` status,
@@ -107,17 +117,20 @@ run (6 agents, under a minute) is in [`demo/DEMO-OUTPUT.md`](demo/DEMO-OUTPUT.md
 - **Safe by default.** Workflows start only when you opt in. Scripts run in a sandbox with no
   filesystem, network or shell. Agents inherit your permission rules and never get more.
 - **Tested for parity.** 60 behaviors are each tracked against Claude Code in
-  [`docs/PARITY.md`](docs/PARITY.md), and each has at least one test. The 21 extensions beyond
-  Claude Code (`X01`–`X21`: steering, the live progress tree, per-agent models, the per-agent
-  failure summary and outputs) are specified and tested there the same way.
+  [`docs/PARITY.md`](docs/PARITY.md), and each has at least one test. The 31 extensions beyond
+  Claude Code (`X01`–`X31`: steering, the live progress tree, per-agent models, the per-agent
+  failure summary and outputs, idle-boundary steering and schema nudges, the freeform
+  `workflow_script` tool, the TUI agent dialog and sidebar, waiting for background subagents, and the desktop app
+  companion) are specified and tested there the same way.
 
 ## Requirements
 
-- **opencode 2.0.15.** The plugin is pinned to this exact version (`engines.opencode`, and the
-  `@opencode/*` dependencies are 2.0.15). Other 2.x versions are untested. opencode v1 is not
-  supported, because the plugin uses the v2 plugin API. Check your version with
-  `opencode --version`, which should print `opencode v2.0.15`. One way to install or pin that
-  version is the npm package: `npm install -g @opencode/cli@2.0.15` (this needs Node.js and npm).
+- **opencode 2.3.0.** The plugin is pinned to this exact version (`engines.opencode`, and the
+  `@opencode/*` dependencies are 2.3.0). Other 2.x versions are untested; 2.2.x and older will not
+  load the TUI part (it needs OpenTUI 0.8). For opencode 2.0.15 use the plugin's 0.2.x releases.
+  opencode v1 is not supported, because the plugin uses the v2 plugin API. Check your version with
+  `opencode --version`, which should print `opencode v2.3.0`. One way to install or pin that
+  version is the npm package: `npm install -g @opencode/cli@2.3.0` (this needs Node.js and npm).
   See [opencode's docs](https://opencode.ai/docs) for other install methods.
 - **Nothing else for the plugin.** opencode downloads and installs npm plugins itself, so the
   plugin needs no Node, Bun or npm of its own (your opencode install method might).
@@ -164,7 +177,7 @@ testing). If it doesn't, run `opencode service restart` or restart the TUI.
 
   ```text
   ID                 VERSION  SOURCE
-  dynamic-workflows  0.2.0    @rphang/opencode-workflows
+  dynamic-workflows  0.3.1    @rphang/opencode-workflows
   ```
 
   The first `opencode` command after an install starts the background service, and `plugin list`
@@ -176,7 +189,7 @@ testing). If it doesn't, run `opencode service restart` or restart the TUI.
 
 | I want to… | Do this |
 |---|---|
-| Pin a version | `opencode plugin add @rphang/opencode-workflows@0.2.0`, or `"plugins": ["@rphang/opencode-workflows@0.2.0"]` |
+| Pin a version | `opencode plugin add @rphang/opencode-workflows@0.3.1`, or `"plugins": ["@rphang/opencode-workflows@0.3.1"]` |
 | Pass plugin options | `"plugins": [{ "package": "@rphang/opencode-workflows", "options": { "sizeGuideline": "small" } }]` (see [Configuration](#configuration)) |
 | Install for one project only | The same `plugins` entry in `<project>/opencode.json`. Worktree agents then need that config committed, so the global install is recommended. |
 | Update | Unpinned installs track `latest`. opencode checks for updates every 24 h; run `opencode plugin check`, then `opencode plugin update @rphang/opencode-workflows`. To update a pinned install, change the version in the config. |
@@ -200,7 +213,7 @@ export { default } from "/absolute/path/to/opencode-workflows/dist/index.js"
 ```
 
 or point the config at the checkout directory: `"plugins": ["file:///absolute/path/to/opencode-workflows"]`.
-Both were tested on opencode 2.0.15. Details, including a no-build loader for `src/index.ts`:
+Both load the built `dist/` (run `npm run build` first). Details, including a no-build loader for `src/index.ts`:
 [docs/INSTALL.md](docs/INSTALL.md#from-source).
 
 Use **one** install method only. If the plugin is loaded twice (for example the npm package plus a
@@ -314,9 +327,10 @@ an extension: Claude Code's workflows do not have it.
 
 Or ask the model ("tell the researchers to prefer primary sources"): it calls `workflow_control`
 with `action: "message"`. The model only does this when you ask, and only for its own session's runs.
-In the TUI, select an agent in the [live progress tree](#live-progress-tree-tui) and press `m`:
+In the TUI, select an agent in the [live progress tree](#live-progress-tree-tui) and press `m`, or
+pick it in the agent dialog (`ctrl+x j`) and press Enter:
 
-![The live tree's message dialog, sending "Also end your reply with STEERED-OK." to the running agent #4 slow listener](docs/assets/live-tree-steer.png)
+![The message dialog for the running agent #4 slow listener, with the text "Also end your reply with STEERED-OK."; the tree behind it shows both slow agents on slow_step call 6](docs/assets/live-tree-steer.png)
 
 | Target | Meaning |
 |---|---|
@@ -351,7 +365,7 @@ How it behaves:
 In the terminal UI, the plugin adds a live, interactive view of your workflow runs. This is an
 extension beyond Claude Code's workflow tool.
 
-![The live progress tree next to a session: the Scan phase lists the models its agents use, the Report phase shows its meta model label, and each agent row shows the model it runs on (one with the #low effort variant, one on another model) while two agents run slow_step tool calls](docs/assets/live-tree-running.png)
+![The live progress tree next to a session on opencode 2.3.0: the Scan phase lists the models its agents use, the Report phase shows its meta model label, and each agent row shows the model it runs on (one with the #low effort variant, one on opencode/glm-5.3-flash-free) while two agents run slow_step tool calls](docs/assets/live-tree-running.png)
 
 - **Footer.** While a run of the current session is active, the prompt footer shows
   `wf <name> <done>/<total> · <tokens> · $<cost>` (`+n` when more runs are active). The home screen
@@ -367,7 +381,7 @@ extension beyond Claude Code's workflow tool.
   and elapsed time always stay. The footer likewise shortens only the workflow name.
   ![The tree in a 120-column terminal: the run id is gone; on the rows that don't fit, the agent model loses its provider and is shortened along with the activity, while status, tokens and time stay; #3 was stopped](docs/assets/live-tree-narrow.png)
 - **Models.** Each agent row shows the model the agent runs on, as `provider/model#variant`:
-  `opencode/space-bunny-free#low` is the parent's model with `effort: 'low'`, and an agent with its
+  `opencode/deepseek-v4.1-flash-free#low` is the parent's model with `effort: 'low'`, and an agent with its
   own `model` shows that model. It is the model opencode reports for the agent's session, so if
   opencode falls back to another model, the row shows it (and the agent gets a warning). A phase
   shows its `meta.phases[].model` label when the script declares one, and otherwise the models its
@@ -390,14 +404,39 @@ and the panel):
 | `a` | any | show this session's runs, or every run of the project |
 | Esc | any | close the panel |
 
-`ctrl+x j` messages a running agent from anywhere (it asks which one when there are several).
+**Agent dialog.** `ctrl+x j` (or "Workflows: agents" in the command palette) opens a searchable list
+of the running and queued agents from anywhere, grouped by workflow and starting on the agent
+selected in the panel. Type `#3` or `3` to jump to agent 3, or part of a label, phase, workflow name
+or run id. Then:
 
-| Opening an agent (Enter) | Stopping it (`x`, then confirm) | Finished, with the notification |
+| Key | Does |
+|---|---|
+| Enter | send the agent a message (read at its next step) |
+| `ctrl+u` | send an urgent message (interrupts its current step) |
+| `ctrl+d` | stop the agent, after a confirmation |
+| `ctrl+o` | open the agent's session (in a tab when tabs are on) |
+
+![The agent dialog over a running workflow: a search line, the two running agents #3 slow stepper and #4 slow listener with their status and phase, and the actions urgent steer ctrl+u, stop ctrl+d, open ctrl+o](docs/assets/live-tree-agent-dialog.png)
+
+**Sidebar.** When the session has runs, the session sidebar gets a **Workflows** section under
+opencode's own: up to three runs (running ones first) with a colored status dot, `done/total`, and a
+line with the current phase, running agents, tokens and cost. Click a run to open the panel on it.
+With more than two runs, click the header to fold the section (it stays folded across restarts and
+then shows `(1 running · $0.42)`).
+
+![The session sidebar under Context: a Workflows section with live-tree-demo at 3/5 and the line "Scan · 2 running · 28.5k · $0", while the prompt footer shows the same run](docs/assets/live-tree-sidebar.png)
+
+Right after opencode starts, the plugins may still be loading: the panel says `loading…` and the tree
+retries for a few seconds before it reports that the workflows RPC is unavailable.
+
+| Opening an agent (Enter) | Stopping it (`x`, or `ctrl+d` in the agent dialog, then confirm) | Finished, with the notification |
 |---|---|---|
-| ![The steered agent's child session: the workflow message arrives between two slow_step calls and its reply ends with STEERED-OK; the tree still tracks the parent run](docs/assets/live-tree-open-agent.png) | ![The stop confirmation for #3 slow stepper](docs/assets/live-tree-stop.png) | ![The parent session answers the task notification; the tree shows the finished run with one stopped and one steered agent](docs/assets/live-tree-done.png) |
+| ![The steered agent's child session: the workflow message arrives between its slow_step calls and its reply ends with STEERED-OK; the sidebar's Workflows section still shows the parent's run](docs/assets/live-tree-open-agent.png) | ![The stop confirmation for #3 slow stepper, opened from the agent dialog](docs/assets/live-tree-stop.png) | ![The parent session answers the task notification; the tree shows the finished run with one stopped and one steered agent](docs/assets/live-tree-done.png) |
 
-The TUI screenshots come from opencode 2.0.15 in Windows conhost, with free `opencode/*` models
-(the parent on `opencode/space-bunny-free`) and a demo tool, `slow_step`, that takes 4 s per call.
+The TUI screenshots come from opencode 2.3.0 in a Linux terminal (tmux, 180×48), with free
+`opencode/*` models (the parent on `opencode/deepseek-v4.1-flash-free`) and a demo tool,
+`slow_step`, that takes 4 s per call. The narrow-panel and finished-run images are from the same
+demo on opencode 2.0.15 in Windows conhost.
 
 **Notifications.** When a run finishes while the terminal is not focused, the TUI sends a desktop
 notification if you enabled opencode's attention notifications in `cli.json` (next to your
@@ -406,7 +445,7 @@ not report focus (Windows conhost), you get an in-app toast. Terminals that repo
 Windows Terminal, iTerm2 and kitty.
 
 The tree ships with the npm package (`dist/tui.js`) and with directory installs
-(`"plugins": ["file:///…/opencode-workflows"]`, through the repo's `tui.tsx`). A single-file
+(`"plugins": ["file:///…/opencode-workflows"]`, which loads the built `dist/tui.js`). A single-file
 loader (`plugins/workflows.js`) loads only the server part: the tree is not available there, but
 `/workflows` and `/workflows msg` work everywhere, including the web UI.
 
@@ -419,6 +458,47 @@ curl -u opencode:$OPENCODE_PASSWORD -H "content-type: application/json" \
   -H "x-opencode-directory: <url-encoded project path>" \
   -d '{"input":{"all":true}}' http://127.0.0.1:<port>/api/rpc/dynamic-workflows/list
 ```
+
+### Desktop app (experimental)
+
+opencode's desktop app (2.3) can load a plugin's GUI part, and this plugin ships one
+(`dist/gui-experimental.cjs`, the `./gui-experimental` export). opencode marks this plugin API as
+experimental. The pill (also in a workflow agent's own tab), the tree panel, steering and stop were
+checked live in the macOS desktop app 2.3.0 (the screenshots below); the finish notice was not.
+
+- **Composer pill.** While a run of the session is active, a pill above the composer shows
+  `wf <done>/<total> · <tokens> · $<cost>` (`+n` when more runs are active). It turns orange when a
+  run is paused or has warnings, and red when a run has an error or a failed agent. Click it for one
+  row per active run; a row opens the tree on that run.
+- **Tree panel.** "Workflows: toggle the live progress tree" in the command palette (or `/wf`, or the
+  side panel's `+` menu) opens the tree in the side panel. It shows the same runs, phases and agents as
+  the TUI tree, with buttons on each row: fold, open the agent's (or the run's) session in a tab,
+  pause/resume the run, stop (after a confirmation), message and urgent message (see
+  [Steering](#steering-a-running-agent)). A switch at the top shows every run of the project instead
+  of this session's.
+- **Notifications.** When a run of a session open in a tab finishes, the app sends a system
+  notification under your Agent (or, for a failed run, Errors) notification settings. Clicking it
+  opens the session. If none was shown (for example because the app has focus), you get a toast.
+- From a workflow agent's own tab, the pill and the tree show the parent's run.
+
+![The desktop app's composer pill "wf 3/5 · 54.6k · $0" above the composer, with its menu open: a heading "Workflow api-review" and one row, api-review 3/5 · 54.6k · $0](docs/assets/desktop-pill.png)
+
+![The tree in the desktop app's side panel next to the session: the api-review run, its Scan phase with three completed agents on their models and two running slow agents with stop, message and urgent-message buttons, and the Report phase, not started yet (◌ 0/0), with its model label](docs/assets/desktop-tree-panel.png)
+
+| Steer an agent | Stop an agent | Finished run |
+|---|---|---|
+| ![The message dialog for #4 slow listener, with the text "Also end your reply with STEERED-OK." and the note that the agent reads it at its next step boundary](docs/assets/desktop-steer.png) | ![The Stop agent confirmation for #3 slow stepper, with the toast that confirms the message sent to #4](docs/assets/desktop-stop.png) | ![The parent session's report after the task notification; the tree shows the completed run (6/6, 1 steered), #3 stopped by user and the Report phase's agent](docs/assets/desktop-done.png) |
+
+The desktop screenshots come from opencode desktop 2.3.0 on macOS, in a sandboxed profile with a demo
+project, the same `slow_step` demo tool and free `opencode/*` models (the parent on
+`opencode/deepseek-v4.1-flash-free`).
+
+The app loads the GUI part for the plugins of its own server: list the plugin in `plugins` in
+`opencode.json(c)` and install it from npm or a built directory (see
+[Install](docs/INSTALL.md#the-desktop-app-part-experimental)); a single-file loader has no GUI part.
+The GUI then talks to the server plugin through its `dynamic-workflows` RPC on each session's own
+server. If a server runs no copy of the plugin (or an older one), the pill stays hidden there and the
+panel says the workflows are not available.
 
 ### Saved workflows
 
@@ -468,6 +548,7 @@ Plugin options (config install only, see [Install](#other-options)):
 | `disabled: true` | Registers no tools or commands. |
 | `sizeGuideline` | `unrestricted`, `small`, `medium` (default) or `large`: tells the model to aim for fewer than ∞, 5, 10 or 50 agents. |
 | `dataDir` | Where run transcripts are stored. Takes precedence over `OPENCODE_WORKFLOW_DATA_DIR`. |
+| `freeformTool: false` | Registers no `workflow_script` tool: the model launches new inline scripts with the `workflow` tool only. |
 | `rpcControl: false` | Makes the live tree's RPC read-only: the tree still shows runs, but its `x`, `p` and `m` keys (and any other RPC client) cannot stop, pause or message them. `/workflows msg` and `workflow_control` still work. See [Security model](#security-model). |
 
 ## Environment variables
@@ -481,7 +562,9 @@ Set them in the environment of the opencode server. They work with every install
 | `OPENCODE_WORKFLOW_SIZE_GUIDELINE` | `medium` | Same as the `sizeGuideline` option. The env var wins. |
 | `OPENCODE_WORKFLOW_AGENT_TIMEOUT_MS` | unset (no timeout) | Per-agent timeout. An agent that exceeds it fails, and `agent()` returns `null`. |
 | `MAX_STRUCTURED_OUTPUT_RETRIES` (or `OPENCODE_WORKFLOW_MAX_STRUCTURED_OUTPUT_RETRIES`) | `5` | Attempts a schema agent gets before `agent()` throws. |
+| `OPENCODE_WORKFLOW_FREEFORM` | unset (on) | `0`, `false`, `no` or `off` registers no `workflow_script` tool, like the `freeformTool: false` option. |
 | `OPENCODE_WORKFLOW_RPC_CONTROL` | unset (on) | `0`, `false`, `no` or `off` makes the live tree's RPC read-only, like the `rpcControl: false` option. |
+| `OPENCODE_WORKFLOW_IDLE_HOOK` | unset (on) | `0`, `false`, `no` or `off` registers no `experimental.idle` hook (opencode 2.3+). Without it, a steering message that lands as an agent finishes still reaches it through an extra turn, and a schema agent that forgot `workflow_submit` is re-prompted in a new turn instead of nudged in the same one. It also turns off waiting for an agent's background subagents (opencode 2.3 runs them in the background): an agent that launched one is then read as soon as its turn ends. |
 | `OPENCODE_WORKFLOW_DATA_DIR` | `$XDG_DATA_HOME/opencode/workflows`, else `%LOCALAPPDATA%\opencode\workflows` (Windows) or `~/.local/share/opencode/workflows` | Run transcripts, stored as `<dir>/<sessionID>/<runId>/`. The `dataDir` plugin option wins over it. |
 
 ## How it compares to Claude Code
@@ -497,8 +580,11 @@ that check it:
 | ADAPTED | 1 | Same purpose, reached another way |
 | N/A | 1 | Cannot be done as an opencode plugin |
 
-The same file specifies the 21 extensions (status `EXT`, `X01`–`X21`): steering, the live progress
-tree and its RPC, the per-agent model display, and the per-agent failure summary and outputs.
+The same file specifies the 31 extensions (status `EXT`, `X01`–`X31`): steering (including the
+opencode 2.3 idle-boundary flush and schema nudges), the live progress tree and its RPC, the
+per-agent model display, the per-agent failure summary and outputs, the freeform `workflow_script`
+tool, the TUI agent dialog and sidebar, waiting for background subagents, and the desktop app
+companion.
 
 Most of the gaps come from one limit of opencode's plugin API: **a plugin cannot create a child
 session with a `parentID`**. So workflow agents aren't nested under your session in the UI, and
@@ -521,7 +607,7 @@ opencode never shows their permission prompts. Upstream work to expose this:
 | P72 | Plugin-namespaced workflows | N/A | opencode plugins cannot ship `workflows/` folders for other plugins. |
 | P73 | Restart one agent | DEGRADED | Use `stop_agent`, or stop the run and resume it. |
 | P74 | Open an agent's transcript | DEGRADED | Open its tagged child session. `agents/<i>.json` holds its `sessionID`. |
-| P76 | `scriptPath` permission checks | DEGRADED | An "ask" counts as refused. |
+| P76 | `scriptPath` permission checks | DEGRADED | A `workflow` call asks through opencode's own prompt. `workflow({scriptPath})` inside a running script never asks: there an "ask" counts as refused. |
 | P79 | Per-agent results named in the notification | ADAPTED | Claude Code points at `journal.jsonl`. Here `<diagnostics>` points at `workflow_control` `result`, because the run store is outside the project (a permission prompt per read) and opencode's `read` cuts long lines. |
 
 Also:
@@ -563,8 +649,11 @@ Also:
   `agentType`, the parent agent's deny and ask rules are added on top. In every child, `workflow`,
   `workflow_control`, `workflow_submit` and `question` are denied, and any "ask" becomes "deny".
 - **`scriptPath` reads only files you could read anyway**: the project, this session's runs and the
-  personal workflows directory, plus directories an `external_directory` allow rule covers. Symlinks
-  are resolved first, `read` deny rules apply, and UNC or device paths are refused.
+  personal workflows directory, plus directories your `external_directory` rules allow. Anything else
+  raises opencode's usual approval prompt on the `workflow` tool call (opencode 2.3+), where "always"
+  is saved as usual. A `workflow({scriptPath})` call inside a running script never prompts: it needs a
+  rule or a saved approval. Symlinks are resolved first, `read` rules apply, and UNC or device paths
+  are refused.
 - **Runs are private to their session.** Another session's run id answers "not found". This covers
   `workflow_control` `result` too: the parent model sees its own runs' agent outputs, and workflow
   agents cannot call it.
@@ -654,7 +743,7 @@ whatever model you pick. It has not been tested with Copilot, though. Every agen
 requests, so providers that bill or rate-limit per request will feel a large fan-out.
 
 **Does it work with opencode v1?**
-No. It needs the opencode v2 plugin API and is pinned to 2.0.15.
+No. It needs the opencode v2 plugin API and is pinned to 2.3.0.
 
 **Do I need Claude Code or an Anthropic account?**
 No. This is an independent reimplementation for opencode, and it runs on any provider opencode

@@ -46,10 +46,11 @@ Supports OpenCode 1.19.1+ (1.x) and 2.0.30+.
 
 When opencode starts, the plugin uses the
 [`tinfoil` SDK](https://github.com/tinfoilsh/tinfoil-js) to verify the inference
-enclave: it checks the enclave's attestation, confirms the running code against
-the release digest signed in Sigstore, and binds the attested key to the live
-connection. Every request body is then encrypted end-to-end with HPKE, so only
-the verified enclave can read it.
+enclave: it checks the enclave's attestation document and confirms the running
+code against the release digest signed in Sigstore. Every request then goes
+only to that enclave: over a connection pinned to its attested TLS key, or, on
+OpenCode builds with a Bun older than 1.4, with the request sealed to its
+attested key. Either way, only the verified enclave can read your requests.
 
 The plugin fails closed. If verification does not succeed, requests are refused
 before anything leaves your machine, including your API key, your prompts and

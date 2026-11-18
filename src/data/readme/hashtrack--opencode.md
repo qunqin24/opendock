@@ -3,7 +3,7 @@
 Token & cost tracking for AI coding agents — one append-only usage log per repo,
 written by a small extension for each agent harness.
 
-- **Per-repo**: data lives in `<git-root>/.hashtrack/usage.jsonl` (override with `HASHTRACK_DIR`). Keyed by git remote URL, so totals accumulate across sessions — restarts included.
+- **Per-repo**: data lives in `<git-root>/.hashtrack/usage.jsonl` (override with `HASHTRACK_DIR`). One log per repository: linked worktrees share the main checkout's log. Keyed by git remote URL, so totals accumulate across sessions — restarts included.
 - **Per-turn breakdown**: input/output/cache/reasoning tokens, cost, and per-tool usage + errors, per turn.
 - **Harness-agnostic**: the storage layer (`packages/core`) knows nothing about pi/Claude/Copilot/OpenCode; each `apps/*` package is a thin adapter that maps its harness's events onto the same `Session` API.
 - **Append-only schema**: short keys, never renamed — new fields may be added, old lines always parse.
@@ -16,7 +16,9 @@ written by a small extension for each agent harness.
 
 ##### Where data is stored
 
-Usage is written to `<git-root>/.hashtrack/usage.jsonl` (override with `HASHTRACK_DIR`). Each line is one JSON record per agent run — one prompt and all of its turns. The repository is identified by its git remote URL; if there is no remote, the git root is used, and if there is no git repo, the current directory.
+Usage is written to `<git-root>/.hashtrack/usage.jsonl` (override with `HASHTRACK_DIR`), where `<git-root>` is the main checkout's root: every linked worktree of a repository writes the same log. Each line is one JSON record per agent run — one prompt and all of its turns. The repository is identified by its git remote URL; if there is no remote, the shared root is used, and if there is no git repo, the current directory.
+
+A worktree's own `.hashtrack` directory from an older version is folded into the shared log on the next session, so that history keeps counting.
 
 The file is append-only and uses a shared format, so adapters for other agents (OpenCode, Claude Code; Copilot planned) write to the same file. Old lines keep parsing when the format changes, and malformed lines are skipped.
 

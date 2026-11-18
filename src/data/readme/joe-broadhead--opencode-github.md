@@ -18,18 +18,18 @@ GitHub is a trademark of GitHub, Inc.; this unofficial plugin is not endorsed by
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-github#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-github#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/github-status`: it shows `Connection: sign-in required` until
 you sign in, and `opencode mcp list` shows `github  needs authentication`.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-github#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-github#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -142,7 +142,7 @@ asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied**, and GitHub's own server lists no write tools |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6", "options": { "access": "read-only" } }] }
    ```
 
    `readOnly: true` and `false` still work: they mean `"read-only"` and `"all"`, and `/github-status` says they are
@@ -334,7 +334,7 @@ Options go in the plugin's entry in `opencode.json`:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.5", "options": { "toolsets": ["context", "repos", "issues"] } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6", "options": { "toolsets": ["context", "repos", "issues"] } }]
 }
 ```
 
@@ -365,7 +365,7 @@ overrides user and project config, so members only sign in:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-github#v0.0.5",
+      "package": "github:joe-broadhead/opencode-github#v0.0.6",
       "options": {
         "clientId": "<your organisation's OAuth App client ID>",
         "scopes": ["repo", "read:org"],
@@ -481,7 +481,7 @@ still stores its token.
    account, which works only in an interactive terminal. Then, on GitHub, delete the token under **Settings →
    Developer settings → Personal access tokens**, or, after a device sign-in, revoke the app under **Settings →
    Applications → Authorized OAuth Apps** (or **Authorized GitHub Apps**).
-2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.5` (the spec you installed), then `opencode reload`.
+2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.6` (the spec you installed), then `opencode reload`.
 3. Data folders: none. The plugin stores nothing of its own.
 4. Remove the default rules you copied into agents' own `permissions`.
 
@@ -498,7 +498,7 @@ still stores its token.
 - **GitHub's rate limits and error text are GitHub's.** Errors from OpenCode and GitHub pass through unchanged.
 - **`events_list` reads GitHub's search, which has its own limits.** GitHub allows 30 search requests a minute for a
   signed-in user, and at most 1,000 results for one query ([REST API endpoints for search](https://docs.github.com/en/rest/search/search#rate-limit));
-  one `events_list` call makes three searches (issues, pull requests, commits) and at most 9 pages of each, 27 requests, beside GitHub's REST limit of 5,000 requests an hour for a user
+  one `events_list` call makes three searches (issues, pull requests, commits) and at most 30 search requests (6 pages of 100 each, and one second read whole when it holds every result read), beside GitHub's REST limit of 5,000 requests an hour for a user
   ([rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)).
   A call over the limit fails with GitHub's answer as `UNAVAILABLE`: call again later with the same cursor.
 - **Notifications need a classic sign-in.** A fine-grained token or a GitHub App cannot read `/notifications`
@@ -507,9 +507,14 @@ still stores its token.
 - **The source's links are `github.com`'s.** The `sources` declaration names `github.com` as its `urlHosts`; with the
   `host` option (GitHub Enterprise Server) the events link to your server, which a consumer that checks `urlHosts`
   does not render.
-- **A GitHub cursor never expires.** It holds a time in each stream, so the plugin never answers `CURSOR_EXPIRED`, and
-  the conformance report stays incomplete on the kit's expired-cursor check. The kit runs on GitHub answers that are
-  invented, modelled on GitHub's REST docs, and not live-verified.
+- **GitHub keeps notifications for three months.** A read whose notifications start before that, or that finds more
+  than one call reads, answers `gap` once (`expired` from a cursor, `window-truncated` from `since`) and reads on from
+  inside the window; so does a second with more than 1,000 search results, which the search moves past. A read answers
+  one gap; a loss it finds after that is answered by the next read. A notification
+  GitHub delivers more than 6 hours late is not listed. If GitHub orders a second's search results differently from one
+  page to the next, a result can be missed while that second is read. A notification marked Done before `events_list` reads it may not be listed, and nothing tells the
+  plugin it was there. The conformance kit runs on GitHub answers that are invented, modelled on GitHub's REST docs,
+  and not live-verified.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links

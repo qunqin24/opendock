@@ -185,7 +185,9 @@ instead of double-registering it.
 Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
 
 - [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
-- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permission prompts, questions and idle sessions, with tap-only inline buttons.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permissions, questions and idle sessions, with tap-only inline buttons.
+- [opencode-claude-hooks](https://github.com/Hamza-Abili/opencode-claude-hooks) — run existing Claude Code hooks natively in OpenCode, with trust, timeouts and a compatibility doctor.
+- [opencode-integrity](https://github.com/Hamza-Abili/opencode-integrity) — lock plugins, MCP tool definitions and skills; detect drift, tool poisoning and rug pulls.
 
 ## Support
 
@@ -195,6 +197,8 @@ Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
   [Discussions](https://github.com/Hamza-Abili/opencode-agent-plugins/discussions).
 - Security: [private advisory](https://github.com/Hamza-Abili/opencode-agent-plugins/security/advisories/new),
   never a public issue.
+- If this saves you time, a [star](https://github.com/Hamza-Abili/opencode-agent-plugins/stargazers)
+  helps other OpenCode users find it.
 
 ## Development
 

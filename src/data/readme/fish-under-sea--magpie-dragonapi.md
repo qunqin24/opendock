@@ -2,7 +2,7 @@
 
 把 [DragonAPI](https://newapi.dragon3api.com/) 接进 magpie：模型广场、余额、用量，外加一个能按分组建钥匙的本地界面。
 
-> 当前版本 **0.3.0**。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
+> 当前版本 **1.9.2**。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
 
 ## 它是什么
 
@@ -25,7 +25,7 @@
 | **命令行** | `magpie plugin add @fish-under-sea/magpie-dragonapi` |
 
 npm 拉不到时（内网、镜像抽风）：到 [Releases](https://github.com/Fish-under-sea/magpie-dragonapi/releases) 下
-`fish-under-sea-magpie-dragonapi-0.3.0.tgz`，解包成目录，再 `magpie plugin add <那个目录>` ——
+`fish-under-sea-magpie-dragonapi-<版本>.tgz`，解包成目录，再 `magpie plugin add <那个目录>` ——
 `plugin add` 认 `path`，和从文件夹加插件是同一条路。
 
 装好后：Settings → Plugins 里出现 **DragonAPI** 行（带一张页面），供应商列表里出现 **DragonAPI**。
@@ -108,6 +108,31 @@ NearToken 那套「页面里点充值、点连接」依赖两个本站没有的�
 | **访问令牌** | 填入/清除 PAT，说明需要哪些权限，并显示实际验到的 scope；健康与诊断记录 |
 
 预览时可以加 `?demo` 用虚拟数据把四个页面都填满（订阅示例包括不限量、取消、到期与超额）。
+
+### 液态玻璃（Magpie 2.4.0+）
+
+界面会跟着 magpie「设置 › 外观」的液态玻璃走：`page/boot.js` 把宿主的
+`_magpie/bridge.js` 地址随跳转交给本地页面，`ui/host.js` 重新加载它、接回
+`magpie.glass` / `onGlass`；`ui/style.css` 用 `--magpie-glass-<region>-fill/-blur`
+与 `data-magpie-glass` 铺卡片（内容区）、标签与工具条（侧边栏）、按钮与输入
+（控件）、菜单与对话框（浮层）。旧宿主、玻璃关着、或单独打开本地服务时，
+所有规则都有 `100% / 0px` 回退，界面与改动前完全一致。
+
+三个实现要点：跳转后必须重新加载宿主 bridge，否则拿不到这组变量；根元素
+不能声明深色 `color-scheme`（Chromium 会给文档盖一层不透明的 `#121212`
+画布，宿主壁纸就被挡住了），深色交给 `body` 的 `color-scheme`；**画布照抄
+主界面 `content` 的数字**（`fill=0` 就是真透，壁纸由宿主带 `--wall-veil` 画在
+它自己的 body 上，页面不再叠一层底，否则会出现一大块灰色遮罩）。
+
+画布与所有面都**原样使用**官方的 `--magpie-glass-<region>-fill/-blur`（`fill=0` 就是全透，
+不再加「最低不透明度」，否则壁纸颜色会被压成灰板）；像不像玻璃靠 1px 高光边 + 柔和外
+阴影，不靠加底色。页底只留一层 10% 的极淡底，避免壁纸纯白区域看起来像「大白底」。
+表头不吸顶、透明。玻璃颜色与字体颜色都直接取宿主的 `--magpie-bg` / `--magpie-card` /
+`--magpie-fg` 系列（`green/red/amber` 同步映射到 `ok/warn/bad`），页面自己不再挑颜色。
+选中/按下态用强调色的半透明玻璃（不再是深色实底）；比例、端点、厂商图标不再描黑框，
+厂商图标也放大了 4px。滚动条只留圆角拇指，无轨道底、无上下箭头。宿主的 bridge 实际只
+下发 sidebar / content / overlay 三个区域；控件区域缺席时按 12% 兜底，不会再回退成 100%
+实底（那会让按钮和分段变成一整块黑底）。
 
 仅设置 PAT、没有绑定 `sk-` 也能读取账户钱包与账户级用量。`profile:read` 用于账户资料与钱包余额，`usage:read` 用于账户日志；有 PAT 时默认只统计账户日志，不再叠加绑定钥匙日志。钱包余额与钥匙额度分别展示，不求和。
 

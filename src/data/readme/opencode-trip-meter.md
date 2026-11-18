@@ -48,7 +48,8 @@ Speed counts output and reasoning tokens per assistant step, timed from the firs
 the end of the model stream, so tool execution and time to first token are excluded.
 
 Prices come from the model catalog for the model selected in the prompt, using the base tier
-(context-size tiers are ignored). Models with no pricing, such as local ones, show `no pricing`.
+(context-size tiers are ignored). Models with no pricing, such as local ones, show the session's
+token counts per category instead, marked `no pricing`.
 
 Spend prices each message's tokens at the base tier of the model that produced it, so switching
 models mid-session stays accurate. Reasoning tokens bill as output. The total is checked against
@@ -81,6 +82,15 @@ To try a local checkout, build it and symlink it into a project's plugin directo
 Bump `version` in `package.json`, merge it, then publish a GitHub release tagged `v<version>`
 (e.g. `v0.2.0`). The `publish` workflow checks the tag matches, runs lint and tests, and publishes
 to npm via trusted publishing, so no npm token is needed.
+
+npm can take a few minutes to make a new version available. Once it shows the new version, update
+the installed plugin and restart OpenCode:
+
+    npm view opencode-trip-meter version
+    opencode plugin check
+    opencode plugin update opencode-trip-meter
+
+`opencode plugin update` with no package name updates every outdated plugin.
 
 ## Layout
 

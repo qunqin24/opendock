@@ -51,6 +51,7 @@ prompt、在很长的对话里找不到某个决定、密钥不小心进了上�
 | 插件 | 它能给你什么 | 什么时候需要 |
 | --- | --- | --- |
 | [Unicorn](./packages/opencode-plugin-unicorn/README.zh-CN.md) | 把下面所有插件打成一个包，并可独立开关 | 想一次装好整套工具，不想逐个管理插件 |
+| [God agent](./packages/opencode-plugin-god/README.zh-CN.md) | 注册 `god` agent，按 model ID 从本地文件或 HTTP 选择 system prompt | 想要一个按模型切换提示词、又不想影响其他 agent 的独立 agent |
 | [自动后台](./packages/opencode-plugin-non-blocking/README.zh-CN.md) | 长时间运行的 Bash 和 subagent 自动转入后台 | 构建、测试、安装或研究型 subagent 卡住了当前 session |
 | [Prompt 检索](./packages/opencode-plugin-prompt-search/README.zh-CN.md) | 搜索所有历史 session 的 prompt，并插入而不发送 | 记得写过某段 prompt，但想不起在哪个 session |
 | [当前对话检索](./packages/opencode-plugin-session-search/README.zh-CN.md) | 搜索当前对话并跳到对应消息 | 长对话把某个决定、命令或报错埋得太深 |
@@ -60,13 +61,14 @@ prompt、在很长的对话里找不到某个决定、密钥不小心进了上�
 | [OpenCode Go 用量](./packages/opencode-plugin-opencode-go-usage/README.zh-CN.md) | 展示所有已登录账号的 OpenCode Go 5 小时、每周和每月用量 | 想直接在 TUI 里查看每个 Go 额度还剩多少 |
 | [记事本](./packages/opencode-plugin-notepad/README.zh-CN.md) | 按文件夹或全局保存随手笔记 | 突然想到一个后续事项，不想打断当前 Agent |
 | [敏感信息加密](./packages/opencode-plugin-sensitive-encrypt/README.zh-CN.md) | 用公钥加密文本或文件，只解密到文件 | 需要保存、传递或交给 Agent 处理密钥，但不能暴露明文 |
-| [敏感信息保护](./packages/opencode-plugin-sensitive-protection/README.zh-CN.md) | 保护凭据文件，脱敏 secret 值并阻断私钥 | 机器上有凭据、token 或私钥 |
+| [敏感信息保护](./packages/opencode-plugin-sensitive-protection/README.zh-CN.md) | 保护凭据文件，在进入模型前脱敏 secret 值 | 机器上有凭据、token 或私钥 |
 | [推荐配置](./packages/opencode-plugin-recomended-opencode-config/README.zh-CN.md) | 补充精选规则和命令，并为 OpenAI 设置 `store:false` | 想要一套更安全、更一致的 OpenCode 基线，又不想自己写规则 |
 
 ## 只安装需要的插件
 
 每个插件也都可以独立使用。具体配置、快捷键和参数见各自的 README：
 
+- [God agent](./packages/opencode-plugin-god/README.zh-CN.md)
 - [自动后台](./packages/opencode-plugin-non-blocking/README.zh-CN.md)
 - [Prompt 检索](./packages/opencode-plugin-prompt-search/README.zh-CN.md)
 - [当前对话检索](./packages/opencode-plugin-session-search/README.zh-CN.md)

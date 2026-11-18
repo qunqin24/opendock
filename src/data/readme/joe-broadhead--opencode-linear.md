@@ -17,7 +17,7 @@ Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endor
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-linear#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-linear#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
@@ -30,7 +30,7 @@ server, which has its own sign-in.
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.4" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5" }] }
 ```
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
@@ -122,7 +122,7 @@ Nothing asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.4", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
    `"read"` and `"write"` still work: they mean `"read-only"` and `"all"`, and `/linear-status` says they are
@@ -259,7 +259,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.4", "options": { "access": "read-only" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "read-only" } }]
 }
 ```
 
@@ -282,7 +282,7 @@ entry in the system config: `/Library/Application Support/opencode/opencode.json
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.4", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -320,13 +320,12 @@ Run `/linear-status` first. Its last line is the next step.
 | `AUTH_REQUIRED` from `linear_issues` | Linear needs a sign-in. Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
 | `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than the plugin uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
+| `UPSTREAM_UNREADABLE` from `linear_issues` or `linear_events_list` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues; ask for `list_issues` with assignee `me` instead. `linear_events_list`: a read answered in a shape it does not read, or an entry without an id or a time, which the listing can neither list nor skip; that feed is held where it was while the other is listed, and the call answers this only when nothing else is left. Call `events_list` again later with the same cursor; if it persists, call the tool it names directly, and run `/linear-status`. |
 | `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace id>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
 | `SOURCE_UNKNOWN` from `linear_events_list` or `probe` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
 | `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
 | `ACCOUNT_MISMATCH` from `linear_events_list` or `probe` | The cursor was issued for another account, or Linear is signed in to another account than `probe` was asked for. Pass the cursor with its own account, or sign in to Linear as that account. |
-| `TOO_MANY_CHANGES` from `linear_events_list` | More changes than one `events_list` call reads came after the cursor or `since`. Call `events_list` again with a later `since`, without a cursor. |
 | `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
 
 A script's errors from the tools RPC have their own codes, listed in
@@ -341,7 +340,7 @@ store.
 1. Sign out: `opencode mcp logout linear`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: linear` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Linear**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.4` (the spec you installed), then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.5` (the spec you installed), then `opencode reload`.
    `opencode mcp list` no longer lists `linear`.
 4. Remove any Linear rules you copied into your agents' own `permissions`.
 
@@ -364,8 +363,36 @@ store.
   that and never reads the identity itself. The plugin forgets it on every credential update or switch, so after a
   new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
-- **A Linear cursor never expires.** It holds an update time in each feed, so the plugin never answers
-  `CURSOR_EXPIRED`, and the conformance report stays incomplete on the kit's expired-cursor check.
+- **A burst bigger than one listing reads is cut, not stopped.** To bound what one call costs, the plugin reads at most
+  2,000 assigned issues and 500 notifications per `events_list` call, newest first (8 and 5 pages' worth; Linear's own
+  limit is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. In the worst case,
+  with ties re-read at the cursor and the pages that show an overflow, one call makes 26 `list_issues` and 17
+  `get_notifications` reads, 43 requests against your Linear rate limit (5,000 an hour for an app you sign in to); a
+  quiet call makes one of each. Only changes the listing
+  has not yet listed count toward them, never ones it re-reads at the cursor's own millisecond. When more of those
+  changed after the cursor or `since`, and the page after the caps still holds one, the plugin does not read the
+  oldest: the page answers `gap` once (`expired` for a cursor,
+  `window-truncated` for `since`) and lists from `gap.since` on, so the next call goes on. The cursor remembers the
+  cut until the read has listed what it promised, so changes that arrive meanwhile never cut the read again; only more
+  arrivals than one call reads, a new burst, answer a new gap. Archived issues are listed too.
+- **What Linear no longer shows is not listed.** A change to an issue deleted, or no longer assigned to you, before a
+  listing reads it, and an inbox notification deleted or archived before then, are never listed, and nothing says so:
+  Linear's tools do not show what was removed.
+- **A change that becomes visible more than two minutes after its time is missed.** Linear does not document how soon
+  a write is visible to a list read; the plugin assumes well under a second, and re-reads two minutes. Each listing
+  reads each feed again from two minutes before the later of the cursor and Linear's now, and lists what it had not
+  listed there, once (the cursor carries hashes of what it listed in those two minutes, up to 24 a feed). Linear's now
+  is taken from the newest change a listing reads, never later than your computer's clock nor more than 10 minutes
+  before it (`SKEW_MS`), so a clock running up to 10 minutes ahead of Linear's does not shorten the lookback; one further
+  ahead can. A backlog read far behind Linear's now re-reads nothing: under the assumption every write before it is
+  already visible. A change that shows up more than two minutes late, or more than 10 seconds late during a burst that
+  shortens the lookback without a gap (below), is missed without a sign. When a live burst lists more than the
+  cursor's hashes hold,
+  the lookback is shortened. If what it still covers reaches back at least 10 seconds (`MIN_COVER_MS`, ten times the
+  assumed sub-second delay), nothing the assumption allows can be lost and there is no gap, so a steady stream below
+  about 2.4 changes a second never answers one. If it covers less, as in a bulk edit faster than that, the page answers
+  `gap` (`expired`, or `window-truncated` on a first read from `since`, since Linear's now), so a write behind it is
+  covered.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

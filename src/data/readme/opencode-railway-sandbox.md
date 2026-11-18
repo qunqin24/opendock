@@ -162,6 +162,7 @@ If nothing is connected and the anonymous tier is unavailable, the agent will te
 | `prompt` | Self-contained instructions; the remote agent cannot see your conversation |
 | `preview` | Build the app and serve it on a preview URL |
 | `variables` | Environment variables for the sandbox, as Railway references (see below) |
+| `live` | Only with `network: "isolated"`: make this task watchable as a Desktop tab |
 | `agent` | Remote agent (default `build`) |
 | `model` | `provider/model#variant`, only when you ask for a specific model |
 | `wait` | Block until finished instead of running in the background |
@@ -246,8 +247,8 @@ palette (**Show Railway Sandboxes**). It lists your tasks across projects, showi
 - status and the time left before the sandbox shuts itself down
 - preview URLs, with open and copy buttons
 - patch state (ready or applied) and the injected variable names
-- **Watch live** for running tasks: opens the remote agent's session as a native Desktop tab, like a local session
-  (see below)
+- **Watch live** for running tasks: opens the remote agent's session as a native Desktop tab (see below)
+- **Activity** for running tasks: the remote agent's todos, recent tool calls, and changed files, inside the panel
 - a **Stop and destroy** button for running sandboxes
 
 Tabs switch between **Active** (the default) and **All**, which adds finished, failed, and stopped tasks from the last
@@ -275,6 +276,10 @@ The panel is a GUI part (`./gui-experimental`), which OpenCode Desktop loads onl
 | `agent` | `build` | Default remote agent |
 | `anonymous` | `true` | Try a free `railway.new` sandbox when no account is connected |
 | `variables` | — | Variables for every task, e.g. `{ "DATABASE_URL": "${{Postgres.DATABASE_URL}}" }` |
+| `network` | `"private"` | `"isolated"` keeps sandboxes off the private network with no public URL (see [Design considerations](#design-considerations)) |
+| `withholdSecrets` | `false` | Withhold `.env*`, keys, and credentials from uploads even when not gitignored |
+| `uploadExclude` | — | File patterns never to upload, e.g. `["*.sqlite", "secrets/*"]` |
+| `uploadInclude` | — | Patterns to upload even with `withholdSecrets`, e.g. `[".env.test"]` |
 | `previewMinutes` | `60` | How long a preview stays up before the VM shuts itself down |
 | `maxMinutes` | `120` | Hard cap on a sandbox task, enforced inside the VM |
 | `idleTimeoutMinutes` | `10` | How long a finished sandbox lingers before Railway reclaims it (running work keeps it alive regardless) |
@@ -346,6 +351,35 @@ pull request. Publishing a GitHub release publishes to npm (`.github/workflows/r
 One-time setup: publish the first version manually (`npm login`, `bun run build`, `npm publish --access public`), then
 on npmjs.com add this repository as a **trusted publisher** (workflow `release.yml`, environment `npm`). After that no
 npm token is stored in GitHub.
+
+## Design considerations
+
+Some defaults trade security for a better experience. These are deliberate choices, and each has an opt-in alternative.
+
+**Sandboxes join the project's private network, and their OpenCode server has a public URL.** This is what lets
+**Watch live** open a remote session as a native Desktop tab: Railway only allows public URLs on sandboxes that are on
+the private network. The cost is that a remote agent, which runs without approval prompts, can reach the services in
+that environment, so a prompt injection in your repo or in a page it reads could misuse them. The server itself is
+protected by a random per-task password and is stopped before a preview starts.
+*Alternative:* `"network": "isolated"`. Sandboxes then have no private network access and no URL, and the plugin talks
+to them through Railway's exec channel. Status, follow-up messages, and reports work the same, but the panel shows a
+text **Activity** view instead of a native tab (a task can still opt in with `live: true`). Tasks that use `variables`
+or `preview` always join the private network. Use a dedicated Railway project or environment for sandboxes if you keep
+the default and want to limit what they can reach.
+*Better long term:* forwarding the sandbox's server to a local port over the exec channel would give native tabs with
+no public URL. The Railway CLI can forward ports (`railway sandbox forward`), but the SDK does not expose it yet.
+
+**Untracked files are uploaded unless gitignored, including ones like `.env.local`.** The remote agent sees the project
+as your local agent does, so tasks that need local configuration just work.
+*Alternative:* `"withholdSecrets": true` keeps `.env*` (except templates such as `.env.example`), keys, certificates,
+SSH keys, `.netrc`, Terraform state, and cloud credentials off the sandbox, and the report lists what was withheld.
+`uploadExclude` works either way. Prefer Railway variable references for secrets a task needs.
+
+**Always on, because they cost nothing in experience:**
+- Patches from remote agents are validated before they are applied: absolute paths, `..`, anything under `.git/`,
+  symbolic links, and writes through a symlinked folder that leaves the project are refused.
+- The plugin refuses to upload your home folder, the filesystem root, or folders that are too large to be one project.
+- Model logins are forwarded as access tokens only; refresh tokens never leave your machine.
 
 ## License
 

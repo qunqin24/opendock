@@ -18,9 +18,22 @@ retitling pauses for that session until you re-enable it.
 
 ![The /retitle-status toast in the OpenCode TUI](docs/retitle-status.png)
 
+## Compatibility
+
+- **OpenCode V2 (2.x):** supported. This release is built and tested against
+  OpenCode 2.2.3 and uses the V2 `plugins` configuration key.
+- **OpenCode V1 (1.x):** not supported.
+
 ## Install
 
-Add it to `opencode.json(c)` and pass settings under `options`:
+Install from npm with the OpenCode V2 CLI:
+
+```bash
+opencode plugin add opencode-retitle
+```
+
+Settings are optional. To change them, add the plugin entry to the `plugins`
+array in `opencode.json(c)` and pass settings under `options`:
 
 ```jsonc
 {

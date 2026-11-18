@@ -13,17 +13,17 @@ Unofficial; not affiliated with OpenCode.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-history#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-history#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/history-status`. On first start the plugin indexes every session in OpenCode's database in the background, newest first. The tools work while it runs, over the sessions indexed so far. `/history-status`, or `/history` in the terminal UI, shows the progress.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.6" }] }
 ```
 
 The index is kept; when a new version changes its layout, the plugin rebuilds it in the background.
@@ -103,7 +103,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs
    | `"read-only"` | the reads | nothing: `history_pin` and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.6", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -209,7 +209,7 @@ Options go on the plugin entry in `opencode.json`:
 ```jsonc
 {
   "plugins": [{
-    "package": "github:joe-broadhead/opencode-history#v0.0.5",
+    "package": "github:joe-broadhead/opencode-history#v0.0.6",
     "options": {
       "defaultScope": "project",
       "mask": ["internal-token-[0-9a-f]{32}"]
@@ -228,7 +228,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.5", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.6", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
   "permissions": [
     { "action": "history_sql", "resource": "*", "effect": "deny" }
   ]
@@ -244,7 +244,7 @@ There is nothing to sign in to and no client ID to set. `mask` adds patterns tha
 - **Masking matches patterns.** The built-in patterns and your `mask` entries catch the credentials they describe, not every secret. Text indexed before a change keeps its old form until `/history-reindex rebuild`.
 - **The index is large and grows with your history.** It takes about 2.7 times the text it holds, and deleting a session does not shrink the file.
 - **Every tool is allowed by default.** Any agent can read any indexed session in any project, and `access` decides what runs without asking. `scope` filters results; it is not access control.
-- **History's source reads only this machine.** `history.sessions` is one account, this machine, owned by its OS user; it reads the local index only, costs nothing and makes no network call. Its cursor never expires, so a consumer never gets `CURSOR_EXPIRED`, which the source contract `v0.1.0` cannot yet say, so the plugin's conformance report stays incomplete on that one check. A cursor from before this release lists only the `history` source; for `sessions`, start again with `since`. The account is this machine's host name, so renaming the host changes the account and the owner: every cursor of the old account is then refused (`ACCOUNT_MISMATCH`), and a consumer binds the source again and starts with `since`.
+- **History's source reads only this machine.** `history.sessions` is one account, this machine, owned by its OS user; it reads the local index only, costs nothing and makes no network call. OpenCode keeps a session until it is deleted, and History keeps every session OpenCode keeps, so nothing behind a cursor expires: a consumer never gets `CURSOR_EXPIRED` or a `gap`, and the conformance report says so (the kit's `noExpiry`, with that reason). A session you or your client delete no longer exists, so a consumer that had not listed it never sees it; one it had listed is not withdrawn yet, as consumers on source-contract 0.1.x refuse `removals[]`. A version History indexes late, such as one changed while no OpenCode with History ran, is listed after every cursor issued before it, so no cursor passes it. A rebuild keeps that place: `/history-reindex rebuild`, the rebuild status asks for when the mask patterns change, and the drop on opening an index of another layout all carry where each version was listed, and list a version the old index never had after every earlier cursor. While History reads the fallback session API, which may leave sessions out, it removes a session only on OpenCode's deletion event. A cursor from before this release lists only the `history` source; for `sessions`, start again with `since`. The account is this machine's host name, so renaming the host changes the account and the owner: every cursor of the old account is then refused (`ACCOUNT_MISMATCH`), and a consumer binds the source again and starts with `since`.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.** Other releases inside `>=2.2.3 <2.4.0` start, and status reports them as untested.
 - **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301 does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
@@ -319,7 +319,7 @@ The codes a tool call can return, each with its next step, are in [docs/configur
 2. Remove the plugin, then run `opencode reload` or restart OpenCode:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.5
+   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.6
    ```
 
 3. Delete the index, which removing the plugin keeps: `~/.local/share/opencode-history`, or your `indexPath` with its `-wal` and `-shm` files. OpenCode's database is not touched either way.

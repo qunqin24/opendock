@@ -8,12 +8,14 @@
 
 **Native command sandbox for OpenCode V1 and V2.**
 
-Every shell command runs inside the OS sandbox: [bubblewrap](https://github.com/containers/bubblewrap)
-on Linux and **Seatbelt** (`sandbox-exec`) on macOS — unless the trusted policy
-explicitly authorizes that exact command through `unsandboxedCommands`, or the
-global `mode: "permissive"` opt-out is set. The workspace is writable, the
-system is read-only, `$HOME` is synthetic, ambient secrets are cleared, and the
-network is denied by default. **Fail-closed**: if the sandbox cannot be created,
+Agent shell commands run inside the OS sandbox by default:
+[bubblewrap](https://github.com/containers/bubblewrap) on Linux and
+**Seatbelt** (`sandbox-exec`) on macOS. V2 also covers the terminal shell; V1
+covers the agent's bash tool. The trusted policy can authorize exact commands
+through `unsandboxedCommands`, or the global `mode: "permissive"` opt-out can
+disable the sandbox. The workspace is writable, the system is read-only,
+`$HOME` is synthetic, ambient secrets are cleared, and the network is denied by
+default. **Fail-closed in enforce mode**: if the sandbox cannot be created,
 commands are refused — never silently run unsandboxed.
 
 Zero runtime dependencies. No helper daemon. No proxy. No SRT.
@@ -427,6 +429,25 @@ The project deliberately stays small: the shell is OS-sandboxed, file tools and
 `webfetch` get a boundary policy in the server process, and there is no
 management UI, proxy, credential vault or container runtime.
 
+## OpenCode sandbox without Docker
+
+A container sandbox runs a second userland: build or pull an image, keep a
+daemon running, and decide what to mount into it. This plugin uses the boundary
+the host already has:
+
+| | Docker or VM sandbox | this plugin |
+| --- | --- | --- |
+| Isolation | container namespaces and cgroups (a VM on macOS) | bwrap namespaces or Seatbelt policy (same kernel) |
+| Setup | image pull, daemon, container start | one generated wrapper at OpenCode startup |
+| Project files | bind mount or copy | the real workspace, writable in place |
+| Secrets | injected or mounted into the container | ambient environment cleared |
+| Network | container network policy | denied by default |
+
+Use a VM for full process isolation, a container for a separate userland, or
+this plugin when the shell commands of your existing OpenCode session should
+stay confined without changing how OpenCode starts. The two compose: this shell
+boundary can run inside a whole-process sandbox.
+
 ## Whole-process sandboxes (nono, OpenShell)
 
 Tools such as [nono](https://nono.sh/docs/cli/clients/opencode) and
@@ -512,8 +533,10 @@ environment variable names but not `unsandboxedCommands` values.
 
 Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
 
-- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: discovery from `.agents/plugins` and npm packages, native skills, trust-first MCP registration.
-- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permission prompts, questions and idle sessions, with tap-only inline buttons.
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: portable skills and MCP servers from standard directories and npm, trusted before enabled.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permissions, questions and idle sessions, with tap-only inline buttons.
+- [opencode-claude-hooks](https://github.com/Hamza-Abili/opencode-claude-hooks) — run existing Claude Code hooks natively in OpenCode, with trust, timeouts and a compatibility doctor.
+- [opencode-integrity](https://github.com/Hamza-Abili/opencode-integrity) — lock plugins, MCP tool definitions and skills; detect drift, tool poisoning and rug pulls.
 
 ## Support
 
@@ -523,6 +546,8 @@ Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
   [Discussions](https://github.com/Hamza-Abili/opencode-sandbox/discussions).
 - Security: [private advisory](https://github.com/Hamza-Abili/opencode-sandbox/security/advisories/new),
   never a public issue.
+- If this saves you time, a [star](https://github.com/Hamza-Abili/opencode-sandbox/stargazers)
+  helps other OpenCode users find it.
 
 ## Development
 

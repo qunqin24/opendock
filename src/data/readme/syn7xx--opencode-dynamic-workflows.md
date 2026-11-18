@@ -316,6 +316,7 @@ its default.
 The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md) is the complete guide, and
 [`packages/plugin/docs/examples/`](packages/plugin/docs/examples) has runnable Workflows:
 [`review-files.ts`](packages/plugin/docs/examples/review-files.ts) (typed findings per file),
+[`review-loop.ts`](packages/plugin/docs/examples/review-loop.ts) (review → fix → re-review in one conversation),
 [`research.ts`](packages/plugin/docs/examples/research.ts) (a question to the person, a hard token budget) and
 [`repo-report.ts`](packages/plugin/docs/examples/repo-report.ts) (`ctx.$` and `ctx.file`). Import everything from
 `@syn7xx/opencode-dynamic-workflows/workflow`.
@@ -324,7 +325,7 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 
 | Member | What it does |
 | --- | --- |
-| `agent(prompt, opts?)` | One Unit. Returns its final text, or with `schema` a validated value. A failed Unit returns `null` and is added to `errors`; it never throws. With `{ receipts: true }` it returns `{ value, unitId, toolCalls }` instead — see [Asserting what a Unit did](#asserting-what-a-unit-did). |
+| `agent(prompt, opts?)` | One Unit. Returns its final text, or with `schema` a validated value. A failed Unit returns `null` and is added to `errors`; it never throws. With `{ receipts: true }` it returns `{ value, unitId, toolCalls }` instead — see [Asserting what a Unit did](#asserting-what-a-unit-did). With `{ keepSession: true }` it returns a handle with `sessionID` and `ask()` — see [Continuing a Unit](#continuing-a-unit). |
 | `pipeline(items, ...stages)` | Each item runs through its stages on its own, with no barrier between items. Stages get `(previous, item, index)`. |
 | `parallel(thunks)` | Runs thunks concurrently and waits for all of them (a barrier). Failures become `null`. |
 | `collect(xs)` | Drops the `null`s, with the narrowed type. |
@@ -342,9 +343,10 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 `agent()` options: `schema`, `label`, `phase`, `subagent` (alias `agentType`; default `general`), `model`
 (`"provider/model#variant"`, `{ providerID, modelID }`, or `"inherit"` for the launching session's model), `effort`
 (the reasoning variant; with no `model` the Unit inherits the caller's model at that effort), `retries` (repair turns,
-default 2), `timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged) and
-`location` (another directory). `{ receipts: true }` is a separate flag rather than one of these options — see
-[Asserting what a Unit did](#asserting-what-a-unit-did).
+default 2), `timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged),
+`location` (another directory) and `session` (continue an existing session — see [Continuing a Unit](#continuing-a-unit)).
+`{ receipts: true }` and `{ keepSession: true }` are separate flags rather than options — see
+[Asserting what a Unit did](#asserting-what-a-unit-did) and [Continuing a Unit](#continuing-a-unit).
 
 `meta`: `name`, `description`, `whenToUse`, `phases`, `args` (zod), `concurrency`, `unitTimeout`, `budget` (a number,
 or `{ tokens, hard: true }` to stop at the limit), `permissions` (rules for every Unit), `limits`, and
@@ -420,12 +422,76 @@ Opting in to receipts also changes the shape of a fan-out, because a receipt is 
 `parallel()` of receipts keeps the failed Units instead of dropping them (`value` is what carries the failure), so
 filter on `value` when you want only the Units that succeeded.
 
+### Continuing a Unit
+
+Each `agent()` call starts a fresh session, so a second reviewer knows nothing the first one learned. When a stage
+should come back to the **same conversation** — re-checking its own findings, applying the fixes it proposed,
+iterating until clean — keep the session instead of starting over:
+
+```ts
+let review = await agent("Review the diff. List every issue you find.", {
+  label: "reviewer",
+  schema: Findings,
+  keepSession: true,
+})
+
+for (let round = 0; round < 3 && (review.value?.issues.length ?? 0) > 0; round++) {
+  await agent(`Fix exactly these:\n${JSON.stringify(review.value.issues)}`, { label: `fix-${round}` })
+  review = await review.ask("Re-check your previous findings against the fixes you just made.", {
+    schema: Findings,
+  })
+}
+```
+
+`keepSession: true` resolves to a handle — the same `{ value, unitId, toolCalls }` a receipt has, plus `sessionID`,
+`ask(prompt, opts?)` and `close()`. `ask` sends the next turn into that session, so it sees its own earlier
+transcript and tool results (the files it already read) and reuses the prompt cache. For a review → fix loop that is
+the difference between re-reading the repository every round and continuing where the last turn stopped.
+
+The second turn is still **a new Unit**: its own `unitId`, ordinal and prompt, journaled and replayed like any other,
+so limits, budget, `errors`, the TUI and resume all behave unchanged. Two Units that share a `sessionID` are two turns
+of one conversation — and, deliberately, two **rows**: the surfaces key a Unit by `unitId`, never by session, so a
+turn that finished stays finished while the next one runs. Only session retention dedupes on the id
+(`cleanupTargets`), so one conversation is cleaned up once.
+
+What the session fixes at create time cannot be changed by a later turn — `subagent`/`agentType`, `model`, `effort`,
+`location`, `isolation` and `permissions`. The host's `prompt` takes a session id and text, nothing else, so passing
+one of those on a continuation is an **error** (the turn fails with a legible message in `errors`) rather than a
+silent ignore. Start a new Unit when the agent or model must change. Per-turn options still work: `schema`, `retries`,
+`timeoutMs`, `label`, `phase` — a text turn followed by a typed one on the same session is normal for this loop.
+
+Conversations are **sequential**: one turn at a time per session, so a second concurrent `ask` on the same handle
+is refused. Usage and `toolCalls` are reported **per turn** (what that turn spent and called, not the session's
+lifetime totals), so `budget` and receipts stay meaningful across a long conversation. `close()` is optional — an idle
+kept session runs nothing, and the Run's cleanup still owns its retention — but it ends the conversation, so a later
+turn on it fails instead of running.
+
+**What the transcript shows.** A Unit's transcript view is that Unit's own turn: the web app sends
+`GET /v1/runs/{runId}/units/{unitId}/transcript` (or the `getTranscript` RPC), which slices the session at this turn's
+prompt and reports `earlier` — how many messages came before. "Show whole conversation" asks for `?whole=1`. The slice
+is derived from the transcript itself (each turn opens with its prompt as a `user` message, and turns run strictly one
+after another), so nothing extra is journaled and a resumed Run slices the same way. In the TUI the transcript button
+opens the session in OpenCode itself, where the whole conversation is visible.
+
+One consequence worth knowing: because a continuation's answer is read from its own slice, a turn whose slice cannot be
+measured — the session transcript is unreadable when the turn starts — **fails with a legible error** rather than
+falling back to the whole session. Reporting another turn's text as this turn's answer would be worse than a failure.
+
+`agent(prompt, { session })` does the same without a handle, for when you thread the id through your own state.
+`{ keepSession: true }` has to be written inline (or on an `as const` object), like `receipts: true`: a plain
+`boolean` variable selects no overload. A handle journals as `{ value, unitId, sessionID }` — `toolCalls`, `ask`
+and `close` are not enumerable.
+
 ### Resume
 
 Every Run is journaled under `.opencode/workflows/runs/<runId>/`. A plugin reload does not stop running Runs. If the
 OpenCode service dies, the Run reads back as `interrupted`. `resume` starts a new Run that matches Units by start order
 and prompt: each Unit whose prompt is unchanged returns its recorded result at once, answers to `ask` are replayed, and
 from the first changed prompt on everything runs live. Units that failed run again.
+
+A conversation replays the same way, turn by turn: every turn is its own Unit with its own prompt, so a resumed Run
+reproduces the whole exchange without prompting the model once. A replayed first turn keeps the session the original
+Run recorded, so a script can go on with the conversation live after the replayed part.
 
 A Workflow composed of several files (its entry importing local modules, at any depth) journals the bundled module
 the Run actually executed alongside its source, so a resume replays that exact module even if those files were edited,

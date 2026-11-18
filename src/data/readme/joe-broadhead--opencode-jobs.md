@@ -16,7 +16,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.2
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/jobs-status`.
@@ -108,6 +108,35 @@ The body is the prompt. [Configuration](https://github.com/joe-broadhead/opencod
 covers every field, and [the morning example](https://github.com/joe-broadhead/opencode-jobs/blob/HEAD/docs/examples/morning.md)
 is a full file to copy.
 
+## The `jobs.runs` source
+
+Jobs declares one source for Memory and other consumers, in `package.json`'s `sources` key (the source contract,
+version 1): `jobs.runs`, this machine's finished job runs as events. A consumer reads it through the tools RPC
+(`jobs.scheduler.tools`): `probe` names whose runs they are, and `events_list` lists them after a cursor, in a session
+fenced to the source's grants.
+
+- **One event per finished run**: succeeded, failed, timed out, interrupted or skipped. Its kind is `x-jobs/run`, its
+  `external_id` is `<job id>/<slot>/<attempt>`, its `thread` is `jobs-job:<job id>`, and it has no actors and no link.
+- **`occurred_at` is the run's end.** A run is known only once it ends, and runs are listed in the order they finished,
+  so a cursor never passes a run that was still in flight. A run is listed once it has been finished for a minute; its
+  start is in the text. A slot skipped before it started (overlap, expired or ended) has no start, and its time is when
+  the skip was recorded.
+- **The plugin's words only.** The title is the job's name and the run's status, as `/jobs-status` writes them; the text
+  is the status row, the planned slot, the start, the end, the attempt and the failure's code. It never carries the
+  prompt, a run's summary, a script's result or any other output. A run whose job name holds a secret is refused.
+- **Not listed:** a run still queued or running, a collapsed record of missed slots, which never started, and a failed
+  attempt that a retry replaced before it was listed (the retry's event names its attempt).
+- **Local.** The account is this machine and the owner its OS user (`os-user:<user>@<machine>`). It reads only the
+  plugin's own storage: no network and no sign-in.
+- **Retention.** Jobs keeps the last 50 runs of each job and 30 days. When retention has removed a finished run a read had
+  not reached, the page says so once, with `gap` (`expired` after a cursor, `window-truncated` for a read from `since`),
+  and lists what is left.
+- **Permissions.** `events_list` asserts `jobs_events_list` and `jobs_history` (the run history it reads, the same as the
+  `jobs_history` tool's), and `probe` asserts `jobs_probe`. Both are reads, allowed under every `access`.
+
+`npm run conformance` runs the source contract's conformance kit over a fixture and writes
+`reports/conformance-report.json`, which each release attaches.
+
 ## Permissions
 
 **Every tool is allowed by default.** OpenCode's base rule allows everything, and Jobs adds no grant of its own: its
@@ -118,8 +147,8 @@ The `access` option picks the block the plugin inserts after each agent's base r
 | `access` | Jobs' own tools | A script |
 | --- | --- | --- |
 | `all` (default) | allowed, like every other plugin's tools | approved automatically; the digest and the audit record are still kept |
-| `ask-changes` | the four reads are allowed; every change, a pause included, asks | an all-read script with no file writes is approved automatically; anything else asks once per version |
-| `read-only` | the four reads are allowed; every change is denied | an all-read script with no file writes is allowed; anything else is denied |
+| `ask-changes` | the four reads, and the source's `events_list` and `probe`, are allowed; every change, a pause included, asks | an all-read script with no file writes is approved automatically; anything else asks once per version |
+| `read-only` | the four reads, and the source's `events_list` and `probe`, are allowed; every change is denied | an all-read script with no file writes is allowed; anything else is denied |
 
 A script follows `access` like every other Jobs tool: at the default `all` no script asks for approval, `ask-changes`
 asks once (the `jobs_script` prompt, bound to the script's digest) before a script that can change something, and
@@ -182,7 +211,7 @@ Set options with the object form of the plugin entry. Every option is optional.
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-jobs#v0.0.1",
+      "package": "github:joe-broadhead/opencode-jobs#v0.0.2",
       "options": { "enabled": true, "concurrency": 2, "keepAliveMinutes": 20 }
     }
   ]
@@ -202,7 +231,7 @@ Put the plugin entry in the system config: `/Library/Application Support/opencod
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.1", "options": { "concurrency": 2 } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.2", "options": { "concurrency": 2 } }],
   "experimental": { "location_idle_timeout": "60 minutes" }
 }
 ```
@@ -269,7 +298,7 @@ Run `/jobs-status` first. Its last line is the next step.
 ## Uninstall
 
 1. Pause first if a job is mid-run: `/jobs-pause`.
-2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.1`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.2`, then `opencode reload`.
 3. Remove the agent block you copied into `opencode.json`, or the job agent's Markdown file.
 
 The plugin's storage stays in OpenCode's own database; removing the plugin does not delete it.

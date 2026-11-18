@@ -99,6 +99,36 @@ across `init`/`update` (the `permissions` array is unioned and `agents` is
 add-only per agent). This is the **native V2 shape**: there is no V1
 `small_model`, singular `agent`, keyed `permission`, or `instructions` key.
 
+## Closed / air-gapped environments
+
+`npx` needs the public registry. For a locked-down machine, build the artifacts
+once on a connected machine and carry them in:
+
+```bash
+npm run bundle                    # full harness -> dist/
+npm run bundle -- --profile core  # scan-reduced (no host-tuning / mobile-E2E / global plugin)
+npm run bundle -- --profile sdlc  # process/quality only (no deploy, CI, host tuning, mobile-E2E)
+```
+
+Each bundle directory contains a source zip, a git bundle, `MANIFEST.json`
+(commit + per-file SHA-256), `REVIEW-NOTES.md` (one page for the reviewer), and
+`SHA256SUMS`. Install without a registry:
+
+```bash
+sha256sum -c SHA256SUMS
+git clone agent-harness-*.bundle agent-harness
+node agent-harness/bin/agent-harness.js init --target . --dry-run
+node agent-harness/bin/agent-harness.js init --target . --yes
+```
+
+The `core` profile's bundle is a single-commit snapshot, so excluded files are
+not in its history either. The `sdlc` profile (personas, rules, skills, backlog,
+and the process gates, without the deploy/CI/host machinery) is a snapshot too,
+and it carries a `profile.json` so `init` wires only the scripts it actually
+ships — no dead `ship`/`nightly` entries in the target. Nothing is installed
+globally and no lifecycle script runs; `tools/` is repo tooling and is not part
+of the published package.
+
 ## Placeholders
 
 Templates use `{{PROJECT_NAME}}` and `{{PROJECT_DOMAIN}}`; `init` substitutes

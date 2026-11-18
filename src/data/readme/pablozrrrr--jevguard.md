@@ -445,8 +445,12 @@ Known limitations:
 
 - Target host is OpenCode `2.2.x` (minimum `2.2.2`). The plugin does not load on
   `2.1.x` or `1.x`. A real-host smoke on `2.2.2` (2026-11-02) covered observe
-  and remediation (FAIL review, deny-all proposer). The single-delivery flow replaced the
-  earlier chain and has not been re-smoked on the real host.
+  and remediation (FAIL review, deny-all proposer). The single-delivery flow
+  (`delivery: agent`) was re-smoked on the real host on `2.2.7` (2026-11-17,
+  plugin `0.4.0` and `0.4.1`): one delivery per FAIL unit, at most 3 per
+  session, and the turn a delivery causes is reviewed without a new delivery
+  (those turns were SKIPPED). From plugin `0.4.1`, JevGuard's lines in the host
+  log carry no task, diff, finding, path or credential.
 - OpenCode `2.2.2` does not install dependencies for a `file:` plugin spec. Use
   the registry package; a local `file:` build needs its dependencies installed
   next to it.
@@ -499,9 +503,11 @@ pass 1 · warn 1 · fail 1 · skipped 0 · unavailable 0
 ```
 
 The structured log (and, on hosts with a toast channel, one toast per turn) shows
-the aggregate outcome and the outcome counts; the structured log carries every rule's result, its raw violation probability or typed
-reason, and its scoped paths. The counts include every entry, including the single
-synthetic entry a review-level failure produces.
+the aggregate outcome and the outcome counts; the structured log carries every rule's
+result with its raw violation probability or typed reason, and no file path — scoped
+paths and per-slice detail stay in the local review history described below. The
+counts include every entry, including the single synthetic entry a review-level
+failure produces.
 
 `PASS`, `WARN`, and `FAIL` are per-rule semantic outcomes. `SKIPPED` means that
 rule had no applicable change to evaluate. `UNAVAILABLE` means JevGuard could not
@@ -517,9 +523,10 @@ structured-log projection plus an ISO 8601 timestamp to one JSON Lines file:
 <XDG_DATA_HOME or ~/.local/share>/jevguard/reviews.jsonl
 ```
 
-The file holds the aggregate counts, each result's rule or check ID, its outcome, and
-its typed reason or raw probability — the same allowlist as the structured log. It
-never holds a task, diff, prompt, model output, credential, or environment value. It
+The file holds the aggregate counts, each result's rule or check ID, its outcome, its
+typed reason or raw probability, plus the scoped paths and slice metadata the host log
+leaves out. It never holds a task, diff, prompt, model output, credential, or
+environment value. It
 is local-only, bounded (it rewrites itself once it passes 5 MB, keeping the newest
 records), and safe to delete at any time; the next review recreates it.
 
@@ -736,7 +743,8 @@ strategy-only workflow delivered by the server plugin; it never edits code and n
 applies a change. Only a user who opts in with `delivery: agent` in their own
 `opencode.yaml` gets one visible message per reviewed unit queued into the source
 session, at most 3 per session and never while the session is busy; see
-[OpenCode `delivery: agent`](docs/configuration.md#opencode-delivery-agent-one-delivery-per-unit). A real-host smoke on OpenCode `2.2.2` passed for observe; see
+[OpenCode `delivery: agent`](docs/configuration.md#opencode-delivery-agent-one-delivery-per-unit). A real-host smoke on OpenCode `2.2.2` passed for observe, and `delivery: agent`
+was re-smoked on `2.2.7` (2026-11-17); see
 [OpenCode 2.2.x limitations](#opencode-22x-limitations).
 
 The Claude Code plugin reuses the same core, policy files, gate, and local history. It

@@ -35,8 +35,9 @@ X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
   read, $0.010 per user read, $0.001 per read of your own posts, mentions or bookmarks **only when the account owns the
   app**, $0.005 per bookmark change,
   and $0.015 per post created ($0.200 when it contains a URL). Reads are not capped by the plugin: the model fetches what
-  the question needs, and every answer that read ends with its actual cost, such as "Cost: 10 posts ($0.05) + 10 authors ($0.10) = $0.15." A 100-post search costs about
-  $0.50. X sets the prices and can change them.
+  the question needs, and [Cost lines](#cost-lines) lists the answers that carry a cost line, such as "Cost: at most 10
+  posts ($0.05) + 10 authors ($0.10) = $0.15." A 100-post search costs about $0.50. X sets the prices and can change
+  them.
 - The plugin can post, reply, quote and edit a Post (all public, and each follows the `access` option), read X, change your bookmarks and
   lists, and draft Articles. It also exposes X's DM, follow, block, mute, list-membership, moderator and live-video
   tools, which run like every other tool under `access`. It has no like or repost tool: X's MCP exposes neither.
@@ -45,7 +46,7 @@ X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-x#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-x#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/x-status`: it shows `not configured` until you save your X
@@ -55,12 +56,12 @@ The plugin registers X's MCP server under the name `x`, adds default permission 
 `/x` status view and two skills. Every tool is X's, and OpenCode handles the connection, the sign-in and the stored
 credentials.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.6" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -130,6 +131,16 @@ Two skills teach the model to use X well:
 - `x-write`: whom each change reaches, saying so before the call, drafting and publishing an Article, and how `access`
   decides whether a change runs, asks or is refused.
 
+### Cost lines
+
+X bills every call, and the plugin's cost line sits on some answers. On the model path an answer carries a cost line
+only for `x_search_posts_all`, `x_get_posts_by_id`, `x_get_posts_by_ids`, `x_get_posts_counts_recent`,
+`x_get_users_mentions`, `x_get_users_timeline`, `x_get_users_posts`, `x_get_users_bookmarks`,
+`x_get_users_bookmarks_by_folder_id`, `x_get_users_liked_posts`, `x_search_users`, `x_get_users_by_id`,
+`x_get_users_by_username`, `x_get_users_by_usernames`, `x_get_users_me_followers`, `x_get_users_me_following`,
+`x_get_users_list_memberships` and `x_get_users_blocking`; every other read, and every write, ends without one. A
+script's result carries a cost line on every method X prices, and says the price is unknown for a method X does not.
+
 ### Sources
 
 X's mentions, bookmarks and home timeline are sources under the shared source contract, declared in `package.json`
@@ -137,7 +148,7 @@ X's mentions, bookmarks and home timeline are sources under the shared source co
 for their collectors, not for answering questions: it lists, since a cursor, one feed (or, as source `x`, every feed
 `events.feeds` names) as normalised events, oldest first, each with its author's handle and link. The tools RPC's
 `probe` says who is signed in. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default,
-an account lookup included) and says there is more when it stops early; a collector picks up the rest on its next
+an account lookup included, besides a feed source's small reach check) and says there is more when it stops early; a collector picks up the rest on its next
 call. A feed's page counts the posts, authors and users X returned, and refuses for good a post holding a secret.
 Leaving a feed out of `events.feeds` turns its source off
 ([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#sources)).
@@ -155,10 +166,10 @@ opencode api post /api/rpc/x.posts.tools/search_posts_all -H "x-opencode-directo
   -d '{"input":{"sessionID":"ses_…","input":{"query":"from:example","max_results":10}}}'
 ```
 
-Every call is billed, and every result carries its cost line. Scripts have no budget by default: set
+Every call is billed, and every result from a script carries its cost line. Scripts have no budget by default: set
 `scriptBudgetUsd` (per session) or `scriptDailyBudgetUsd` (per rolling 24 hours, across all scripts) to opt in, and use
 your app's spending limit in X's Developer Console to cap the account. The ledger is an estimated spend, at most: it
-counts every returned resource again while X deduplicates within 24 hours, so the real bill is in X's Developer Console.
+counts every returned resource again while X deduplicates within a UTC day, so the real bill is in X's Developer Console.
 See
 [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md).
 
@@ -217,7 +228,7 @@ Set options with the object form of the plugin entry:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.5",
+      "package": "github:joe-broadhead/opencode-x#v0.0.6",
       "options": {
         "oauth": { "client_id": "YOUR_X_CLIENT_ID", "client_secret": "{env:X_CLIENT_SECRET}" }
       }
@@ -237,7 +248,7 @@ Set options with the object form of the plugin entry:
 | `ownsXApp` | `true` or `false` | `false` | Use the $0.001 Owned Read price for the account's own posts, mentions, bookmarks, followers and lists. Set it only if that account owns the developer app. |
 | `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.4.0`, with a warning in status. |
 | `events.feeds` | `mentions`, `bookmarks`, `timeline` | `["mentions", "bookmarks"]` | The feeds `x_events_list` lists, and so which of X's sources are on. Your home timeline is the busiest and dearest feed, so it is listed only when you name it. |
-| `events.maxCalls` | `2` or more | `4` | The most billed X reads one `x_events_list` call makes, an account lookup included. |
+| `events.maxCalls` | `2` or more | `4` | The most billed X reads one `x_events_list` call makes, an account lookup included. A feed source's reach check, up to five posts X has just returned, is besides them. |
 
 `{env:NAME}` is substituted when OpenCode loads the config, so the secret can stay in your environment instead of the
 file. An unset variable arrives as an empty string, which the plugin rejects with `OPTIONS_INVALID`. A variable
@@ -258,7 +269,7 @@ on macOS, or `/etc/opencode/opencode.json` on Linux. Members then only run `/con
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.5",
+      "package": "github:joe-broadhead/opencode-x#v0.0.6",
       "options": { "oauth": { "client_id": "YOUR_TEAM_APP_CLIENT_ID" } }
     }
   ]
@@ -292,7 +303,7 @@ Run `/x-status` first. Its last line is the next step.
 | Tools: unknown | X added tools the plugin does not know yet. With `access: all` (the default) they run like any other tool; `ask-changes` asks for them and `read-only` denies them. A known tool missing from the count is normal: X may list fewer tools for a token with fewer scopes. |
 | Access: default rules missing or not added | Some agents lack the default rules (see the agents row), or OpenCode could not add them (see the OpenCode row). Follow the next step. |
 | Account: account name not reported | Nothing is wrong: status makes no X call, and OpenCode keeps no name on this sign-in. X answers follow the account you signed in as. |
-| Answers cost more than expected | Every call is billed per resource returned. Each answer reports its actual cost, and a script pays the same rates. Set your app's spending limit in X's Developer Console, or `scriptBudgetUsd` for scripts, if you want a cap. |
+| Answers cost more than expected | Every call is billed per resource returned. Only the answers under [Cost lines](#cost-lines) carry a cost line, and a script pays the same rates. Set your app's spending limit in X's Developer Console, or `scriptBudgetUsd` for scripts, if you want a cap. |
 | Posting asks first | `x_create_posts` is public. With `access: all` (the default) it runs without a prompt; with `ask-changes` answer the prompt, or run writes interactively. |
 | How much credit is left | Ask the model to call `x_get_usage_credits`; it returns the payer's developer-platform balance in USD. |
 | `429` | X's rate limit for that endpoint is used up. Wait for the reset X returns, and make fewer calls. |
@@ -339,8 +350,15 @@ A script's errors from the tools RPC have their own codes, listed in
 - **Media uploads have no published price.** X's pricing page gives none for `x_media_upload` or the chat media tools,
   so the plugin does not guess one: a script with a budget set is refused them (`X_PRICE_UNKNOWN`), and without a
   budget their cost line says the price is unknown. X's Developer Console has the real bill.
+- **X lists only each feed's most recent posts.** X keeps a limited number of each feed's newest mentions, timeline posts
+  and bookmarks (its 800 most recent bookmarks). A collector that falls behind, or a first listing from further back,
+  could miss posts. A feed source answers the contract's `gap` once when that may have happened ([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#events_list)).
+  Source `x` answers no gap.
+- **A deleted post is not reported.** A post X stops listing because its author deleted it, or a bookmark you removed,
+  is simply not listed again; an event already listed stays with the consumer. It makes no gap: nothing was lost.
 - **A feed source notices a change of X account only when told.** `x_events_list`'s feed sources never ask X who is
-  signed in, because the source contract keeps that identity read for `probe`. If you sign in to X as another account,
+  signed in, because that identity read is `probe`'s until Memory and jelly accept a source that declares it
+  (`permission.readsIdentity`, in the source contract they pin). If you sign in to X as another account,
   a feed notices only when its caller passes the new account (the old account's cursor is then `ACCOUNT_MISMATCH`) or
   calls `probe`. Until then a cursor reads its own account's feed: X refuses bookmarks and the home timeline of anyone
   but the signed-in user, and mentions are public posts. Source `x` asks X on every call.
@@ -360,9 +378,9 @@ A script's errors from the tools RPC have their own codes, listed in
   undeclared tool, a write included, runs without asking until a release of this plugin declares it. A Jelly admin
   can set it to ask.
 - **The plugin does not cap spending.** Reads pass to X as the model or a script asks, with no page or result cap,
-  and scripts have no budget unless you set `scriptBudgetUsd` or `scriptDailyBudgetUsd`. Every answer that read ends
-  with its actual cost line and `/x-status` shows the estimated 24-hour spend; X's Developer Console has the real bill,
-  and the app's spending limit there caps the account.
+  and scripts have no budget unless you set `scriptBudgetUsd` or `scriptDailyBudgetUsd`. The answers under
+  [Cost lines](#cost-lines) carry their cost line and `/x-status` shows the estimated 24-hour spend; X's Developer
+  Console has the real bill, and the app's spending limit there caps the account.
 - **X's prices are X's.** The rates above are from X's pricing page on 5 November 2026, and can change without
   notice.
 
@@ -377,7 +395,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out: `opencode mcp logout x`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: x` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **X**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.5`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.6`, then `opencode reload`.
    `opencode mcp list` no longer lists `x`.
 4. Remove the **X app** entry: `opencode auth logout x-app` from a terminal, or in `/connect`. Remove any X rules you
    copied into your agents' own `permissions`.

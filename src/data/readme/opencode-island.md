@@ -104,11 +104,13 @@ Under that, the steps of the agent's plan: the one before, the one in hand
 and the one after, each a number and a dot. Green when the step is done,
 orange and pulsing on the step in hand, yellow for the ones waiting, red for
 the one that failed. Open the island and every agent shows its whole plan,
-with a count of how many of its steps are done.
+with a count of how many of its steps are done and the title of the step in
+hand.
 
 The plan is the agent's own. The plugin gives it one tool, `island_plan`, and
-a rule in the global `AGENTS.md` that asks it to record the steps as it
-works. Delete that block and the island goes back to showing only the words.
+a rule in the global `AGENTS.md` that asks it to record the steps as it works,
+each titled in a few words. Delete that block and the island goes back to
+showing only the words.
 
 The dotted grip at the **top** moves the tab: press and drag it up or down and
 it slides along the edge, staying where you leave it.

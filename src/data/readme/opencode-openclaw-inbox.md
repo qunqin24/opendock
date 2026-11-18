@@ -35,6 +35,8 @@ GUI parts load only from the global config (`~/.config/opencode/opencode.jsonc`)
 | `days`   | `1`             | Days a read task stays in the inbox           |
 | `max`    | `15`            | Tasks in the menubar menu; the rest sit behind a "N more" row that opens OpenCode |
 | `locale` | `"en"`          | `"en"`, `"zh"`, or `"auto"` to follow OpenCode |
+| `header` | `true`          | Show the badge in the session header          |
+| `tray`   | `true`          | Show the macOS menubar item                   |
 
 ## Using it with OpenClaw (or any agent)
 
@@ -42,7 +44,7 @@ A task only reaches the inbox if it is started with **both** `--archived` and th
 
 ```bash
 d=~/.openclaw/workspace/skills/opencode-dispatch
-base=https://raw.githubusercontent.com/PeberWang/opencode-openclaw-inbox/v0.3.1/integrations/openclaw/opencode-dispatch
+base=https://raw.githubusercontent.com/PeberWang/opencode-openclaw-inbox/v0.4.0/integrations/openclaw/opencode-dispatch
 mkdir -p "$d/scripts"
 curl -fsSL "$base/SKILL.md" -o "$d/SKILL.md"
 curl -fsSL "$base/scripts/opencode-dispatch" -o "$d/scripts/opencode-dispatch"
@@ -54,11 +56,19 @@ No clone needed; the URLs are pinned to a release tag, so you get exactly the re
 
 That installs an OpenClaw skill with `scripts/opencode-dispatch`, a thin wrapper around `opencode run`. A new task always gets `--archived` and the prefix (a task without `--title` is refused); follow-ups with `-s <id>` pass through unchanged. Other agents can call the script the same way.
 
+`--detach` starts the task in the background and returns as soon as the session exists, printing its id. The agent that dispatched never gets a completion notice, which is what you want when something else follows the task (the inbox, or another app).
+
+Other local apps can open a task in OpenCode: write `{"sessionID": "ses_…", "at": <epoch ms>}` to `~/Library/Application Support/opencode-openclaw-inbox/open-session`. The plugin picks it up within a moment (requests older than 30 seconds are ignored).
+
 Then add a line like this to the agent's standing instructions (for OpenClaw, the workspace `AGENTS.md`):
 
 > To hand work to OpenCode, always run `~/.openclaw/workspace/skills/opencode-dispatch/scripts/opencode-dispatch --title "<task>" ...` from the project directory. Never call `opencode run` directly for a new task.
 
 If a task still slips through, fix it in place: `opencode api patch /api/session/<id> --data '{"title":"🦞 <task>","archived":true}'`.
+
+## Going further: OpenClaw Desk
+
+The inbox tells you a dispatched task exists and lets you jump to it. If you would rather not read OpenCode sessions at all, [OpenClaw Desk](https://github.com/PeberWang/openclaw-desk) is a companion macOS app: a project-manager agent follows each handed-off task, checks the delivery itself, and puts a one-sentence brief with at most two decisions on a quiet panel. You answer with a click; it relays to OpenCode. It uses this plugin's `opencode-dispatch --detach` and open requests, and you can switch the inbox's own entry points off (`"header": false, "tray": false`) so the Desk is the only one.
 
 ## Develop
 

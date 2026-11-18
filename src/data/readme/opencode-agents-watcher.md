@@ -43,34 +43,38 @@ The utility is designed to observe sub-agent behavior, provide guarded restart c
 If you have OpenCode 1.18.0 or later, install the plugin with:
 
 ```
-opencode plugin add opencode-agents-watcher@0.1.0
+opencode plugin add opencode-agents-watcher@opencode-v1
 ```
 
 For OpenCode v2:
 
-> WIP
+```
+opencode plugin add opencode-agents-watcher@latest
+```
 
 ## Manual installation
 
-Add to `~/.config/opencode/opencode.json` (global) or `opencode.json` (project).
+Add the package to `~/.config/opencode/opencode.json` (global) or `opencode.json` (project):
 
 If you have OpenCode 1.18.0 or later, install the plugin with:
 
 ```json
 {
-  "plugin": ["opencode-agents-watcher@0.1.0"]
+  "plugin": ["opencode-agents-watcher@0.1.x"]
 }
 ```
 
 For OpenCode v2:
 
 ```json
-WIP
+{
+  "plugin": ["opencode-agents-watcher@0.2.x"]
+}
 ```
 
-Add the absolute source path to `tui.json` globally at `~/.config/opencode/tui.json` or per project at `.opencode/tui.json`.
+OpenCode loads the TUI part of the package automatically. Restart OpenCode after changing the configuration.
 
-Restart OpenCode after changing the configuration.
+Upgrading from `0.1.x`: rename the `plugin` key to `plugins`, and use a directory for local plugin paths (for example `.opencode/plugins/agents-watcher/tui.tsx`).
 
 ## Usage
 
@@ -122,10 +126,10 @@ Use `/aw-cleanup` when you want to remove all persisted watcher records for the 
 
 ## How it works
 
-- Registers through the official `sidebar_content` TUI slot.
-- Tracks child sessions from session events plus an initial session-list hydration.
-- Combines live session status with message parts to show activity and the latest tool.
-- Hydrates completed agents lazily for historical token and elapsed-time data.
+- Registers through the official `sidebar.content` TUI slot.
+- Tracks child sessions from the OpenCode v2 session data cache and event stream.
+- Combines live session status with message content to show activity and the latest tool.
+- Uses session token, cost, and timing data for active and completed agents.
 - Runs supervision on an independent timer and persists guarded recovery state.
 - Keeps tracker state outside the slot component tree so TUI re-renders do not reset it.
 

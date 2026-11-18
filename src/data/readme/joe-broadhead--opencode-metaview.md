@@ -22,7 +22,7 @@ Metaview is a trademark of Metaview Labs Inc.; this unofficial plugin is not end
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-metaview#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-metaview#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/metaview-status`: it shows `sign-in required` until you sign in
@@ -37,12 +37,12 @@ the connection, the sign-in and the stored credentials.
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.4" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5" }] }
 ```
 
 ### Update
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-metaview#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-metaview#v<version>`.
 
 ## Sign in
 
@@ -110,6 +110,29 @@ the plugin is not loaded there.
 
 See [Scripting](https://github.com/joe-broadhead/opencode-metaview/blob/HEAD/docs/scripting.md).
 
+### Shared-data source
+
+The plugin declares one [source-contract](https://github.com/we-the-rebel-alliance/source-contract) source in
+`package.json`'s `sources`, so Memory, Artifacts and other consumers can read Metaview through the shared contract with
+no code of their own:
+
+| Source | Kind | What it lists | Methods |
+| --- | --- | --- | --- |
+| `metaview.conversations` | events (`meeting`) | the recorded conversations you can see in Metaview, oldest first, once they started 3 hours ago, within the last 30 days | `events_list` and `probe` on `metaview.workspace.tools` |
+
+Each conversation is one event: its id, start, title, Metaview link and conversation type, and its candidates and
+interviewers by the name Metaview shows. **Candidate data is personal data, so an event carries metadata only:** no
+transcript, summary, note, score, feedback, email or phone number, and its `text` is always empty. A conversation whose
+title holds a secret is refused for good, and an email address or phone number in a title is masked. Metaview keeps
+conversations only as long as your organization's retention setting says, which no tool names, so the source vouches
+for the last 30 days: an older cursor or start answers a `gap` and reads on from inside them. One Metaview adds up to 7
+days behind the cursor, such as an upload, is still listed once (see Known limits). The account is `<organization id>/<user id>`, which `probe` names from
+`get_user_context` and a consumer binds; `probe` refuses another account. The reads are Metaview's own
+`get_user_context` (`probe`) and `search_conversations` (`events_list`), through OpenCode's own sign-in and under the
+same rules as any Metaview call, and the `rationale` Metaview receives with each is fixed text with no candidate detail.
+`npm run conformance` runs the contract's conformance kit on fixtures; see
+[Scripting](https://github.com/joe-broadhead/opencode-metaview/blob/HEAD/docs/scripting.md#the-conversations-source).
+
 ## Permissions
 
 **Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied. At its default, `"all"`, an agent can act on candidates and your ATS without asking: it can record an
@@ -127,7 +150,7 @@ credits; and send feedback to the Metaview team. Every read runs without asking 
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.4", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's. Put them in the agent: a
@@ -200,6 +223,8 @@ The plugin inserts this block directly after each agent's base rule that allows 
   { "action": "metaview_search_conversations", "resource": "*", "effect": "allow" },
   { "action": "metaview_search_reports", "resource": "*", "effect": "allow" },
   { "action": "metaview_search_snippets", "resource": "*", "effect": "allow" },
+  { "action": "metaview_events_list", "resource": "*", "effect": "allow" },
+  { "action": "metaview_probe", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_ai_field", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_job_post_check", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_report", "resource": "*", "effect": "allow" },
@@ -253,7 +278,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.4", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -275,7 +300,7 @@ candidates to the ATS, and spending enrichment credits:
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-metaview#v0.0.4"],
+  "plugins": ["github:joe-broadhead/opencode-metaview#v0.0.5"],
   "permissions": [
     { "action": "metaview_post_sourcing_candidates_to_ats", "resource": "*", "effect": "deny" },
     { "action": "metaview_enrich_candidate_contacts", "resource": "*", "effect": "deny" }
@@ -337,13 +362,25 @@ credential store.
 1. Sign out: `opencode mcp logout metaview`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: metaview` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Metaview**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.4`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.5`, then `opencode reload`.
    `opencode mcp list` no longer lists `metaview`.
 4. Remove any Metaview rules you copied into your agents' own `permissions`. If you used an API key, delete it in
    Metaview: Settings, MCP.
 
 ## Known limits
 
+- **The conversations source lists by start time.** Metaview's search orders and filters conversations by their start
+  only, with no time Metaview received them, and an uploaded recording is listed at the start its uploader gave.
+  - **Late arrivals:** one that appears after the source read past its start (an upload, a conversation shared with you
+    later) is listed once if it started within 7 days of the cursor; one later than that is not listed, and no gap says so.
+  - **Busy accounts:** the cursor de-duplicates about 200 conversations (about 28 a day over the 7 days). With more,
+    the lookback is shorter, and a `window-truncated` gap says so once per shortening. A de-dup key is 25 bits of a
+    hash of the id, so about 1 late arrival in 168,000 can be taken for one already listed and not listed.
+  - **Retention:** the source vouches for the last 30 days, since Metaview's retention is your organization's own
+    setting and no tool names it. A workspace retention shorter than 30 days can delete recordings before the source
+    reads them, with no gap.
+  - **Deleted or no longer yours:** one deleted, or that you lose access to (unshared, or hidden by a role change),
+    before a read reaches it is not listed and is not a gap; one already listed is not retracted.
 - **Some changes reach people.** A screening or sequence message, an application-review decision that can reject a candidate and sync to your ATS, and feedback to the Metaview team (a hiring decision can email the candidate) all reach people or systems outside OpenCode. At the default `access`, an agent can make them without a prompt.
 - **Metaview's server decides the tools.** The plugin classifies the tools it knows. A tool Metaview adds later is not classed by the plugin: the `access` option decides whether it runs, asks or is denied, and `/metaview-status` counts it as unknown.
 - **Role and plan limits.** What you can read follows your Metaview role, and reports, AI fields and full transcripts may need a paid plan. The plugin does not change either.

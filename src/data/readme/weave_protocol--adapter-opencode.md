@@ -64,6 +64,9 @@ npm install @weave_protocol/full
 
 ### 🗓️ November 2026 update — hardening
 
+#### 🔒 Sandboxed harnesses can't switch Ward off (Ward 0.3.13)
+**What Ward does:** it decides every tool call against WARD.md, for every adapter. After finding TRAE's sandbox failing open, we audited every adapter for the same kind of hole. **Gemini CLI and Qwen Code** run their hooks inside their macOS sandbox, where `~/.weave` is read-only. If WARD.md set Behavioral Limits, Ward couldn't write its ledger there, and the hook let every call through, including reads of `secrets/`. We reproduced this with the published adapters under each CLI's own Seatbelt profile. From Ward 0.3.13, Ward keeps its state in the sandbox's temp folder, and a ledger it can't use never turns into allow. Every hook adapter gets the fix through its existing Ward dependency, with no adapter update. Container sandbox mode (Docker, Podman) is still a gap: the hook isn't installed inside the container. The [Gemini](adapter-geminicli#sandbox-mode) and [Qwen](adapter-qwencode#sandbox-mode) adapter READMEs explain both modes.
+
 #### 🐉🔥🛡️ Mund reads Chinese (0.7.0)
 **What Mund does:** it scans text, such as prompts, web pages, files and tool results, for prompt injection, secrets and personal data.
 
@@ -546,7 +549,7 @@ The packages that keep your agent within policy: declare it, enforce it across e
 
 | Package | Version | Description |
 |---|---|---|
-| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.12 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
+| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.13 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
 | [🛡️ @weave_protocol/adapter-claudecode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | 0.5.0 | **Claude Code adapter** — enforces WARD.md via PreToolUse hooks; Mund pre-install hooks for skills + MCP |
 | [🛡️ @weave_protocol/adapter-antigravity](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | 0.5.0 | **Google Antigravity adapter** — enforces WARD.md across desktop, `agy` CLI, and SDK; Mund pre-install hooks |
 | [🛡️ @weave_protocol/adapter-msaf](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | 0.4.0 | **Microsoft Agent Framework adapter** — middleware-based WARD enforcement |

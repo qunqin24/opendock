@@ -20,7 +20,7 @@ check  → fail CI when anything drifts
 runtime→ warn or deny changed MCP tools and skills during a session
 ```
 
-## Why
+## Why: tool poisoning, rug pulls and skill drift
 
 An MCP tool description is not inert data: it is instructions the model reads.
 A server can serve one toolset today and a different one tomorrow. Skills are
@@ -184,6 +184,15 @@ reviewed version was safe. Use it with code review, OpenCode permissions,
 
 Read [SECURITY.md](SECURITY.md) before enabling `enforce` on a shared machine.
 
+## Other OpenCode plugins by the same author
+
+Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
+
+- [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permissions, questions and idle sessions, with tap-only inline buttons.
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: portable skills and MCP servers from standard directories and npm, trusted before enabled.
+- [opencode-claude-hooks](https://github.com/Hamza-Abili/opencode-claude-hooks) — run existing Claude Code hooks natively in OpenCode, with trust, timeouts and a compatibility doctor.
+
 ## Support
 
 - Bugs: [open an issue](https://github.com/Hamza-Abili/opencode-integrity/issues/new/choose)
@@ -191,6 +200,8 @@ Read [SECURITY.md](SECURITY.md) before enabling `enforce` on a shared machine.
 - Questions: [Discussions](https://github.com/Hamza-Abili/opencode-integrity/discussions).
 - Security: [private advisory](https://github.com/Hamza-Abili/opencode-integrity/security/advisories/new),
   never a public issue.
+- If this saves you time, a [star](https://github.com/Hamza-Abili/opencode-integrity/stargazers)
+  helps other OpenCode users find it.
 
 ## Development
 

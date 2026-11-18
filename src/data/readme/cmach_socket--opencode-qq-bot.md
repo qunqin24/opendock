@@ -191,6 +191,7 @@ NapCat 连接断开后机器人就不再响应。根治办法是在 `opencode.js
 | ---------------------------- | ------------------------------------- | -------------------------------------------- |
 | `wake`                       | `all` / `mention` / `prefix` / `none` | 群里什么时候必须回复，默认 `mention`         |
 | `wake.prefixes`              | 字符串数组                            | `wake` 为 `prefix` 时的唤醒前缀，命中即必回  |
+| `wake.ignorePrefixes`        | 字符串数组                            | 忽略前缀，命中即整条不理，不回复也不进上下文 |
 | `proactive.enabled`          | 布尔                                  | `false` 表示这个聊天不主动开口               |
 | `proactive.startProbability` | 0 到 1                                | 这个聊天单次心跳的触发概率，不写时用全局公式 |
 | `collect.privateMs`          | 毫秒（≥ 0）                           | 这个私聊的消息收集窗口，`0` 表示立即回复     |
@@ -200,10 +201,12 @@ NapCat 连接断开后机器人就不再响应。根治办法是在 `opencode.js
 | `soulPath`                   | 文件或目录路径                        | 覆盖这个聊天使用的角色设定文件               |
 | `soulName`                   | 文件名                                | 覆盖这个聊天使用的角色设定文件名             |
 
-- 会话字段与全局配置项同名：`wake.prefixes`、`proactive.enabled`、`soulPath` / `soulName`
-  在两边含义一致，没写的继续用全局值。
+- 会话字段与全局配置项同名：`wake.prefixes`、`wake.ignorePrefixes`、`proactive.enabled`、
+  `soulPath` / `soulName` 在两边含义一致，没写的继续用全局值。
 - `wake` 只作用于群聊，私聊永远回复：`all` 每条都必回，`mention` 被 @ 才必回，
   `prefix` 命中前缀才必回（被 @ 同样必回），`none` 这个群完全不理。
+- `wake.ignorePrefixes` 群聊私聊都算：消息以这些前缀开头就整条丢掉，模型看不到它，
+  比被 @ 机器人还优先；机器人自己的管理命令不受影响。
 - 必回与不必回都会写进提示词，模型知道这轮该不该说话；`/status` 会列出每个聊天当前的唤醒方式与主动说话开关。
 - 改完下一轮生效；单个字段写错只忽略这一项并告警，整个文件解析失败会沿用上一份。
 

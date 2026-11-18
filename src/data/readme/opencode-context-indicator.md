@@ -9,8 +9,8 @@ The package ships a **dual V1 + V2 plugin**, an optional TUI module (`./tui`:
 live sidebar, composer capsule, zero-LLM `/cx` panel with measured contributors
 and redacted export) and an **experimental Desktop GUI part**
 (`./gui-experimental`: side-panel tab + composer pill). V2 is tested against
-**opencode 2.3.0 / OpenTUI 0.8.4** (the e2e also passes on the 2.2.0-2.2.5
-Desktop CLI); V1 against 1.18.29+. **V1 is feature-frozen** (bug fixes only).
+**opencode 2.3.2 / OpenTUI 0.8.4** (and on the 2.2.0-2.2.5 Desktop CLI); V1
+against 1.18.29+. **V1 is feature-frozen** (bug fixes only).
 
 ![TUI sidebar — per-category context breakdown](docs/sidebar.png)
 
@@ -70,10 +70,9 @@ For every served request the plugin estimates how the context window is split:
   min(input, context)` (or whichever exists), `reserve = max(15% of the window,
   16k)` once the window reaches 32k, ceiling = `window - reserve`. A
   `compaction.buffer` set in opencode itself is honoured (project over global),
-  and `OPENCODE_CONTEXT_INDICATOR_COMPACT_BUFFER` overrides it for tests.
-  `node test/drift-watch.mjs` parses the released host and fails when the
-  formula changes. Exact rationale (#51271, the released 0.15 vs the PR's 10%,
-  the multi-project caveat) - [docs/internals.md](docs/internals.md#compaction-ceiling).
+  and `OPENCODE_CONTEXT_INDICATOR_COMPACT_BUFFER` overrides it for tests. Exact
+  rationale (#51271, the released 0.15 vs the PR's 10%, the multi-project
+  caveat) - [docs/internals.md](docs/internals.md#compaction-ceiling).
 
 ### Toast (V1 only)
 
@@ -225,8 +224,8 @@ subagent sessions switch the route. Above the table, a **`family total`** line
 sums each session's own `ctx` and prints the session count (token spend, not one
 window's fill), in millions when large (`10.3M`).
 
-The list is **capped at the 20 heaviest subagent sessions** (`MAX_FAMILY_ROWS`);
-the rest collapse into one muted tail row, `+125 more - 8.9M (88%)`, carrying
+The list is **capped at the 20 heaviest subagent sessions**; the rest collapse
+into one muted tail row, `+125 more - 8.9M (88%)`, carrying
 the hidden rows' summed `ctx` and their share. The root is always first and
 never counts against the cap; the total still sums **every** row - the cap
 shortens the list, never the arithmetic. The eight category rows are **not**
@@ -281,8 +280,8 @@ reserve, then a **`Family total`** row (the sum of every session's own `ctx` plu
 the session count - each session has its own window, so this is token spend, not
 one window's fill) and one line per subagent with its own window and percentage.
 The total sits above the list so it stays visible for hundreds of sessions; the
-list itself is capped at the **20 heaviest subagents** (`MAX_FAMILY_ROWS`,
-shared with the TUI panel) and the rest collapse into a muted `+N more` row
+list itself is capped at the **20 heaviest subagents** (as in the TUI panel) and
+the rest collapse into a muted `+N more` row
 showing their summed `ctx` and share. Category rows with a measured **zero** are
 omitted (a fresh session keeps the full eight-row layout). The header tooltip
 carries `provider/model`; a subagent on a **different model** shows it next to
@@ -300,7 +299,7 @@ for the current session).
 ### Where the numbers come from
 
 A Desktop window has **no filesystem access**, so the server part exposes an
-**RPC contract** (`lib/rpc.js`, id `context-indicator`, method `family`); the GUI
+**RPC contract** (id `context-indicator`, method `family`); the GUI
 calls it via `ctx.client.rpc()`. It is published as the `./rpc` export:
 
 ```js
@@ -333,8 +332,8 @@ step is needed on install.
   nothing.
 * **Polling, not push:** up to 1.5 s to appear (5 s for the pill); the numbers are
   the same snapshot the sidebar reads.
-* **Not exercised in CI.** CI typechecks, builds and validates the artifact (gate
-  `g`); the panel and pill are verified manually in the app before a release.
+* **Verified manually.** The panel and pill need a real window, so both are
+  checked in the app before a release.
 
 ---
 
@@ -389,8 +388,7 @@ snapshot is regenerated and summaries (idle), compaction notes and command
 payloads are re-rendered from a bounded buffer (last 50 blocks per instance), so
 the file never grows and no reader sees a half-written file. Every write merges
 the on-disk summary section (de-duplicated, max 400 lines), so notes from another
-instance survive; duplicate summaries are suppressed by an atomic claim marker
-(`lib/dedup.js`).
+instance survive; duplicate summaries are suppressed by an atomic claim marker.
 
 ---
 
@@ -469,9 +467,9 @@ behaves like an npm install ([Live sidebar](#live-sidebar)).
 * **OpenCode ≥ 1.18.29** for V1. **V1 is feature-frozen** (bug fixes only): it
   relies on `experimental.chat.*` hooks, and if those change or stop firing the
   breakdown falls back to throttled `session.messages` fetches.
-* **OpenCode ≥ 2.2.3** for V2 with TUI surfaces (verified on **2.3.0** /
-  OpenTUI **0.8.4**; the load + state-write e2e also passes on the 2.2.0-2.2.5
-  Desktop CLI). Server-only V2 works on 2.0.16+. The TUI module is typed against
+* **OpenCode ≥ 2.2.3** for V2 with TUI surfaces (verified on **2.3.2** /
+  OpenTUI **0.8.4**, and on the 2.2.0-2.2.5 Desktop CLI). Server-only V2 works on
+  2.0.16+. The TUI module is typed against
   the host's OpenTUI generation, so older hosts (0.7, 0.6) may not load it.
 * **TUI surfaces** resolve `@opentui/core`, `@opentui/solid` and `solid-js` from
   the host, so they are optional peers and the package installs **no runtime
@@ -481,7 +479,7 @@ behaves like an npm install ([Live sidebar](#live-sidebar)).
   export is not loaded and everything else keeps working.
 * **Developing in a checkout**: `npm install` may print `WARN EBADENGINE` for
   `@opentui/core` (`node >= 26.4.0`; the repo runs on Node 20/22). The plugin
-  itself runs in the host's Bun, so CI audits `npm audit --omit=dev`.
+  itself runs in the host's Bun.
 
 ---
 
@@ -516,8 +514,11 @@ logged and never breaks the main event path.
 payload; the plugin persists that *true* breakdown and flags the entry stale
 (`compactStale`), so every surface marks the row (`*` in the TUI panel, `stale
 after compaction` in the Desktop) until the next request refreshes it. The
-`session.compacted` event remains a fallback; a no-op compaction writes no stale
-entry.
+`session.compacted` event remains a fallback; a no-op compaction on a session
+that has never measured anything writes nothing. A process that only compacts -
+a standalone `oc run "/compact"`, or the background compaction opencode 2.3.1+
+runs by default - has no in-memory counters for the session, so the numbers are
+borrowed from the persisted entry (never zeroed, and no entry is invented).
 
 This plugin does not touch `opencode-token-monitor` (`token_stats` /
 `token_history` / `token_export` keep working unchanged).
@@ -560,7 +561,7 @@ budget), so the full chain is roughly **30 s warm to ~2 min cold**.
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images and `internals.md` only; `dist/` only the built GUI bundle | no test/node_modules/tsconfig in the tarball, and no published export pointing at nothing |
 | (b) JSX-free TUI | no `.tsx`/`.jsx` in the TUI surface (root + `lib/`), every TUI source parses with esbuild `loader:"ts"`, no `@jsx*` pragma, imports stay inside the host-bridgeable allowlist, relative imports carry a file extension | OpenCode skips its Solid transform under `node_modules` (#33884): one JSX file freezes the npm-installed sidebar |
 | (c) resolve chain | walks the real TUI import graph (`resolve-bridge.cjs`): every bare specifier is host-bridged, every relative one resolves to a shipped file, and **no host-bridged module is a production dependency** | an accidental runtime dependency, or a bad local import, silently breaks the sidebar |
-| (d) unit harness T1-T48 | **138 checks** against the extracted lib modules: limits/agent/state, contributors, redacted export, sanitizers, prompt-cache, waste detector, compaction reserve, diff, subagent rollup, Desktop RPC, panel width budget, deleted-session purge, the released-core ceiling, the family-list cap, recency-ordered (LRU) in-memory caches, family-aware retention (incl. a randomized 40-forest invariant test and a 120-step merge/evict soak) and the recursive V1 walk (caps, diamond/shared child, exact 64/65 boundary, waves, failures). The full list is in `test/prepublish.mjs` | regressions in modelLimits, writeStateFile, hydrate, contributors, export, categories, compaction reserve, panel layout, cache eviction, retention or the V1 rollup |
+| (d) unit harness T1-T48 | **139 checks** against the extracted lib modules: limits/agent/state, contributors, redacted export, sanitizers, prompt-cache, waste detector, compaction reserve, diff, subagent rollup, Desktop RPC, panel width budget, deleted-session purge, the released-core ceiling, the family-list cap, recency-ordered (LRU) in-memory caches, family-aware retention (incl. a randomized 40-forest invariant test and a 120-step merge/evict soak) and the recursive V1 walk (caps, diamond/shared child, exact 64/65 boundary, waves, failures). The full list is in `test/prepublish.mjs` | regressions in modelLimits, writeStateFile, hydrate, contributors, export, categories, compaction reserve, panel layout, cache eviction, retention or the V1 rollup |
 | (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.ts`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is not text-scanned) | English-only source rule |
 | (g) Desktop GUI bundle | `dist/gui-experimental.cjs` exists and is a non-trivial single-file CJS bundle: no ESM `import`, no dynamic `import()`, no Node built-in, and every app-provided module (`solid-js`, `solid-js/web`, `@opencode/plugin/gui`, `@opencode/plugin/rpc`) still a `require()` - no bundled second copy, no React/OpenTUI/bare-`opencode` import; the artifact must also be newer than every source file it inlines | a stale or hand-edited bundle, or a build that inlines the app instance, breaks the Desktop panel at load time |
@@ -609,7 +610,7 @@ repo inactivity — a push or manual run re-enables them):
 1. `tsc --noEmit` and `tsc -p tsconfig.gui.json --noEmit` - typecheck the TUI
    entry (`tui.ts` + `lib/*`) and the Desktop GUI part (`gui/*.tsx`);
 2. `npm run build:gui` - build the bundle the gate inspects;
-3. `test/prepublish.mjs` - gates **(a)-(h)**, 138 unit checks, via the esbuild
+3. `test/prepublish.mjs` - gates **(a)-(h)**, 139 unit checks, via the esbuild
    **programmatic API** (a Linux bin/esbuild binary cannot be spawned);
 4. `test/drift-watch.mjs` - compares the OpenTUI pins and `@opencode/plugin`
    types with the **latest released** opencode. Advisory by default: patch drift

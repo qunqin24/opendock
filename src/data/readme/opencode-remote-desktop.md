@@ -346,6 +346,7 @@ npx wrangler pages deploy pages --project-name bot-console
 - **桌面 App 连远端服务**时才有侧边栏面板：`Cmd+Shift+S`、`/screen` 或侧边栏 `+` 菜单都能打开。桌面 App 连本机服务时面板、`+` 菜单项和 `/screen` 都会隐藏。
 - **Web 端（含手机浏览器）不加载插件界面**——OpenCode 只在桌面 App 里加载配置中插件的 UI。所以 web / 手机、TUI、没装插件的控制端，靠 `/bot-link` 给出的 Web 控制台接管。
 - 接管时若控制端没有面板（由桌面 App 里面板每 15 秒发的心跳判断），控制台链接会自动附在工具结果里，Agent 会原样贴进回复。
+- **桌面 App 连本机服务**时没有可输入的端点：面板隐藏，也没有远端控制端，因此 `computer_request_takeover` 与 `computer_secret_request` 会被禁用，直接返回提示、不挂起会话。需要密码时请在本机自行处理，或预先存好密钥再用 `computer_secret_type`。
 
 ### 屏幕锁
 

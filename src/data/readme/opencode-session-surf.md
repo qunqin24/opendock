@@ -1,8 +1,19 @@
 # OpenCode session surf
 
-Session list sidebar plugin for [opencode](https://opencode.ai) TUI. Shows all
-sessions from the local opencode database, with live status (busy/waiting)
-synced across opencode instances, plus quick session switching.
+Session list sidebar plugin for the [opencode](https://opencode.ai) TUI. Shows
+your sessions, with live status (busy/waiting) synced across opencode
+instances, plus quick session switching.
+
+**Requires OpenCode v2 (2.2 or newer) and `bun`.** The 0.1.x releases target the
+v1 plugin API and do not load on v2.
+
+The sidebar is meant to replace the native session tabs, so turn those off:
+
+```json
+{
+  "tabs": { "mode": "off" }
+}
+```
 
 ## Features
 
@@ -25,46 +36,37 @@ synced across opencode instances, plus quick session switching.
 
 ## Install
 
-From npm (published version):
+The plugin is a TUI-only plugin, configured in `cli.json`
+(`~/.config/opencode/cli.json`). From a local checkout, point at the directory,
+not at a file:
 
 ```json
 {
-  "plugin": [
-    "opencode-session-surf"
+  "plugins": [
+    {
+      "package": "file:///path/to/opencode-session-surf",
+      "options": { "preset": "ping" }
+    }
   ]
 }
 ```
 
-From the GitHub repo:
+From npm:
 
 ```json
 {
-  "plugin": [
-    "https://github.com/luchev/opencode-session-surf"
-  ]
+  "plugins": ["opencode-session-surf"]
 }
 ```
-
-From a local checkout:
-
-```json
-{
-  "plugin": [
-    "file:///path/to/opencode-session-surf/index.tsx"
-  ]
-}
-```
-
-Requires opencode with TUI plugin support and `bun`.
 
 ## Configuration
 
-Plugin options are set through the `plugin` array in `tui.json` (tuple form):
+Plugin options go in the `options` object of the plugin entry:
 
 ```json
 {
-  "plugin": [
-    ["opencode-session-surf", { "spinner": "dots" }]
+  "plugins": [
+    { "package": "opencode-session-surf", "options": { "spinner": "dots" } }
   ]
 }
 ```
@@ -143,50 +145,52 @@ Subagent display is controlled by `subagents`:
   before it (so a quiet gap, like a weekend, doesn't hide the last real batch
   of sessions). Rows are white, as usual.
 
-Keybinds are configured through `tui.json`'s `keybinds` map, keyed by command
-name (custom keybinds are additive to the defaults):
+Keybinds are configured through `cli.json`'s `keybinds` map, keyed by command
+id. A key you set replaces that command's default:
 
 ### Keybinds
 
 | Action | Default | Command |
 |---|---|---|
 | Open session picker | `ctrl+o` | `session_surf.picker.open` |
-| Next session | `ctrl+x j` | `session_surf.next` |
-| Previous session | `ctrl+x k` | `session_surf.previous` |
-| Move session into a directory | `ctrl+x w` | `session_surf.chdir` |
+| Next session | `<leader>j` | `session_surf.next` |
+| Previous session | `<leader>k` | `session_surf.previous` |
+| Move session into a directory | `<leader>d` | `session_surf.chdir` |
+
+`ctrl+o` is also OpenCode's built-in `open.menu` default. The plugin's binding
+takes priority, so the picker opens instead (checked on 2.2.0). To get the
+built-in menu back, move the picker: `"session_surf.picker.open": "<leader>o"`.
+
+The previous `ctrl+x w` binding for moving a session is now OpenCode's own
+`session.tab.close`, so the move command defaults to `<leader>d`.
 
 The picker itself has its own actions, also configurable through the same
 `keybinds` map and shown at the bottom of the popup:
 
 | Picker action | Default | Command |
 |---|---|---|
-| Switch to selected session | `enter` | `session_surf.picker.switch` |
-| Move selection up | `↑`, `ctrl+k` | `session_surf.picker.up` |
-| Move selection down | `↓`, `ctrl+j` | `session_surf.picker.down` |
+| Switch to selected session | `return` | `session_surf.picker.switch` |
+| Move selection up | `up`, `ctrl+k` | `session_surf.picker.up` |
+| Move selection down | `down`, `ctrl+j` | `session_surf.picker.down` |
 | Rename selected session | `ctrl+r` | `session_surf.picker.rename` |
 | Delete selected session | `ctrl+d` | `session_surf.picker.delete` |
 | Fork selected session | `ctrl+f` | `session_surf.picker.fork` |
 | Move selected session | `ctrl+w` | `session_surf.picker.move` |
 | New session | `ctrl+n` | `session_surf.picker.new` |
-| Close the picker | `esc` | `session_surf.picker.close` |
+| Close the picker | `escape`, `ctrl+o` | `session_surf.picker.close` |
 
 Selection wraps around both ends. Rename and delete keep the picker open (a
 confirmation prompt appears first, and rename shows the new title
 immediately); fork closes it and switches to the new session, which keeps the
 original name the first time and gets a numbered suffix afterwards
 (`name (fork 2)`, `name (fork 3)`, …); move closes it and prompts for a
-directory, exactly like `ctrl+x w`. Plain letter keys always stay free for
+directory, exactly like `<leader>d`. Plain letter keys always stay free for
 search — only the control/arrow/enter/esc bindings above are captured while the
 picker is open.
 
-`ctrl+x w` moves the current session into a directory you type or tab-complete:
-the conversation is forked into a new session whose working directory is the
-one you chose, the new session keeps the original name, and the original
-session is deleted. The server's fork API copies the conversation but cannot
-set a directory (fork/update/import all ignore it), so after forking the
-plugin writes the chosen directory straight into the new session's row in
-`~/.local/share/opencode/opencode.db` — the server re-reads it from the
-database on every request.
+`<leader>d` moves the current session into a directory you type or
+tab-complete. It calls the server's move API, so the session keeps its ID,
+title and history and only its working directory changes.
 
 ```json
 {
@@ -202,7 +206,7 @@ Set a command to `"none"` to disable its keybind.
 ### Rebind the leader key
 
 The leader is opencode's own setting, not this plugin's. Change it in
-`tui.json`:
+`cli.json`:
 
 ```json
 {
@@ -216,16 +220,16 @@ The leader is opencode's own setting, not this plugin's. Change it in
 
 ```bash
 bun install
-bun run dev     # build watch → dist/index.js
-bun run build   # one-shot build
-bun run test    # unit + render tests (uses the @opentui/solid preload)
+bun run typecheck   # tsc against the @opencode/plugin types
+bun run test        # unit + render tests (uses the @opentui/solid preload)
 ```
 
-To test the plugin locally, point tui.json's `plugin` array at the local
-checkout and restart opencode.
+There is no build step: the package ships `tui.tsx` and OpenCode loads it
+directly. To test locally, add the checkout to `cli.json` as shown above (the
+edit applies without a restart).
 
-The plugin reads session data from
-`~/.local/share/opencode/opencode.db` (via `bun:sqlite`).
+Session data comes from the server API (`client.session.list`) and live events,
+not from the database.
 
 ## License
 

@@ -14,7 +14,7 @@ Slack is a trademark of Slack Technologies, LLC; this unofficial plugin is not e
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-slack#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-slack#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/slack-status`: it shows `not configured` until you give OpenCode your Slack app's client ID (see [Sign in](#sign-in)).
@@ -24,7 +24,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.4" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.5" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -94,7 +94,7 @@ The methods `events_list` and `mark_read` run `slack_events_list` and `slack_mar
    | `"read-only"` | the read tools | the private-channel search, file reads, writes and sends, and new tools: they are **denied** |
 
    ```jsonc
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.4", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.5", "options": { "access": "read-only" } }] }
    ```
 
    The default block, generated from `defaultRules()` for `access: "all"`:
@@ -171,7 +171,7 @@ Everything works without options. Options set the client ID for everyone (instea
 ```jsonc
 {
   "plugins": [
-    { "package": "github:joe-broadhead/opencode-slack#v0.0.4", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
+    { "package": "github:joe-broadhead/opencode-slack#v0.0.5", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
   ]
 }
 ```
@@ -197,7 +197,7 @@ Put the client ID of your organisation's Slack app in the system configuration, 
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-slack#v0.0.4",
+      "package": "github:joe-broadhead/opencode-slack#v0.0.5",
       "options": {
         "oauth": { "client_id": "YOUR_SLACK_CLIENT_ID" }
       }
@@ -227,7 +227,7 @@ Run `/slack-status` (or `/slack` in the TUI) first. Its `Connection` row shows a
 | `connected` | none | A skill in your own or the project's skill folders has the id `slack-search`, so OpenCode loads it instead of the plugin's. The `Skills` row names its file. | Move or rename that skill, then run `opencode reload`. |
 | `connected` | none | Ready. The next step reads `Nothing to do.` | If status names agents without default rules, put the default rules first in their own permissions (see above). |
 | — | `STATUS_UNAVAILABLE` | Status itself could not be read. | Run `/slack-status` again in a moment. |
-| — | `SKILLS_INVALID` | A bundled skill is missing or has invalid frontmatter, so the plugin does not load. | Reinstall the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.4`, then `opencode plugin add github:joe-broadhead/opencode-slack#v0.0.4`, then `opencode reload`. |
+| — | `SKILLS_INVALID` | A bundled skill is missing or has invalid frontmatter, so the plugin does not load. | Reinstall the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.5`, then `opencode plugin add github:joe-broadhead/opencode-slack#v0.0.5`, then `opencode reload`. |
 | — | `INPUT_INVALID` | A plugin tool's input is invalid; the message names the problems. | Pass the fields its schema describes. |
 | — | `SCOPE_MISSING` | `mark_read` lacks the `:write` scope the message names, or `mentions_list` or `dms_list` a scope a sign-in from before 0.0.3 lacks. | Add it to the app (and `oauth.scopes`, if you set it), then sign in again. |
 | — | `SOURCE_UNKNOWN` | This plugin lists only the source `slack`. | Leave `source` out, or pass `slack`. |
@@ -275,7 +275,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out of Slack: `opencode mcp logout slack`. If it answers "MCP server not found" right after OpenCode starts, wait a few seconds and run it again.
 2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app client ID** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app client ID"`. An entry saved by an earlier release is named "Slack app".
 3. Check: `opencode auth list` lists neither **Slack** nor **Slack app client ID**.
-4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.4` (the spec you installed), then `opencode reload`. `opencode mcp list` no longer lists `slack`.
+4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.5` (the spec you installed), then `opencode reload`. `opencode mcp list` no longer lists `slack`.
 5. Remove any Slack rules you copied into your agents' own `permissions`.
 
 ## Known limits
