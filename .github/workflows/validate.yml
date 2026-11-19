@@ -28,6 +28,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: python3 scripts/test/deploy-receive.test.py
       - run: pnpm check
       # Same-repository PRs exercise the complete live pipeline without writing
       # a snapshot commit or deploying. Forks still run tests/check/build.

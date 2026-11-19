@@ -67,6 +67,7 @@ jobs:
         run: |
           pnpm check
           pnpm test
+          python3 scripts/test/deploy-receive.test.py
           pnpm build
 
       - name: Commit snapshot

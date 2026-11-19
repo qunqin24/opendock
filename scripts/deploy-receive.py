@@ -12,6 +12,25 @@ import urllib.request
 ROOT = Path('/srv/opendock')
 
 
+def prune_releases(release, previous):
+    """Retention is best effort: it must not fail a successful deployment."""
+    try:
+        releases = sorted((ROOT / 'releases').glob('release-*'), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in releases[3:]:
+            if old in (release, previous):
+                continue
+            try:
+                # Bootstrap releases may belong to root; never delete those.
+                if old.is_symlink() or old.stat().st_uid != os.geteuid():
+                    print(f'Warning: retaining unmanaged release {old.name}', file=sys.stderr)
+                    continue
+                shutil.rmtree(old)
+            except OSError as error:
+                print(f'Warning: could not prune {old.name}: {error}', file=sys.stderr)
+    except OSError as error:
+        print(f'Warning: could not list old releases: {error}', file=sys.stderr)
+
+
 def main():
     with (ROOT / '.deploy.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -55,11 +74,7 @@ def main():
                 pending.replace(current)
             shutil.rmtree(release)
             raise
-        # Keep recent releases (including the immediate rollback target).
-        releases = sorted((ROOT / 'releases').glob('release-*'), key=lambda p: p.stat().st_mtime, reverse=True)
-        for old in releases[3:]:
-            if old not in (release, previous):
-                shutil.rmtree(old)
+        prune_releases(release, previous)
 
 
 if __name__ == '__main__':
