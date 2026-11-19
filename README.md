@@ -2,171 +2,140 @@
 
 # OpenDock
 
-**OpenCode 插件目录与排行榜** —— 自动收录、自动排名、自动更新
+**An automatically updated directory and leaderboard for OpenCode plugins**
 
-[opendock.net](https://www.opendock.net) · [提交插件](https://www.opendock.net/submit) · [报告问题](https://github.com/qunqin24/opendock/issues/new)
+[English](README.md) · [简体中文](README.zh-CN.md)
+
+[Browse OpenDock](https://www.opendock.net) · [Submit a plugin](https://www.opendock.net/submit) · [Report an issue](https://github.com/qunqin24/opendock/issues/new)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Astro](https://img.shields.io/badge/Astro-7-BC52EE?logo=astro&logoColor=white)](https://astro.build)
-[![Deploy](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)](https://vercel.com)
 
 </div>
 
----
+## What OpenDock does
 
-## 它解决什么问题
+OpenDock helps you find and compare OpenCode plugins without digging through manually maintained lists. It refreshes public data from npm and GitHub daily.
 
-现有的 OpenCode 插件发现方式都是人工维护的 awesome-list：更新滞后、无法比较、
-看不出哪些已经废弃。OpenDock 每天从 npm 与 GitHub 重新抓取全量数据，
-给出多维度排名和明确的健康度提示——没有需要人工维护的列表。
+- **Plugin discovery:** Finds npm packages with the `opencode-plugin` keyword.
+- **Five leaderboards:** Overall score, GitHub stars, trending this week, downloads, and recently added.
+- **Project health:** Flags archived projects, projects inactive for six months, missing documentation, and missing licenses.
+- **Copyable install config:** Each plugin page includes an `opencode.json` snippet.
+- **Bilingual site:** English and Simplified Chinese, with localized SEO, structured data, and RSS.
+- **Static site:** No application backend, database, or tracking.
 
-- **1500+ 插件** —— 来源是 npm 上带 `opencode-plugin` 关键词的全部包
-- **五个排行榜** —— 综合评分、星标、本周飙升、下载量、最新收录
-- **健康度徽章** —— 已归档 / 半年未更新 / 缺少文档 / 无协议
-- **一键安装配置** —— 每个详情页提供可复制的 `opencode.json` 片段
-- **双语站点** —— 中英文界面与 SEO（hreflang、JSON-LD、RSS）
-- **纯静态** —— 无后端、无数据库、无追踪
+## How it works
 
-## 工作原理
-
-```
-npm 全量搜索 ──▶ GitHub 元数据 ──▶ 评分 & 健康度 ──▶ 静态数据集 ──▶ Astro 构建
- (keyword)      (GraphQL 批量)     (score.mjs)      plugins.json    3148 页
-                                        ▲
-                              每日 03:00 UTC 自动重跑
+```text
+npm discovery → GitHub metadata → scoring and health checks → plugins.json → Astro build
 ```
 
-评分算法、分类规则、健康度判定全部是公开代码，见下方「目录结构」。
+The ranking, categorization, and health rules are open source. See the repository layout below.
 
-## 技术栈
+## Tech stack
 
-| | |
+| Area | Tools |
 |---|---|
-| 框架 | Astro 7（静态输出 + ClientRouter 软导航） |
-| 交互 | React 19 island（仅 `/plugins` 与分类页的搜索筛选水合） |
-| 样式 | Tailwind CSS v4 + shadcn/ui 设计令牌 |
-| 搜索 | Fuse.js —— 页内筛选，以及全站 ⌘K 命令面板（索引按需加载） |
-| 部署 | Vercel |
-| 数据刷新 | GitHub Actions 每日 cron |
+| Framework | Astro 7, with static output and ClientRouter navigation |
+| Interactivity | React 19 islands for search and filters on the plugin and category pages |
+| Styling | Tailwind CSS v4 and shadcn/ui design tokens |
+| Search | Fuse.js for page filters and the on-demand site-wide ⌘K search |
+| Hosting | Self-hosted static site served by Nginx |
+| Data refresh | Daily GitHub Actions workflow |
 
-## 本地开发
+## Local development
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-数据快照已提交在仓库里，克隆后即可直接起服务，无需任何 token。
+The repository includes a data snapshot, so you can start the dev server without a token.
 
-### 重新抓取数据
-
-```bash
-pnpm data        # 全量抓取（约 10–20 分钟）
-pnpm data:dev    # 只抓 120 个包，快速验证管线
-```
-
-抓取结果缓存在 `.cache/`（20 小时过期），中断后重跑只补缺失的部分；
-强制全量重抓加 `--fresh`。
-
-下载量是可选增强数据：单次请求最多 10 秒，月/周下载量各有 3 分钟预算。
-超时、限流或部分响应会保留缓存或上次已提交快照里的下载量（不把失败记成新鲜的 0）；
-首次发现且没有历史值的包才回退到 0。日志会汇总更新、缓存、保留及不可用数量。
-`--fresh` 会绕过请求缓存，但在下载接口故障时仍保留已提交快照中的历史值。
+### Refresh the data
 
 ```bash
-pnpm test         # HTTP 超时、重试、下载回退与预算回归测试
-pnpm check        # 类型检查
-pnpm build        # 静态构建
+pnpm data        # Full crawl, typically 10–20 minutes
+pnpm data:dev    # Crawl 120 packages to check the pipeline quickly
 ```
 
-抓取脚本需要 GitHub token 才能用 GraphQL API。本地自动读取 `gh auth token`，
-CI 里用 `GITHUB_TOKEN`。没装 `gh` 的话手动导出：
+The crawler caches responses in `.cache/` for 20 hours. Rerunning an interrupted crawl fills in missing results. Use `pnpm data --fresh` to bypass the cache.
+
+Download counts are optional enrichment. Each request has a 10-second timeout, with separate three-minute budgets for weekly and monthly counts. On timeouts, rate limits, or partial responses, the crawler keeps cached or previously committed counts rather than replacing them with zero. Only new packages with no historical count fall back to zero. This fallback also applies with `--fresh`. The logs summarize which counts were updated, cached, retained, or unavailable.
+
+The crawler needs a GitHub token for GraphQL. It uses `gh auth token` locally or `GITHUB_TOKEN` in CI. If you do not have the GitHub CLI, set `GITHUB_TOKEN` in your shell before running the crawler.
 
 ```bash
-export GITHUB_TOKEN=ghp_xxx
+pnpm test     # HTTP timeout, retry, fallback, and budget regression tests
+pnpm check    # Type checks
+pnpm build    # Static build
 ```
 
-## 目录结构
+## Repository layout
 
-```
+```text
 scripts/
-  fetch-plugins.mjs      抓取管线入口
-  lib/categories.mjs     分类规则（改这里调整分类）
-  lib/score.mjs          评分算法与健康度判定
-  lib/http.mjs           带重试的 fetch / GraphQL / 并发控制
+  fetch-plugins.mjs      Crawler entry point
+  lib/categories.mjs     Category rules
+  lib/score.mjs          Ranking and health checks
+  lib/http.mjs           HTTP retries, GraphQL, and concurrency
 data/
-  curated.json           人工层：精选、黑名单、分类覆盖
-  history.json           每日星标快照，用于计算增长（自动生成）
+  curated.json           Featured plugins, exclusions, and overrides
+  history.json           Generated daily star history for growth rankings
 src/
-  data/plugins.json      生成的数据集（自动生成）
-  data/readme/*.md       各插件 README（自动生成，独立文件避免拖慢构建）
-  lib/plugins.ts         类型定义 + 排序视图
-  lib/readme.ts          README 渲染与消毒
-  components/            UI 组件
-  pages/                 路由
+  data/plugins.json      Generated plugin dataset
+  data/readme/*.md       Generated plugin READMEs, stored separately
+  lib/plugins.ts         Types and sorted views
+  lib/readme.ts          README rendering and sanitization
+  components/            UI components
+  pages/                 Routes
 ```
 
-## 调整数据
+## Curate the directory
 
-| 想改什么 | 改哪里 |
+| To change | Edit |
 |---|---|
-| 分类规则 | `scripts/lib/categories.mjs` |
-| 排名权重 | `scripts/lib/score.mjs` |
-| 精选 / 拉黑 / 手动修正某个包 | `data/curated.json` |
+| Category rules | `scripts/lib/categories.mjs` |
+| Ranking weights | `scripts/lib/score.mjs` |
+| Featured plugins, exclusions, or individual plugin metadata | `data/curated.json` |
 
 ```jsonc
 {
-  "featured": ["oh-my-opencode-slim"],    // 首页精选
-  "include": ["some-package"],            // 强制收录（即使没有关键词）
-  "blocklist": ["spam-package"],          // 永久排除
-  "overrides": {                          // 覆盖自动推断的字段
-    "some-package": { "category": "memory", "title": "更好的名字" }
+  "featured": ["oh-my-opencode-slim"],
+  "include": ["some-package"],            // Include even without the keyword
+  "blocklist": ["spam-package"],
+  "overrides": {
+    "some-package": { "category": "memory", "title": "A better name" }
   }
 }
 ```
 
-改完重跑 `pnpm data`。
+Run `pnpm data` after making changes.
 
-## 部署
+## Deployment
 
-推到 GitHub 后在 Vercel 导入即可，框架会被自动识别为 Astro。
-唯一需要改的是 `astro.config.mjs` 里的 `site` 字段——canonical URL、
-sitemap 和 RSS 都由它派生。
+Set `site` in `astro.config.mjs` to your public URL. Astro uses it for canonical URLs, the sitemap, and RSS.
 
-数据刷新走 `.github/workflows/refresh.yml`：每天 03:00 UTC 重新抓取、
-运行类型检查和测试、构建、提交快照，再通过受限 SSH 密钥直接发布到生产服务器。
-也可以在 GitHub Actions 页面手动运行该工作流。
+The [refresh workflow](.github/workflows/refresh.yml) runs daily at 03:00 UTC. It fetches fresh data, checks types, runs tests, builds the site, commits the snapshot if it changed, and deploys the build to the production server over SSH. You can also run it manually in GitHub Actions.
 
-### 自托管自动部署
+### Self-hosted automatic deployment
 
-- 工作流需要仓库 Secrets：`OPENDOCK_DEPLOY_HOST`、`OPENDOCK_DEPLOY_KEY`、
-  `OPENDOCK_DEPLOY_KNOWN_HOSTS`（固定服务器 SSH 主机公钥，禁止跳过校验）。
-- 服务器使用专用 `opendock-deploy` 用户；密钥通过 `restrict,command=...`
-  仅允许执行 `scripts/deploy-receive.py`，不能使用交互 shell、端口转发或执行任意命令。
-- 将该脚本安装为 `/usr/local/bin/opendock-deploy-receive`，由 root 持有；
-  发布用户需拥有 `/srv/opendock` 和 `/srv/opendock/releases` 的写权限。
-- Nginx 只读挂载 `/srv/opendock:/site:ro`，站点根目录为 `/site/current`。
-  上传完成并验证必要文件后，原子切换 `current`；线上检查失败自动回退。
-  保留最近版本以便回滚，部署过程不需要重启服务。
-- 工作流无数据变化时仍会部署，可用手动运行恢复线上版本。
+- Configure the repository secrets `OPENDOCK_DEPLOY_HOST`, `OPENDOCK_DEPLOY_KEY`, and `OPENDOCK_DEPLOY_KNOWN_HOSTS`. Pin the SSH host key and keep host verification enabled.
+- Use a dedicated `opendock-deploy` user. Restrict the SSH key to `scripts/deploy-receive.py` with a forced command and no interactive shell or forwarding.
+- Install the script as `/usr/local/bin/opendock-deploy-receive`, owned by root. Give the deploy user write access to `/srv/opendock` and `/srv/opendock/releases`.
+- Mount `/srv/opendock:/site:ro` in Nginx and serve from `/site/current`. The script verifies the uploaded files, switches `current` atomically, and rolls back if the live check fails. It retains recent releases and does not restart the web server.
+- The workflow still deploys when the data is unchanged, so a manual run can restore the live build.
 
-## 已知偏差
+## Known limitations
 
-- **monorepo 星标继承** —— 发布自大型 monorepo 的包会继承整个仓库的星标，数字虚高
-- **飙升榜需要历史** —— 增长指标靠对比每日快照，刚上线时是空的
-- **只覆盖 npm** —— 纯本地插件无法被自动发现
+- **Monorepo stars:** Packages in a monorepo inherit the repository's total stars.
+- **Trending needs history:** Growth is based on daily snapshots, so a fresh installation starts without trending history.
+- **npm discovery only:** Local-only plugins are not discovered automatically.
 
-详见站内 [/about](https://www.opendock.net/about) 页。
+See the [About page](https://www.opendock.net/about) for details.
 
-## 协议
+## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The snapshots in `src/data/` use public npm and GitHub metadata. Individual plugin READMEs and code remain the property of their respective authors.
 
-`src/data/` 下的数据快照来自 npm 与 GitHub 的公开元数据，
-各插件的 README 与代码版权归其各自作者所有。
-
----
-
-<div align="center">
-<sub>OpenDock 是社区项目，与 OpenCode 官方无隶属关系。</sub>
-</div>
+OpenDock is a community project and is not affiliated with OpenCode.
