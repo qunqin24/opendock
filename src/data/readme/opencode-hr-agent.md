@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Unified harness that matches autonomous LLM coding agents to task-appropriate seats — a seat is a named job role an agent fills (for example "backend implementer" or "test fixer"), each with its own required capability profile — runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 34 CLI commands.
+Unified harness that matches autonomous LLM coding agents to task-appropriate seats — a seat is a named job role an agent fills (for example "backend implementer" or "test fixer"), each with its own required capability profile — runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 35 CLI commands.
 
 The English version is canonical. The Chinese version (`README.zh-CN.md`) is a faithful mirror. When the two diverge, the English text governs.
 
@@ -104,9 +104,9 @@ Everything the installer places lives in ONE directory it owns: `~/.aihr` (Linux
 - `share/aihr` — the packaged configuration
 - `receipt.json` — the record of every written path
 
-Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the two opencode config arrays it registers plugins into; all of it is on the receipt.
+Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the `plugins` array it registers into your opencode config; all of it is on the receipt.
 
-npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's config arrays (the main `plugin` array in `opencode.jsonc`, plus `tui.json` for the FastDraw TUI half), and opencode/bun auto-fetches those npm packages at startup.
+npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's single `plugins` array (`opencode.jsonc`), and opencode auto-fetches those npm packages at startup. Under OpenCode 2.x one entry loads every part of a plugin — server tools and the TUI command/keybind alike; `tui.json` registration is obsolete.
 
 `hr db-up` needs no Docker. It decides its backend automatically among the embedded vendored Postgres (the bundle default), a compose container (the existing lane, kept), or a BYO PostgreSQL described by `HR_DSN` / `hr.toml`; `hr db-status` reports which backend is live. The Docker-free turnkey install lands with **aihr 0.4.0 (2026-09)**; the 0.3.0 era in which `hr db-up` required a preinstalled Docker (the "docker not found" era) is superseded.
 
@@ -130,28 +130,25 @@ pip install "aihr[vision]"
 
 The embedded Postgres ships with the bundle; on the pip channel `hr db-up` uses the compose container or your own PostgreSQL. Run `hr install-post` once after the pip install to get the PATH shim and the opencode config registration (idempotent, receipted). `hr` itself lands in pip's scripts directory, which is NOT on PATH by default on Windows (`…\Scripts`) or for macOS user-site installs (`~/Library/Python/<version>/bin`). `install-post` detects this and persists a single user-scope PATH entry: `HKCU\Environment` on Windows, a clearly-marked block in your existing shell rc files elsewhere. Never elevated, never system-wide.
 
-Manual registration (fallback, config-only): opencode loads plugins **only from its config files' `"plugin"` arrays** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare the plugins in **both** files:
+Manual registration (fallback, config-only): opencode loads plugins **only from its config's `"plugins"` array** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare the plugins in one file:
 
 ```jsonc
-// ~/.config/opencode/opencode.json (or .jsonc) — server half: hr_* / fastdraw_* agent tools
-{ "plugin": ["opencode-hr-agent@latest", "opencode-fastdraw@latest"] }
-```
-
-```json
-// ~/.config/opencode/tui.json — FastDraw TUI half: /fastdraw command + <leader>m keybind
-{ "plugin": ["opencode-fastdraw@latest"] }
+// ~/.config/opencode/opencode.json (or .jsonc) — one entry loads every part:
+// hr_* / fastdraw_* agent tools, /fastdraw command, <leader>f keybind
+{ "plugins": ["opencode-hr-agent@latest", "opencode-fastdraw@latest"] }
 ```
 
 `opencode-fastdraw` is a standalone model/role-switching plugin and can be declared on its own. `opencode-hr-agent` bridges the OpenCode tool surface to the `hr` CLI, so it requires the Python engine above. Wheel artifacts are also attached to each [GitHub Release](https://github.com/TachikomaGundam/AIHR/releases).
 
-- **Why `@latest` by default:** one-click setup must never ship a stale pin — a hardcoded version silently rots and was the source of real version-drift pain on fresh-machine deploys. `@latest` always resolves to the newest published release. If you would rather freeze the running surface (each opencode startup re-resolving `@latest` can pull new code with access to your `~/.npmrc` and `HR_HOME`), replace `@latest` with an exact version in both files above.
-- **Why two files:** with only the `opencode.json` entry the agent tools work but `/fastdraw` and `<leader>m` silently vanish; with only `tui.json` it is the mirror image. `hr install-post` registers both automatically.
-- **Optional HR-workflow layer:** the `/hr-workflow` slash skill and the `hr` sub-agent are config files, not plugin code — they are versioned under `opencode-config/` and install by copying:
+- **Why `@latest` by default:** one-click setup must never ship a stale pin — a hardcoded version silently rots and was the source of real version-drift pain on fresh-machine deploys. `@latest` always resolves to the newest published release. If you would rather freeze the running surface (each opencode startup re-resolving `@latest` can pull new code with access to your `~/.npmrc` and `HR_HOME`), replace `@latest` with an exact version in the file above.
+- **Why one file:** OpenCode 2.x loads the server and TUI parts of a plugin from the single `plugins` entry (the TUI reads the TUI parts of the plugins its server loads). The V1-era `tui.json` `"plugin"` registration is obsolete — entries there still load for backward compatibility, but `hr install-post` registers `plugins` only.
+- **Optional HR-workflow layer:** the `hr-workflow` skill and the `hr` sub-agent are config files, not plugin code — versioned under `opencode-config/`, with the skill's single authority at `opencode-config/skills/hr-workflow/SKILL.md`. Install the skill through the factory command (it validates frontmatter fail-closed, copies idempotently, prints SHA-256 receipts) and the agent file by copy:
   ```bash
-  mkdir -p ~/.config/opencode/skills ~/.config/opencode/agents
-  cp <AIHR>/opencode-config/skills/hr-workflow.md ~/.config/opencode/skills/
-  cp <AIHR>/opencode-config/agents/hr.md         ~/.config/opencode/agents/
+  hr skill install hr-workflow   # -> ~/.config/opencode/skills/hr-workflow/SKILL.md
+  mkdir -p ~/.config/opencode/agents
+  cp <AIHR>/opencode-config/agents/hr.md ~/.config/opencode/agents/
   ```
+  `hr skill validate --all` gates the authority, `hr skill list` reports whether the engine advertises each skill, `hr skill doctor` hash-compares installed copies against the authority and fails on drift. Docs: `docs/en/hr-skill-factory.md` (mirror: `docs/zh-CN/hr-skill-factory.md`).
 - **Maintainers publishing these packages** still need npm itself; a user-level prefix (`npm config set prefix ~/.npm-global`, skip under nvm) keeps `npm login`/`npm publish` sudo-free.
 
 Security model & trust assumptions: docs/PLUGIN_SECURITY.md
@@ -236,7 +233,7 @@ Live benchmarks (`hr bench`, `hr discover`) additionally read provider credentia
 
 ## CLI Map
 
-Thirty-four commands, each targeting a specific concern: 16 core commands, 4 `db-*` database-lifecycle commands, 4 `apply-*` transactional-preset commands, 6 `release-*` lifecycle commands, and 4 installer/support tools. A guard test (`tests/test_cli.py`) pins every count claim in this file to the live command registry, so these numbers cannot silently drift. Legacy v1 commands (`evaluate`, `report`, `run_all`) were retired. `hr verdict` supersedes the retired evaluation path.
+Thirty-five commands, each targeting a specific concern: 17 core commands, 4 `db-*` database-lifecycle commands, 4 `apply-*` transactional-preset commands, 6 `release-*` lifecycle commands, and 4 installer/support tools. A guard test (`tests/test_cli.py`) pins every count claim in this file to the live command registry, so these numbers cannot silently drift. Legacy v1 commands (`evaluate`, `report`, `run_all`) were retired. `hr verdict` supersedes the retired evaluation path.
 
 | Command | Purpose |
 |---------|---------|
@@ -252,6 +249,7 @@ Thirty-four commands, each targeting a specific concern: 16 core commands, 4 `db
 | `hr publish` | Publish reports to Wiki.js (optional target; skips with exit 0 when unconfigured) |
 | `hr recommend` | Seat recommendations from `configs/seats.yaml` + recent measurements |
 | `hr status` | DB status: sweeps + latest-sweep capability means (DB-only) |
+| `hr skill` | Validate, list, scaffold, install, and audit opencode skills (fail-closed skill factory) |
 | `hr apply` | Bridge the latest verdict seating into a FastDraw preset |
 | `hr apply-preview` | Preview an apply transaction (exact file changes, preview record id) |
 | `hr apply-rollback` | Roll back an apply transaction from its backup manifest |
@@ -300,21 +298,16 @@ fastdraw/
 2. Writes a named preset to `<opencode-config-dir>/fastdraw-presets.json`
 3. With `--set-state`, also writes `.fastdraw.json` for boot-time activation
 
-### Dual-File Registration
+### Registration
 
-FastDraw has server and TUI components. Register the plugin in both opencode configuration files; registering only one silently omits the other component.
+FastDraw has server and TUI components, but OpenCode 2.x loads both from a single entry:
 
 ```jsonc
 // ~/.config/opencode/opencode.jsonc
-{ "plugin": ["opencode-fastdraw"] }
+{ "plugins": ["opencode-fastdraw"] }
 ```
 
-```json
-// ~/.config/opencode/tui.json
-{ "plugin": ["opencode-fastdraw"] }
-```
-
-The first loads the `fastdraw_*` agent tools; the second loads `/fastdraw` and the `<leader>m` key binding.
+That one entry loads the `fastdraw_*` agent tools and `/fastdraw` with the `<leader>f` key binding (`<leader>m` is the engine's own model list since 2.x; rebind via keybinds id `fastdraw.open`). (The V1-era practice of also listing the plugin in `tui.json` is obsolete; `hr install-post` and `fastdraw/install.sh` register `plugins` only.)
 
 ## Layout
 
@@ -325,7 +318,7 @@ harness/hr/               # repo root (pip install -e .)
   docs/                   # bilingual documentation (en/, zh-CN/)
   exports/                # generated artifacts (gitignored)
   fastdraw/               # npm subpackage: FastDraw server, TUI, preset management
-  opencode-config/        # canonical copies of the hr-workflow skill + hr agent (copy into ~/.config/opencode/)
+  opencode-config/        # hr-workflow skill (hr skill install) + hr agent (copy into ~/.config/opencode/)
   hr/                     # Python package: the CLI and all business logic
     adapters/             # provider adapters (anthropic-compat, openai-compat) + fleet routing
     bench/                # benchmark batteries + stage0/stage1 sweep engines

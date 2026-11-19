@@ -33,10 +33,11 @@ Run OpenCode's **Reload Configurations** command after installing. If you previo
 into `~/.config/opencode/plugins/opencode-tavily-quota/`, remove that copy so it
 is not loaded twice.
 
-`opencode plugin add` is the recommended install: it registers both halves of the
-plugin and can use OpenCode's Tavily connection. If you list the package in
-`cli.json` instead, only the sidebar half runs and cannot reach the quota RPC.
-Install both halves, and configure `apiKey` or `TAVILY_API_KEY` on the server.
+`opencode plugin add` registers the package in `opencode.json(c)` and loads both
+halves of the plugin. For OpenChamber, install it on the OpenCode server that
+OpenChamber connects to. No `cli.json` entry is needed for the slash command; use
+one only to customize the terminal sidebar. Listing the package only in
+`cli.json` does not load the server command or quota RPC.
 
 ## Connect Tavily
 
@@ -61,12 +62,14 @@ neither is set.
 
 The sidebar refreshes every 10 minutes. To refresh immediately:
 
-- run `/tavily-quota`, or
-- press `Ctrl+P` and choose **Refresh Tavily quota**.
+- Run `/tavily-quota` in an OpenChamber or OpenCode session to see the result in
+  the session without invoking a model.
+- In the OpenCode terminal, press `Ctrl+P` and choose **Refresh Tavily quota**
+  to update the sidebar immediately and show a toast.
 
 A manual refresh bypasses the server's fresh snapshot cache, but it still
 respects a `Retry-After` cooldown and keeps at least 65 seconds between real
-requests. A toast then shows the credits left, the percentage remaining, and the
+requests. Both actions show the credits left, the percentage remaining, and the
 reset countdown. Switching Tavily credentials or updating the integration
 refreshes the sidebar automatically.
 
@@ -150,7 +153,8 @@ file is reported in the sidebar instead of being used as the key.
 | `rate limited on /usage` | This limit applies to quota checks, not searches. The plugin respects `Retry-After` (or waits ten minutes if absent/invalid), including across launches and manual refreshes. |
 | `quota cache unavailable` | Check that the cache directory is writable. The plugin will not bypass a failed cache/lock and send uncoordinated requests. |
 | A file-reference error | Check that the `{file:...}` path exists and is readable. |
-| No Tavily section | Refresh or restart OpenCode, and confirm the plugin is installed. |
+| No `/tavily-quota` in OpenChamber | Confirm the plugin is installed in `opencode.json(c)` on the connected OpenCode server, then reload configurations and reopen the slash menu. |
+| No Tavily section in the terminal | Reload configurations and confirm the plugin is installed. |
 
 If your terminal connects to a remote OpenCode server and you want to use that
 server's Tavily connection, install the plugin on the server as well.

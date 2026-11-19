@@ -9,7 +9,7 @@ X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0` (2.2.3 or a later 2.2 or 2.3 release), tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0` (2.2.3 or a later 2.2 or 2.3 release), tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux, and a browser for the sign-in.
 - An X account and an **X developer account** at [console.x.com](https://console.x.com), with the Developer Agreement
@@ -46,7 +46,7 @@ X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-x#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-x#v0.0.7
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/x-status`: it shows `not configured` until you save your X
@@ -56,12 +56,12 @@ The plugin registers X's MCP server under the name `x`, adds default permission 
 `/x` status view and two skills. Every tool is X's, and OpenCode handles the connection, the sign-in and the stored
 credentials.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.6`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.7" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -228,7 +228,7 @@ Set options with the object form of the plugin entry:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.6",
+      "package": "github:joe-broadhead/opencode-x#v0.0.7",
       "options": {
         "oauth": { "client_id": "YOUR_X_CLIENT_ID", "client_secret": "{env:X_CLIENT_SECRET}" }
       }
@@ -269,7 +269,7 @@ on macOS, or `/etc/opencode/opencode.json` on Linux. Members then only run `/con
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.6",
+      "package": "github:joe-broadhead/opencode-x#v0.0.7",
       "options": { "oauth": { "client_id": "YOUR_TEAM_APP_CLIENT_ID" } }
     }
   ]
@@ -308,7 +308,7 @@ Run `/x-status` first. Its last line is the next step.
 | How much credit is left | Ask the model to call `x_get_usage_credits`; it returns the payer's developer-platform balance in USD. |
 | `429` | X's rate limit for that endpoint is used up. Wait for the reset X returns, and make fewer calls. |
 | Agents without default rules | Put the default rules shown by `/x-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for X tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If X misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 or 2.3.2. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If X misbehaves, use a tested release. |
 | Connection: sign-in required soon after signing in | The app lacks `offline.access`, so X issued no refresh token and the two-hour token expired. Add the scope in the app and sign in again. |
 | Signed in to the wrong X account | Run `opencode mcp logout x` (or remove the account in `/connect` → X), then sign in again. |
 | Upgraded, and a read or write now fails with `403` | The new version asks for more scopes. Sign in again, and add the missing scope in the app first. |
@@ -395,7 +395,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out: `opencode mcp logout x`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: x` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **X**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.6`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.7`, then `opencode reload`.
    `opencode mcp list` no longer lists `x`.
 4. Remove the **X app** entry: `opencode auth logout x-app` from a terminal, or in `/connect`. Remove any X rules you
    copied into your agents' own `permissions`.

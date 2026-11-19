@@ -7,7 +7,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux.
 - **Jobs run while OpenCode is running.** Nothing runs while the OpenCode service is stopped, and nothing runs after a
@@ -16,7 +16,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.3
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/jobs-status`.
@@ -211,7 +211,7 @@ Set options with the object form of the plugin entry. Every option is optional.
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-jobs#v0.0.2",
+      "package": "github:joe-broadhead/opencode-jobs#v0.0.3",
       "options": { "enabled": true, "concurrency": 2, "keepAliveMinutes": 20 }
     }
   ]
@@ -231,7 +231,7 @@ Put the plugin entry in the system config: `/Library/Application Support/opencod
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.2", "options": { "concurrency": 2 } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.3", "options": { "concurrency": 2 } }],
   "experimental": { "location_idle_timeout": "60 minutes" }
 }
 ```
@@ -280,7 +280,7 @@ Run `/jobs-status` first. Its last line is the next step.
 | `JOBS_AGENTS_UNKNOWN` | OpenCode could not list its agents, so nothing ran. Restart OpenCode, then run `/jobs-status`. |
 | `JOBS_STORAGE_VERSION` | The job store was written by a newer version of the plugin. Update the plugin, or clear its storage. |
 | `JOBS_UNCHECKED` | A tool that changes something was called with no tool call behind it. Call it from a session, never from a script. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 or 2.3.2. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. |
 | `/jobs` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.4.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.4.0`, or set `"allowUntestedHost": true` to run anyway. |
@@ -298,7 +298,7 @@ Run `/jobs-status` first. Its last line is the next step.
 ## Uninstall
 
 1. Pause first if a job is mid-run: `/jobs-pause`.
-2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.2`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.3`, then `opencode reload`.
 3. Remove the agent block you copied into `opencode.json`, or the job agent's Markdown file.
 
 The plugin's storage stays in OpenCode's own database; removing the plugin does not delete it.

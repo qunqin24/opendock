@@ -262,7 +262,7 @@ code-mentor serve --port 5000
 }]
 ```
 
-完整欄位和寫作規則見 [`skill/code-mentor/SKILL.md`](skill/code-mentor/SKILL.md)。
+完整欄位見 [`skill/code-mentor/references/guide-format.md`](skill/code-mentor/references/guide-format.md)，寫作規則見 [`skill/code-mentor/SKILL.md`](skill/code-mentor/SKILL.md)。
 
 ## 常見問題
 

@@ -9,7 +9,7 @@ Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endor
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux.
 - A Linear account.
@@ -17,7 +17,7 @@ Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endor
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-linear#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-linear#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
@@ -30,7 +30,7 @@ server, which has its own sign-in.
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.6" }] }
 ```
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
@@ -122,7 +122,7 @@ Nothing asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.6", "options": { "access": "read-only" } }] }
    ```
 
    `"read"` and `"write"` still work: they mean `"read-only"` and `"all"`, and `/linear-status` says they are
@@ -259,7 +259,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "read-only" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.6", "options": { "access": "read-only" } }]
 }
 ```
 
@@ -282,7 +282,7 @@ entry in the system config: `/Library/Application Support/opencode/opencode.json
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.5", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.6", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -307,7 +307,7 @@ Run `/linear-status` first. Its last line is the next step.
 | Connection: conflict | Your config has an `mcp.servers.linear` entry with a URL other than `https://mcp.linear.app/mcp`, Linear's read-only server included. Point it at that URL or remove it, then restart OpenCode. |
 | Tools: unknown | Linear added tools the plugin does not know yet. They follow the `access` value: allowed, asking, or denied. |
 | Agents without default rules | Put the default rules shown by `/linear-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Linear tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Linear misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 or 2.3.2. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Linear misbehaves, use a tested release. |
 | Signed in to the wrong workspace | Linear's consent page decides the workspace. Run `opencode mcp logout linear` (or remove the account in `/connect` → Linear), then sign in again and pick the workspace. |
 | A Linear tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool. |
 | `/linear` is missing | The plugin did not start. Run `/plugins` to see the error. |
@@ -340,7 +340,7 @@ store.
 1. Sign out: `opencode mcp logout linear`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: linear` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Linear**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.5` (the spec you installed), then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.6` (the spec you installed), then `opencode reload`.
    `opencode mcp list` no longer lists `linear`.
 4. Remove any Linear rules you copied into your agents' own `permissions`.
 
@@ -352,7 +352,7 @@ store.
   default rules (`/linear-status` names it) could still change Linear. Linear's own read-only server is not used, so
   that changing `access` never needs a new sign-in.
 - **Linear's consent page picks the workspace.** The plugin cannot choose a workspace; the sign-in shows Linear's page.
-- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 only.** Other releases in `>=2.2.3 <2.4.0` run untested.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2 only.** Other releases in `>=2.2.3 <2.4.0` run untested.
 - **Linear's rate limits and error text are Linear's.** Linear's MCP server documents no limit of its own; Linear's API
   allows an OAuth app 5,000 requests an hour per user
   ([Rate limiting](https://linear.app/developers/rate-limiting)), which the server's reads presumably count against (not

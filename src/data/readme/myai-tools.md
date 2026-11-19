@@ -232,7 +232,8 @@ history. This is best-effort: a failed continuation can leave the native
 model changed without saving the new team snapshot. Main-session models,
 prompts, tools, skills and MCPs are not switched by the session action.
 The sidebar shows the current session's saved team models and variants;
-`/preset` marks its bound preset separately from the global default.
+`/preset` marks its bound preset separately from the global default. In Web
+and Desktop, bare `/preset` displays the session binding and configured defaults.
 V2 defaults to `backgroundJobs.mode: "native"`: OpenCode owns the child Job
 lifecycle, and Slim keeps exact-ID status, cancellation, permission reply, and
 child progress reporting. V2 applies the old `"managed"` mode as `"native"`
@@ -651,7 +652,7 @@ activation, and update flow.
 > **Why a separate agent?** If your Orchestrator model is not multimodal, enable Observer to handle images, screenshots, and other visual files. Observer is disabled by default and gives the Orchestrator a dedicated multimodal reader without forcing you to change your main reasoning model. Set `disabled_agents: []` and an `observer` model in your configuration. The bundled `opencode-go` install preset does this automatically because its GLM Orchestrator is not multimodal. Omitting `image_routing` preserves existing conditional Observer behavior. `"auto"` is capability-aware: models that accept image input keep attachments inline for native vision; non-vision chains get attachments saved under `.opencode/images/<session>/` with a delegation nudge by path. `"direct"` always keeps image parts inline. Saved workspace images are not automatically deleted. Remove the whole `.opencode/images/` directory or a single session subdirectory manually when no longer needed (references in old conversations then stop resolving); images from session-less messages are saved at the top level.
 
 > [!TIP]
-> **Subagents reading images.** Advisory subagents (explorer, oracle, designer, councillors) can dispatch `@observer` themselves for image files on disk. On OpenCode v2 hosts this needs one extra hop of nesting, which the host denies by default — set `"experimental": { "subagent_depth": 2 }` in your opencode config to enable it. Fixer, observer itself, and the council synthesizer stay non-spawning by design.
+> **Subagents reading images.** Advisory subagents (explorer, oracle, designer, councillors) read visual files directly when they can and can delegate to `@observer` when they need help. On OpenCode v2 hosts this needs one extra hop of nesting, which the host denies by default — set `"experimental": { "subagent_depth": 2 }` in your opencode config to enable it. Fixer, observer itself, and the council synthesizer stay non-spawning by design.
 
 <table>
   <tr>

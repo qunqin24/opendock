@@ -6,15 +6,42 @@
 [![CI](https://github.com/cheejiayuan512/opencode-file-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/cheejiayuan512/opencode-file-editor/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/cheejiayuan512/opencode-file-editor?style=flat)](https://github.com/cheejiayuan512/opencode-file-editor/stargazers)
 
-A file editor panel for **OpenCode Desktop**. Files open in their own tabs, edits
-autosave, and writes never clobber what the agent just changed.
+A file editor panel for **OpenCode Desktop**. Click a path in chat, or open one
+from the workspace tree: every file gets its own tab, edits autosave, and writes
+never clobber what the agent just changed.
 
 Built on the `@opencode/plugin/gui` SDK, so it uses the app's own buttons, fields,
 tooltips, themes and Markdown renderer instead of its own widgets.
 
 Requires **OpenCode Desktop 2.2.5 or newer**.
 
+### Why not the built-in preview?
+
+The preview is for reading: one file, one slot, and opening another replaces the
+first. This panel is what you reach for when you actually work on the file.
+
+| | Built-in preview | This panel |
+|---|---|---|
+| Read a file | yes | yes |
+| Edit and save | no | yes, with autosave and undo |
+| Several files at once | one preview slot | a tab each |
+| The agent rewrites the file you have open | reload and see what you get | **conflict guard, then a line diff** |
+| Find and replace, indent, comment | no | `Ctrl+F`, `Tab`, `Ctrl+/` |
+
+### The moment it exists for
+
+The agent edits the same files you do. When it changes one you have open, the
+panel stops autosaving and offers **Reload** or **Overwrite** — with **Compare**
+next to them: a line diff of what is on disk against what is in your buffer, so
+neither side is lost by guesswork.
+
 ## Preview
+
+<img src="https://raw.githubusercontent.com/cheejiayuan512/opencode-file-editor/main/docs/compare.png" alt="The agent changed gui.tsx on disk: the conflict bar offers Compare, Reload or Overwrite, and the diff shows the two lines only in the buffer in green and the one only on disk in red" width="880">
+
+The conflict flow: the agent rewrote `gui.tsx` while it was open here. **Compare**
+shows what each choice would cost — green is only in your buffer, red is only on
+disk — instead of picking one blind.
 
 <img src="https://raw.githubusercontent.com/cheejiayuan512/opencode-file-editor/main/docs/demo.gif" alt="Switching between the CSV table view, quick open, the source editor, the Markdown preview and the folder browser" width="880">
 
@@ -147,9 +174,16 @@ claim the id `file-editor`.
 npm install
 npm run build        # gui-experimental.cjs at the package root
 npm test             # builds, then runs every test
+npm run test:fuzz    # property tests only; FUZZ_RUNS / FUZZ_SEED override
 npm run typecheck
+npm run lint
 npm run verify:live  # asks the running desktop app what it actually loaded
 ```
+
+CI runs the suite on Windows, macOS and Linux, lints on Linux, and repeats the
+tests on the minimum supported Node. A nightly job runs 5,000 generated cases
+per property and opens an issue with the failing seed; another runs the suite
+against the newest published `@opencode/plugin` and does the same.
 
 The package deliberately has **no `exports` map**. OpenCode resolves a plugin's
 parts by file name at the package root (`index.ts`, `gui-experimental.cjs`). A

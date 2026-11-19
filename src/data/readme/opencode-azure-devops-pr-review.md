@@ -45,6 +45,15 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
 
 </details>
 
+## Watch the workflow
+
+[![Real OpenCode run: a review starts, a panel beside the conversation lists its sessions, then shows the report and the comment preview rendered.](docs/assets/terminal-panel-teaser.gif)](docs/DEMO.md#the-terminal-panel)
+
+*A 15-second edit of a real OpenCode 2.3.0 session on a dedicated test PR.
+Waiting time is shortened, so the length is not the review duration.
+[Recording details and other walkthroughs](docs/DEMO.md), among them
+[adjusting findings before publishing](docs/DEMO.md#adjust-findings-before-publishing).*
+
 ## Your first review
 
 1. Install the npm package using OpenCode's plugin manager (already installed?
@@ -52,15 +61,16 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.4.3
+   opencode plugin add opencode-azure-devops-pr-review@0.4.4
    ```
 
 2. In OpenCode's terminal UI, type `/pr-setup`. Dialogs ask for your Azure
    DevOps organization, a proxy if your network needs one, your token (PAT) and
    a model. AZPR checks the token with Azure DevOps, saves it in a file only
    you can read, and is ready at once: no restart. The
-   [quickstart](docs/QUICKSTART.md) walks through it; in another client, such
-   as the desktop app, see
+   [quickstart](docs/QUICKSTART.md#3-set-azpr-up-opencodes-terminal-ui) walks
+   through it with a recording of the dialogs; in another client, such as the
+   desktop app, see
    [without the terminal UI](docs/QUICKSTART.md#without-the-terminal-ui).
 3. In one OpenCode conversation, check access, then review:
 
@@ -80,12 +90,19 @@ For a lighter first pass, use `/pr-quick <PR URL>`; its findings are not
 independently verified. Every command answers `--help` with its options,
 without a model.
 
+In OpenCode's terminal UI a [panel](#terminal-panel) opens beside the
+conversation: it shows the report and the preview rendered, and at its foot
+what you can do next. Pick **Post N comments…** there, or leave findings out
+first with **Adjust findings…**, without typing a command; posting always asks
+once more.
+
 <details>
 <summary>Optional: adjust findings and publish after reading the preview</summary>
 
-Read the preview; it ends with the commands for the next step. Before
-publishing, you can leave findings out or change their severity, using the
-finding IDs the preview and the report show:
+Read the preview; it ends with the commands for the next step, and the
+terminal panel lists the same steps at its foot, to pick. Before publishing,
+you can leave findings out or change their severity, using the finding IDs the
+preview and the report show:
 
 ```text
 /pr-comment --exclude F-1,R-2                     leave two findings out
@@ -136,6 +153,33 @@ search downloads a bounded repository archive into memory, source context goes
 to your selected model providers, and review records are saved locally. See
 [team setup and data handling](docs/ENTERPRISE.md) and
 [content-search limits](docs/AZURE_DEVOPS.md#who-calls-what).
+
+## Choose a review
+
+| Command | Best starting point | What runs |
+| --- | --- | --- |
+| `/pr-quick` | Small or routine changes | One reviewer per shard covers function and risk. Findings are **reported, not independently verified**. |
+| `/pr-review` | Changes that need an independent second check | Functional and risk reviewers, followed by separate verification sessions. |
+| `/pr-deep` | Important or risky changes worth a stronger model | The same verified pipeline as `/pr-review`, run with the stronger models you set in `models.deep`; usually slower and costlier. |
+
+All three modes use the same Azure comment layout. Quick comments disclose their
+method. Separate verification adds scrutiny; it does not guarantee correct
+findings or complete defect coverage. Mixing models is a choice about capability
+and cost, not a proven accuracy improvement. See [model configuration](#configuration).
+
+<details>
+<summary>Sessions, model requests and cost</summary>
+
+For a small PR that fits in one shard and one comment-planning page, quick
+usually needs one review session plus one planning session; review needs two
+reviewer sessions, a verifier and comment planning, plus a short severity
+rating when `models.review.rater` is set.
+**Sessions are not API requests:** each can make multiple requests, and repairs, retries, larger PRs
+and extra planning pages add work. Previewing comments also uses a model.
+See [measured runs and their limits](docs/VALIDATION.md) for cost and timing
+examples, rather than treating a session count as a price guarantee.
+
+</details>
 
 ## Benchmark results
 
@@ -211,6 +255,14 @@ the [validation record](docs/VALIDATION.md#martian-code-review-bench-2026-11-05-
 
 ### Checked on a second benchmark
 
+Two later releases were checked on ReviewBench's test set, which was not used
+to write their changes: recall stayed within the run-to-run variation, and
+agreement with the judge on which findings deserve an inline comment rose from
+70.0 (0.3.5) to 83.0 (0.3.7).
+
+<details>
+<summary>The ReviewBench runs of 0.3.5, 0.3.6 and 0.3.7</summary>
+
 0.3.6 changed two reviewer instructions because of issues this run missed:
 defects in code a pull request moves unchanged, and findings dropped because
 the behavior might be intended. They were written after reading three of the
@@ -248,40 +300,6 @@ labeled low, against 51% for 0.3.6. Recall fell by 2.0 points and the high and
 medium issues found by 0.6, both within the variation allowed for 0.3.6. The
 runs and their limits are under
 [severity from verified harm](docs/VALIDATION.md#severity-from-verified-harm-2026-11-11-and-12).
-
-## Watch the workflow
-
-[![Real OpenCode run: a review starts, a panel beside the conversation lists its sessions, then shows the report and the comment preview rendered.](docs/assets/terminal-panel-teaser.gif)](docs/DEMO.md#the-terminal-panel)
-
-*A 15-second edit of a real OpenCode 2.3.0 session on a dedicated test PR.
-Waiting time is shortened, so the length is not the review duration.
-[Recording details and other walkthroughs](docs/DEMO.md), among them
-[adjusting findings before publishing](docs/DEMO.md#adjust-findings-before-publishing).*
-
-## Choose a review
-
-| Command | Best starting point | What runs |
-| --- | --- | --- |
-| `/pr-quick` | Small or routine changes | One reviewer per shard covers function and risk. Findings are **reported, not independently verified**. |
-| `/pr-review` | Changes that need an independent second check | Functional and risk reviewers, followed by separate verification sessions. |
-| `/pr-deep` | Important or risky changes worth a stronger model | The same verified pipeline as `/pr-review`, run with the stronger models you set in `models.deep`; usually slower and costlier. |
-
-All three modes use the same Azure comment layout. Quick comments disclose their
-method. Separate verification adds scrutiny; it does not guarantee correct
-findings or complete defect coverage. Mixing models is a choice about capability
-and cost, not a proven accuracy improvement. See [model configuration](#configuration).
-
-<details>
-<summary>Sessions, model requests and cost</summary>
-
-For a small PR that fits in one shard and one comment-planning page, quick
-usually needs one review session plus one planning session; review needs two
-reviewer sessions, a verifier and comment planning, plus a short severity
-rating when `models.review.rater` is set.
-**Sessions are not API requests:** each can make multiple requests, and repairs, retries, larger PRs
-and extra planning pages add work. Previewing comments also uses a model.
-See [measured runs and their limits](docs/VALIDATION.md) for cost and timing
-examples, rather than treating a session count as a price guarantee.
 
 </details>
 
@@ -325,10 +343,17 @@ for both quick and verified reviews.
 | Install AZPR and run a first review | [Step-by-step quickstart](docs/QUICKSTART.md) |
 | Upgrade an existing installation | [Upgrade instructions](#upgrading) |
 | Choose models, language or settings | [Configuration](#configuration) |
+| Look up one setting | [All settings and defaults](#all-settings-and-defaults) |
+| Look up a command or a status | [Commands](#commands) |
+| Read reports and pick the next step beside the conversation | [Terminal panel](#terminal-panel) |
 | Adjust, preview or publish comments | [Commenting guide](docs/COMMENTING.md) |
 | Set up a company proxy or understand data handling | [Team setup](docs/ENTERPRISE.md) |
 | Understand what has been tested | [Validation and limitations](docs/VALIDATION.md) |
 | Troubleshoot or contribute | [Debugging](docs/DEBUGGING.md) · [Contributing](CONTRIBUTING.md) |
+
+The sections below are reference: how reviews work, installation and
+upgrading, configuration with every setting, the commands, the terminal panel,
+comments, and what is kept on your machine.
 
 ## How reviews work
 
@@ -408,14 +433,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.3
+opencode plugin add opencode-azure-devops-pr-review@0.4.4
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.3'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.4'
 ```
 
 Add only one of them. OpenCode 2.3.0 loads the plugin into a running OpenCode
@@ -430,7 +455,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.4.3",
+    "package": "opencode-azure-devops-pr-review@0.4.4",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -455,7 +480,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.3 &&
+opencode plugin add opencode-azure-devops-pr-review@0.4.4 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -487,7 +512,8 @@ the first one (`Unknown setting settings.terminalPanel`) instead of starting. `o
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.4.3 release notes](docs/releases/v0.4.3.md) for what changed, the
+See the [0.4.4 release notes](docs/releases/v0.4.4.md) for what changed, the
+[0.4.3 release notes](docs/releases/v0.4.3.md) for setup in the terminal UI, the
 [0.4.0 release notes](docs/releases/v0.4.0.md) for commands without review IDs and the
 [0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments. A
 preview follows each COMPLETE review unless `afterReview` says otherwise;
@@ -499,8 +525,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.4.3 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.3.tar.gz)
-and extract it, or check out tag `v0.4.3`. The installer needs POSIX `sh` and
+Download the [v0.4.4 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.4.tar.gz)
+and extract it, or check out tag `v0.4.4`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -527,7 +553,7 @@ sh install.sh --config-dir /absolute/path/to/v2-opencode-config --replace
 ### Manual copying without Git
 
 Keep these relative paths under one source directory, then run its installer.
-These **35 files** include the runtime and its license:
+These **36 files** include the runtime and its license:
 
 <details>
 <summary>Show the required files</summary>
@@ -558,6 +584,7 @@ src/review-work.mjs
 src/store.mjs
 src/tui-model.mjs
 src/tui-setup.mjs
+src/tui-actions.mjs
 src/tui.js
 src/prompts/common.md
 src/prompts/functional.md
@@ -594,6 +621,12 @@ they started with.
 In OpenCode's terminal UI, `/pr-setup` without options opens dialogs. The
 command palette has them too ("AZPR: settings").
 
+[![The dialogs of a first setup in OpenCode's terminal UI: the organization, a proxy that Enter skips, the token in a field that shows only bullets and a count, a model from OpenCode's list, what will be saved, and "AZPR is set up".](docs/assets/setup-dialogs.gif)](docs/QUICKSTART.md#3-set-azpr-up-opencodes-terminal-ui)
+
+*AZPR's dialogs in OpenCode 2.3.0's terminal UI, recorded with a test
+organization and token and a stand-in for Azure DevOps; waiting time is
+shortened.*
+
 - **First setup.** Your organization (its name, or the URL of a pull request);
   a proxy, only if your network needs one (Enter skips it; after a proxy, the
   CA certificate file of a company that inspects HTTPS, which Enter skips
@@ -620,7 +653,18 @@ command palette has them too ("AZPR: settings").
   saved for the organization it was checked for; the two are saved together,
   the new token in a new file beside the first, and AZPR says where the
   earlier token still is.
-  The other settings are in the settings file, which the list names.
+  The list says what each model is for, and the deep model's dialog what makes
+  one: a model stronger than the review model, or the same model with a higher
+  variant.
+  The other settings are in the settings file, which the list names together
+  with the section that describes them all:
+  [all settings and defaults](#all-settings-and-defaults).
+
+![OpenCode's terminal UI with the list of AZPR's settings open: the organization, the access token, the proxy and the CA certificate file, then the review, quick and deep models, each with what it is for and its value.](docs/assets/setup-settings.png)
+
+*The list goes on below what is shown: the settings of reviews, of the terminal
+UI and of diagnostics, and the settings file. Recorded like the picture above,
+with test values.*
 
 The dialogs only ask. The plugin's server part checks every answer, writes
 the two files, and is the only part that contacts Azure DevOps. Other OpenCode
@@ -693,10 +737,12 @@ Model IDs use `provider/model` form and must exist in OpenCode. To choose a
 model variant such as a reasoning effort, use OpenCode's `provider/model#variant`
 form (for example `provider/model#high`); `/pr-check` reports a variant the
 model does not offer. Without a variant the model's default is used. `/pr-deep`
-needs all three deep models and never falls back to the review models; choose
-models stronger than the review models there, since the models are the only
-difference from `/pr-review`. The [benchmark results](#benchmark-results)
-include a measured choice for `models.deep`. Likewise `/pr-quick` needs `models.quick.reviewer`,
+needs all three deep models and never falls back to the review models; make
+them stronger than the review models, since the models are the only
+difference from `/pr-review`: a stronger model, or the same model with a
+higher variant (`provider/model#high`), which reasons longer. The
+[benchmark results](#benchmark-results) include a measured choice for
+`models.deep` and compare the effort levels of one model. Likewise `/pr-quick` needs `models.quick.reviewer`,
 and a command checks only the models it uses, so an unavailable quick model
 never blocks `/pr-review`. Comment planning uses the review's risk model
 (`models.deep.risk` for a deep review, the quick reviewer for a quick review).
@@ -734,6 +780,9 @@ reviewer's confidence, the size of the fix or the kind of issue:
 - **low** (can wait): anything else, such as a recoverable failure that only a
   rare trigger reaches, or an issue with no effect on behavior.
 
+<details>
+<summary>More on severity, and on what counts as a finding</summary>
+
 A rare trigger lowers the severity; it does not keep a defect out of the
 findings. Neither does the code's history: a defect on lines the PR adds or
 moves is a finding even when the same code existed before (a function moved to
@@ -763,10 +812,13 @@ that each need their own fix is one finding per place. Identical copies of one f
 count as one place when one reviewer has them; in a large PR split into shards,
 copies that different reviewers get can each produce a finding.
 
+</details>
+
 ### All settings and defaults
 
-<details>
-<summary>Show the settings reference</summary>
+Every setting is in the settings file, each at its default until you change
+it; `/pr-setup` names the file and changes the common ones. After a change,
+restart the OpenCode service.
 
 | Setting | Default and meaning |
 | --- | --- |
@@ -803,8 +855,6 @@ into `azure`). There is deliberately no per-stage step cap; see the
 [roadmap](docs/ROADMAP.md#deferred) for why. The inactivity watchdog
 (`workflow.stageIdleSeconds`) is not one: it stops only a stage that stopped
 working.
-
-</details>
 
 ### Azure DevOps access
 
@@ -859,6 +909,7 @@ troubleshooting.
 | `/pr-comment [review-id] --show` | Show the saved preview again; no model or Azure DevOps request. |
 | `/pr-comment [review-id] --exclude <IDs>` / `--severity <ID=level,…>` / `--reset` | Leave findings out or change their severity after reading the preview, then preview again, for example `--exclude F-1,R-2` (see [adjusting findings](docs/COMMENTING.md#adjusting-findings-after-a-preview)). |
 | `/pr-comment --list` | The reviews saved for this conversation, with their IDs, PRs and state; no model or Azure DevOps request. |
+| `/pr-comment … --seen <word>` | What the terminal panel adds to the commands it sends: the word names the preview and the adjustments its step was offered for, and the command is refused when they have changed since. A typed command needs none. |
 | `/<command> --help` | The command's usage and examples; no model or Azure DevOps request. |
 
 A `/pr-comment` command without a review ID acts on the conversation's
@@ -877,7 +928,8 @@ an option (`--no-coment`, `-p`) is refused, so start your context with a word.
 Text after the URL (and the flag) is supplementary context for that command
 only. PR content, comments and tool responses are untrusted data.
 
-Status meanings:
+<details>
+<summary>Status meanings: COMPLETE, STALE, PARTIAL, and what a quick review states</summary>
 
 - **COMPLETE**: verification produced structured decisions and no source-commit
   change was detected. Findings without a usable decision are listed as
@@ -908,6 +960,8 @@ A failed final version recheck adds a warning; it does not by itself prevent
 COMPLETE in any review mode. Read the receipt warnings. Publication separately
 rechecks that the PR's source commit is unchanged before posting.
 
+</details>
+
 In OpenCode's terminal UI, `/pr-panel` shows or hides the
 [terminal panel](#terminal-panel); it runs no model and makes no Azure DevOps
 request.
@@ -917,9 +971,11 @@ request.
 OpenCode shows what a plugin tells a conversation as plain text, so a report
 or a comment preview appears there as Markdown source. In OpenCode's terminal
 UI, AZPR therefore adds a panel beside the conversation: it shows the newest
-report or preview rendered, and lists the sessions of the review so that you
-can open one. The [recording of a real review](docs/DEMO.md#the-terminal-panel)
-shows both side by side.
+report or preview rendered, lists the sessions of the review so that you can
+open one, and after a preview lists what you can do next, so that you pick a
+step instead of typing its command. The
+[recording of a real review](docs/DEMO.md#the-terminal-panel) shows the report
+and the conversation side by side.
 
 - **It opens by itself** when a review or a comment run starts and when a
   report or preview arrives, in the conversation that is on screen. The
@@ -932,26 +988,56 @@ shows both side by side.
   ```
 
 - **Sessions.** While a review runs, each of its sessions is a row with its
-  state. Click a row to open that session; OpenCode opens it in a tab, and the
+  state: `running` while its model works, `finished` once it has answered, and
+  the stage's result (`complete`, `failed`) when the run's receipt names it.
+  Click a row to open that session; OpenCode opens it in a tab, and the
   panel is there again when you return to the conversation. After the review
   the rows are the sessions that still exist (see
   [retention](#retention-and-privacy)), first the one that holds the report.
   OpenCode's own session list has them too.
 - **Report or preview.** Below the sessions: the report of the review, then
   the comment preview once one is planned, and the saved preview again after
-  `/pr-comment --show`. A check (`/pr-check`) shows its table there too.
+  `/pr-comment --show`. A check (`/pr-check`) shows its table there too. A
+  preview that is planned again is shown from its beginning.
+- **What you can do next** is one row at the foot of the panel, where reading
+  ends. It stays in place while the text scrolls and is level with OpenCode's
+  status bar:
+
+  ```text
+  [p] Post 4 comments…   [a] Adjust findings…   [u] Reset adjustments
+  ```
+
+  Click one, or press its key while the panel has the keyboard; the keys are
+  drawn dim while they would only type a letter into the prompt. A label that
+  ends in `…` asks before anything is sent: posting asks once more, with "No,
+  post nothing" first, and adjusting opens the findings as a list, where you
+  pick one to leave it out or to choose its level and then apply everything
+  at once (**apply** at the foot of the list, `ctrl+s`, or the list's last
+  row). **Reset adjustments** is there once you have adjusted something and
+  clears all of it. After a review that no preview follows by itself
+  (`afterReview: none`), the row offers **Preview comments** (`c`) instead of
+  posting. Each of them sends the `/pr-comment` command you would type, for
+  the review shown, and its STARTED notice and receipt follow as always. A
+  click there leaves the keyboard with the prompt. If the preview is planned
+  again, or another session comes on screen, while a question is open, the
+  answer is not acted on and the panel says so. Each command also says which
+  preview and adjustments it was picked for (`--seen`), and AZPR refuses it
+  when they are others by now, for instance after a command typed in the
+  review's own session or in another client: nothing is posted that you have
+  not read.
 - **Keys.** `/pr-panel` shows and hides the panel; it is the panel's only
-  command. A click inside it gives it the keyboard: the arrow keys or `j` and
-  `k`, Page Up and Page Down, Home and End scroll, and Escape or `q` closes
-  it.
+  command. A click inside its text gives it the keyboard: the arrow keys or
+  `j` and `k`, Page Up and Page Down, Home and End scroll, `p`, `a`, `u` and
+  `c` pick what the foot offers, and Escape or `q` closes it.
 - **A narrow terminal** (fewer than 108 columns) has no room for two panes,
   and OpenCode would show the panel in place of the conversation. There the
   panel does not open by itself; it says that something is ready, and
   `/pr-panel` shows it full screen.
 
-The panel only reads what AZPR already put into your conversation and into the
-session that holds a report. It sends no prompt, starts no review and posts
-nothing; `/pr-comment --publish` is still a command you type. It comes with
+The panel shows what AZPR already put into your conversation and into the
+session that holds a report. It sends nothing by itself and never a prompt:
+the one thing it sends is the `/pr-comment` command of a step you pick, which
+AZPR takes like a typed one, and posting always asks first. It comes with
 the package and needs no setup; `terminalPanel` is its one setting. Other
 OpenCode clients, such as the desktop app, do not load it and show AZPR's
 notices as before. The same terminal part brings the
@@ -977,8 +1063,9 @@ them into one comment under fixed rules (see [commenting](docs/COMMENTING.md)).
 ### Adjusting findings after a preview
 
 When a preview contains findings you disagree with, leave them out or change
-their severity, then read the new preview. Several IDs go in one list,
-separated by commas:
+their severity, then read the new preview. In the terminal UI, **Adjust
+findings…** at the foot of the panel does this from a list of the findings.
+With commands, several IDs go in one list, separated by commas:
 
 ```text
 /pr-comment --exclude F-1,R-2                     leave F-1 and R-2 out
@@ -1044,7 +1131,16 @@ findings to comment on gets one notice instead, with no planning, model
 request or comment. When another AZPR command is running in the conversation
 or on the PR, the step is skipped and the notice names the command to run.
 
-Automatic publication posts as the PAT owner, item by item. A comment (or the
+Automatic publication posts as the PAT owner, item by item, and holds back
+for a person every item whose text could notify someone, load content or run a
+script; a plan that would post nothing new posts nothing (`NOTHING_TO_POST`).
+A command you type, such as `/pr-comment --publish`, posts every item of the
+saved preview, held ones included.
+
+<details>
+<summary>What automatic publication holds back, exactly</summary>
+
+A comment (or the
 summary) whose text contains an `@<…>` mention, an image, HTML that embeds
 content or runs a script (such as `<img>`, `<iframe>`, `<script>`, or an
 `on…=`, `src=` or `style=` attribute, read as a browser reads a tag), HTML
@@ -1074,6 +1170,8 @@ inline comments, so re-reviewing an unchanged PR would otherwise add a summary
 each time). Publication itself still rechecks that the PR's source commit is
 unchanged. A command you type, such as `/pr-comment --publish`, posts
 every item of the saved preview, held ones included.
+
+</details>
 
 ### Publication
 
@@ -1113,6 +1211,15 @@ every later run. While debug is enabled every session is kept until its
 review is evicted, so turn `debug.enabled` off for everyday use if the list
 gets long. A review that an OpenCode restart interrupts leaves its sessions in
 the list; delete those yourself. Your own conversations are never deleted.
+A conversation nobody named yet, which OpenCode lists as **New session**, is
+named after the PR when its first check or review starts
+(`AZPR: PR #123 (repository)`): an AZPR command never makes the conversation's
+own model run, which is what names a conversation otherwise. A conversation
+that has a name keeps it. OpenCode has no rename that applies only to an
+unnamed conversation, so AZPR follows the renames OpenCode reports: a name
+that you or OpenCode's model give in that very moment is written back where
+AZPR's own may have replaced it. What that cannot rule out is said in
+[the architecture](docs/ARCHITECTURE.md#authorization-and-isolation).
 In the terminal UI you need not look for these sessions in the list: the
 [terminal panel](#terminal-panel) names those of the latest review and opens
 the one you click.
@@ -1136,6 +1243,8 @@ node tests/host-v2-comment-scale.mjs /absolute/path/to/opencode --cleanup
 node tests/host-v2-background-compaction.mjs /absolute/path/to/opencode --cleanup
 node tests/host-v2-tui-panel.mjs /absolute/path/to/opencode
 node tests/host-v2-tui-panel.mjs /absolute/path/to/opencode --native
+node tests/host-v2-tui-setup.mjs /absolute/path/to/opencode
+node tests/host-v2-tui-setup.mjs /absolute/path/to/opencode --native
 sh uninstall.sh --config-dir /absolute/path/to/v2-opencode-config
 sh uninstall.sh --config-dir /absolute/path/to/v2-opencode-config --apply
 ```
@@ -1144,17 +1253,17 @@ The host fixtures run a real OpenCode binary with a loopback fake model provider
 and a loopback fake Azure DevOps REST service in disposable directories under
 `.local/`. They keep debug on to read its records, and debug keeps every
 private session; the two `--cleanup` runs turn it off, so that each run deletes
-its sessions as an installation with default settings does. The two
-`host-v2-tui-panel` runs drive the real terminal UI in `tmux`, which they need,
-once installed from source and once as OpenCode's plugin manager installs the
-package. `npm ci` installs the compiler of the terminal panel's JSX, which only
+its sessions as an installation with default settings does. The
+`host-v2-tui-panel` and `host-v2-tui-setup` runs drive the real terminal UI in
+`tmux`, which they need, each once installed from source and once as
+OpenCode's plugin manager installs the package. `npm ci` installs the compiler of the terminal panel's JSX, which only
 `npm run check` and `npm run build:tui` use; the installed plugin has no
 dependency and is not built on your machine.
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.4.3` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.3'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.4.4` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.4'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -1167,7 +1276,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.4.3](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.3)
+release scope, [v0.4.4](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.4)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

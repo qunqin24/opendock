@@ -1,13 +1,15 @@
 # llama.cpp provider for OpenCode
 
-An OpenCode plugin that discovers models from a llama.cpp server.
+An OpenCode plugin that discovers chat and decision models from a llama.cpp server.
 
 ### Usage
+
+Run `opencode plugin add opencode-llamacpp-provider@latest`
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-llamacpp-provider@0.1.0"],
+  "plugins": ["opencode-llamacpp-provider@latest"],
 }
 ```
 
@@ -20,7 +22,7 @@ To use another endpoint or an optional API key, set provider settings:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-llamacpp-provider@0.1.0"],
+  "plugins": ["opencode-llamacpp-provider@latest"],
   "providers": {
     "llamacpp": {
       "settings": {

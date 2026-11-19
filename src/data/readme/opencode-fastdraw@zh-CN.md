@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-统一工具链，用于将自主 LLM 编码代理匹配至任务适当的席位——席位指代理所担任的一个具名岗位职责（例如"后端实现"或"测试修复"），各有其能力要求——跨模型集群执行能力基准测试、并发布部署判定。Python 引擎发布于 PyPI（`aihr`），两个 OpenCode 插件发布于 npm；单一数据库结构，34 条 CLI 命令。CLI 本身运行时不需要 API 密钥。
+统一工具链，用于将自主 LLM 编码代理匹配至任务适当的席位——席位指代理所担任的一个具名岗位职责（例如"后端实现"或"测试修复"），各有其能力要求——跨模型集群执行能力基准测试、并发布部署判定。Python 引擎发布于 PyPI（`aihr`），两个 OpenCode 插件发布于 npm；单一数据库结构，35 条 CLI 命令。CLI 本身运行时不需要 API 密钥。
 
 本文档（README.zh-CN.md）是英文规范版本的忠实镜像。当两者出现差异时，以英文版本为准。
 
@@ -80,9 +80,9 @@ powershell -c "irm https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/s
 - `share/aihr` —— 随包配置
 - `receipt.json` —— 逐条记录每个落盘路径
 
-目录之外安装器只碰两样东西：shell rc 里那段指向 shim、带醒目标记的 PATH 块，以及它写入插件注册的两个 opencode 配置数组——统统在回执里。
+目录之外安装器只碰两样东西：shell rc 里那段指向 shim、带醒目标记的 PATH 块，以及它写入插件注册的 opencode 配置 `plugins` 数组——统统在回执里。
 
-npm 不是安装步骤：安装收尾命令 `hr install-post` 把插件登记进 opencode 的配置数组（`opencode.jsonc` 的主 `plugin` 数组，FastDraw TUI 那半边在 `tui.json`），opencode/bun 在启动时自行拉取并缓存这些 npm 包。
+npm 不是安装步骤：安装收尾命令 `hr install-post` 把插件登记进 opencode 唯一的 `plugins` 数组（`opencode.jsonc`），opencode 在启动时自行拉取并缓存这些 npm 包。OpenCode 2.x 下一条条目即加载插件的全部部分——服务端工具与 TUI 命令/键位皆是；`tui.json` 注册方式已废弃。
 
 `hr db-up` 不需要 Docker：后端自动三选一，内嵌 vendored Postgres（bundle 默认）、compose 容器（保留的原有通道）、或用 `HR_DSN` / `hr.toml` 指向你自己已有的 PostgreSQL；`hr db-status` 会报告当前生效的是哪个后端。无 Docker 的 turnkey 随 **aihr 0.4.0（2026-09）**落地；0.3.0 那个 `hr db-up` 还要求预装 Docker 的"docker not found"时代已被取代。
 
@@ -106,28 +106,25 @@ pip install "aihr[vision]"
 
 内嵌 Postgres 只随 bundle 分发；pip 通道上的 `hr db-up` 走 compose 容器或你自己的 PostgreSQL。pip 装完后运行一次 `hr install-post`，即可获得 PATH shim 与 opencode 配置注册（幂等、有回执）。`hr` 命令本身装在 pip 的 scripts 目录里，而 Windows（`…\Scripts`）与 macOS user-site 安装（`~/Library/Python/<版本>/bin`）默认都不在 PATH 里，`pip install aihr` 成功之后直接敲 `hr` 会找不到命令。`install-post` 会检测到这一点并只持久化一条用户作用域的 PATH 记录：Windows 写 `HKCU\Environment`，其余系统在你已有的 shell rc 文件里加一段带醒目标记的块。绝不提权、绝不碰系统级。
 
-手动注册（回退方案，纯配置）：opencode 只从配置文件的 `"plugin"` 数组（以及插件目录）发现插件；npm 条目由 opencode 在启动时自行下载并缓存。全局 npm 前缀根本不会被扫描，`-g` 安装对 opencode 完全不可见。请在**两个**文件中都声明插件：
+手动注册（回退方案，纯配置）：opencode 只从配置的 `"plugins"` 数组（以及插件目录）发现插件；npm 条目由 opencode 在启动时自行下载并缓存。全局 npm 前缀根本不会被扫描，`-g` 安装对 opencode 完全不可见。在一个文件中声明插件即可：
 
 ```jsonc
-// ~/.config/opencode/opencode.json（或 .jsonc）—— 服务端半边：hr_* / fastdraw_* agent 工具
-{ "plugin": ["opencode-hr-agent@latest", "opencode-fastdraw@latest"] }
-```
-
-```json
-// ~/.config/opencode/tui.json —— FastDraw TUI 半边：/fastdraw 命令 + <leader>m 键位
-{ "plugin": ["opencode-fastdraw@latest"] }
+// ~/.config/opencode/opencode.json（或 .jsonc）—— 一条条目加载全部部分：
+// hr_* / fastdraw_* agent 工具、/fastdraw 命令、<leader>f 键位
+{ "plugins": ["opencode-hr-agent@latest", "opencode-fastdraw@latest"] }
 ```
 
 `opencode-fastdraw` 是独立的模型/角色切换插件，可单独声明；`opencode-hr-agent` 是 OpenCode 工具面到 `hr` CLI 的桥接层，依赖上面的 Python 引擎。每个 [GitHub Release](https://github.com/TachikomaGundam/AIHR/releases) 也附带 wheel 产物。
 
-- **为什么默认 `@latest`：** 一键安装绝不该带着过期锁版本——写死的具体版本会悄然腐烂，且正是新机部署时版本漂移坑的根源。`@latest` 始终解析到最新已发布版本。若你更想冻结运行面（每次 opencode 启动重新解析 `@latest` 可能拉取能访问你 `~/.npmrc` 与 `HR_HOME` 的新代码），把上面两个文件里的 `@latest` 换成具体精确版本即可。
-- **为什么要两个文件：** 只写 `opencode.json` 时 agent 工具正常但 `/fastdraw` 与 `<leader>m` 会静默消失；只写 `tui.json` 则相反。`hr install-post` 会自动注册两处。
-- **可选的 HR 工作流层：** `/hr-workflow` 斜杠技能与 `hr` 子代理是配置文件而非插件代码——权威副本版本化在 `opencode-config/` 下，复制即装：
+- **为什么默认 `@latest`：** 一键安装绝不该带着过期锁版本——写死的具体版本会悄然腐烂，且正是新机部署时版本漂移坑的根源。`@latest` 始终解析到最新已发布版本。若你更想冻结运行面（每次 opencode 启动重新解析 `@latest` 可能拉取能访问你 `~/.npmrc` 与 `HR_HOME` 的新代码），把上面文件里的 `@latest` 换成具体精确版本即可。
+- **为什么一个文件就够了：** OpenCode 2.x 从单条 `plugins` 条目同时加载插件的服务端与 TUI 部分（TUI 会加载其服务端所加载插件的 TUI 部分）。V1 时代的 `tui.json` `"plugin"` 注册已废弃——那里的旧条目出于兼容仍会加载，但 `hr install-post` 只登记 `plugins`。
+- **可选的 HR 工作流层：** `hr-workflow` 技能与 `hr` 子代理是配置文件而非插件代码——技能的唯一权威在 `opencode-config/skills/hr-workflow/SKILL.md`。技能用工厂命令安装（先做 fail-closed 前置校验、幂等复制、打印 SHA-256 回执），代理文件仍用复制：
   ```bash
-  mkdir -p ~/.config/opencode/skills ~/.config/opencode/agents
-  cp <AIHR>/opencode-config/skills/hr-workflow.md ~/.config/opencode/skills/
-  cp <AIHR>/opencode-config/agents/hr.md         ~/.config/opencode/agents/
+  hr skill install hr-workflow   # -> ~/.config/opencode/skills/hr-workflow/SKILL.md
+  mkdir -p ~/.config/opencode/agents
+  cp <AIHR>/opencode-config/agents/hr.md ~/.config/opencode/agents/
   ```
+  `hr skill validate --all` 把关权威面，`hr skill list` 报告每项是否被引擎广告，`hr skill doctor` 将各处副本与权威做哈希对照、发现漂移即失败。文档：`docs/zh-CN/hr-skill-factory.md`（权威原文：`docs/en/hr-skill-factory.md`）。
 - **发布这两个包的维护者**仍需要 npm 本身；建议用户级前缀（`npm config set prefix ~/.npm-global`，用 nvm 则跳过），让 `npm login`/`npm publish` 永远不需要 sudo。
 
 安全模型与信任假设：docs/PLUGIN_SECURITY.md
@@ -209,7 +206,7 @@ hr status                            # 扫描列表 + 最新扫描能力均值
 
 ## CLI Map
 
-三十四条命令，每条针对一项具体职责：16 条核心命令、4 条 `db-*` 数据库生命周期命令、4 条 `apply-*` 事务预设命令、6 条 `release-*` 生命周期命令、4 条安装/支持工具。旧 v1 命令（`evaluate`、`report`、`run_all`）已淘汰。`hr verdict` 取代了退役的评估路径。
+三十五条命令，每条针对一项具体职责：17 条核心命令、4 条 `db-*` 数据库生命周期命令、4 条 `apply-*` 事务预设命令、6 条 `release-*` 生命周期命令、4 条安装/支持工具。旧 v1 命令（`evaluate`、`report`、`run_all`）已淘汰。`hr verdict` 取代了退役的评估路径。
 
 | 命令 | 用途 |
 |------|------|
@@ -225,6 +222,7 @@ hr status                            # 扫描列表 + 最新扫描能力均值
 | `hr publish` | 报告发布至 Wiki.js（可选目标；未配置时以 exit 0 跳过） |
 | `hr recommend` | 基于 `configs/seats.yaml` + 近期测量的席位推荐 |
 | `hr status` | DB 状态：扫描 + 最新扫描能力均值（纯 DB） |
+| `hr skill` | 校验、列出、生成、安装、巡检 opencode 技能（fail-closed 技能工厂） |
 | `hr apply` | 将最新判定结果桥接为 FastDraw 预设 |
 | `hr apply-preview` | 预览 apply 事务（精确文件变更 + 预览记录 id） |
 | `hr apply-rollback` | 依据备份清单回滚一次 apply 事务 |
@@ -273,21 +271,16 @@ fastdraw/
 2. 将命名预设写入 `<opencode 配置目录>/fastdraw-presets.json`
 3. 使用 `--set-state` 时，另写 `.fastdraw.json` 供启动时激活
 
-### Dual-File Registration
+### 注册
 
-FastDraw 包含服务端与 TUI 两部分。必须在两个 opencode 配置文件中都注册插件；只注册一个文件会静默缺失另一部分。
+FastDraw 有服务端与 TUI 两个部分，但 OpenCode 2.x 从一条条目同时加载两者：
 
 ```jsonc
 // ~/.config/opencode/opencode.jsonc
-{ "plugin": ["opencode-fastdraw"] }
+{ "plugins": ["opencode-fastdraw"] }
 ```
 
-```json
-// ~/.config/opencode/tui.json
-{ "plugin": ["opencode-fastdraw"] }
-```
-
-前者加载 `fastdraw_*` Agent 工具，后者加载 `/fastdraw` 命令与 `<leader>m` 快捷键。
+这一条条目即加载 `fastdraw_*` Agent 工具与 `/fastdraw` 命令、`<leader>f` 快捷键（2.x 起 `<leader>m` 是引擎自带的模型列表；可用 keybinds id `fastdraw.open` 改绑）。（V1 时代在 `tui.json` 里再登记一遍的做法已废弃；`hr install-post` 与 `fastdraw/install.sh` 只登记 `plugins`。）
 
 ## Layout
 

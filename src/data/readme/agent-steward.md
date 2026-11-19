@@ -1,12 +1,12 @@
-# opencode-windows-scheduler
+# agent-steward
 
 > OpenCode V1 (≥ 1.18.29) and V2 plugin for scheduling and orchestrating AI agent jobs — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. Runs on Windows, macOS and Linux. Free and open source (MIT).
 
-[![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
-[![npm downloads](https://img.shields.io/npm/dm/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
-[![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](LICENSE)
-[![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](package.json)
+[![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
+[![npm downloads](https://img.shields.io/npm/dm/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
+[![license](https://img.shields.io/npm/l/agent-steward.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/agent-steward.svg)](package.json)
 
 Translations: [Russian](docs/README.ru.md) · [中文](docs/README.zh.md).
 
@@ -19,7 +19,7 @@ Translations: [Russian](docs/README.ru.md) · [中文](docs/README.zh.md).
 
    > Schedule a task "morning-report" that runs every day at 09:00 with the prompt: "Summarize yesterday's git commits and write the report to ~/reports/".
 
-3. Open the dashboard to watch it run: the agent prints the URL when the task is created (default `http://localhost:4380`), or ask for it later with the `get_dashboard_info` tool. Prefer a preview without installing anything? `node scripts/demo-dashboard.mjs` starts a demo dashboard at `http://localhost:4380`.
+3. Open the dashboard to watch it run: the agent prints the URL when the task is created (default `http://localhost:3782`), or ask for it later with the `get_dashboard_info` tool. Prefer a preview without installing anything? `node scripts/demo-dashboard.mjs` starts a demo dashboard at `http://localhost:3782`.
 
 ## Why
 
@@ -35,7 +35,7 @@ Everything runs on your machine. No SaaS, no telemetry, no accounts.
 
 ![Local web dashboard: matrix builds, DAG graph, metrics and run history](docs/dashboard.png)
 
-Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` starts the dashboard with demo data at http://localhost:4380.
+Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` starts the dashboard with demo data at http://localhost:3782.
 
 ## Features
 
@@ -49,7 +49,7 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 25 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 26 agent tools, built-in agent skill |
 
 ### Language
 
@@ -80,13 +80,13 @@ The config key differs between lines:
 
 | OpenCode line | Key in `opencode.jsonc` |
 |---|---|
-| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["opencode-windows-scheduler"]` |
-| V2 (`≥ 2.2.7`) | `"plugins": ["opencode-windows-scheduler"]` |
+| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["agent-steward"]` |
+| V2 (`≥ 2.2.7`) | `"plugins": ["agent-steward"]` |
 
 Use the key of your line; there is no need to add both. On V2 the CLI does it for you:
 
 ```bash
-opencode plugin add opencode-windows-scheduler
+opencode plugin add agent-steward
 ```
 
 V1 — manual config:
@@ -94,7 +94,7 @@ V1 — manual config:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-windows-scheduler"]
+  "plugin": ["agent-steward"]
 }
 ```
 
@@ -103,20 +103,20 @@ V2 — equivalent manual config:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-windows-scheduler"],
+  "plugins": ["agent-steward"],
   "experimental": {
     "schedules": false
   }
 }
 ```
 
-`experimental.schedules: false` disables the built-in OpenCode scheduler so the agent does not confuse built-in job tools with this plugin's tools. Restart OpenCode after changing the config. The TUI panel is part of the same package (`exports["./tui"]`), so it is enabled by the same entry on both lines.
+`experimental.schedules: false` disables the built-in OpenCode scheduler so the agent does not confuse built-in job tools with this plugin's tools. In OpenCode 2.x, config changes reload automatically; use `/reload` if the change is not picked up. On 1.x, restart OpenCode after editing the config. The TUI panel is part of the same package (`exports["./tui"]`), so it is enabled by the same entry on both lines.
 
 From source:
 
 ```bash
-git clone https://github.com/DeadSno/opencode-windows-scheduler.git
-cd opencode-windows-scheduler
+git clone https://github.com/DeadSno/agent-steward.git
+cd agent-steward
 npm install
 npm run build && npm run build:gui
 ```
@@ -141,6 +141,7 @@ The agent gets the full feature set — 26 tools covering scheduling, pipelines,
 | `matrix_control` | `action`, `name?` | Matrix results, cancel pending clones, clean up orphans, preview clones |
 | `get_metrics` | — | Aggregate runs, successes and failures |
 | `get_analytics` | `days?`, `topLimit?` | Period report: counts, success rate, duration, tokens, cost, top tasks |
+| `self_analysis` | `days?`, `topLimit?`, `includeAnomalies?` | Self-analysis report over a period: health score, anomaly detection, trends and optimisation recommendations |
 | `manage_settings` | `action`, `maxConcurrent?`, `winterMode?`, `notifications?`, `history?` | Read/update global settings (concurrency, notifications, retention) |
 | `manage_local_ai` | `action` (`get`/`update`/`test`), `mode?`, `baseUrl?`, `model?`, `timeoutMs?`, `fallback?`, `confidenceThreshold?`, `shadow?` | Read, update or test the local triage assistant; `test` sends one synthetic notification and reports latency and verdict |
 | `manage_templates` | `action`, template fields | List, save or delete reusable task templates |
@@ -238,7 +239,7 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 58 test suites, 600+ checks
+npm test             # 83 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 

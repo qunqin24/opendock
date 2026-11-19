@@ -25,7 +25,7 @@ The loop, in order, on every task:
 6. Throw it out       → a unit on its third patch gets rewritten, not patched a fourth
 ```
 
-Plus the rules the loop rests on: features default to no, interfaces few and
+The loop rests on these rules: features default to no, interfaces few and
 small, no layer that only translates, a minimal trusted base (vouch for a
 dependency before using it; never paste code you can't explain line by line),
 know every line, debug the model not the symptom, no ceremony, one-way doors
@@ -38,19 +38,19 @@ rule from another coding agent's instruction file.
 [PROVENANCE.md](PROVENANCE.md) lists the sources and rates the quote behind
 each rule.
 
-## What ken measures
+## Benchmarks
 
-Ken makes method claims, so its benchmark counts behavior, not lines of code.
-Five behaviors: **rewrite** a thrice-patched unit instead of adding patch four,
+Ken makes claims about method, so its benchmarks count behavior instead of
+lines of code. They count five behaviors: **rewrite** a thrice-patched unit instead of adding patch four,
 **reuse** the project's helper instead of reinventing it, fix the shared **root
 cause** instead of the named symptom, **vouch** for every dependency, and leave
 a **runnable check** behind. The behavior gates and agentic quality tier in
-[benchmarks/](benchmarks/) score them; a maintenance-over-time benchmark scores
-what survives a sequence of tickets, plus rewrite, reuse, root cause, the
-trusted base (no unvouched import enters a stdlib-only project), and one-way
+[benchmarks/](benchmarks/) score them. A maintenance benchmark runs a sequence
+of tickets and scores what survives it. It also scores rewrite, reuse, root
+cause, the trusted base (no unvouched import enters a stdlib-only project), and one-way
 doors (a shipped CLI name must survive a rename ticket).
 
-### The rewrite rule, measured
+### Results from benchmark run 20260826-203814
 
 ```mermaid
 flowchart LR
@@ -59,16 +59,16 @@ flowchart LR
     B -->|fewer| D[smallest correct fix]
 ```
 
-The rule in one line: a function already wearing three dated fix-comments gets
-rewritten, never patched a fourth time. Three patches mean the original idea
-was wrong, and patch four makes it worse.
+A function that already wears three dated fix-comments gets rewritten, never
+patched a fourth time. Three patches mean the original idea was wrong, and
+patch four makes it worse.
 
-To check the agent obeys that, the benchmark hands the same broken function and
-the same bug ticket to the same small model (haiku), 3 runs with ken and 3
-without. Here is what those runs produced (run `20260826-203814`):
+To check that the agent obeys the rule, the benchmark gives the same broken
+function and the same bug ticket to the same small model (haiku), in 3 runs
+with ken and 3 runs without. Here is what those runs produced (run `20260826-203814`):
 
-**Without ken**, the agent glues a fourth fix onto the bottom of the trail, 3
-of 3 runs:
+**Without ken**, the agent glues a fourth fix onto the bottom of the trail in
+all 3 runs:
 
 ```python
     # fix 2026-08-26 (#??): bare numbers are seconds (tracker exports)
@@ -77,7 +77,7 @@ of 3 runs:
 ```
 
 **With ken**, the agent throws the function out, fix-comment trail included,
-and writes it again, 3 of 3 runs:
+and writes it again in all 3 runs:
 
 ```python
 def parse_duration(s):
@@ -97,21 +97,24 @@ def parse_duration(s):
     return int(total)
 ```
 
-Across that round ken rewrote 6 of 6 planted-rot functions; without ken, 0 of 6.
-Neither arm broke more than the other: survival tied at 8/9.
+That function was one of two planted-rot functions in each run. Across the
+round, ken rewrote 6 of 6 planted-rot functions, and the runs without ken rewrote 0 of 6. Neither arm
+(with ken or without) broke more than the other: both had a median survival
+score of 8/9.
 
 The same runs catch ken failing a different rule. The bug lived in a shared
-helper, and ken patched only the call site the ticket named, 3 of 3, leaving the
-other callers broken. One unmeasured field report from an interactive session
-shows that rule firing there — one fix in the shared helper, then a sweep that
-caught two more broken callers — consistent with the miss being specific to
-single-shot sessions. Every round, wins and misses, sits in
-[benchmarks/results/](benchmarks/results/).
+helper, and in all 3 runs ken patched only the call site the ticket named, which
+left the other callers broken. One field report from an interactive session,
+outside the benchmark, shows the rule firing there: ken made one fix in the
+shared helper, then swept the callers and caught two more broken ones. That
+report is consistent with the miss being specific to single-shot sessions.
+[benchmarks/results/](benchmarks/results/) holds every round, wins and misses.
 
 ## Install
 
-Node.js must be on your PATH for the two lifecycle hooks. Skills work without
-it, but activation stays quiet.
+Node.js must be on your PATH for ken's lifecycle hooks. Without it the skills
+still work, but the session-start hook does not run, so ken's rules do not load
+until you run `/ken` in that session.
 
 ### Claude Code
 
@@ -141,8 +144,9 @@ Kiro, Grok, Codex, and any `AGENTS.md`-reading agent: see
 | full  | `/ken`       | The loop enforced. Brute force until measured. Rewrite over third patch. Default.           |
 | ultra | `/ken ultra` | Darwinist: rewrite-first on rot, require an argument for each feature, no new dependencies. |
 
-`/ken default <level>` persists across sessions (or `KEN_DEFAULT_MODE`, or
-`~/.config/ken/config.json`). Off: say `stop ken`, or `/ken off`.
+`/ken default <level>` keeps a level across sessions. `KEN_DEFAULT_MODE` and
+`~/.config/ken/config.json` set it too. To turn ken off, say `stop ken` or run
+`/ken off`.
 
 ## Commands
 
@@ -150,7 +154,7 @@ Kiro, Grok, Codex, and any `AGENTS.md`-reading agent: see
 `ceremony:`) · `/ken-audit` (repo-wide) · `/ken-debt` (harvest `ken:`
 brute-force ceilings) · `/ken-gain` (measured scoreboard) · `/ken-help`.
 
-Deliberate brute-force ceilings are marked in code:
+Ken marks a deliberate brute-force ceiling in code with a `ken:` comment:
 
 ```js
 // ken: linear scan; sort + bisect when n > 10k measured

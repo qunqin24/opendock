@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.1`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.1 | 9 | 0.40.1 | 0.40.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.1 (`hermes-agent` >=0.17.0) |
 | 0.40.0 | 9 | 0.40.0 | 0.40.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.0 (`hermes-agent` >=0.17.0) |
 | 0.39.0 | 9 | 0.39.0 | 0.39.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.39.0 (`hermes-agent` >=0.17.0) |
 | 0.38.0 | 9 | 0.38.0 | 0.38.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.38.0 (`hermes-agent` >=0.17.0) |
@@ -327,6 +328,13 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.1: capture standing preferences before acting (#783)
+
+- **Codex records a confirmed standing repository preference before the first edit or final answer.** If an initial
+  lookup misses it, the agent searches again using the document or artifact name. One-off instructions remain local
+  to the current task.
+- The CLI flags and fact-base schema (9) are unchanged.
 
 ### 0.40.0: a bounded helper log, the OpenCode TUI, and evidence for a change (#777, #757, #771)
 

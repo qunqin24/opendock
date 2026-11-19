@@ -1,12 +1,12 @@
-# opencode-windows-scheduler
+# agent-steward
 
 > 用于在 OpenCode V1（≥ 1.18.29）或 V2 中调度与编排 AI agent 任务的插件 —— cron、一次性运行、DAG 流水线、矩阵构建、质量门禁、SQLite 历史记录和本地 Web 仪表盘。支持 Windows、macOS 和 Linux。免费开源（MIT）。
 
-[![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
-[![npm downloads](https://img.shields.io/npm/dm/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
-[![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](LICENSE)
-[![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](package.json)
+[![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
+[![npm downloads](https://img.shields.io/npm/dm/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
+[![license](https://img.shields.io/npm/l/agent-steward.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/agent-steward.svg)](package.json)
 
 Translations: [English](../README.md) · [Русский](README.ru.md).
 
@@ -19,7 +19,7 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
    > 创建一个名为 "morning-report" 的任务，每天 09:00 运行，提示词为："Summarize yesterday's git commits and write the report to ~/reports/"。
 
-3. 打开仪表盘观察运行情况：创建任务时 agent 会打印 URL（默认 `http://localhost:4380`），之后也可以随时用 `get_dashboard_info` 工具获取。想不安装任何东西先看看效果？`node scripts/demo-dashboard.mjs` 会在 `http://localhost:4380` 启动一个演示仪表盘。
+3. 打开仪表盘观察运行情况：创建任务时 agent 会打印 URL（默认 `http://localhost:3782`），之后也可以随时用 `get_dashboard_info` 工具获取。想不安装任何东西先看看效果？`node scripts/demo-dashboard.mjs` 会在 `http://localhost:3782` 启动一个演示仪表盘。
 
 ## 为什么需要它
 
@@ -35,7 +35,7 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
 ![本地 Web 仪表盘：矩阵构建、DAG 图、指标与运行历史](dashboard.png)
 
-不想安装 OpenCode 也想看看效果？`node scripts/demo-dashboard.mjs` 会用演示数据在 http://localhost:4380 启动仪表盘。
+不想安装 OpenCode 也想看看效果？`node scripts/demo-dashboard.mjs` 会用演示数据在 http://localhost:3782 启动仪表盘。
 
 ## 功能
 
@@ -72,13 +72,13 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
 | OpenCode 版本线 | `opencode.jsonc` 中的键 |
 |---|---|
-| V1（`1.18.29`–`1.19.x`） | `"plugin": ["opencode-windows-scheduler"]` |
-| V2（`≥ 2.2.7`） | `"plugins": ["opencode-windows-scheduler"]` |
+| V1（`1.18.29`–`1.19.x`） | `"plugin": ["agent-steward"]` |
+| V2（`≥ 2.2.7`） | `"plugins": ["agent-steward"]` |
 
 请使用对应版本线的键，无需同时添加两者。V2 可直接用 CLI：
 
 ```bash
-opencode plugin add opencode-windows-scheduler
+opencode plugin add agent-steward
 ```
 
 V1 手动配置：
@@ -86,7 +86,7 @@ V1 手动配置：
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-windows-scheduler"]
+  "plugin": ["agent-steward"]
 }
 ```
 
@@ -95,27 +95,27 @@ V2 手动配置：
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-windows-scheduler"],
+  "plugins": ["agent-steward"],
   "experimental": {
     "schedules": false
   }
 }
 ```
 
-`experimental.schedules: false` 会关闭 OpenCode 内置调度器，避免 agent 把内置任务工具与本插件的工具混淆。修改配置后请重启 OpenCode。TUI 面板随同一个包提供（`exports["./tui"]`），两条版本线都用同一条配置启用。
+`experimental.schedules: false` 会关闭 OpenCode 内置调度器，避免 agent 把内置任务工具与本插件的工具混淆。OpenCode 2.x 会自动重新加载配置；如未生效，请执行 `/reload`。1.x 修改配置后请重启 OpenCode。TUI 面板随同一个包提供（`exports["./tui"]`），两条版本线都用同一条配置启用。
 
 从源码安装：
 
 ```bash
-git clone https://github.com/DeadSno/opencode-windows-scheduler.git
-cd opencode-windows-scheduler
+git clone https://github.com/DeadSno/agent-steward.git
+cd agent-steward
 npm install
 npm run build && npm run build:gui
 ```
 
 ## Agent 工具
 
-agent 可获得完整功能 —— 25 个工具，覆盖调度、流水线、运维、可观测性与管理：
+agent 可获得完整功能 —— 26 个工具，覆盖调度、流水线、运维、可观测性与管理：
 
 | 工具 | 参数 | 作用 |
 |---|---|---|
@@ -133,6 +133,7 @@ agent 可获得完整功能 —— 25 个工具，覆盖调度、流水线、运
 | `matrix_control` | `action`、`name?` | 矩阵结果、取消待运行克隆、清理孤儿、预览克隆 |
 | `get_metrics` | — | 汇总的运行数、成功数与失败数 |
 | `get_analytics` | `days?`、`topLimit?` | 周期报告：数量、成功率、耗时、token、成本、热门任务 |
+| `self_analysis` | `days?`、`topLimit?`、`includeAnomalies?` | 周期自检报告：健康评分、异常检测、趋势分析与优化建议 |
 | `manage_settings` | `action`、`maxConcurrent?`、`winterMode?`、`notifications?`、`history?` | 读取/更新全局设置（并发、通知、保留策略） |
 | `manage_local_ai` | `action`（`get`/`update`/`test`）、`mode?`、`baseUrl?`、`model?`、`timeoutMs?`、`fallback?`、`confidenceThreshold?`、`shadow?` | 读取、更新或测试本地分诊助手；`test` 会发送一条合成通知并返回延迟与判定结果 |
 | `manage_templates` | `action`、模板字段 | 列出、保存或删除可复用的任务模板 |
@@ -230,7 +231,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 58 test suites, 600+ checks
+npm test             # 83 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 

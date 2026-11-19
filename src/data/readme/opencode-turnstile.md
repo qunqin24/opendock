@@ -123,22 +123,23 @@ Gates are decided in `execute.before` hooks; every gate has a human escape
 hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 [`docs/architecture/gates.md`](docs/architecture/gates.md).
 
-| Gate                   | In one line                                                                                                                                                                               |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan approval          | `executor` dispatches blocked while the plans dir holds a pending plan (no reviewer `VERDICT: APPROVE` or human approval); editing the plan's spec region invalidates an earlier approval |
-| Reviewer dispatch gate | `reviewer` dispatches blocked until a `GATE: PASS` verified by a real exit-0 test execution in this task                                                                                  |
-| Reviewer round cap     | Max 2 `reviewer` dispatches per task; waived dispatches bypass and don't count                                                                                                            |
-| Reviewer ensemble      | A reviewer APPROVE credits the landing gate only at ≥2 unwaived reviewer dispatches                                                                                                       |
-| Loop caps              | Per task: planner 3, plan-reviewer 3, test-runner 4, 16 total dispatches; exhaustion blocks and journals an `escalation` entry                                                            |
-| Decomposition gate     | `executor` dispatches must cite `chunk-N` / `AC-n` when a plan has a `## Decomposition` block                                                                                             |
-| Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                           |
-| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                               |
-| Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                      |
-| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` blocks; a repeat attempt forces the interactive human ask                                                                       |
-| Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                      |
-| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors                                                                                                            |
-| Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                               |
-| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                          |
+| Gate                   | In one line                                                                                                                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Plan approval          | `executor` dispatches blocked while the plans dir holds a pending plan (no reviewer `VERDICT: APPROVE` or human approval); editing the plan's spec region invalidates an earlier approval                                                                                |
+| Reviewer dispatch gate | `reviewer` dispatches blocked until a `GATE: PASS` verified by a real exit-0 test execution in this task                                                                                                                                                                 |
+| Reviewer round cap     | Max 2 `reviewer` dispatches per task; waived dispatches bypass and don't count                                                                                                                                                                                           |
+| Reviewer ensemble      | A reviewer APPROVE credits the landing gate only at ≥2 unwaived reviewer dispatches                                                                                                                                                                                      |
+| Loop caps              | Per task: planner 3, plan-reviewer 3, test-runner 4, 16 total dispatches; exhaustion blocks and journals an `escalation` entry                                                                                                                                           |
+| Decomposition gate     | `executor` dispatches must cite `chunk-N` / `AC-n` when a plan has a `## Decomposition` block                                                                                                                                                                            |
+| Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                                                                                                          |
+| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                                                                                                              |
+| Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                     |
+| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` blocks; a repeat attempt forces the interactive human ask                                                                                                                                                      |
+| Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                     |
+| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors                                                                                                                                                                                           |
+| Journal concurrency    | Concurrent OpenCode instances share one journal safely: chained appends and the approval sidecar write under a per-file lock with an in-lock re-read; lock contention degrades to an unlocked write with a journaled `journal-lock:` warning, never blocking enforcement |
+| Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                              |
+| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                                                                                                         |
 
 A few behaviors worth knowing; the mechanics live in
 [`docs/architecture/gates.md`](docs/architecture/gates.md) and
@@ -416,11 +417,11 @@ tools remain unguarded. The full threat model:
 
 ### OpenCode compatibility matrix
 
-| OpenCode host       | turnstile (current) | Status                                                                 |
-| ------------------- | ------------------- | ---------------------------------------------------------------------- |
-| ≥ 2.0.22, < 3.0.0   | 0.15.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0) |
-| ≥ 3.0.0 or < 2.0.22 | all                 | Refuses to enforce at setup; upgrade turnstile                         |
-| version unreadable  | all                 | Enforces; one-time journal warning                                     |
+| OpenCode host       | turnstile (current) | Status                                                                        |
+| ------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| ≥ 2.0.22, < 3.0.0   | 0.16.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0, 2.3.2) |
+| ≥ 3.0.0 or < 2.0.22 | all                 | Refuses to enforce at setup; upgrade turnstile                                |
+| version unreadable  | all                 | Enforces; one-time journal warning                                            |
 
 On an incompatible host turnstile toasts the upgrade instruction and
 registers no hooks (a full no-op — fail-open):

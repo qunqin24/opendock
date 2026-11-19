@@ -12,18 +12,16 @@ When the orchestrator model is text-only and a task needs pixels — not just ac
 
 ### About the v2 plugin architecture
 
-opencode is migrating to a new ("v2") internal plugin architecture. As of opencode 1.18, the v2 plugin surface covers agents, skills, catalog, commands, and integrations — but **not** custom tools, chat message/system transforms, or permission hooks, which are exactly what this plugin's core features need. The official plugin docs still document the hooks API ("v1") as the way to write plugins, and the `opencode plugin` installer loads it.
+opencode 2.x ships a new ("v2") plugin API with a stable domain surface — tools, permissions, session hooks, agents, and skills — while 1.18 hosts load the hooks API ("v1"). This package ships **both entries in one default export**, each full-featured on its host:
 
-This package therefore ships **both entries in one default export**:
-
-- `server` (hooks API) — full features: `vision_analyze` tool, per-model vision routing, image materialization, permission handling. **This is what `opencode plugin` loads today.**
-- `setup` (v2 API) — forward compatibility: registers the `vision-agent` subagent and the vision skill through the v2 `agent`/`skill` domains. A v2 host that loads `setup` gets subagent + skill delegation (the tool-dependent features stay on the hooks entry until upstream v2 gains tool registration).
+- `server` (v1 hooks API) — full features: `vision_analyze` tool, per-model vision routing, image materialization, permission handling. **This is what opencode 1.18 loads.**
+- `setup` (v2 plugin API) — **the same full feature set through the v2 domains**: the `vision_analyze` tool via `ctx.tool.transform`, permission auto-allow via `ctx.permission.hook("evaluate")`, image materialization + native-vision gating via `ctx.session.hook("context")`, and the tool knobs resolved from the user's `vision-agent` agent record. Runtime-verified on opencode 2.3.2. The v2 surface is structurally typed with guards — a host missing a domain degrades that one registration instead of failing the load.
 
 The two entries write disjoint registration systems, so there is no double-registration conflict if both loaders ever see the package.
 
 ## Requirements
 
-- opencode 1.18+
+- opencode 1.18+ or opencode 2.x (both host lines load this package; on 2.x the full feature set registers through the v2 plugin API)
 - At least one configured provider with an image-capable model (`enabled_providers` and/or `provider` entries in opencode config). The plugin discovers models from your configured providers and opencode's cached model catalog (`~/.cache/opencode/models.json`) — it does not ship a fixed model list.
 
 ## Installation
@@ -57,6 +55,8 @@ After install, restart opencode. The plugin registers the `vision-agent` subagen
 
 - **Local checkout:** `"plugin": ["file:///<repo-absolute-path>"]` — the skill is discovered straight from the package directory via `skills.paths`.
 - **Single file:** copy `dist/index.js` to `~/.config/opencode/plugin/vision.js` and copy `SKILL.md` to `~/.config/opencode/skills/vision/SKILL.md` manually (there is no installer script).
+- **opencode 2.x hosts:** the V2 loader reads the plural `plugins` config key and accepts either a package entry or an object form —
+  `"plugins": ["opencode-vision-delegate"]` or `"plugins": [{ "package": "opencode-vision-delegate" }]` — and also discovers local plugins from `.opencode/plugins/<name>/index.js` directories. Full feature parity applies on 2.x (see "About the v2 plugin architecture" above).
 
 Do not mix install methods for the same plugin id (`vision`) — they would double-register.
 

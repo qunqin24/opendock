@@ -9,7 +9,7 @@ GitHub is a trademark of GitHub, Inc.; this unofficial plugin is not endorsed by
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release loads too, and the status marks it
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. A later 2.2 or 2.3 release loads too, and the status marks it
   untested. Outside `>=2.2.3 <2.4.0` the plugin does not load, unless you set
   [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md#allowuntestedhost).
 - macOS or Linux.
@@ -18,7 +18,7 @@ GitHub is a trademark of GitHub, Inc.; this unofficial plugin is not endorsed by
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-github#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-github#v0.0.8
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/github-status`: it shows `Connection: sign-in required` until
@@ -29,7 +29,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.8" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -142,7 +142,7 @@ asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied**, and GitHub's own server lists no write tools |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.8", "options": { "access": "read-only" } }] }
    ```
 
    `readOnly: true` and `false` still work: they mean `"read-only"` and `"all"`, and `/github-status` says they are
@@ -334,7 +334,7 @@ Options go in the plugin's entry in `opencode.json`:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.6", "options": { "toolsets": ["context", "repos", "issues"] } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.8", "options": { "toolsets": ["context", "repos", "issues"] } }]
 }
 ```
 
@@ -365,7 +365,7 @@ overrides user and project config, so members only sign in:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-github#v0.0.6",
+      "package": "github:joe-broadhead/opencode-github#v0.0.8",
       "options": {
         "clientId": "<your organisation's OAuth App client ID>",
         "scopes": ["repo", "read:org"],
@@ -454,7 +454,8 @@ Error codes:
 | `SOURCE_UNKNOWN` | `events_list` or `probe` names a source the plugin does not have. Leave source out, or pass github. |
 | `CURSOR_INVALID` | The cursor was not issued by GitHub's `events_list` for this account and its signed-in user, or was changed. Call events_list without a cursor, with since, to start again. |
 | `ACCOUNT_MISMATCH` | `events_list` or `probe` names another account than the signed-in login, or a cursor issued for another account. Pass the account the cursor was issued for, or sign in to GitHub as that account; probe names the signed-in login. |
-| `UNAVAILABLE` | A search, notifications or `GET /user` read for `events_list` or `probe` failed, its answer was too large to read whole, or the sign-in names no login. Call it again with the same cursor; if it keeps failing, run /github-status. |
+| `TOO_LARGE` | A notifications answer for `events_list` is over 32 MB; a search answer over it is read in smaller pages instead. Nothing in `events_list` changes it: the answer is over the bytes it reads whole. |
+| `UNAVAILABLE` | A search, notifications or `GET /user` read for `events_list` or `probe` failed or took more than 60 seconds, or the sign-in names no login. Call it again with the same cursor; if it keeps failing, run /github-status. |
 
 Each row's own next step is in the message, and [the error codes](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md#errors) give the same set with when each one happens.
 
@@ -481,7 +482,7 @@ still stores its token.
    account, which works only in an interactive terminal. Then, on GitHub, delete the token under **Settings →
    Developer settings → Personal access tokens**, or, after a device sign-in, revoke the app under **Settings →
    Applications → Authorized OAuth Apps** (or **Authorized GitHub Apps**).
-2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.6` (the spec you installed), then `opencode reload`.
+2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.8` (the spec you installed), then `opencode reload`.
 3. Data folders: none. The plugin stores nothing of its own.
 4. Remove the default rules you copied into agents' own `permissions`.
 
@@ -491,16 +492,21 @@ still stores its token.
 - **The token limits what is possible.** The scopes you granted decide what the account's token can do. The default `repo` scope reaches every repository the account can write.
 - **Toolsets are a selection.** The default `toolsets` turn on 15 of the 24 toolsets, which show 69 tools. Nine toolsets are off by default, such as `copilot` and `gists`, and GitHub's two issue artifact tools need a feature flag the plugin does not turn on. See the [toolsets table](docs/configuration.md#toolsets).
 - **An allow on `github_api` covers writes.** An allow for `github_api` authorises every `api` call, reads included, and also its writes, downloads and uploads. Grant it only to a session that may change GitHub, or set `access` to `"read-only"` for a read-only script.
-- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 only.** Other releases in `>=2.2.3 <2.4.0` run untested.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2 only.** Other releases in `>=2.2.3 <2.4.0` run untested.
 - **Agents without the base allow ask before reads.** Every GitHub request asserts `github_api` on its own `METHOD /path` first. An agent without the base `* * allow` rule gets no default block, so its `github_api` reads ask, and a script's reads there are refused with `PERMISSION_DENIED` until that agent's rules allow them (see [Permissions](#permissions)). `events_list` is not affected: its reads assert `github_events_list`, so an allow for that tool, which Jelly writes, is enough.
 - **A GitHub App sign-in expires after six months.** Its 8-hour user token is renewed with its refresh token, which lasts six months; after that, or once GitHub refuses it, `/connect` asks for a new sign-in. The App reaches only the accounts it is installed on.
 - **Jelly.** The `access` and `unknownTools` settings declare their choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **GitHub's rate limits and error text are GitHub's.** Errors from OpenCode and GitHub pass through unchanged.
 - **`events_list` reads GitHub's search, which has its own limits.** GitHub allows 30 search requests a minute for a
   signed-in user, and at most 1,000 results for one query ([REST API endpoints for search](https://docs.github.com/en/rest/search/search#rate-limit));
-  one `events_list` call makes three searches (issues, pull requests, commits) and at most 30 search requests (6 pages of 100 each, and one second read whole when it holds every result read), beside GitHub's REST limit of 5,000 requests an hour for a user
+  one `events_list` call makes three searches (issues, pull requests, commits) and at most 30 search requests (6 each, for pages of 100 paged by time, and one second read whole when a page lies in it), each with 60 seconds to answer, beside GitHub's REST limit of 5,000 requests an hour for a user
   ([rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)).
   A call over the limit fails with GitHub's answer as `UNAVAILABLE`: call again later with the same cursor.
+- **`events_list` misses commits that reach the default branch late, with no gap.** GitHub's commit search covers only
+  default branches and exposes no time a commit reached one. A commit whose committer date is earlier than the time it
+  reached the default branch (typically from a pull request merged later, or a cherry-pick) is never listed once the
+  commits stream has passed that date. The pull-request stream still lists the merge of a pull request the user is
+  involved in. `events_list` does not re-scan: a lossless re-scan needs per-commit state the cursor cannot hold.
 - **Notifications need a classic sign-in.** A fine-grained token or a GitHub App cannot read `/notifications`
   ([REST API endpoints for notifications](https://docs.github.com/en/rest/activity/notifications#list-notifications-for-the-authenticated-user)),
   so `events_list` leaves them out for those sign-ins.
@@ -509,10 +515,14 @@ still stores its token.
   does not render.
 - **GitHub keeps notifications for three months.** A read whose notifications start before that, or that finds more
   than one call reads, answers `gap` once (`expired` from a cursor, `window-truncated` from `since`) and reads on from
-  inside the window; so does a second with more than 1,000 search results, which the search moves past. A read answers
+  inside the window; so does a second with more than 1,000 search results, which the search moves past, and a search
+  result alone over 32 MB, which is left out (two or more in a row are left out together). A read answers
   one gap; a loss it finds after that is answered by the next read. A notification
   GitHub delivers more than 6 hours late is not listed. If GitHub orders a second's search results differently from one
-  page to the next, a result can be missed while that second is read. A notification marked Done before `events_list` reads it may not be listed, and nothing tells the
+  page to the next, a result can be missed while a second of more than 100 results is read. A second one call cannot
+  read whole is read first by the next call, and walked across calls in GitHub's order if even that is not enough, so at
+  most one call in a row lists nothing because of it, and a second of n results takes at most 1 + n/20 calls; a walked
+  second that loses a result meanwhile is passed with a `window-truncated` gap. A notification marked Done before `events_list` reads it may not be listed, and nothing tells the
   plugin it was there. The conformance kit runs on GitHub answers that are invented, modelled on GitHub's REST docs,
   and not live-verified.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

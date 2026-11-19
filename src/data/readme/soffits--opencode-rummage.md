@@ -21,6 +21,8 @@ $ rummage search "INV-20931" --words-only --json
 - Pictures by what they show ("a dog on the beach", "a receipt from a restaurant"), and by the text in them, read on
   this machine by OCR in Chinese (simplified and traditional), Japanese, Korean, English and other Latin-script
   languages (`rummage[ocr]`). HEIC and other formats the model can't open go through ffmpeg.
+- Pictures sent in a chat (DeepSeek Harness sessions) the same way: part of the message they came with, found by what
+  they show or by the words in them, and pointing to that message (`rummage get --around` opens the turn).
 - Recordings by what they sound like and videos by what they show and sound like, each hit at its moment (`0:01:25`):
   the model hears 30-second windows and sees a frame per shot. Needs ffmpeg. It doesn't transcribe: an agent that
   needs the words can transcribe that window itself.
@@ -148,7 +150,7 @@ rummage index              # incremental: new and changed items go into keyword 
 rummage search "query"     # --json, -s SOURCE, -k KIND, -n LIMIT, --words-only (no model, instant)
 rummage search "lease" --path housing --glob '*.pdf'   # only part of a source
 rummage search "receipt" --since 2026-10-01 --until 2026-10-31   # a dated note (weekly/2026-W44.md) counts as its period
-rummage search "Ana Souza" --sort newest -n 50   # the newest of the matches first
+rummage search "Ana Souza" --sort newest -n 50   # the newest of the matches first (--sort oldest: where it was first said)
 rummage get "#3f2a9c"     # a result's text by its id (or ref); --loc for one passage, --head N
 rummage get "#3f2a9c" --around 3   # with context: 3 chat turns before and after, or 3 lines around a passage
 rummage get ~/Documents/report.pdf --original   # a file's whole text, read now, past the indexing limits
@@ -256,7 +258,9 @@ drops the ones that are gone.
 Agents use the same CLI: `search --json`, `get` and `recent`. `rummage recall` gives prompt hooks a short block of
 cited passages, or nothing when nothing clearly matches; it also adds what was said minutes ago in another chat
 session when it holds a good part of the prompt's words, so a conversation can go on in a new window. Within a chat
-session it doesn't repeat a passage it showed in the last few hours.
+session it doesn't repeat a passage it showed in the last few hours. A prompt with pictures (`--image FILE`, or the
+hook's `images`) also finds items with pictures that look like them, if the query daemon embeds the picture within
+two seconds; the cues from the words never wait for it.
 [docs/integrations.md](docs/integrations.md) has hook snippets for Claude Code, Codex, OpenCode, Hermes Agent and
 DeepSeek Harness, and [skills/rummage](skills/rummage/SKILL.md) is an Agent Skill to drop into an agent's skills
 folder.
@@ -290,7 +294,7 @@ settings for the speaker labels.
 | `codex` | `dsh-sessions` | [Codex CLI](https://github.com/openai/codex) sessions (`~/.codex/sessions`, archived and compressed ones too), the same way. Off until enabled. |
 | `gemini-cli` | | [Gemini CLI](https://github.com/google-gemini/gemini-cli) sessions (`~/.gemini/tmp/*/chats`), the same way. Off until enabled. |
 | `opencode` | | [OpenCode](https://github.com/anomalyco/opencode) 2 sessions in its `opencode.db`, the same way. Off until enabled. |
-| `dsh-sessions` | `dsh-sessions` | Chats in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) session logs: one item per message a person wrote, with the reply after it. Config: optional `projects` (default: all), `people` (a JSON map of sender ids to names), `assistant_name`, `principals_since` (when every channel began recording its sender as `source.principal`; from then the principal alone decides, and a message without one is no person's), `web_senders_since` (for older history: when the Web login began recording every sender; later Web prompts with no sender are an agent's). Messages agents send each other, and the replies to them, are left out. Off until enabled. |
+| `dsh-sessions` | `dsh-sessions` | Chats in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) session logs: one item per message a person wrote, with the reply after it. Config: optional `projects` (default: all), `people` (a JSON map of sender ids to names), `assistant_name`, `principals_since` (when every channel began recording its sender as `source.principal`; from then the principal alone decides, and a message without one is no person's), `web_senders_since` (for older history: when the Web login began recording every sender; later Web prompts with no sender are an agent's). Messages agents send each other, and the replies to them, are left out. Pictures sent with a message are read from DSH's attachment store (`attachments`, default `<dsh home>/attachments/v1`) into the message's item like a file's picture: an image vector and the text OCR finds in them (`rummage[ocr]`), at `image N` in the message; `images = false` leaves them out, `ocr = false` skips the text, `limits.image` caps their size. A message of only pictures is a message too. Off until enabled. |
 | `hermes` | | Chats in a [Hermes Agent](https://github.com/NousResearch/hermes-agent) `state.db`, the same way. Config: `db` (default: Hermes's home), optional `people`, `exclude_sessions`, `frontends`. Off until enabled. |
 | `mail` | | Mail in a Maildir, an mbox, an IMAP or a JMAP account (read-only: nothing is marked read). One item per message: subject, sender, recipients, date, body, and the text of attached documents. Every folder but junk, trash and drafts by default. Config: `maildir` or `mbox`, or `imap_host` + `imap_user`, or `jmap_session` + `jmap_user`; `password_env`, `password_file` or `password_command` (or `oauth_token_command` for OAuth/XOAUTH2 IMAP); optional `folders`, `since` (`2024-01-01`, `2y`). |
 | `memory-export` | | Memories exported from another memory system, one item per memory with its time, user, agent and origin, embedded again with rummage's model (vectors in the file are not used). Config: `format` (`mem0`, `letta`, `zep` or `lines`), `path` (a file or a folder of them), optional `user` and `agent` for files that don't say, `origin` for a `lines` file. See [Coming from another memory system](#coming-from-another-memory-system). |

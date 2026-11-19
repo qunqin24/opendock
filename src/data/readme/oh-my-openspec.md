@@ -108,6 +108,7 @@ Among the tools above, none combines all three: dependency-ordered parallel suba
 
 - [`/omos.init`](skills/omos-init/SKILL.md) — bootstrap the baseline: research the codebase → agree on capabilities → validated `openspec/specs/**`
 - [`/omos.plan`](skills/omos-plan/SKILL.md) — coverage interview → parallel research → grill (1–3 rounds, up to 5) → draft → critique loop → validated, ready to build
+- [`/omos.quick`](skills/omos-quick/SKILL.md) — short plan → apply → verify
 - [`/omos.apply`](skills/omos-apply/SKILL.md) — implement `tasks.md` in dependency-ordered waves, verify scenarios, review the diff
 - [`/omos.archive`](vendor/openspec/skills/openspec-archive-change/SKILL.md) — archive completed changes through the vendored archive workflows; two or more ids run the bulk one
 - [`/omos.retro`](skills/omos-retro/SKILL.md) — meta: mine the finished run for prompt defects — ≤8 cited, ranked findings, read-only
@@ -120,12 +121,13 @@ The plugin also ships as a native Codex CLI plugin (see
 plugins have no command surface; every flow is a skill mention
 (OpenCode → Codex):
 
-- `/omos.init` → `$omos-init` — bootstrap baseline specs
-- `/omos.plan` → `$omos-plan` — interview → research → grill → draft → critique
-- `/omos.apply` → `$omos-apply` — parallel `spawn_agent` waves → verify → review
-- `/omos.archive` → `$omos-archive` — archive via the bundled upstream archive skill (bulk for two or more ids)
-- `/omos.retro` → `$omos-retro` — run retrospective, ≤8 cited findings
-- `$omos-setup` — Codex-only first step: installs the seven role agent files
+- `$oh-my-openspec:omos-setup` — Codex-only first step: installs the seven role agent files
+- `$oh-my-openspec:omos-init` — bootstrap baseline specs
+- `$oh-my-openspec:omos-plan` — interview → research → grill → draft → critique
+- `$oh-my-openspec:omos-quick` — short plan → apply → verify
+- `$oh-my-openspec:omos-apply` — parallel `spawn_agent` waves → verify → review
+- `$oh-my-openspec:omos-archive` — archive via the bundled upstream archive skill (bulk for two or more ids)
+- `$oh-my-openspec:omos-retro` — run retrospective, ≤8 cited findings
 
 Roles run as native Codex subagents from `~/.codex/agents/omos-*.toml`, and
 the `openspec validate` gate is the bundled MCP server
@@ -160,7 +162,7 @@ Full catalog with report formats and dispatch mechanics: [docs/agents.md](docs/a
 
 ## Install
 
-Requires [OpenCode v2](https://opencode.ai) (plugin API), [Node.js ≥ 22.18](https://nodejs.org) and the [OpenSpec CLI](https://openspec.dev/docs/installation) — the plugin delegates every mechanical gate to it:
+Requires [OpenCode v2](https://opencode.ai) (plugin API), [Node.js ≥ 22.20](https://nodejs.org) and the [OpenSpec CLI](https://openspec.dev/docs/installation) — the plugin delegates every mechanical gate to it:
 
 ```sh
 npm install -g @fission-ai/openspec@latest

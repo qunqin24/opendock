@@ -26,6 +26,22 @@ opencode plugin add opencode-quota-dashboard
 }
 ```
 
+### 从 GitHub 安装
+
+仓库已提交构建好的 `dist/gui-experimental.cjs`，也可以直接从 GitHub 安装：
+
+```powershell
+opencode plugin add github:bricika/opencode-quota-dashboard
+```
+
+固定版本：
+
+```powershell
+opencode plugin add github:bricika/opencode-quota-dashboard#v0.1.1
+```
+
+GitHub 安装取 `main` 的最新提交；npm 仍是推荐方式。
+
 保存后 OpenCode 会自动重载插件；如果悬浮胶囊没有出现，重开一次窗口。Desktop 用户可在 **Settings > Extensions > Plugins** 查看。
 
 ### 本地开发
@@ -138,10 +154,12 @@ npm pack --dry-run
 
 ```powershell
 npm login
-npm publish
+npm publish --registry=https://registry.npmjs.org/
 ```
 
-如果改成 scoped 包名（例如 `@bricika/opencode-quota-dashboard`），使用 `npm publish --access public`。
+如果改成 scoped 包名（例如 `@bricika/opencode-quota-dashboard`），使用 `npm publish --access public --registry=https://registry.npmjs.org/`。
+
+GitHub Actions 会执行 `npm ci`、`npm test`、`npm run build`，并用 `git diff --exit-code` 检查 `dist/gui-experimental.cjs` 是否与源码同步。提交前先运行 `npm run build`。
 
 ## 卸载 / 回滚
 

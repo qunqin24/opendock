@@ -9,7 +9,7 @@ Metaview is a trademark of Metaview Labs Inc.; this unofficial plugin is not end
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux.
 - A Metaview account in a workspace where an admin has turned on **MCP integration**. Members also need **MCP for
@@ -22,7 +22,7 @@ Metaview is a trademark of Metaview Labs Inc.; this unofficial plugin is not end
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-metaview#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-metaview#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/metaview-status`: it shows `sign-in required` until you sign in
@@ -37,12 +37,12 @@ the connection, the sign-in and the stored credentials.
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.6" }] }
 ```
 
 ### Update
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-metaview#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-metaview#v<version>`.
 
 ## Sign in
 
@@ -150,7 +150,7 @@ credits; and send feedback to the Metaview team. Every read runs without asking 
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.6", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's. Put them in the agent: a
@@ -278,7 +278,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.5", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-metaview#v0.0.6", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -300,7 +300,7 @@ candidates to the ATS, and spending enrichment credits:
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-metaview#v0.0.5"],
+  "plugins": ["github:joe-broadhead/opencode-metaview#v0.0.6"],
   "permissions": [
     { "action": "metaview_post_sourcing_candidates_to_ats", "resource": "*", "effect": "deny" },
     { "action": "metaview_enrich_candidate_contacts", "resource": "*", "effect": "deny" }
@@ -338,7 +338,7 @@ Run `/metaview-status` first. Its last line is the next step.
 | Plan: shared credits | Conversations unlock on your workspace's shared platform credits rather than your own plan. |
 | Answers miss rounds a colleague ran | As a member you see your own conversations and those shared with you. Ask the colleague to share them, or ask an admin. |
 | Agents without default rules | Put the default rules shown by `/metaview-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Metaview tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Metaview misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 or 2.3.2. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Metaview misbehaves, use a tested release. |
 | Signed in to the wrong Metaview account | Run `opencode mcp logout metaview` (or remove the account in `/connect` → Metaview), then sign in again. |
 | A Metaview tool is refused in `opencode run` | Nobody could answer its prompt, so an `access: "ask-changes"` or a rule of yours asked for it. Add an `allow` rule for that tool to the agent's own `permissions`, or set `access: "all"`. |
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `metaview`, replaces the plugin's. Rename or move it. |
@@ -362,7 +362,7 @@ credential store.
 1. Sign out: `opencode mcp logout metaview`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: metaview` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Metaview**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.5`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-metaview#v0.0.6`, then `opencode reload`.
    `opencode mcp list` no longer lists `metaview`.
 4. Remove any Metaview rules you copied into your agents' own `permissions`. If you used an API key, delete it in
    Metaview: Settings, MCP.
@@ -385,7 +385,7 @@ credential store.
 - **Metaview's server decides the tools.** The plugin classifies the tools it knows. A tool Metaview adds later is not classed by the plugin: the `access` option decides whether it runs, asks or is denied, and `/metaview-status` counts it as unknown.
 - **Role and plan limits.** What you can read follows your Metaview role, and reports, AI fields and full transcripts may need a paid plan. The plugin does not change either.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
-- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
+- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
 - **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301
   does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

@@ -15,10 +15,11 @@ anything; they perform the install and post the result into the session.
 
 ## Features
 
-- Interactive catalog browser (`/bifrost-skills`) with search and
+- Interactive catalog browser (`/bifrost-skills`, TUI only) with search and
   global/project scope picker.
 - Non-interactive install, install-all, list, update, remove and config
-  commands.
+  commands. `/bifrost-install` without a selector lists the catalog with
+  installed skills marked, which also works in headless clients.
 - Global scope (`<config dir>/skills`) and project scope
   (`<project>/.opencode/skills`).
 - Catalog fallbacks that keep working when the gateway's marketplace manifest
@@ -82,18 +83,24 @@ then appear in slash completion under `/bifrost-…`.
 /bifrost-skills
 ```
 
+List what the gateway offers, with already installed skills marked (this also
+works in headless/SDK clients where `/bifrost-skills` is not available):
+
+```text
+/bifrost-install
+```
+
 Install a single skill:
 
 ```text
 /bifrost-install git-release --project
 ```
 
-Or install all skills:
+Install all skills:
 
 ```text
-/bifrost-install
-# or explicitly:
 /bifrost-install all
+# or:
 /bifrost-install *
 ```
 
@@ -102,14 +109,14 @@ it when the task matches its description.
 
 ## Commands
 
-| Command                           | Arguments and flags                   | Description                                                                                                       |
-| --------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `/bifrost-skills`                 | —                                     | Browse the catalog, pick a scope, install. Asks before replacing an existing skill and offers to install another. |
-| `/bifrost-install [<skill>\|all]` | `--global` \| `--project`, `--force`  | Install one skill (by name) or all skills from the all-skills bundle. Defaults to `all` if no selector given.     |
-| `/bifrost-list`                   | —                                     | List installed Bifrost skills in both global and project scope.                                                   |
-| `/bifrost-update [<skill>\|all]`  | `--global` \| `--project`             | Update installed skills. Defaults to `all` and checks the global and session project scopes.                      |
-| `/bifrost-remove <skill>`         | `--global` \| `--project`             | Remove an installed skill. Scope is required when the skill exists in both.                                       |
-| `/bifrost-config`                 | `baseUrl=…`, `timeoutMs=…`, `--reset` | Show or change gateway settings.                                                                                  |
+| Command                           | Arguments and flags                   | Description                                                                                                   |
+| --------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/bifrost-skills`                 | —                                     | TUI only: browse the catalog interactively, pick a scope, install.                                            |
+| `/bifrost-install [<skill>\|all]` | `--global` \| `--project`, `--force`  | No selector lists the catalog and marks installed skills; `all`/`*` installs all; a name installs that skill. |
+| `/bifrost-list`                   | —                                     | List installed Bifrost skills in both global and project scope.                                               |
+| `/bifrost-update <skill>\|all`    | `--global` \| `--project`             | Update one installed skill or all of them. A selector is required; without one it prints usage.               |
+| `/bifrost-remove <skill>`         | `--global` \| `--project`             | Remove an installed skill. Scope is required when the skill exists in both.                                   |
+| `/bifrost-config`                 | `baseUrl=…`, `timeoutMs=…`, `--reset` | Show or change gateway settings.                                                                              |
 
 ### Flag notes
 
@@ -121,7 +128,9 @@ it when the task matches its description.
   session's project scope. Scope flags narrow update and remove, not list.
 - Skill names may be given as the raw Bifrost name (`git-release`), the
   marketplace plugin name (`bifrost-git-release`) or the installed skill id.
-- For batch installs, use no argument, `all`, or `*` as the selector.
+- A bare `/bifrost-install` only lists the catalog and writes nothing. Use
+  `all` or `*` to install everything.
+- `/bifrost-update` needs `<skill>` or `all`; a bare invocation prints usage.
 - Option spellings are flexible: `baseUrl=…` / `--base-url …` /
   `--url …`, `timeoutMs=…` / `--timeout-ms …`.
 
@@ -155,8 +164,8 @@ The client tries two sources in order and uses the first non-empty result:
 
 Installs do not depend on the catalog: they always use
 `GET /api/skills/serve/{skill}/download.zip`, with the all-skills bundle for
-batch installs (no selector, `all`, or `*`). Installing by name keeps working when every catalog
-source is unavailable.
+batch installs (`all` or `*`). Installing by name keeps working when every
+catalog source is unavailable.
 
 If the catalog cannot be read at all, the command still supports
 `/bifrost-install <name>`; the download route decides whether the name exists.
@@ -176,7 +185,7 @@ half-written skill behind.
 - After a successful install the plugin asks OpenCode to reload its skill
   registry.
 
-**Update** (`/bifrost-update`, default `all`):
+**Update** (`/bifrost-update <skill>|all`):
 
 - Reads the installed markers from both scopes.
 - Compares the gateway version with the installed version. If the installed

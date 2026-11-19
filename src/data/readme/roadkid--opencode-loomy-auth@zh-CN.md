@@ -218,12 +218,15 @@ Settings → Usage → Plugins，随 **magpie ≥ v0.1.1083** 提供，**默认�
 - **会话十四天，没有续期。** 失效后唯一的路是重新短信登录。
 - **积分倍率只存在于展示名后缀。** Loomy 不提供结构化倍率字段；插件把
   后缀拆下来，但无法对目录核验任何数额。
-- **图片输入因模型家族而异。** 在早前目录的 `deepseek-v4-flash-0731`
-  （已下架）上验证过：它只认网关私有的 `<image_base64>…</image_base64>`
-  标记（标准 `image_url` 会被当文本截断），GLM 系相反——只认
-  `image_url`，喂标记反而坏。改写是计划中的第二迭代；落地之前，图片输入
-  只有 GLM 家族可靠，而较新的 `DeepSeek-V4.1-Flash` 声明了图片输入，
-  其形态在此网关上未经验证。
+- **图片输入因模型家族而异。** 网关线上行对视觉家族都声明了图片输入
+  （2026-11-17 实测：DeepSeek 两行、GLM、qwen、MiMo），插件记录以宿主
+  读的各种拼写携带该位——扁平、嵌套、以及 magpie 图片徽标读取的
+  `capabilities.input` 映射——徽标因此正常显示。传输形态则是另一回事，
+  在早前目录的 `deepseek-v4-flash-0731`（已下架）上验证过：它只认网关
+  私有的 `<image_base64>…</image_base64>` 标记（标准 `image_url` 会被当
+  文本截断），GLM 系相反——只认 `image_url`，喂标记反而坏。按家族改写
+  传输形态是计划中的第二迭代；落地之前，宿主自带的附件流程只有 GLM
+  家族可靠，当前 DeepSeek 行的传输形态在此网关上未经验证。
 - **`reasoning_effort` 在非思考模型上被忽略。** 变体按厂商文档策展的逐模型
   表（DeepSeek 与 GLM 为 low/high/max，qwen 为 low/medium/xhigh，MiMo 无
   挡位，Spark 为 none/low/high）；表内没有的行跟随每行的

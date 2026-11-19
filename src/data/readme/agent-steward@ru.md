@@ -1,11 +1,11 @@
-# opencode-windows-scheduler
+# agent-steward
 
 > Плагин для планирования и оркестрации задач AI-агентов в OpenCode V1 (≥ 1.18.29) и V2: cron, одноразовые запуски, DAG-пайплайны, матричные сборки, Quality Gates и наблюдаемость. Бесплатно, с открытым кодом (MIT).
 
-[![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
-[![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](../LICENSE)
-[![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](../package.json)
+[![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
+[![license](https://img.shields.io/npm/l/agent-steward.svg)](../LICENSE)
+[![node](https://img.shields.io/node/v/agent-steward.svg)](../package.json)
 
 Translations: [English](../README.md) · [中文](README.zh.md).
 
@@ -18,7 +18,7 @@ Translations: [English](../README.md) · [中文](README.zh.md).
 
    > Поставь задачу «утренний-отчёт»: каждый день в 09:00 с промптом «Просуммаризируй вчерашние git-коммиты и запиши отчёт в ~/reports/».
 
-3. Откройте дашборд: агент печатает ссылку при создании задачи (по умолчанию `http://localhost:4380`), позже её можно получить инструментом `get_dashboard_info`. Посмотреть демо без установки: `node scripts/demo-dashboard.mjs` — дашборд с демо-данными на `http://localhost:4380`.
+3. Откройте дашборд: агент печатает ссылку при создании задачи (по умолчанию `http://localhost:3782`), позже её можно получить инструментом `get_dashboard_info`. Посмотреть демо без установки: `node scripts/demo-dashboard.mjs` — дашборд с демо-данными на `http://localhost:3782`.
 
 ![Локальный веб-дашборд: матричные сборки, граф DAG, метрики и история запусков](dashboard.png)
 
@@ -63,13 +63,13 @@ Translations: [English](../README.md) · [中文](README.zh.md).
 
 | Линия OpenCode | Ключ в `opencode.jsonc` |
 |---|---|
-| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["opencode-windows-scheduler"]` |
-| V2 (`≥ 2.2.7`) | `"plugins": ["opencode-windows-scheduler"]` |
+| V1 (`1.18.29`–`1.19.x`) | `"plugin": ["agent-steward"]` |
+| V2 (`≥ 2.2.7`) | `"plugins": ["agent-steward"]` |
 
 Используйте ключ своей линии; добавлять оба не нужно. В V2 проще через CLI:
 
 ```bash
-opencode plugin add opencode-windows-scheduler
+opencode plugin add agent-steward
 ```
 
 V1 — вручную:
@@ -77,7 +77,7 @@ V1 — вручную:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-windows-scheduler"]
+  "plugin": ["agent-steward"]
 }
 ```
 
@@ -86,20 +86,20 @@ V2 — тот же плагин вручную:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-windows-scheduler"],
+  "plugins": ["agent-steward"],
   "experimental": {
     "schedules": false
   }
 }
 ```
 
-`experimental.schedules: false` отключает встроенный планировщик OpenCode, чтобы агент не путал встроенные инструменты расписаний с инструментами этого плагина. После изменения конфигурации перезапустите OpenCode. Панель TUI входит в тот же пакет (`exports["./tui"]`), поэтому включается той же записью на обеих линиях.
+`experimental.schedules: false` отключает встроенный планировщик OpenCode, чтобы агент не путал встроенные инструменты расписаний с инструментами этого плагина. В OpenCode 2.x конфигурация перезагружается автоматически; если изменения не подхватились, выполните `/reload`. В 1.x перезапустите OpenCode после правки конфигурации. Панель TUI входит в тот же пакет (`exports["./tui"]`), поэтому включается той же записью на обеих линиях.
 
 Из исходников:
 
 ```bash
-git clone https://github.com/DeadSno/opencode-windows-scheduler.git
-cd opencode-windows-scheduler
+git clone https://github.com/DeadSno/agent-steward.git
+cd agent-steward
 npm install
 npm run build && npm run build:gui
 ```
@@ -124,6 +124,7 @@ npm run build && npm run build:gui
 | `matrix_control` | `action`, `name?` | Результаты матрицы, отмена клонов, очистка осиротевших задач, предпросмотр |
 | `get_metrics` | — | Всего запусков, успехов и падений |
 | `get_analytics` | `days?`, `topLimit?` | Отчёт за период: запуски, успешность, длительность, токены, стоимость, топ задач |
+| `self_analysis` | `days?`, `topLimit?`, `includeAnomalies?` | Самодиагностика за период: оценка здоровья, аномалии, тренды и рекомендации по оптимизации |
 | `manage_settings` | `action`, `maxConcurrent?`, `winterMode?`, `notifications?`, `history?` | Чтение и изменение глобальных настроек (параллелизм, уведомления, retention) |
 | `manage_local_ai` | `action` (`get`/`update`/`test`), `mode?`, `baseUrl?`, `model?`, `timeoutMs?`, `fallback?`, `confidenceThreshold?`, `shadow?` | Настройки локального ассистента для триажа уведомлений и проверка модели одним запросом (см. [LOCAL-AI.md](LOCAL-AI.md)) |
 | `manage_templates` | `action`, поля шаблона | Список, сохранение и удаление шаблонов задач |
@@ -132,9 +133,27 @@ npm run build && npm run build:gui
 | `send_notification` | `action` (`test`/`digest`), `channel?` (`all`/`webhook`/`telegram`/`native`) | Проверка каналов уведомлений или отправка дайджеста |
 | `get_dashboard_info` | — | Порт/URL дашборда, платформа, заголовок, активный профиль |
 | `cleanup_history` | `retentionDays?`, `maxRecords?` | Удаление старой истории по возрасту и/или лимиту записей |
+| `manage_secrets` | `action`, `name?`, `value?` | Создание, список и удаление секретов AES-256-GCM для `env` задач |
+| `get_audit_log` | `action?`, `target?`, `actor?`, `since?`, `until?`, `limit?` | Журнал мутаций: кто, что и когда изменил и через какой интерфейс |
 | `emit_event` | `eventName`, `payload?` | Запуск задач, подписанных на MCP-событие |
 
 `schedule_task` принимает и полную конфигурацию матрицы (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
+
+## Права и разрешения
+
+Задачи агента запускаются через `opencode run --auto`, поэтому их политика инструментов должна быть задана явно. Глобальная настройка `permissions.defaultPolicy` (GUI → Settings или `manage_settings`) задаёт базу:
+
+| Политика | Разрешено по умолчанию | Запрещено по умолчанию |
+|---|---|---|
+| `hybrid` (по умолчанию) | read, edit, glob, grep, subagent, skill, webfetch, websearch | shell, question |
+| `secure` | read, glob, grep, skill | edit, shell, question, webfetch, websearch, subagent |
+| `legacy` | все десять действий | — |
+
+`deniedTools` всегда важнее. Непустой `allowedTools` превращается в allowlist: всё, что не перечислено, запрещено, а разрешённое политикой действие можно явно вернуть (например, `shell`). `legacyShell: true` возвращает `shell` только при `hybrid` — для задач, перенесённых со старых версий.
+
+Заблокированные действия пишутся в аудит как `tool.blocked` с `reason: "default-policy"` и `hint`, а каждый запуск записывает действующую политику.
+
+Рекомендуемый приём: держите `git commit`/`push`, сборки и тесты вне агента — в `qualityGate` или `afterScript` (обёртка запускает их через `bash -c`), а агенту оставьте `read`/`edit`. Тогда большинству задач `shell` вообще не нужен.
 
 ## Скилл для агента
 
@@ -205,7 +224,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 58 сюит, 600+ проверок
+npm test             # 83 сюит, 600+ проверок
 npm run test:en      # те же сюиты с английской локалью
 ```
 

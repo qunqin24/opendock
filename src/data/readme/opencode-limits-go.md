@@ -5,25 +5,25 @@
 [![npm](https://img.shields.io/npm/v/opencode-limits-go?style=flat-square)](https://www.npmjs.com/package/opencode-limits-go)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![OpenCode](https://img.shields.io/badge/OpenCode-v2.3%2B-111827?style=flat-square)](https://opencode.ai)
-[![Language](https://img.shields.io/badge/Lang-EN%20%7C%20RU-16a34a?style=flat-square)](#features)
+[![Language](https://img.shields.io/badge/Lang-EN%20%7C%20RU-16a34a?style=flat-square)](#localization)
 
 **OpenCode Go** quota monitor plugin for **OpenCode v2.3+** (TUI & Desktop GUI).
 
-Displays live usage across all three OpenCode Go windows — **5-hour rolling**, **weekly**, and **monthly** — with threshold alerts, flexible placement in Desktop GUI, automatic English/Russian localization matching your OpenCode UI language, and built-in GitHub auto-updates.
+Live usage across all three OpenCode Go windows — **5-hour rolling**, **weekly**, and **monthly** — with smart pace estimation, a 5h trend sparkline, threshold & reset alerts, deep strip/dialog customization, English/Russian localization, and GitHub auto-updates.
 
 ---
 
 ## Screenshots
 
 <p align="center">
-  <img src="docs/limits-dialog.png" alt="Desktop GUI limits dialog and topbar indicator" width="760" />
+  <img src="docs/limits-dialog.png" alt="Desktop GUI limits dialog with 5h trend sparkline and topbar indicator" width="760" />
 </p>
 
 <details>
-<summary>More screenshots: Settings dialog &amp; Terminal TUI</summary>
+<summary>More screenshots: Compact Settings Dialog &amp; Terminal TUI</summary>
 <br />
 <p align="center">
-  <img src="docs/settings-dialog.png" alt="Settings dialog with live preview and presets" width="520" />
+  <img src="docs/settings-dialog.png" alt="Compact settings dialog with live preview and presets" width="520" />
 </p>
 <p align="center">
   <img src="docs/tui-limits.png" alt="Terminal TUI sidebar indicator and limits popup" width="760" />
@@ -32,39 +32,45 @@ Displays live usage across all three OpenCode Go windows — **5-hour rolling**,
 
 ---
 
-## Features
+## Highlights
 
-- **All OpenCode Go windows**: `5h` / `1w` / `1m` percentages, reset timestamps, countdowns, elapsed-time markers (`|`), recent `~1h` deltas, and tightest-window summary.
-- **Smart pace estimation v2**: Combines window-average and local snapshot history to suppress tiny spikes while catching fresh coding bursts across `5h`, `1w`, and `1m`.
-- **OpenCode Zen & today's activity**: Displays active Console budgets (`$spent / $limit`) and today's local `opencode-go` tokens vs. `opencode` (Zen) USD spend inside the dialog and hover tooltip.
-- **Works with any OpenCode auth setup**:
-  - OpenCode Console **OAuth** account (`opencode`)
-  - Saved **API key** (`opencode-go` or `opencode` integration)
-  - Environment variables (`OPENCODE_GO_API_KEY`, `OPENCODE_API_KEY`, `OPENCODE_ZEN_API_KEY`)
-  - Plugin options or provider settings in `opencode.json`
-  - Lazy fallback to `opencode auth export` and legacy `~/.local/share/opencode/auth.json`
-- **Desktop GUI**:
-  - Clickable status strip with color-coded or monochrome progress bars and `⚡` fast-burn indicators
-  - **Quick OpenCode Console access**: Direct button in the limits dialog and Settings page to open your org's Console usage page
-  - **Settings window** (`/limits-settings`, gear button in the limits dialog, and native `Settings → OpenCode Go limits`) with a live strip preview and 1-click presets (`Standard`, `Only 5h`, `Text`, `Minimal`)
-  - **Placement options**: Bottom bar (default), Top bar (`session.header`), Both, Titlebar / sidebar button, or Hidden
-  - **Custom strip layout & behavior**: Show/hide individual windows (`5h`, `1w`, `1m`), switch indicator style (`Bar + %`, `Text only`, `Bars only`), toggle window labels, customize warning thresholds (`70%` / `80%` / `90%` / `100% only`) and refresh intervals (`30s` / `90s` / `5m`)
-  - Instant activity updates on model turns and window focus
-  - Light & dark theme support
-- **TUI**:
-  - Live sidebar indicator (`sidebar.content`) with semantic theme colors, optional mini-bars, and `⚡` burn indicator
-  - `/limits` popup with Go windows, smart pace, `+1h` delta, and today's Go/Zen usage
-  - `/limits-settings` & `/limits-windows` interactive selectors (toggle bars, window filter, thresholds, update check)
-  - Command palette entries and `Ctrl+Shift+L` shortcut; auto-refreshes on `session.usage.updated`, periodically, and on credential changes
-- **Bilingual (English / Russian)**: Automatically follows the OpenCode UI language (Desktop `ctx.locale`, or `OPENCODE_LANG` / `LC_ALL` / `LANG` in TUI).
-- **Auto-Update**: Checks [GitHub Releases](https://github.com/cusvv/opencode-limits-go/releases) for new versions and automatically installs updates in the background (can be toggled or triggered manually in Settings).
-- **Security-first**: Tokens never leave the server process — never sent over RPC, never shown in the UI, and automatically redacted from logs (`%TEMP%/opencode-limits-go.log` or `/tmp/opencode-limits-go.log`).
+### Quota & Pace Intelligence
+- **All OpenCode Go windows**: `5h` / `1w` / `1m` percentages, reset timestamps, countdowns, elapsed-time markers (`|`), recent deltas (`+X%`), and tightest-window summary.
+- **Smart pace estimation & 5h sparkline**: Combines window-average and snapshot history to detect coding bursts (`⚡`) and renders a `5h trend` SVG sparkline inside the dialog.
+- **OpenCode Zen & today's models**: Shows active Console budgets (`$spent / $limit`), today's Go tokens / Zen USD spend, and the **top 3 models** used today.
+- **Reset-aligned & instant cold start**: Persists the last valid snapshot to disk for 0 ms startup, schedules a targeted refresh 3 seconds after any window resets, respects `Retry-After` on `429`/`503`, and slows background polling 3× when minimized.
+
+### Deep Customization (Desktop GUI & TUI)
+- **Window modes**: Show any combination of `5h` / `1w` / `1m` (click window labels right inside `/limits` to toggle), or enable **Auto-focus (`tightest`)** to display only the most constrained window.
+- **Auto-hide below threshold**: Keep the strip hidden while all windows are below `50%` / `70%` / `80%`.
+- **Visual themes & density**:
+  - **4 bar palettes**: `Traffic` (green/amber/red), `Monochrome`, `Calm blue`, and `Stealth` (neutral until `100%`).
+  - **3 strip densities**: `Compact`, `Normal`, `Wide`.
+  - **Indicator styles**: `Bar + %`, `Text only`, `Bars only`, optional **Remaining %** mode (`% left` instead of `% used`), toggleable `⚡` icon and `|` elapsed marker.
+  - **Reset countdown on strip**: `Never`, `At 100% only` (default), `At warning & 100%`, or `Always`.
+- **Dialog & time formatting**: `24h` / `12h` clocks, `Date + countdown` / `Countdown only` / `Date only`, and individual toggles for pace banner, sparkline, Zen stats, and auth footer.
+- **Smart alerts**: Threshold toasts (`70%` / `80%` / `90%` / `100%`), **quota-reset recovery toasts** when a `100%` window clears, and **fast-burn spike alerts** (`+15%` / `+20%` / `+30%` in 5–30 min).
+- **GUI ↔ TUI sync**: Window filters, `% left` mode, thresholds, burn-spike sensitivity, and language override sync across Desktop GUI and TUI via plugin RPC (and can also be seeded via `options` in `opencode.json`).
+
+### Works with any OpenCode auth setup
+- OpenCode Console **OAuth** account (`opencode`)
+- Saved **API key** (`opencode-go` or `opencode` integration)
+- Environment variables (`OPENCODE_GO_API_KEY`, `OPENCODE_API_KEY`, `OPENCODE_ZEN_API_KEY`)
+- Plugin options or provider settings in `opencode.json`
+- Lazy fallback to `opencode auth export` and legacy `~/.local/share/opencode/auth.json`
+
+### Localization
+Automatically follows your OpenCode UI language (**English** / **Russian**), or can be overridden manually (`Auto` / `EN` / `RU`) in **Settings → Behavior & language**.
+
+### Security & Auto-Updates
+- Tokens never leave the server process — never sent over RPC, never shown in the UI, and automatically redacted from logs (`%TEMP%/opencode-limits-go.log` or `/tmp/opencode-limits-go.log`).
+- Local/manual installs auto-update from [GitHub Releases](https://github.com/cusvv/opencode-limits-go/releases); CLI-managed installs (`opencode plugin add`) defer cleanly to `opencode plugin update`.
 
 ---
 
 ## Installation
 
-Requires **OpenCode v2.3.0+** and an active OpenCode Go credential (via `opencode auth login` or `OPENCODE_API_KEY`).
+Requires **OpenCode v2.3.0+** and an active OpenCode Go credential (`opencode auth login` or `OPENCODE_API_KEY`).
 
 ### Option 1: Quick Install via OpenCode CLI (recommended)
 
@@ -74,7 +80,7 @@ opencode plugin add opencode-limits-go
 opencode plugin add github:cusvv/opencode-limits-go
 ```
 
-Then restart **OpenCode Desktop** (or run `/reload` in open TUI sessions).
+Restart **OpenCode Desktop** (or run `/reload` in open TUI sessions).
 
 ### Option 2: Clone with Git
 
@@ -90,14 +96,13 @@ git clone https://github.com/cusvv/opencode-limits-go.git "$env:USERPROFILE\.con
 
 ### Option 3: Download Release Archive
 
-Download `opencode-limits-go.zip` or `opencode-limits-go.tar.gz` from the [Releases](https://github.com/cusvv/opencode-limits-go/releases) page and extract it so the folder is:
-
-- Windows: `%USERPROFILE%\.config\opencode\local-plugins\opencode-limits-go`
-- macOS / Linux: `~/.config/opencode/local-plugins/opencode-limits-go`
+Download `opencode-limits-go.zip` or `opencode-limits-go.tar.gz` from [Releases](https://github.com/cusvv/opencode-limits-go/releases) and extract it to:
+- **Windows**: `%USERPROFILE%\.config\opencode\local-plugins\opencode-limits-go`
+- **macOS / Linux**: `~/.config/opencode/local-plugins/opencode-limits-go`
 
 ### Enable in `opencode.json` (Options 2 & 3)
 
-For manual installs, add `./local-plugins/opencode-limits-go` to `plugins` in your global `~/.config/opencode/opencode.json`:
+Add `./local-plugins/opencode-limits-go` to `plugins` in `~/.config/opencode/opencode.json`:
 
 ```jsonc
 {
@@ -108,13 +113,19 @@ For manual installs, add `./local-plugins/opencode-limits-go` to `plugins` in yo
 }
 ```
 
-> **Optional:** You can also pass an API token directly via plugin options:
+> **Optional dotfiles defaults:** You can also pass a token or shared defaults via `options`:
 > ```jsonc
 > {
 >   "plugins": [
 >     {
 >       "package": "./local-plugins/opencode-limits-go",
->       "options": { "token": "{env:OPENCODE_GO_API_KEY}" }
+>       "options": {
+>         "token": "{env:OPENCODE_GO_API_KEY}",
+>         "showRemaining": false,
+>         "warnThreshold": 80,
+>         "burnSpikePct": 20,
+>         "langOverride": "auto"
+>       }
 >     }
 >   ]
 > }
@@ -128,9 +139,9 @@ Restart **OpenCode Desktop** (and run `/reload` in open TUI sessions). No `npm i
 
 | Action | Shortcut / Command |
 |---|---|
-| Show limits dialog | `/limits` or `Ctrl+Shift+L` (or click the indicator in Desktop) |
-| Open plugin settings (Desktop & TUI) | `/limits-settings`, gear button in dialog, or `Settings → OpenCode Go limits` |
-| Filter TUI sidebar windows | `/limits-windows` |
+| Show limits dialog / popup | `/limits` or `Ctrl+Shift+L` (or click the status strip) |
+| Open quick settings (Desktop & TUI) | `/limits-settings`, gear button in dialog, or `Settings → OpenCode Go limits` |
+| Filter TUI sidebar windows | `/limits-windows` (`All`, `5h·1w`, `5h·1m`, `1w·1m`, or single window) |
 
 ### Verify via CLI
 
@@ -145,25 +156,46 @@ opencode api post /api/rpc/opencode-limits-go/status --data '{"input":{"force":t
 
 ```sh
 npm install
-npm test          # Run unit tests (model, auth, updater)
+npm test          # Run unit tests across src/core and src/server
 npm run build     # Typecheck server/TUI/GUI and rebuild dist/gui-experimental.cjs
 ```
 
-### Project Structure
+### Project Architecture
 
-```
+```text
 src/
-  index.ts        Server plugin: RPC endpoints, caching, event invalidation, auto-updater loop
-  auth.ts         Multi-source credential discovery & deduplication
-  api.ts          OpenCode Go usage HTTP client
-  model.ts        Pure formatting, validation, EN/RU localization, semver, secret redaction
-  updater.ts      GitHub Releases updater with HTTPS allowlist & staged verification
-  rpc.ts          Portable RPC contract
-  log.ts          Rotating JSON logger (256 KB max)
-  tui.tsx         OpenTUI adapter
-  gui.tsx         Desktop GUI adapter (SolidJS + OpenCode GUI SDK)
+  index.ts              Server plugin: RPC endpoints, disk/memory cache, reset-aligned timers
+  rpc.ts                Portable RPC contract (status, getPrefs/setPrefs, updates, events)
+  gui.tsx               Desktop GUI entrypoint (SolidJS + OpenCode GUI SDK)
+  tui.tsx               TUI entrypoint
+
+  core/                 Pure domain logic (zero Node/UI dependencies)
+    index.ts            Barrel exports
+    types.ts            Types, error codes, window selection & auto-hide helpers
+    format.ts           Dates (24h/12h), durations, usage parsing, short error labels
+    pace.ts             Snapshot ring buffer, deltas, pace estimation, SVG sparkline data
+    alerts.ts           Threshold, reset recovery, and fast-burn spike detectors
+    stats.ts            Provider spend & top-model aggregation
+    summary.ts          TUI sidebar & detail formatter
+    utils.ts            Secret redaction, retry, semver
+
+  server/               Node / IO layer
+    api.ts              OpenCode Go HTTP client with Retry-After support
+    auth.ts             Multi-source credential discovery & deduplication
+    updater.ts          GitHub Releases updater with HTTPS allowlist & recursive sync
+    log.ts              Rotating async JSON logger with secret redaction
+
+  gui/                  Desktop GUI modules
+    i18n.ts             EN/RU translations
+    stores.ts           Effect Schema stores & constants
+    components.tsx      MiniBar, Sparkline, LimitsStrip, SectionDivider
+
+  tui/                  Terminal UI modules
+    i18n.ts             EN/RU TUI copy
+    plugin.tsx          OpenTUI adapter
+
 dist/
-  gui-experimental.cjs   Prebuilt CommonJS Desktop GUI bundle
+  gui-experimental.cjs  Prebuilt CommonJS Desktop GUI bundle
 ```
 
 ---

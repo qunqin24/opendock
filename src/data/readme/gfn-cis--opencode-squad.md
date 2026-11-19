@@ -34,9 +34,9 @@ Plugin options (e.g. `rate_limit_guard`) go in the object form:
 }
 ```
 
-The package entry (`index.js`) exports the OpenCode 2 `setup` in `.opencode/lib/orchestrate-v2.js`, backed by decision modules in `src/`:
+The package entry (`index.js`) exports the OpenCode 2 `setup` in `.opencode/lib/squad.js`, backed by decision modules in `src/`:
 
-- The delegation tool is `subagent`; the `[TASK OUTCOME]` / `[CACHE STATUS]` notes are appended to its result.
+- The delegation tool is `subagent`. Since OpenCode 2.3 it always runs in the background: its reply is a stub with the child's `sessionID`, and the result arrives later as a `<subagent>` message. Cache status and the empty-result diagnosis therefore come from the `squad_session` tool, not from notes on that reply.
 - The rate-limit guard vetoes the retry through OpenCode 2's `retry` hook instead of aborting the subagent, and steers its explanation into the orchestrator's running turn.
 - No toasts: an OpenCode 2 server plugin has no TUI handle (the metrics refresh still runs, silently).
 - `squad_compact` cannot choose the summarising model — OpenCode 2's compaction settings pick it; the tool takes no model argument.
@@ -51,10 +51,11 @@ The package entry (`index.js`) exports the OpenCode 2 `setup` in `.opencode/lib/
 | `squad-stall` | skill | The orchestrator's stall-breaking ladder — loaded on demand when it recognizes it's stuck (kept separate so a stall doesn't pull in the whole delegation protocol) |
 | `squad-draft` | skill | Scaffolds the per-model squad — discovers available models, proposes a tiered set, asks what to add/remove, then generates a hidden `grunt-<provider>-<model>` (executor) **and** `drill-<provider>-<model>` (reviewer) for each, giving the orchestrator a menu of models for both roles |
 | `squad-redteam` | skill | Cross-model red-team / second-opinion review — dispatches the same artifact or question to several `grunt-*` agents in parallel (user picks the panel via a multi-select question, defaulting to the single strongest grunt per provider) and has the orchestrator cross-analyze their independent findings into one consolidated report. Uses grunts, not drills, since the panel needs live MCP/gitlab/webfetch access to fetch the artifact itself. Same parallel-dispatch-and-consolidate idea as [`@alexmkx/opencode-multi-delegate`](https://github.com/AlexMKX/opencode-multi-delegate), reusing the squad's own grunts instead of a separate delegate config |
-| Bootstrap | hidden injection | Injected into the first user message of the `build` agent; sets the orchestrator role and selection rules, the current local time, the orchestrator's own model, and an inventory of subagents (each with its model) |
-| Context signal | hidden injection | A live `<ORCHESTRATE_CONTEXT>` line added to the latest user message each turn, reporting current context usage so the orchestrator can weigh it in the decision |
+| Bootstrap | system prompt | Appended to the `build` agent's system prompt; sets the orchestrator role and selection rules, the orchestrator's own model, and an inventory of subagents (each with its model) |
 
-The bootstrap carries live session facts resolved at injection time — the current local time (with timezone) and the model the orchestrator is actually running on (so an Opus session does not mistake itself for Sonnet). Each subagent in the inventory is listed with its description, its model and its **context window** (`ctx`, from opencode):
+The bootstrap lives in the system prompt and changes only when the squad or the orchestrator's model does, so it is cached with the rest of the system prompt and the conversation is never modified. Earlier versions injected it — together with the current time and the context size — into the latest user message on every request. Every prompt-cache entry past the system prompt then contained a user message *with* that block, which reverted to its bare text on the next turn, so each warm user turn re-wrote the whole conversation: ~$299 of $869 over 14 days of measured orchestrator sessions. The current time and the orchestrator's context size now come from `squad_session` with no arguments.
+
+The bootstrap names the model the orchestrator is actually running on (so an Opus session does not mistake itself for Sonnet). Each subagent in the inventory is listed with its description, its model and its **context window** (`ctx`, from opencode):
 
 ```
 - `grunt-openai-gpt-6-1-terra`: Code-strong mid-tier … (model: openai/gpt-6.1-terra · ctx 1.1M)
@@ -69,8 +70,11 @@ The inventory carries **no benchmarks and no prices** on purpose. The bootstrap 
 ```
 - zai-coding-plan/glm-5.3 [grunt+drill]: SI 80.6 #19 · ctx 1M · subscription: GLM Coding Pro · TerminalBench4 0.418 · APEX-Agents 0.566 · FrontierSWE 0.302 · ValsIndex 0.599
 - anthropic/claude-sonnet-5-5 [grunt+drill]: SI 85.2 #7 · ctx 1M · $2/$10 · TerminalBench4 0.618 · APEX-Agents 0.755 · FrontierSWE 0.619 · LiveBench-coding 0.772 · ValsIndex 0.708
-- openai/gpt-6.1-terra-fast: same data as openai/gpt-6.1-terra
+- openai/gpt-6.1-terra-fast: ctx 1.1M · tier price unknown · same benchmarks as openai/gpt-6.1-terra
+- opencode/iceman-free: free · no benchmark data
 ```
+
+A tier with another model's scores shows only its own context, plan and rules next to `same benchmarks as`. A tier (`-fast`, `-ultrafast`, `-highspeed`, `-free`) never shows its base model's list price — whether it is asked for alone or together with the base — because the tier is billed on its own; only a SuperIndex row of the tier itself gives it a price. Dated snapshots and `-latest`/`-preview` aliases keep the base price. It says `tier price unknown` instead, so silence is not read as "no dearer than the base"; in `full: true` output such a tier also names whose row it is (`row of <base>`). A model with no benchmarks still shows its context, plan and rules. Only models with nothing at all to show share the trailing `no benchmark data:` line.
 
 `squad_metrics({models: ["a/b", "c/d"], full: true})` (up to 6) returns **every** metric the sources hold for those models, grouped by source and the setting it was measured at — for a close call the summary does not settle.
 
@@ -103,11 +107,11 @@ Fetching: at plugin start and then whenever data is older than **48 hours** (che
 - `providers` — how each opencode provider is paid for: the plan in your own words, or `"api"` for metered billing. Write `{"plan": …, "info": …}` to add a routing rule for **every** model of that provider — trust in who runs the servers ("no secrets") is a provider property, not a model one. `squad_metrics` prints `subscription: Max 5x` instead of a list price; the plugin keeps no catalog of plan limits — the model knows what common plans include. Without an entry, an OAuth login in opencode's `auth.json` and a `*-coding-plan` / `*-token-plan` provider read as `subscription: plan not set`; anything else as metered API. `squad-draft` asks for missing plans once and writes them here;
 - `models.<id>.info` — **your routing rule** for that one model, after the provider's ("no secrets, no production"). It goes into the agent's description as `Owner rule: …`, which the orchestrator treats as binding — it outranks benchmarks — and is shown next to the numbers in `squad_metrics`. Leave it out and the model is routed on metrics and plan alone;
 - `models.<id>.billing` — per-model override of the provider's plan (`"api"` or a plan name);
-- `models.<id>.cache_ttl_seconds` — see [the cache note](#cache-status-hint) below.
+- `models.<id>.cache_ttl_seconds` — see [Session status](#session-status-squad_session) below.
 
 The global file is refreshed at opencode startup: new squad models get an empty entry, removed ones are dropped, every hand-added field is kept, and the benchmark fields earlier versions copied in from Artificial Analysis are stripped. It is written only when something actually changed. A project's file is never auto-touched.
 
-"Hidden" means the subagents are registered but do not appear in the `@` mention menu. The orchestrator invokes them programmatically via `subagent`. Both injections target **only the `build` agent's own sessions** — grunt/drill subagent sessions are never injected into, so there is no recursion.
+"Hidden" means the subagents are registered but do not appear in the `@` mention menu. The orchestrator invokes them programmatically via `subagent`. The bootstrap goes **only into the `build` agent's own requests** — grunt/drill subagent sessions are never injected into, so there is no recursion.
 
 ---
 
@@ -181,25 +185,34 @@ Three independent signals feed the guard, so it also catches failures that never
 
 1. **Session `retry` hook** — once a threshold trips, the plugin vetoes the retry and steers an explanatory note into the parent turn (resuming it if idle). The note tells sarge to choose another model and includes an absolute `Rate limited till <ISO datetime>` deadline when known.
 2. **Terminal `session.execution.failed` events** — a provider limit that produces no retry still gets the same explanatory note when its error matches the guard patterns.
-3. **Silence polling backstop** — an independent timer watches each child session. If it has no activity past `max_silence_seconds`, the plugin interrupts it and sends the parent an explanation, even without a retry or terminal error event.
+3. **Silence polling backstop** — an independent timer watches each child execution: it arms on `session.created` and again on every `session.execution.started`, so a child resumed by its `sessionID` is watched too, and it stops when the execution ends. If an execution has no activity past `max_silence_seconds`, the plugin interrupts it and tells the parent what the interrupt actually did — stopped, already idle, or unconfirmed (the child may still be running, so check before redispatching).
+
+Every note also tells sarge that the subagent may already have changed files or run commands before it stopped, so work with side effects is checked before it is redispatched.
 
 Verified live end-to-end against a genuinely quota-exhausted model, on two separate occasions: the guard caught the limit, told the orchestrator, and the orchestrator switched to a different grunt on its own — then, when that one turned out to share the same exhausted account, switched again to a different provider entirely, all without being told which model to pick. The silence backstop specifically was confirmed against a live subagent that produced zero events for over 10 minutes.
 
 ---
 
-## Cache-status hint
+## Session status (`squad_session`)
 
-The `subagent` tool supports resuming a prior child by passing its `sessionID`, so the orchestrator can continue an existing grunt/drill session (reusing its history and, if timed right, the provider cache) or start fresh. Knowing which is worth it requires knowing the time since the last provider hit, the cache TTL, and the accumulated context size. The plugin's notes label the same session identifier `task_id`; pass it as `sessionID` to `subagent` and as `task_id` to `squad_compact`.
+The `subagent` tool supports resuming a prior child by passing its `sessionID`, so the orchestrator can continue an existing grunt/drill session (reusing its history and, if timed right, the provider cache) or start fresh. Knowing which is worth it requires knowing the time since the last provider hit, the cache TTL, and the accumulated context size.
 
-When a `subagent` call completes, this plugin appends a line to its result:
+The orchestrator asks for these with `squad_session({sessionIDs: [...]})` — every candidate session in one call — at the moment it decides, and gets them computed at that moment, with the arithmetic done:
 
 ```
-[CACHE STATUS] task_id=ses_abc123 — last provider hit ~45s ago (2026-08-27 13:25:16 (Europe/Moscow)), model anthropic/claude-sonnet-5. published cache TTL ~5m — likely still warm. Its context is ~120k / 200k (60%) as of its last completed turn (so right after a compaction this still reads high for one turn). Reusing it re-reads all of that on every step; a fresh session starts from the brief. Pass task_id to continue this same session if you want to reuse it.
+now: 2026-11-18 12:23:41 (Europe/Moscow)
+session ses_abc123 (grunt-anthropic-claude-sonnet-5-5, anthropic/claude-sonnet-5-5)
+cache: WARM — expires in 215 s (last provider request 85 s ago, TTL 300 s, published).
+context: ~26k / 1000k (3%) as of its last finished step. Reusing it re-reads all of that on every step; a fresh session starts from your brief.
 ```
 
-The last-hit time is given both ways on purpose. The relative age is what reads at the moment the task finishes; the absolute wall clock — same format and zone the bootstrap stamps its own "now" with — is what is still usable a turn later, when the orchestrator has to recompute the gap to decide whether to resume. `~17m ago` is meaningless by then. (It is the moment that session last *started* a provider request, not when the task finished.)
+A pulled tool rather than a note appended to the `subagent` result, for two reasons:
+- Since OpenCode 2.3 every `subagent` call runs in the background. The tool result is a stub, and the real result arrives later as a synthetic `<subagent>` message that no tool hook sees. A note on the stub described the session as it was *before* the dispatch.
+- A note is a snapshot: "45 s ago" is wrong a turn later, and leaving the orchestrator to redo the arithmetic against a clock was a source of errors of its own.
 
-The line reports two more things, because warm/cold alone was not enough to decide with: the cache temperature, and **how big the session being offered for reuse has grown**. Reuse re-reads that whole context on every step — the cost the orchestrator was previously blind to. The size is the last *completed* turn's usage, so it still reads high for one turn right after a compaction; the line says so rather than misleading in exactly the compact-then-continue flow it exists to support.
+`sessionIDs` is declared as an array: a string-or-array union is not a schema every provider's tool calling accepts, so the union lives in the code instead — a bare id is accepted too. Without `sessionIDs` the tool returns the current date and time and the caller's own context size. The bootstrap no longer carries a clock: a timestamp that changes every turn has no business in text the prompt cache has to match.
+
+The last-hit time is when that session last *started* a provider request, not when the task finished. The size is the last *finished* step's usage, so it still reads high for one step right after a compaction. If the newest step has no finish reason, the report says the session is probably still running (an aborted step looks the same) and gives no cache verdict.
 
 The TTL comes from an optional hand-edited `cache_ttl_seconds` field in `model_data.json` (same file and pattern as `info`/`billing` above). When that field is absent, `resolveCacheTtl()` (`src/cache-status.js`) resolves one anyway — on the read path, so it works for anyone who never edits the file (which is how it came to be unset for every Anthropic model in the first place).
 
@@ -235,7 +248,7 @@ Results as of 2026-09-01 fed `MEASURED_CACHE_TTL_SECONDS`: `zai` and `zai-coding
 
 This is manual-only and will go stale. That is tolerable here in a way it was not for the read path: it is a periodic measurement, and a provider with no entry now falls through to the tiers above rather than to "unknown".
 
-The `[CACHE STATUS]` line is appended to the completed `subagent` tool result, alongside any `[TASK OUTCOME]` diagnosis.
+The `squad_session` report carries the cache verdict, and any `[TASK OUTCOME]` diagnosis below it.
 
 ---
 
@@ -315,9 +328,10 @@ A third tool covers the other half of reuse:
 
 | tool | what it does |
 | --- | --- |
-| `squad_compact` | compacts a subagent session before it is reused for a new task — `task_id` only; the compaction model comes from OpenCode 2's own settings |
+| `squad_session` | a subagent session's cache verdict (warm for N s / cold for N s), context size, running state and empty-result diagnosis, for one or several sessions per call; without `sessionIDs`, the current time and the caller's own context — see [Session status](#session-status-squad_session) |
+| `squad_compact` | compacts a subagent session before it is reused for a new task — `sessionID` only; the compaction model comes from OpenCode 2's own settings |
 
-Reuse used to be all-or-nothing: pass the `task_id` and re-read the whole
+Reuse used to be all-or-nothing: pass the `sessionID` and re-read the whole
 transcript on every step, or start fresh and lose the history. `squad_compact`
 is the middle option — it runs OpenCode's own `session.compact` so the
 next dispatch reads a summary instead. OpenCode 2's compaction settings select
@@ -358,7 +372,7 @@ Per-agent fields, and why these and not the rest of opencode's agent schema:
 | `steps` | cap on agentic iterations before opencode forces a text response |
 | `disable` | park an agent without deleting it — the soft alternative to a removal |
 
-**Descriptions are generated, not drafted.** An agent's `description` is the line the orchestrator reads when it picks whom to dispatch, so it carries exactly what you own and nothing that goes stale: the role, your `info` for that model as `Owner rule: …`, and the provider's plan (`Billing: subscription (Max 5x).`). The plugin writes it on every `squad_patch` and **rewrites it at every start** from the global `model_data.json` — only files whose text changes, atomically — and opencode reloads changed agent files live. So editing `info` or a plan needs a restart, not a re-draft. Benchmarks, prices and rankings never go in: hand-written ones went stale within a week, and an orchestrator asked to "refresh descriptions" invented them.
+**Descriptions are generated, not drafted.** An agent's `description` is the line the orchestrator reads when it picks whom to dispatch, so it carries exactly what you own and nothing that goes stale: the role, your `info` for that model as `Owner rule: …`, and the provider's plan (`Billing: subscription (Max 5x).`). The plugin writes it on every `squad_patch` and **rewrites it at every start** from the global `model_data.json` — only files whose text changes, atomically — and opencode reloads changed agent files live. So editing `info` or a plan needs a restart, not a re-draft. A `model_data.json` that does not parse is never overwritten: startup leaves it as it is and logs its path and the parse position, the description rewrite is skipped, `squad_patch` refuses until it is fixed, and `squad_metrics` lists it as ignored. Benchmarks, prices and rankings never go in: hand-written ones went stale within a week, and an orchestrator asked to "refresh descriptions" invented them.
 
 Deliberately **not** exposed: `permission` (a drill's read-only contract is a
 safety property, not a preference), `mode`/`hidden`/`color` (ours), and
@@ -398,10 +412,10 @@ That gap is not theoretical. On 2026-09-01 two `zai-coding-plan` grunts (`glm-5.
 
 Given only `""` to look at, the orchestrator announced *«отказ провайдера zai … бриф до оценки даже не дошёл»* and switched providers. Nothing in the session supported either claim — the brief had been parsed line by line and nearly implemented, and the only actual errors in that session were `Tool execution aborted` / `Task cancelled`, i.e. the user's own ESC. A missing diagnosis is bad; an invented one is worse, because the orchestrator acts on it.
 
-So when a `subagent` call returns an empty or truncated result, this plugin appends:
+So when a session's last result is empty or truncated, the `squad_session` report for it ends with:
 
 ```
-[TASK OUTCOME] task_id=ses_fa3e7d7a6ffe… (zai-coding-plan/glm-5.3) hit max_tokens (finish=length; 9 tokens output, 31991 tokens reasoning) and was cut off before emitting anything — the result is empty because the turn never reached one, not because the provider refused or the brief was rejected. The budget went into the reasoning channel, so the work may exist there as drafts; read that session's reasoning before rewriting the brief from scratch. Do not switch providers on this signal. Fix the cap: shorten the brief, split the task, or dispatch a model with room to answer.
+[TASK OUTCOME] sessionID=ses_fa3e7d7a6ffe… (zai-coding-plan/glm-5.3) hit max_tokens (finish=length; 9 tokens output, 31991 tokens reasoning) and was cut off before emitting anything — the result is empty because the turn never reached one, not because the provider refused or the brief was rejected. The budget went into the reasoning channel, so the work may exist there as drafts; read that session's reasoning before rewriting the brief from scratch. Do not switch providers on this signal. Fix the cap: shorten the brief, split the task, or dispatch a model with room to answer.
 ```
 
 Three outcomes get a note, and they say different things:
@@ -409,65 +423,51 @@ Three outcomes get a note, and they say different things:
 | Signal | What the note says |
 | --- | --- |
 | `finish=length`, empty result | Truncated before emitting anything. **Not** a provider failure; don't reroute, fix the cap. Names the reasoning channel when reasoning dwarfs output (>4×), because that is where the work is. |
-| `finish=length`, non-empty result | The result below is **cut off mid-answer** — partial, not a deliverable. Verify what landed on disk. |
+| `finish=length`, non-empty result | The last result is **cut off mid-answer** — partial, not a deliverable. Verify what landed on disk. |
 | empty result, normal finish | Genuinely stopped rather than cut off. Named as such so the two don't get conflated in the other direction either. |
 
 A normal finish that produced a result gets no note at all.
 
-The facts come from the last *completed* assistant turn of the child session — the same `ctx.session.context` read `[CACHE STATUS]` already makes, so this costs no extra call. Deliberately the last turn that carried a finish reason, not simply the newest: an aborted session can end with a stub assistant record. `[TASK OUTCOME]` is also appended when the model or timestamp is unknown, both of which suppress the cache-status line.
+The facts come from the last *completed* assistant turn of the child session — the same `ctx.session.context` read the cache verdict uses, so this costs no extra call. Deliberately the last turn that carried a finish reason, not simply the newest: an aborted session can end with a stub assistant record. "Empty" means that turn produced no text part.
 
 The stored-session regression fixtures exercise both empty-result diagnoses through `formatTaskOutcome()`.
 
 ---
 
-## Provider-quota signal (parser landed, delivery unsolved)
+## Provider-quota signal
 
-Providers report how much of their rate-limit window is already burnt **on every successful response**, and opencode keeps none of it — so the orchestrator only learns a provider is saturated by getting a 429 from it, mid-dispatch, after paying for the work so far.
+Providers report how much of their rate-limit window is already burnt **on every successful response**, and opencode keeps none of it. Without this signal, the orchestrator learns a provider is saturated only when a 429 comes back mid-dispatch, after it has paid for the work so far.
 
-Verified live on 2026-09-01, `HTTP 200` in both cases:
+On OpenCode 2 the plugin reads those headers through the `http.response` session hook. The hook runs on a subagent's own model calls (`kind: "primary"`). The response is left untouched: the hook reads headers only, never the body, and the lookup and note run beside the transport, not in front of it.
+
+What a 200 carries, re-checked on OpenCode 2.1.3 on 2026-11-18:
 
 ```
-POST api.anthropic.com/v1/messages
+POST api.anthropic.com/v1/messages   (Anthropic OAuth)
   anthropic-ratelimit-unified-representative-claim  five_hour   <- which window binds
-  anthropic-ratelimit-unified-5h-utilization        0.07
-  anthropic-ratelimit-unified-5h-reset              1788258600
-  anthropic-ratelimit-unified-7d-utilization        0.06
-
-POST chatgpt.com/backend-api/codex/responses
-  x-codex-primary-used-percent    51    x-codex-primary-window-minutes    300
-  x-codex-secondary-used-percent  15    x-codex-secondary-window-minutes  10080
-  x-codex-credits-has-credits     True
+  anthropic-ratelimit-unified-5h-utilization        0.48
+  anthropic-ratelimit-unified-5h-reset              <epoch s>
+  anthropic-ratelimit-unified-7d-utilization        0.39
 ```
 
-Note what is reported: **used**, not remaining (Anthropic as a fraction, codex as a percent). And `primary`/`secondary` are not fixed windows — codex re-ranks them by whichever is closest to its limit, so `src/quota.js` labels windows by `window-minutes` (300 → `5h`, 10080 → `7d`) rather than by the slot they arrive in. On the Anthropic side `representative-claim` names the binding window outright.
+- **Anthropic** reports **used**, not remaining, as a fraction, and `representative-claim` names the binding window.
+- **Codex** (ChatGPT OAuth): on 2.1.3 the responses carry **no** `x-codex-*` quota headers, only an opaque turn state. `src/quota.js` still parses the 2026-09 format (percent used, windows named by `window-minutes`, since Codex re-ranks primary/secondary), so the note comes back if the headers do. Until then nothing is reported for Codex.
+- **z.ai** sends nothing of the kind.
 
-z.ai returns nothing of the kind (`alt-svc`, `ga-traceid`, `x-log-id`, plumbing), so no snapshot is recorded for it and no claim is made about it.
+A provider that sends no quota data gets no note and no claim.
 
 ### Not polluting the context
 
-Once something feeds it, the clause rides on the `[CACHE STATUS]` note that already exists — no extra message, no extra turn — and stays **silent** unless the binding window crossed a reporting band (60% / 80% / 95%) or sits in the top one. A flat threshold would re-print the same figure on every task result for the rest of the session; transitions carry the same information for a fraction of the tokens, and the top band keeps repeating because there the exact number changes the decision.
-
-At the utilizations actually observed above (7% and 51%) it emits nothing at all:
+The note is steered into the subagent's orchestrator session as a synthetic message. It stays **silent** unless the binding window crosses a band: 60%, 80% or 95%. Inside the top band it repeats only after a further 2-point climb. A rejection is the exception: when the provider reports `rejected`, the note goes out at any utilization, once per change from allowed to rejected. A flat threshold would repeat the same figure on every model call for the rest of the session. Band transitions carry the same information in far fewer tokens.
 
 ```
 [QUOTA] anthropic: 5h 83% (binding), 7d 6% used. The 5h window resets in 2h 25m.
 
-[QUOTA] openai: 5h 97% (binding), 7d 15% used. The 5h window resets in 2h 21m.
-Credits are exhausted on this plan. Route further work to a different provider
-unless it must run here.
+[QUOTA] anthropic: 5h 97% (binding), 7d 15% used. The 5h window resets in 2h 21m.
+Route further work to a different provider unless it must run here.
 ```
 
-### Delivery: two measured dead ends
-
-`src/quota.js` parses and gates; **nothing currently feeds it.** Getting response headers out of opencode has no sanctioned hook — `chat.headers` is request-side, `ProviderHook` exposes only `{id, models}` (`ModelV2` is metadata, not an executable model), and the SDK has no usage/quota endpoint. Two seams were tried and measured:
-
-1. **Wrapping `globalThis.fetch`.** Installed correctly (`patched=true`, `fetch` no longer native, host regex verified) and was then called for **zero** requests. ai-sdk only falls back to `() => globalThis.fetch` when `options.fetch` is unset, and something upstream — the OAuth plugin — already sets it. Dead, not merely ugly.
-
-2. **Injecting `provider.<id>.options.fetch` from the `config` hook.** This *is* the documented ai-sdk seam (`new AY(H, {provider, url, headers, fetch: W.fetch, ...})` in the bundle) and a function can only get there from code. But at `config` time the OAuth plugin has not yet claimed the slot, so wrapping finds it empty, takes it first, and delegates to `globalThis.fetch` — dropping the token injection. Measured: a trivial session hung past a 240s timeout with the call live, and completed in **9.8s** with it disabled.
-
-The untried third option is to intercept the *later* assignment — a `defineProperty` accessor on `options` that wraps whatever the auth plugin assigns — leaving the transport theirs and reading headers on the way past. Unimplemented and unverified; a draft of the wrapper is kept out of tree.
-
-Worth weighing before building it: plugin initialisation order in opencode is undocumented and was established here only by measurement, so each attempt rests on behaviour that can change silently. A response-header hook upstream would make all of this unnecessary.
+Earlier attempts, kept here so nobody repeats them: wrapping `globalThis.fetch` saw zero model requests, because the OAuth plugin sets its own `fetch`. Injecting `provider.<id>.options.fetch` from the V1 `config` hook took the slot before the OAuth plugin did and dropped its token injection. A trivial session then hung for 240s instead of finishing in 9.8s.
 
 ---
 
@@ -483,7 +483,7 @@ The orchestrator picks **DELEGATE** when *any* signal is present (this is the de
 - **Depth** — it would take more than ~3 tool steps.
 - **Artifact** — it produces code, docs, or config.
 - **Heavy I/O** — it would ingest or generate a lot of raw material when you only need a summary (offload it, keep the orchestrator's context clean).
-- **Context pressure** — the fuller the orchestrator's own context already is, the more a heavy task should be delegated rather than burned into it. A live `<ORCHESTRATE_CONTEXT>` line (e.g. `~120k / 1000k (12%)`) reports the current size each turn so this is a real number, not a guess.
+- **Context pressure** — the fuller the orchestrator's own context already is, the more a heavy task should be delegated rather than burned into it. `squad_session` with no arguments reports the current size (e.g. `~120k / 1000k (12%)`), so this is a real number, not a guess.
 
 It picks **SELF** only for: pure Q&A / explanation, a single trivial read, or when you explicitly told it to.
 
@@ -512,7 +512,7 @@ Delegation isn't automatically the cheap option — three factors can flip it:
 
 - **Prompt/KV caching** — a fresh `grunt-*` session starts with no cache hit on your accumulated context, while continuing yourself on a provider with prompt caching reuses your already-cached prefix at a steep discount. For a small task on top of a large, already-cached context, finishing it yourself can beat the cost of writing a brief, spinning up a grunt cold, and reading its result back.
 - **Subscription vs API billing** — a grunt shown as `subscription: <plan>` by `squad_metrics` (see above) costs the user ~$0 marginally regardless of tokens; an API-billed grunt's cost scales with usage. When quality is comparable, the orchestrator prefers the subscription-covered delegate and saves API-billed models for when they're genuinely the better fit — not by default.
-- **Context pressure is not a panic button** — the live `<ORCHESTRATE_CONTEXT>` line is for genuinely heavy work, not an excuse to delegate every minor task once usage looks high. opencode compacts automatically, and for small/quick work the overhead of a task brief plus a grunt round-trip usually costs more than just doing it and letting compaction absorb the overflow.
+- **Context pressure is not a panic button** — the context size from `squad_session` is for genuinely heavy work, not an excuse to delegate every minor task once usage looks high. opencode compacts automatically, and for small/quick work the overhead of a task brief plus a grunt round-trip usually costs more than just doing it and letting compaction absorb the overflow.
 
 For full routing rules, escape hatches, and edge-case handling see [skills/squad-delegate/SKILL.md](skills/squad-delegate/SKILL.md).
 
@@ -548,7 +548,7 @@ The orchestrator opens with its verdict, then proceeds:
 
 **Confirm the plugin loaded**
 
-Check the OpenCode log for a line referencing `opencode-squad` (plugin id `orchestrate`). If the plugin fails to load, the log prints the error immediately after startup.
+Check the OpenCode log for a line referencing `opencode-squad` (plugin id `squad`; `orchestrate` before 0.6.0). If the plugin fails to load, the log prints the error immediately after startup.
 
 **Subagents are hidden — that is intentional**
 
@@ -577,9 +577,12 @@ npm run coverage  # vitest + @vitest/coverage-v8, scoped to src/**; CI-gated at 
 npm run lint      # biome check — formatting + lint
 npm run lint:fix  # biome check --write
 npm run knip      # unused files/exports/dependencies
+npm run test:integration  # the plugin inside the real OpenCode 2 host, offline (Node >= 24)
 ```
 
-Coverage is scoped to `src/**` on purpose — that's the decision-logic layer separated from `.opencode/lib/orchestrate-v2.js`'s session/tool hook plumbing. Package-entry tests additionally check registration and native agent generation.
+`tests-integration/` boots the embedded OpenCode 2.1.3 host (`@opencode/sdk`), loads this repository as a plugin from disk, and replaces the model with `TestLLM` from `@opencode/ai/testing`. No credentials and no network: HOME and the XDG dirs point into a temp directory, and every outbound fetch fails. It checks that the plugin loads and puts its bootstrap in the system prompt, that a scripted tool call reaches `squad_session`, and that a subagent whose model stream hangs is interrupted with one guard note to its orchestrator. All `@opencode/*` dev packages are pinned to one exact release, so the host and the plugin types come from the same build.
+
+Coverage is scoped to `src/**` on purpose — that's the decision-logic layer separated from `.opencode/lib/squad.js`'s session/tool hook plumbing. Package-entry tests additionally check registration and native agent generation.
 
 ---
 

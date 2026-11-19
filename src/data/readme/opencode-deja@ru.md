@@ -1,13 +1,15 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
-<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 48 кодинг-агентов.</b></p>
+<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 49 кодинг-агентов.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 41 агент уже сохраняют каждую сессию на диск.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 42 агента уже сохраняют каждую сессию на диск.<br>
 deja индексирует всю историю локально, чтобы агенты сохраняли контекст после <code>/compact</code>, передавали задачу на полпути через <code>deja handoff</code> и восстанавливали перезаписанный код через <code>deja restore</code> — без LLM, один Go-бинарник.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -26,7 +28,7 @@ deja индексирует всю историю локально, чтобы �
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Сайт и интерактивный поиск</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Живое демо в браузере</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html">Быстрый старт (RU)</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Сайт и интерактивный поиск</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Живое демо в браузере</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html">Быстрый старт (RU)</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="один и тот же вопрос одному и тому же агенту дважды: без памяти он не помнит ничего, с deja отвечает выводом восьмимесячной давности"></p>
 
@@ -134,7 +136,7 @@ shell-скрипт; используйте `scoop install deja-vu` (есть в 
 
 ## Что это даёт
 
-**Решено в Codex — помнит Claude.** Сорок восемь кодинг-агентов пишут каждый разговор в локальные файлы,
+**Решено в Codex — помнит Claude.** Сорок девять кодинг-агентов пишут каждый разговор в локальные файлы,
 deja превращает эти файлы в слой памяти, который читают все они.
 
 | | |
@@ -263,7 +265,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Что именно каждый из них поддерживает — MCP-recall, авто-recall, skills, команды, resume, handoff — см. в
 [матрице возможностей в английском README](../../README.md#supported-harnesses). Нестандартные пути к хранилищам
@@ -367,7 +369,7 @@ deja bench read       # сколько стоит прочитать храни�
 | Возможность | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | История до установки ([нулевой день](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Да — индексирует готовые транскрипты (`36/100` hit@1) | Нет — пишет с момента установки (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Общие агенты | 48 харнесов | 9 (хуки) | 3 (CLI) |
+| Общие агенты | 49 харнесов | 9 (хуки) | 3 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | Рантайм и зависимости | 1 Go-бинарник | Воркер Bun + SQLite + Chroma | Python + модель эмбеддингов на 300 МБ |
 | Вызовы LLM / аккаунт | Не нужны | Вызовы LLM-наблюдателя | Не нужны |
@@ -469,5 +471,3 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## Лицензия
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

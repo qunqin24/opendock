@@ -21,9 +21,9 @@ Then add the package name to the `plugins` list in your project's `opencode.json
 
 Preserve other entries if you already have an OpenCode config.
 
-Open OpenCode in the Code App project, then run `/cap-setup --app-name "My App" --description "My Code App"` to copy the bundled `codeapp-js` template and install `.opencode/agents/codeapp.md`, adapted from the bundled `codeapp-js` agent instructions. Existing agent and app files are left intact. Setup sets `"default_agent": "codeapp"` in the project's existing OpenCode config (preferring `.opencode/opencode.json(c)` when present), or creates `opencode.jsonc`. Comments and unrelated settings, including the model and plugins, are preserved. This sets the default for new sessions; it does not switch the agent of an existing session.
+Open OpenCode in the Code App project, then run `/cap-setup --app-name "My App" --description "My Code App"` to copy the bundled `codeapp-js` template and install `.opencode/agents/codeapp.md`, adapted from the bundled `codeapp-js` agent instructions. Existing agent and app files are left intact except app configuration metadata and the configured HTML title. Setup sets `"default_agent": "codeapp"` in the project's existing OpenCode config (preferring `.opencode/opencode.json(c)` when present), or creates `opencode.jsonc`. Comments and unrelated settings, including the model and plugins, are preserved. This sets the default for new sessions; it does not switch the agent of an existing session.
 
-Add `--skills` to `/cap-setup` to copy the bundled `codeapp-js/AI/skills` into `.opencode/skills`; this is optional, and existing skills are left untouched. You can then ask the agent to load a matching skill or call the `skill` tool yourself. The bundled `start` skill may mention older CAP commands; use `/cap-setup` rather than `cap newApp` in OpenCode.
+Add `--skills` to `/cap-setup` to copy the bundled `codeapp-js/AI/skills` into `.opencode/skills`; this is optional, and existing skills are left untouched. You can then ask the agent to load a matching skill or call the `skill` tool yourself. Use `/cap-skills` or **Browse skills** to read bundled instructions without installing them. The bundled `start` skill may mention older CAP commands; use `/cap-setup` rather than `cap newApp` in OpenCode.
 
 The installed **codeapp** agent asks for approval before running mutating `cap_*` tools. To get the same behavior with other agents, add `{ "action": "cap_mutation", "resource": "*", "effect": "ask" }` under `permissions` in `opencode.jsonc`. Explicit slash commands are user-initiated actions.
 
@@ -42,7 +42,9 @@ Click **Hide bar** to remove the bottom Code App bar and close its drawer. This 
 - The last folder picked in the drawer and the last successfully selected environment are remembered across restarts. These are global plugin preferences, not guesses about the current draft. The session panel still targets its own session folder. The selected folder and environment remain visible, including in mutation confirmations.
 - Click an action to run it directly. Operations with only optional settings (setup/deploy) run using defaults on the first click; optional fields below that section configure a subsequent run from the same action button. Operations requiring typed details show fields in their section; fill them in and press Enter (Ctrl+Enter in multiline fields) or click the original action again. There is no second submit button at the bottom of the panel.
 - Import apps, environments, tables, connectors, flows, and mockups open searchable lists at the bottom of their own section. Selecting a resource starts its action, with confirmation before mutations. **Refresh list** only reloads options; it never runs the action. Search matches names and IDs. Loading spinners, failures, and results appear inside the relevant section.
-- **Change environment** lives under **Power Platform** and saves the chosen environment to workspace configuration and the plugin's preference only after success. Other requests use that remembered selection, or the workspace default if none was saved. The old cloud/region and clear-override controls have been removed from the panel; normal authentication/cloud defaults are used. CLI cloud options remain available.
+- **Change environment** lives under **Power Platform** and saves the chosen environment to the plugin's preference after success. It updates workspace configuration only if `power.config.json` (or `setup/power.config.json`) already exists; selecting an environment in an ordinary folder never creates app configuration. Setup and other requests use that remembered selection, or the workspace default if none was saved. The old cloud/region and clear-override controls have been removed from the panel; normal authentication/cloud defaults are used. CLI cloud options remain available.
+- **Change authentication account** clears cached authentication and opens the account picker. **Log out** clears the shared CAP authentication cache after confirmation. **Toggle debugger** only edits the app build; it does not deploy. Deploy separately, or use Deploy's **Enable debugger** option.
+- **Browse skills** lists every skill bundled with `codeapp-js` and displays the selected instructions inline without a mutation confirmation. **Add flow** also accepts a manually entered flow ID, alongside its searchable list.
 - **Open folder in Explorer** opens the selected folder with the desktop's default file manager. Choosing a mockup opens it directly in Review for sessions, or the default desktop app from the pre-chat drawer.
 - Requests use the active session's server/location, or the explicitly chosen folder in the pre-chat workspace drawer. They never default to the CAP CLI checkout. Power Platform requests are serialized because its runtime uses process-wide state.
 
@@ -55,21 +57,30 @@ Slash commands perform operations directly. Matching namespaced agent tools (`ca
 | Command | Example / purpose |
 | --- | --- |
 | `/cap-sign-in` | Sign in to Power Apps without requiring an existing app configuration |
-| `/cap-setup` | `/cap-setup --app-name "My App" --description "Demo" --skills` — copy template, install agent, optionally install skills |
+| `/cap-change-account` | Clear cached authentication and sign in with the account picker; optional `--cloud <region>` |
+| `/cap-sign-out` | Clear the shared cached Power Platform login |
+| `/cap-skills` | List bundled skills; `/cap-skills cap-cli` reads one without installing it |
+| `/cap-setup` | `/cap-setup --app-name "My App" --description "Demo" --environment <id> --logo-path ./logo.png --skills` — copy template, apply metadata/title, install agent, optionally install skills |
 | `/cap-change-environment` | List environments; pass an environment ID or URL to select one in `power.config.json` |
 | `/cap-deploy` | Push the Code App; optional `--environment <id>`, `--cloud <region>`, `--solution-id <id>` |
-| `/cap-debugger` | Enable debugger bootstrap in `dist/index.js` and deploy |
+| `/cap-debugger` | Toggle debugger bootstrap in the current build's `index.js`, without deploying |
 | `/cap-add-dataverse` | `/cap-add-dataverse account` — add table data source |
 | `/cap-add-connector` | `/cap-add-connector shared_sharepointonline` — add first matching connection |
 | `/cap-add-flow` | `/cap-add-flow <workflow-id>` — add a Power Automate flow |
 | `/cap-add-environment-variable` | `/cap-add-environment-variable --name "Service Settings" --publisher-prefix wd --value '{"enabled":true}'` |
-| `/cap-create-table` | `/cap-create-table --display-name Project --plural-name Projects --field 'Status:choice:New|Active'` |
+| `/cap-create-table` | `/cap-create-table --display-name Project --schema-name wd_Project --publisher-prefix wd --ownership OrganizationOwned --description "Track work"` (optional repeated `--field`) |
 | `/cap-list-mockups` | List HTML mockups under `agent/` without opening a browser |
 | `/cap-import` | `/cap-import "My Existing App"` — import an existing Code App by name or ID |
 
 Use `--environment <id-or-url>` where supported, and quote values containing spaces. Import and add-flow require a specific app or flow identifier, since OpenCode's service is not a terminal picker. Power Apps authentication can open a browser on first use; make sure your OpenCode service runs in an environment where browser sign-in is possible.
 
-**Side effects:** Deploy pushes an app; debugger changes `dist/index.js` before pushing; import copies app files into `dist/`; setup copies template files; table and environment-variable commands modify Dataverse. Unlike the CLI's existing post-generation cleanup, the plugin leaves generated `src/` and `.power/` files in place.
+**Side effects:** Deploy pushes an app (use `--debugger` to enable debugging before pushing); debugger only toggles the bootstrap in the current build's `index.js`; import copies app files into `dist/`; setup copies template files and updates supplied metadata and the configured HTML title; table and environment-variable commands modify Dataverse. Unlike the CLI's existing post-generation cleanup, the plugin leaves generated `src/` and `.power/` files in place. Account change and logout clear CAP's shared authentication cache.
+
+## VS Code extension parity
+
+Aligned with `codeappjsext` **2.1.9**, using exact dependencies `codeapp-js-cli` **1.4.0** and `codeapp-js` **2.4.0**. A dependency override keeps the CLI, setup template, agent and skills on the same SDK version. The parity tests cover authentication, table metadata, setup metadata/title, import/flow/deploy routing, local debugger toggling, skill browsing and environment selection before setup.
+
+OpenCode supplies the panel, agent, permissions and previews instead of VS Code editor/status-bar controls and Copilot registrations. Skills are optionally installed into `.opencode/skills`, not registered with Copilot. Generated artifacts are deliberately preserved, and resource discovery never invokes terminal pickers. Deploy and flow requests explicitly use non-interactive mode. Environment selections made before setup are remembered by the desktop panel; slash commands and tools must pass `--environment`/`environment` until app configuration exists. This plugin does not modify terminal or system `PATH`.
 
 ## Development
 

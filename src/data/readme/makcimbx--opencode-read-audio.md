@@ -98,7 +98,7 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 
 Defaults:
 
-- Model: `xiaomi/mimo-v2.6-flash` (audio input, text output)
+- Model: `xiaomi/mimo-v2.6-flash` (audio input, text output; reasoning is disabled for this model to avoid empty answers)
 - Base URL: `https://openrouter.ai/api/v1`
 
 Environment variables take precedence over OpenCode credentials and provider settings; the tool's `model` argument takes precedence over `OPENROUTER_MODEL`. On OpenCode 1.x, the plugin reads the legacy auth file and global `provider.openrouter.options` configuration.

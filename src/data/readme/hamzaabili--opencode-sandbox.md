@@ -126,7 +126,7 @@ are not preserved. The V1 tool guard checks file arguments (including
 `apply_patch`) and the initial `webfetch` URL, but V1 has no redirect hook.
 Use V2 when permission-rule fidelity matters. The adapter is tested against
 OpenCode 1.19.5. The V2 path is contract-checked against the OpenCode v2 plugin
-API (tested on 2.3.0; the package declares `>=1.19 <2 || >=2.0`). A V1 wrapper
+API (tested on 2.3.2; the package declares `>=1.19 <2 || >=2.0`). A V1 wrapper
 replay is identified by OpenCode's call ID, not by trusting a command string
 that merely starts with the wrapper prefix.
 

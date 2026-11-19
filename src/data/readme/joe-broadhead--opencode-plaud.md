@@ -8,7 +8,7 @@ Plaud is a trademark of PLAUD LLC; this unofficial plugin is not endorsed by the
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0` (2.2.3 or a later 2.2 or 2.3 release), tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Another release inside that range starts, and `/plaud-status` calls it untested. Outside the range the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options).
+- OpenCode `>=2.2.3 <2.4.0` (2.2.3 or a later 2.2 or 2.3 release), tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Another release inside that range starts, and `/plaud-status` calls it untested. Outside the range the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options).
 - macOS or Linux.
 - A Plaud account. Plaud's hosted MCP server, `https://mcp.plaud.ai/mcp`, is in the US; accounts in other regions are untested. If Plaud gives you another address, set it with the [`url`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options) option.
 
@@ -17,7 +17,7 @@ The plugin is plain JavaScript. It bundles no Node runtime or Plaud software, do
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.7
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/plaud-status`: it shows `sign-in required` until you sign in.
@@ -27,7 +27,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.7" }] }
 ```
 
 ## Sign in
@@ -112,7 +112,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/s
    | `"read-only"` | the reads and `plaud_recent` | nothing: exports and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.6", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.7", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -210,7 +210,7 @@ Every option is optional. To add a second Plaud account, give it an alias in `ac
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-plaud#v0.0.6",
+      "package": "github:joe-broadhead/opencode-plaud#v0.0.7",
       "options": { "accounts": ["work"], "exportRoots": ["~/Plaud", "~/Documents/Meetings"] }
     }
   ]
@@ -227,7 +227,7 @@ OpenCode registers itself with Plaud's server automatically, so there is no clie
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.6", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.7", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
   "permissions": [{ "action": "plaud_export", "resource": "*:audio", "effect": "deny" }]
 }
 ```
@@ -291,7 +291,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 
 1. Sign out of each account: `opencode mcp logout plaud`, and `opencode mcp logout plaud-<alias>` for each account in `accounts`. If one answers `MCP server not found` while the plugin is still installed, OpenCode is still loading the plugin for that folder: wait a few seconds and run it again.
 2. Check: `opencode auth list` lists no **Plaud** entry.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.6`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.7`, then `opencode reload`.
 4. Your exports stay in your export roots (`~/Plaud` by default); delete them if you no longer want them. The plugin keeps no other data.
 5. Remove any Plaud rules you copied into your agents' own `permissions`.
 
@@ -303,7 +303,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 - **New Plaud tools.** A tool Plaud adds later follows `access`, so it runs at the default `"all"`. It is not a script method until a plugin release.
 - **Signed links.** Tool results never show a signed link. Audio and transcripts reach a file only through `plaud_export`.
 - **Unattended exports.** An export folder is outside the project, so an unattended run needs the `external_directory` rule as well as `plaud_export` (see [Permissions](#permissions)).
-- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release starts, and `/plaud-status` marks it untested.
+- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. A later 2.2 or 2.3 release starts, and `/plaud-status` marks it untested.
 - **Other accounts in Jelly.** Jelly's declaration names another account's reads as patterns (`plaud-*.get_file` and the rest), so they keep their read-only rules in Jelly. In a Jelly that does not yet write a pattern's rules, those tools follow the plugin's namespace and are denied at Read only, reads included.
 - **Jelly.** The settings declare their choices and bounds, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **The recordings source.** `plaud.recordings` names the owner the account's last `probe` named, so every listing of an account, with a cursor or without, needs a probe of it since OpenCode started (`UNAVAILABLE` otherwise). A cursor issued for another Plaud user than the one the probe names is refused (`CURSOR_INVALID`). The source contract `v0.2.0` can let a page read who is signed in itself (`permission.readsIdentity`), but a consumer on `v0.1.x` refuses that key, so the plugin declares it only once Memory and Jelly read `v0.2.0`.

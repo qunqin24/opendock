@@ -15,8 +15,6 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 > tool is still registered for agents that want to check the quota on their own; only that path involves a model,
 > because an agent is already running.
 
----
-
 ## Features
 
 - **Footer status line**: used 5h and weekly credits (the same percentage as the report's *Usage* column) with a reset countdown, refreshed every 2 minutes through a
@@ -28,16 +26,15 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
   *GLM credit limits*), so it runs instantly and never starts an agent.
 - **Credit-native**: speaks the CREDIT_LIMIT format (5h and weekly windows), not the legacy token quotas; no fake
   fallback numbers.
-- **Zero dependencies**: the server part is compiled plain TypeScript, the TUI part is JSX compiled by OpenCode
-  itself. Nothing to install, nothing to audit.
+- **Zero dependencies**: nothing is installed at runtime. The server part is plain TypeScript; the TUI part is
+  precompiled to plain JavaScript (`dist/tui.js`, compiled from `src/tui.tsx` by `npm run build` with Solid's
+  Babel preset). Babel is a build-time dev dependency only; the published package ships no third-party code.
 - **Reads your existing login**: takes the API key from OpenCode v2's credential store (`opencode.db`, opened
   read-only with Bun's built-in SQLite inside OpenCode), with `auth.json` and `ZAI_API_KEY` / `ZHIPU_API_KEY` as fallbacks. Works with
   both the Global (`api.z.ai`) and China (`open.bigmodel.cn`) platforms.
 - **Coded conservatively**: the plugin calls the same three fixed monitor endpoints with the same auth header as
   Z.ai's own tooling; API failures (a bad key, rate limits, timeouts) are shown as such, with the key scrubbed from
   the message.
-
----
 
 ## Installation
 
@@ -60,10 +57,10 @@ You will need:
 2) **Build and copy (manual installation, for advanced users)**
     - Clone the repository or download the source code from GitHub.
     - Go to the folder with the code in your Terminal.
-    - Run `npm install --ignore-scripts` (nothing needs scripts; this only fetches the TypeScript compiler) and
-      `npm run build` to produce `dist/`.
+    - Run `npm install --ignore-scripts` and `npm run build` to produce `dist/` (the server part and the
+      precompiled TUI part).
     - Copy the plugin into OpenCode's global plugins folder, so the layout is
-      `~/.config/opencode/plugins/opencode-zai-limits/` containing `package.json`, `dist/` and `src/`. OpenCode
+      `~/.config/opencode/plugins/opencode-zai-limits/` containing `package.json` and `dist/`. OpenCode
       finds plugin folders there on its own; to remove it, delete the folder.
     - Restart OpenCode. `opencode plugin list` should show the local plugin.
     - You are perfect, the meter is in your footer and `/zai-limits` is in every session.
@@ -80,10 +77,8 @@ Use one of the two, not both, or you get two meters.
   footer meters and two quota tools side by side.
 
 There are no command or agent files to copy: the plugin has two parts, the server part (the `opencode-zai-limits`
-tool for agents) and the TUI part (`src/tui.tsx`: the footer meter and the `/zai-limits` command, compiled by
-OpenCode at load), and one plugin entry loads both.
-
----
+tool for agents) and the TUI part (`dist/tui.js`, built from `src/tui.tsx`: the footer meter and the `/zai-limits`
+command), and one plugin entry loads both.
 
 ## Usage
 
@@ -121,8 +116,6 @@ OpenCode at load), and one plugin entry loads both.
 - The monitor endpoints are not documented by Z.ai. They are the same ones the official console and plugins use, but
   they may change without notice.
 
----
-
 ## How it works
 
 The server part registers the `opencode-zai-limits` tool for agents. Its credential module finds your GLM Coding Plan
@@ -134,8 +127,10 @@ ever runs outside Bun, it falls back to the `sqlite3` CLI (3.33+, `--readonly`, 
 and the meter read. When a request fails, the report shows the error (the key scrubbed from it) instead of empty
 tables.
 
-The TUI part (`src/tui.tsx`) is a second plugin part compiled by OpenCode's own Solid/OpenTUI loader. It keeps the
-last quota snapshot in a Solid signal, refreshed every 2 minutes, and renders one `<text>` into the
+The TUI part (`src/tui.tsx`) is compiled at build time to `dist/tui.js` with Solid's Babel preset. That is
+deliberate: OpenCode transforms local `.tsx` TUI parts at load time, but its transform skips files under
+`node_modules`, where an npm-installed plugin lives, so the published package must ship plain JavaScript. It keeps
+the last quota snapshot in a Solid signal, refreshed every 2 minutes, and renders one `<text>` into the
 `prompt.footer.status` slot (the line below the input field) and `home.footer.status`.
 
 It also registers `/zai-limits` as a TUI command: a keymap layer with a `slash` name, the same mechanism OpenCode's
@@ -146,26 +141,28 @@ plugin types yet; it is taken from OpenCode 2.3's own built-in plugins, so a fut
 `Plugin.define()` in `@opencode/plugin` is an identity function (it returns its argument), so the plugin ships
 without the SDK and its ~180 MB dependency tree.
 
----
-
 ## Development
 
 ```bash
 npm install --ignore-scripts
-npm run build        # dist/ (server part; tui.tsx ships as source, OpenCode compiles it)
-npm run typecheck    # build, then type-check tui.tsx against dist/ declarations
+npm run build        # dist/ (server part + dist/tui.js compiled from src/tui.tsx)
+npm run typecheck    # type-check without writing dist/ (tui.tsx needs the dist/ declarations of a build)
+npm run check        # build + typecheck + static check of dist/tui.js (scripts/check-tui.mjs)
 npm run clean
 ```
 
-There is no test suite yet; `npm run typecheck` is the check.
+There is no test suite yet; `npm run check` is the check. A local plugin folder needs `npm run build` first:
+`./tui` points at `dist/tui.js`.
 
 | Path | What it is |
 |---|---|
 | `src/index.ts` | server part: the `opencode-zai-limits` tool and `executeGlmQuota` (fetch + report) |
 | `src/quota.ts` | `parseQuota`: the quota response as a typed snapshot (5h, weekly, MCP) |
 | `src/report/` | the Markdown report, a pure function of already-fetched data |
-| `src/tui.tsx` | TUI part: the footer meter and the `/zai-limits` dialog (Solid JSX, compiled by OpenCode) |
+| `src/tui.tsx` | TUI part: the footer meter and the `/zai-limits` dialog (Solid JSX, compiled to `dist/tui.js`) |
 | `src/tui-support.ts` | the one module `tui.tsx` imports from `dist/` |
+| `scripts/build-tui.mjs` | compiles `src/tui.tsx` to `dist/tui.js` with Babel (`babel-preset-solid`) |
+| `scripts/check-tui.mjs` | static check of `dist/tui.js`: imports resolve, only host modules and helpers |
 | `src/api/` | HTTPS client, endpoints, platform detection |
 | `src/utils/` | credentials, auth paths, durations, formatting, time windows |
 | `types/`, `tsconfig.tui.json` | type-checking setup for `tui.tsx` (no runtime role) |
@@ -173,8 +170,6 @@ There is no test suite yet; `npm run typecheck` is the check.
 Releases are cut from a `vX.Y.Z` tag: the release workflow checks that the tag matches `package.json`, builds and
 type-checks, smoke-tests the packed tarball, publishes it to npm with trusted publishing (with a provenance statement,
 no stored token) and creates the GitHub release with the tarball attached.
-
----
 
 ## Credits
 

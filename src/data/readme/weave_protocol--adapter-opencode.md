@@ -1064,14 +1064,22 @@ done
 
 ## 🗺️ Roadmap
 
-### Q1 2027: coming soon
+### Q4 2026: shipped
 
-The full Q1 2027 roadmap is on its way. Planned so far:
+Details are under [What's New](#-whats-new) and in each package's README.
+- **One WARD.md in 11 harnesses:** Claude Code, Antigravity, Microsoft Agent Framework, Gemini CLI, Codex, OpenCode, Cursor, Qwen Code, CodeBuddy Code, Qoder and TRAE. All of them report to the dashboard, and each Chinese harness has its own adapter, live-checked in the real product.
+- **Model-endpoint guardrails:** secrets or personal data sent to a model API your policy doesn't list need approval, and `model_jurisdictions` decides whose model providers an agent may call.
+- **Mund reads Chinese**, including the usual tricks for dodging keyword filters.
+- **Signed policies, signed decision receipts, and receipts anchored on-chain.**
+- **Fail-open hardening:** we audited every adapter for ways a harness can drop Ward's answer. TRAE's sandbox and Gemini CLI's and Qwen Code's macOS sandboxes could. Each is fixed (adapter-trae 0.1.1, Ward 0.3.12 and 0.3.13) and re-checked under the real sandbox.
 
-- **More harness adapters: done.** [Gemini CLI](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-geminicli), [Codex CLI](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex), [OpenCode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) and [Cursor](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) now enforce the same `WARD.md` through Ward's shared evaluator. Next is adding them to the dashboard.
-- **Model-endpoint guardrails.** A WARD network rule and a Mund check that flag secrets or personal data sent to model endpoints your policy doesn't list.
+### Q1 2027: planned
 
-Everything shipped through Q4 2026 is under [What's New](#-whats-new) and in each package's README.
+This is the plan as of November 2026, and it will change.
+- **Q4 2026 report:** a public write-up like the [Q3 2026 report](https://tyox-all.github.io/Weave_Protocol/q3-2026.html), covering this quarter's harness coverage, live checks and fail-open findings.
+- **Container sandboxes:** Gemini CLI and Qwen Code can run inside Docker or Podman, where the hook isn't installed, so the harness lets every call through. Make the adapters detect it and warn, and document how to add the hook to the sandbox image.
+- **Qoder IDE and JetBrains plugin:** map their own tool names (such as `run_in_terminal`) in adapter-qoder, and live-check them.
+- **More Chinese coding agents,** each with its own adapter: Kimi Code and DeepSeek's agent first. Also a live check of TRAE's China build.
 
 ---
 

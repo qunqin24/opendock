@@ -7,7 +7,9 @@ Get **detailed agent messages** on your iPhone: task finished, permission needed
 ## Features
 
 - **Detailed content** — Sends the agent's actual last message, not just "task completed"
-- **Category badges** — iOS subtitle shows what happened: ✅ Responded / 🔐 Wait for Permission / ❓ Input Needed
+- **Category badges** — iOS subtitle shows what happened: ✅ Responded / 🔐 Wait for Permission / ❓ Input Needed / ❌ Error
+- **Markdown replies** — Headings, lists and code blocks keep their formatting
+- **Auto-dismiss** — Answer a permission or question on the computer and its notification disappears from the phone
 - **Session-aware** — Includes the session title in every notification
 - **Zero dependencies** — Pure TypeScript, runs on Bun
 
@@ -58,6 +60,11 @@ Restart OpenCode.
 | `barkUrl` | string | `https://api.day.app` | Bark server URL (for self-hosted) |
 | `level` | string | `timeSensitive` | iOS notification level |
 | `group` | string | `opencode` | iOS notification group |
+| `expireAfter` | string \| number | *(permanent)* | Auto-delete notifications after this long, e.g. `"5m"`, `"30m"`, `"1h"`, `"24h"`, `"2d"`, `"90s"`. A bare number means minutes. `"permanent"` / `0` / unset = never delete |
+| `markdown` | boolean | `true` | Send the reply as Markdown (Bark's [`markdown`](https://github.com/Finb/Bark/blob/master/docs/en-us/params.md#markdown) parameter) so its formatting is kept. A short plain-text `body` is still sent for older Bark versions |
+| `autoDismiss` | boolean | `true` | Delete 🔐 / ❓ notifications from the phone once answered in opencode (Bark's [`id`](https://github.com/Finb/Bark/blob/master/docs/en-us/params.md#id) + [`delete`](https://github.com/Finb/Bark/blob/master/docs/en-us/params.md#delete)). Requires **Background App Refresh** for Bark in iOS settings |
+
+> `expireAfter` maps to Bark's [`ttl`](https://github.com/Finb/Bark/blob/master/docs/en-us/params.md#ttl) parameter: when it expires, Bark deletes the history entry and removes the notification from Notification Center. It only applies to pushes saved to Bark's history (on by default).
 
 ### Example with all options
 
@@ -68,7 +75,10 @@ Restart OpenCode.
       "barkKey": "YOUR_KEY",
       "barkUrl": "https://your-bark-server.com",
       "level": "active",
-      "group": "my-agent"
+      "group": "my-agent",
+      "expireAfter": "1h",
+      "markdown": true,
+      "autoDismiss": true
     }]
   ]
 }
@@ -81,6 +91,7 @@ Restart OpenCode.
 | Session complete | **✅ Responded** | The agent's last reply (up to 500 chars) |
 | Permission request | **🔐 Wait for Permission** | Permission type + patterns |
 | Question | **❓ Input Needed** | The question text |
+| Session failed | **❌ Error** | The error message (sent instead of ✅; cancelling is not an error) |
 
 ## Pairing with desktop notifications
 

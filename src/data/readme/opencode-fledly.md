@@ -11,6 +11,7 @@ Sign in with your Fledly account the first time a tool runs. A free account work
 | Claude.ai, Claude Desktop | Settings > Connectors: add Fledly from the directory, or add a custom connector with `https://fledly.app/mcp` |
 | Claude Code | `claude mcp add --transport http fledly https://fledly.app/mcp`, or the plugin: `/plugin marketplace add synthentica/fledly`, then `/plugin install fledly@fledly` |
 | Cursor | Install Fledly from the Cursor Marketplace, or add the server to `~/.cursor/mcp.json` (below) |
+| Gemini CLI | `gemini extensions install https://github.com/synthentica/fledly`, then run `/mcp auth fledly` in Gemini CLI to sign in |
 | Hermes Agent | `hermes plugins install synthentica/fledly --no-enable`, then `hermes plugins enable fledly` |
 | OpenCode | `opencode plugin opencode-fledly` |
 | Any agent with skills (Cursor, Codex, Claude Code and others) | `npx skills add synthentica/fledly` (the skill only; add the MCP server too) |
@@ -99,6 +100,7 @@ Restart OpenCode. The first Fledly tool call opens the sign-in page; you can als
 | `.cursor-plugin/`, `cursor-mcp.json` | Cursor Marketplace plugin (skill + hosted MCP server) |
 | `.mcp.json`, `.claude-plugin/` | Claude Code plugin and marketplace |
 | `index.js`, `package.json` | The `opencode-fledly` npm package for OpenCode |
+| `gemini-extension.json` | Gemini CLI extension (skill + hosted MCP server) |
 
 Tools, data coverage and privacy: https://fledly.app/docs/mcp/. Support: hello@fledly.app.
 
