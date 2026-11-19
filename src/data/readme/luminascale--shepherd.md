@@ -1,0 +1,414 @@
+<p align="center">
+  <strong>SHEPHERD</strong><br />
+  <em>Native Herdr agent orchestration for Pi and OpenCode</em>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> · <a href="#key-features">Features</a> · <a href="#available-tools">Tools</a> · <a href="#settings">Settings</a> · <a href="#fieldnotes">Fieldnotes</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/%40luminascale%2Fshepherd" alt="Apache-2.0 license" /></a>
+  <a href="https://github.com/MikkelKappelPersson/shepherd/stargazers"><img src="https://img.shields.io/github/stars/MikkelKappelPersson/shepherd?logo=github" alt="GitHub stars" /></a>
+  <a href="https://github.com/MikkelKappelPersson/shepherd/releases/latest"><img src="https://img.shields.io/github/v/release/MikkelKappelPersson/shepherd?label=release" alt="latest stable release" /></a>
+  <a href="https://www.npmjs.com/package/@luminascale/shepherd"><img src="https://img.shields.io/npm/v/%40luminascale%2Fshepherd?label=npm&logo=npm" alt="npm version" /></a>
+</p>
+
+Shepherd is a no-fuss extension for native, low-level Herdr agent orchestration. The **Shepherd**—your main session can launch and coordinate specialized agents in visible Herdr panes, while shared session fieldnotes (artifacts) let agents share context across delegated work.
+
+## Install
+
+| Harness | Installation | Quick install | Verify after restart |
+| --- | --- | --- | --- |
+| Pi | [Pi setup guide](docs/guides/installation.md#pi) | `pi install npm:@luminascale/shepherd` | `/shepherd agents` |
+| OpenCode | [OpenCode setup guide](docs/guides/installation.md#opencode) | add `@luminascale/shepherd` to `plugins` in `opencode.json` | `/shepherd agents` |
+
+The tools, opaque ids, agent definitions, and fieldnotes layout are shared across both hosts.
+
+## Key Features
+
+-   **Native, no-fuss, low-level Herdr agent orchestration** — Shepherd uses native Herdr panes for all agents and simple, open primitives for agent orchestration. Everything is visible and inspectable. Shepherd does not impose a workflow; it gives you the tools to build your own.
+-   **Herdr and hc support** — run inside the [Herdr](https://github.com/herdrdev/herdr) TUI or an [hc](https://github.com/herdrdev/herdr-core) terminal in [herdr-app](https://github.com/herdrdev/herdr-app); launched agents stay visible and inspectable in their panes or terminals. `backend: auto` runs where you called from, or pin `herdr` / `hc`.
+-   **Granular system-prompt and agent-context support** — Shepherd goes beyond standard definitions and utilises pi's open system-prompt. Shepherd agents can be defined with granular control over context for very specific and narrow agent and context control.
+-   **Manual agent launch** — start an interactive specialist directly with `/shepherd spawn` and chat with it in its own host session.
+-   **Shared session fieldnotes (artifacts)** — give agents a durable shared place to leave notes and share context across delegated work, on the same layout in both hosts.
+
+## Requirements
+
+-   [Pi](https://github.com/earendil-works/pi) **or** [OpenCode](https://opencode.ai) (see [Install](#install))
+-   [Herdr](https://github.com/herdrdev/herdr) (TUI panes) **or** [herdr-app](https://github.com/herdrdev/herdr-app) / [herdr-core](https://github.com/herdrdev/herdr-core) (desktop-app terminals)
+-   Node.js 22 or newer
+
+## Available tools
+
+pi-shepherd exposes these tools to the Shepherd. You can use them explicitly when you need precise control, but ordinary natural-language requests are the recommended starting point:
+
+| Tool | Purpose |
+| --- | --- |
+| `shepherd` | List definitions (`agents`), list active agents (`herd`), or remove stale pane registrations (`prune`) |
+| `shepherd_spawn` | Create an idle persistent agent |
+| `shepherd_delegate` | Start a tracked task; returns immediately with a task ID |
+| `shepherd_message` | Send an asynchronous message (parent or peer); `expectsReply` opens a tracked reply request |
+| `shepherd_watch` | Receive task completion without blocking the current turn (task IDs preferred, legacy prompt IDs still work) |
+| `shepherd_status` | Inspect an agent without focusing its pane; reports process and task state independently |
+| `shepherd_close` | Close an owned agent, cancel its active task, and clear pending requests |
+| `shepherd_read` | Read recent terminal output for diagnostics |
+
+Child agents additionally see `shepherd_message` (talk to the parent or a peer) and `shepherd_done` (the only normal successful completion of their tracked task).
+
+## Your first delegation
+
+You do not need to call Shepherd’s tools yourself. After restarting pi, describe the work you want done in your normal conversation, or nudge the Shepherd to delegate it explicitly. Phrases such as “use Shepherd,” “ask the herd,” “ask a sheep,” “delegate this,” “orchestrate a review,” or “use a subagent” are all natural-language requests; no special syntax is required. For example:
+
+> Ask a planner to create an implementation plan for adding authentication, including the relevant files and recommended steps.
+
+The Shepherd starts the planner in a visible Herdr tab, gives it the task, collects its result, and reports back to you. This is the recommended one-shot workflow. Shepherd’s structured tools are still available when you need explicit lifecycle control, parallel work, or want to inspect what the Shepherd is doing; see [Placement and lifecycle](#placement-and-lifecycle) below.
+
+### Work directly with a specialist agent
+
+If you would rather work with a specialist directly, use the human command surface described in the [Command reference](#command-reference). Switch to the new Herdr tab to chat with the planner. Spawning creates an idle, persistent agent; it does not submit a task. Close interactive agents when you are finished so your Herdr session does not accumulate unnecessary panes.
+
+## Common workflows
+
+### Sequential work
+
+Use sequential delegation when one agent’s result should inform the next agent’s task. Describe the handoff in your request:
+
+> Ask a planner to create an implementation plan for adding authentication. Once it has finished, give its plan to a worker and ask the worker to implement the feature. Return the implementation result when it is complete.
+
+The Shepherd waits for the planner before starting the worker and passes the planner’s result along as context. This is useful for plan-then-implement, research-then-review, or any workflow with a clear handoff.
+
+### Parallel work
+
+Use parallel delegation when tasks are independent. Ask the Shepherd to delegate them together:
+
+> Ask two scouts to work in parallel: have one research how authentication is implemented and the other research authorization. Wait for both results, then summarize the findings and explain any relevant connections.
+
+The Shepherd runs the independent tasks concurrently and combines their results. This is useful for comparing approaches, investigating separate parts of a codebase, or getting multiple reviews of the same change.
+
+### Delegate, then watch
+
+The tracked-task workflow is: spawn, delegate, watch, close. `shepherd_delegate` starts the work and returns immediately with a **task ID**; nothing is settled until the child calls `shepherd_done` (or the task fails, is cancelled, or times out).
+
+```text
+shepherd_spawn({ agent: "worker", label: "auth" })
+shepherd_delegate({ target: "<agent ID>", task: "Implement the auth middleware from the plan." })
+shepherd_watch({ id: "<task ID>" })
+```
+
+When the task settles, the watcher delivers a completion notification containing the result. Delivery uses pi's steer mode: if the Shepherd is mid-turn, the notification is injected between tool rounds (before cleanup calls such as `shepherd_close`); if the Shepherd is idle, it triggers a new turn immediately. Watchers finish automatically after all their tasks settle; they do not close agents. Use `shepherd_watch` for non-blocking completion notifications and `shepherd_status` to inspect intermediate task state.
+
+Watching is optional, but completion is never silent: a tracked task that settles while no watcher is attached produces one notice. When the Shepherd is mid-turn, the notice is appended at the next settle boundary (one extra model request, never a mid-turn interruption); when the Shepherd is idle, it arrives as a single coalesced wake covering the whole batch. The notice names the settled tasks and the `shepherd_watch({ id: [ … ] })` call that retrieves their full results. It never claims a result is lost — a watcher registered after settlement still receives the result synchronously. `shepherd_watch` on a settled task clears its pending notice, and `shepherd_close` reports any notices it drops for that agent. The notice holds on both backends: an hc terminal settle produces the same wording as a Herdr pane settle (only the opaque task/agent ids differ). On hc, a 250 ms background poll settles queued completions even with no watcher and no messages, and `shepherd_watch` / `shepherd_status` drain first so they never report stale pending/running for an already-settled task.
+
+### Forgotten completion nudges
+
+If a child ends its turn while its tracked task is still open — the common slip being finished work with no `shepherd_done` — the child extension notices at that exact boundary and feeds itself one reminder turn asking for a terminal `shepherd_done`. The nudge is deliberately narrow: it only fires for a tracked task the child still holds, never after an aborted or errored turn, and never while a tracked request (`expectsReply`) is outstanding, because ending the turn is how a child waits for an answer.
+
+The reminder budget is one turn per task by default (`PI_SHEPHERD_DONE_NUDGES`, `0` disables it). If the task is still open afterwards, the child reports the stall to the parent as a normal Shepherd message instead of inventing a status — the parent then blocks, cancels, or waits for the task deadline. Legacy `shepherd_prompt` runs are unaffected: they settle through the completion sidecar at turn end.
+
+### Messaging between agents
+
+Agents in the same project can message each other through the parent broker. The child's `shepherd_message` tool can target `parent` or an owned agent ID. A peer question that requires an answer is sent with `expectsReply: true`:
+
+```text
+shepherd_message({
+  target: "<planner agent ID>",
+  message: "Which retry backoff should the middleware use?",
+  taskId: "<own task ID>",
+  expectsReply: true
+})
+```
+
+The angle-bracket values above are documentation placeholders only. At runtime,
+copy the planner's exact `id` from `shepherd_spawn` into `target`; do not use
+`planner`, a display label, or a Herdr pane ID. Invalid targets are rejected.
+
+While the answer is outstanding, the sender's task is `waiting` — even though its pi process is `idle` and the child's turn has ended. The reply (correlated by `replyTo`) returns the task to `running`; a `shepherd_done`, cancellation, or the reply deadline settle it. Delivery modes: `followUp` (default) queues the message for the recipient's next turn; `steer` injects it urgently into an active turn. Child requests (`expectsReply: true`) and replies wake the parent at the next safe boundary (between tool rounds when the Shepherd is mid-turn, immediately when it is idle); ordinary informational messages remain passive. A wake-up never interrupts an active tool call.
+
+### Continue working while an agent runs
+
+`shepherd_watch({ id: prompt.id })` is also non-blocking for the legacy prompt path; completion arrives as a steered notification.
+
+### Compatibility
+
+`shepherd_prompt` is a **deprecated** one-turn compatibility path: each prompt still completes at the end of that child turn (that semantics is unchanged and documented, not silently altered). Use `shepherd_delegate` instead for any work that may need to answer or receive a reply. `shepherd_watch` accepts task IDs (`shepherd_delegate`) and legacy prompt IDs (`shepherd_prompt`) and returns immediately; completions arrive as steered notifications. Use `shepherd_status` to inspect running or waiting tasks.
+
+## Agent definitions
+
+Agent definitions are Markdown files, so you can tune an agent’s behavior with granular system-prompt engineering. Define its role, workflow, tools, model, and prompt options in YAML frontmatter and the Markdown body. The supported frontmatter fields are:
+
+| Field | Values | Default | Description |
+| --- | --- | --- | --- |
+| **`name`** | String | — | The agent’s name. **Required.** |
+| **`description`** | String | — | A short description shown during discovery. **Required.** |
+| **`tools`** | Comma-separated string or YAML list | pi’s default tools | Tools available to the agent. |
+| **`model`** | Provider-qualified model, `null`, or `default` | Shepherd’s model | Select the model, for example `anthropic/claude-sonnet-4-5`. `null`, `default`, or omission inherits the Shepherd’s model. |
+| **`thinking`** | `default`, `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | Shepherd’s level | Select the requested Pi thinking level. `null`, `default`, empty, or omission inherits the Shepherd’s current level. Unsupported levels are clamped by Pi to the child model’s capabilities. |
+| **`omit-system-prompt`** | `true`, `false` | `false` | Omit pi’s built-in system prompt when `true`. |
+| **`omit-pi-documentation`** | `true`, `false` | `false` | Omit pi’s built-in documentation guidance when `true`. |
+| **`omit-context-files`** | `true`, `false` | `false` | Omit automatic `AGENTS.md` and `CLAUDE.md` context-file loading when `true`. |
+| **`user-invocable`** | `true`, `false` | `true` | Indicate whether the agent is intended to be directly invoked by a user. |
+
+For example:
+
+```markdown
+---
+name: tester
+description: Runs and evaluates GUI tests
+tools: read, grep, find
+model: anthropic/claude-sonnet-4-5
+thinking: high
+omit-system-prompt: false
+omit-pi-documentation: true
+omit-context-files: true
+user-invocable: true
+---
+
+You are a focused GUI testing specialist. Report reproducible failures
+with exact steps and useful evidence.
+```
+
+`thinking` is a requested level. Pi clamps it to a level supported by the
+child model, so `xhigh` may become `high`, and a model that cannot
+disable reasoning may not honor `off`. `none` is invalid; use `off` for an
+explicit no-reasoning request. Invalid `thinking` or `model` values cause that definition to be skipped during discovery rather than preventing other agents from loading.
+
+### Bundled definitions and discovery
+
+The bundled agent definitions are:
+
+-   `scout` — fast codebase investigation
+-   `planner` — planning and decomposition
+-   `worker` — implementation work
+-   `reviewer` — review and verification
+
+User and project definitions can add or override these names. Discovery precedence is:
+
+1.  `~/.pi/agent/agents/`
+2.  `~/.agents/agents/`
+3.  nearest project `.pi/agents/`
+4.  nearest project `.agents/agents/`
+5.  bundled `.pi/agents/`
+6.  bundled `.agents/agents/`
+
+Discovery defaults to `both` scope, so repository-controlled definitions are listed alongside user definitions. The confirmation gate (`confirmProjectAgents`) is user-owned and off by default; enable it in `/shepherd settings` when working in untrusted repositories — a project file can never change it. The bundled definitions can be disabled from settings. Agents retain the host user’s normal pi tool permissions.
+
+## Placement and lifecycle
+
+By default, `shepherd_spawn` creates a background Herdr tab. You can request a pane or workspace placement:
+
+```text
+shepherd_spawn({
+  agent: "worker",
+  label: "implementation",
+  placement: "pane_right", // pane_right, pane_down, tab, or workspace
+})
+```
+
+The working directory defaults to the Shepherd session and `cwd` can be supplied when spawning. The child model and requested thinking level come from the discovered agent definition; omission, `null`, or `default` inherits the Shepherd session's corresponding setting. Agent scope, project approval, and prompt-shaping options come from Shepherd settings and the discovered definition; they are not spawn overrides.
+
+### Subagents and separate agents in the Herdr app
+
+When Shepherd runs in an hc terminal in the Herdr desktop app, a spawned agent is normally a **subagent**: Herdr lists it under the calling agent. Pass `no_parent: true` to launch a **separate agent** instead — a parentless terminal that Herdr adopts into its own tab at the same level, not under the caller:
+
+```text
+shepherd_spawn({
+  agent: "worker",
+  label: "independent review",
+  no_parent: true,
+})
+```
+
+Separate agents are still ordinary Shepherd sheep: the same opaque id, delegation, messaging, watching, fieldnotes, and close path apply. Only their place in the Herdr layout changes. If the calling terminal has no Herdr app space to place them in, the spawn fails with a clear hint rather than silently creating a subagent.
+
+`/shepherd spawn <agent>` always uses `no_parent: true` in the Herdr app: typing the command by hand means you want a separate agent with that definition's context. This mode is **hc/herdr-app only**. The older Herdr TUI has no parent relationship — every agent there already gets its own pane — so `no_parent` is accepted and ignored, and the result says so.
+
+Lifecycle tools use short, opaque, session-scoped IDs:
+
+```text
+shepherd_spawn    -> agent ID      (for delegate, message, status, close)
+shepherd_delegate -> task ID       (for watch, wait, message taskId, shepherd_done)
+shepherd_message  -> message ID    (answer it with replyTo)
+```
+
+Task IDs identify the unit of work; message IDs identify individual envelopes and only matter when correlating a reply (the answering participant sets the request's message ID as `replyTo`). When the Shepherd answers a child-originated request, the parent resolves its own pending request as soon as that reply is queued, so the child does not need to send a redundant acknowledgment before calling `shepherd_done`. Do not substitute a Herdr pane ID for any of these. Pane IDs are only diagnostic targets for `shepherd_read`.
+
+## Command reference
+
+The slash command is useful when you want to manage an agent directly rather than ask the Shepherd to orchestrate a task:
+
+```text
+/shepherd agents                # list available definitions
+/shepherd agents both           # include project definitions
+/shepherd herd                  # list active agents
+/shepherd spawn worker          # spawn an interactive agent
+/shepherd status worker         # inspect an agent
+/shepherd read worker --lines=20
+/shepherd settings
+```
+
+Supported actions are `agents`, `herd`, `prune`, `spawn`, `status`, `read`, and `settings`. `/shepherd list` remains a compatibility alias for `/shepherd agents`. Optional spawn flags include: `--placement pane_right|pane_down|tab|workspace`, `--no-parent` (Herdr app only; also always implied by the command itself), and `--cwd <path>`.
+
+For one-shot delegation, prompting, waiting, parallel work, and opaque-ID lifecycle control, use the structured `shepherd_*` tools instead of manual commands. The old single-tool form such as `shepherd({ action: "prompt", ... })` is no longer supported.
+
+## Settings
+
+Open `/shepherd` or `/shepherd settings` to configure pi-shepherd. The menu
+shows the effective values for the current workspace; use the arrow keys and
+Enter to cycle values, `/` to fuzzy-search, and `Esc` to close it.
+
+| Option | Values | Default | Description |
+| --- | --- | --- | --- |
+| **Settings scope** (`projectScope`) | `user`, `project` | `user` | Select the settings source for this workspace. A dormant project file is shown as `user (project file dormant)`. |
+| **Agent scope** (`agentScope`) | `user`, `project`, `both` | `both` | Select which agent definition directories are searched. Project agents are repository-controlled; choose `user` to ignore them entirely. |
+| **Include bundled agents** (`includeBundledAgents`) | on, off | on | Include the built-in `scout`, `planner`, `worker`, and `reviewer` definitions in discovery. |
+| **Confirm project agents** (`confirmProjectAgents`) | on, off | off | User-only security gate for project-local agent definitions. A project config cannot change it. Enable it when working in untrusted repositories. |
+| **Keep tab open after done** (`keepOpen`) | on, off | on | Leave the Herdr tab open after an agent completes so its output can be inspected. |
+| **Keep agent alive after done** (`stayOpen`) | on, off | on | Keep the agent's pi process alive after completion so you can continue driving it in its tab. |
+| **Enable fieldnotes** (`fieldnotes`) | on, off | on | Create durable shared session notes for delegated prompts. Changes take effect when the next pi session starts. |
+| **Use sheep emoji** (`emojiSheep`) | on, off | on | Show the animated `🐑` marker beside actively working agents; off uses a plain marker instead. |
+| **Default run timeout** (`timeout`) | `1`, `2`, `5`, `10`, `20`, `30`, or `60` minutes | `60` minutes | Set the default time limit before a Herdr run is reported as timed out. |
+| **Stale wait reminder** (`staleWaitThreshold`) | `off`, `1`, `2`, `5`, `10`, `15`, or `30` minutes | `30` minutes | A task waiting longer than this on a required reply raises one stale-wait reminder. `off` disables reminders; reminders never cancel or block the task. |
+| **Execution backend** (`backend`) | `auto`, `herdr`, `hc` | `auto` | Run where called from — Herdr TUI or hc app. A pin that can't be reached fails cleanly with a setup hint, never a silent fallback. App-side only; the model never decides. |
+
+The user layer is stored in `pi-shepherd/config.json` inside the active pi
+agent directory (`~/.pi/agent` by default, or `PI_CODING_AGENT_DIR`). It stores
+personal values only. The project layer is `.shepherd/config.json` in the
+current working directory, with no walk-up. A project file is active only when
+it contains `"projectScope": true`; when active, it is self-contained and
+missing project-owned fields fall back to built-in defaults rather than private
+user values. A project file with `projectScope: false` or no flag is dormant.
+
+`confirmProjectAgents` is intentionally user-owned. A committed project file
+may select repository-controlled agent definitions through `agentScope`, but it
+cannot change the confirmation gate in either direction. The gate is off by
+default; a user who wants an approval prompt before a project-local agent runs
+must enable it in the user layer.
+
+For example:
+
+```jsonc
+// ~/.pi/agent/pi-shepherd/config.json — personal values
+{
+  "agentScope": "both",
+  "includeBundledAgents": true,
+  "confirmProjectAgents": false,
+  "keepOpen": true,
+  "stayOpen": true,
+  "fieldnotes": true,
+  "emojiSheep": true,
+  "timeout": 60,
+  "staleWaitThreshold": 30
+}
+
+// .shepherd/config.json — optional, self-contained project values
+{
+  "agentScope": "project",
+  "includeBundledAgents": true,
+  "keepOpen": true,
+  "stayOpen": false,
+  "fieldnotes": true,
+  "emojiSheep": true,
+  "timeout": 30,
+  "staleWaitThreshold": 5,
+  "projectScope": true
+}
+```
+
+Project settings are intended to be optionally committed. Since `.shepherd/`
+also contains runtime fieldnote sessions, use this pattern when sharing only
+the config:
+
+```gitignore
+.shepherd/*
+!.shepherd/config.json
+```
+
+When a delegated task is **waiting** on a required reply (set with
+`shepherd_message` + `expectsReply`, or set by the child asking another
+participant), it can sit there for a while if the target is busy.
+`staleWaitThreshold` controls how long a task may wait before the parent
+receives a **single** stale-wait reminder naming the task, the question, the
+target, and how long it has been waiting. The reminder is informational: it
+never cancels, times out, or blocks the task. The task's own reply deadline
+(`timeout`) remains the authoritative bound and settles the task as `blocked`
+if the reply never comes. A reply (or the task resuming/completing) clears the
+episode, so the same wait never re-notifies while open.
+
+## Diagnostic tools
+
+These commands are primarily useful for contributors and local development checkouts. Use the diagnostic extractor when you need to see the fully assembled prompt that pi will give the Shepherd or a discovered agent:
+
+```bash
+npm run extract:system-prompt -- shepherd
+npm run extract:system-prompt -- agent scout --scope both --cwd /path/to/project
+npm run extract:system-prompt -- agent scout --output /tmp/scout-system.md
+npm run extract:system-prompt -- shepherd --json
+```
+
+This captures the prompt at pi’s `before_agent_start` hook without making a provider request. For the full prompt-composition workflow and troubleshooting, see the [Diagnostics guide](docs/diagnostics.md).
+
+### Inspect active agents
+
+```text
+/shepherd herd
+```
+
+The command lists all active agents currently detected in Herdr. For one agent, use `/shepherd status` or `/shepherd read`.
+
+### Reading status
+
+`shepherd_status` reports **process state and task state independently**. A process can be `idle` while its delegated task is still `waiting` on a required reply, and one can be `working` while its task is `running`. When an agent owns an open task the status also includes the task ID, how long it has been `waiting`, the pending request (message) ID, the agent the reply is expected from, and a `stale` flag once a stale-wait reminder has fired.
+
+The persistent "below the editor" widget tracks the same two dimensions: it lists agents that are `working` **or** that are idle-but-`waiting` on a required reply (so an idle child parked on a peer reply is never hidden as done). Waiting rows render distinctly, show how long the wait has lasted, and name the agent being waited on; a `stale` wait is flagged. Pane and task IDs never leak into the display — rows use only display names.
+
+## Fieldnotes
+
+When fieldnotes are enabled, all agents orchestrated by one Shepherd session in the same project share a durable note session:
+
+```text
+.shepherd/sessions/NNNN-orchestrator-<id>/
+├── session.json
+├── shepherd.md
+└── <agent>-NN.md
+```
+
+`shepherd.md` is the shared index, and each delegated prompt receives its own note. Notes are retained after waiting, closing, timeout, or extension restart; pi-shepherd does not automatically delete, archive, commit, or check them out. The fieldnotes setting is session-scoped, so start a new Shepherd session after changing it. Existing agents retain the current session’s behavior.
+
+## Troubleshooting
+
+### An agent is not responding
+
+Inspect its state and terminal output:
+
+```text
+/shepherd status <agent>
+/shepherd read <agent>
+```
+
+### There are too many Herdr panes
+
+The slash command does not close lifecycle-managed agents. Use `shepherd_close` with the agent ID returned by `shepherd_spawn`:
+
+```text
+shepherd_close({ id: agent.id })
+```
+
+### There are stale pane registrations
+
+Remove registrations for panes that no longer exist:
+
+```text
+/shepherd prune
+```
+
+## Herdr runtime and safety
+
+pi-shepherd uses the `herdr` CLI and never uses an invisible subprocess fallback. It works inside Herdr or from a plain terminal by ensuring a headless Herdr server is available. Background tabs use `--no-focus`, preserve the requested working directory, and remain visible for inspection.
+
+Only panes recorded in pi-shepherd’s created-pane registry may be closed by the extension. Temporary launch and session resources are cleaned only after the child pane is confirmed gone.
+
+## Contributing
+
+For development setup, testing instructions, and contribution guidelines, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
