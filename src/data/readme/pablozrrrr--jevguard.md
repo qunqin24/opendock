@@ -17,15 +17,42 @@ your local deterministic gate to return `PASS`, `WARN`, or `FAIL`.
 
 | Host | Package | Status |
 | --- | --- | --- |
-| [OpenCode](https://opencode.ai) | `@pablozrrrr/jevguard` | Available, targets OpenCode `2.2.x` (`>=2.2.2 <2.3`) |
+| [OpenCode](https://opencode.ai) | `@pablozrrrr/jevguard` | Available, targets OpenCode `2.2.x` and `2.3.x` (`>=2.2.2 <2.4`) |
 | [Claude Code](https://claude.com/claude-code) | `@pablozrrrr/jevguard-claude-code` | Available through this repository's plugin marketplace |
 | Codex | — | Planned |
 
 ## Quick start
 
+Two commands per host. Each one prints a plain line for every step and never replaces
+a file you already have.
+
 ```sh
-# 1. Install the plugin on every supported host found on this machine
-#    (prints the plan first; --yes applies it without asking)
+# OpenCode (the default host)
+npx @pablozrrrr/jevguard-cli init      # registers the plugin in ./opencode.json and
+                                       # creates .jev/rules.md with example rules
+npx @pablozrrrr/jevguard-cli login     # stores your API key in the OS credential store
+
+# Claude Code
+npx @pablozrrrr/jevguard-cli init --host claude-code
+npx @pablozrrrr/jevguard-cli login
+```
+
+Then start the host in the project: the first completed turn is reviewed and the
+verdict goes to the log (and to the agent only if you opt into `delivery: agent`).
+Already have history? Replay the rules over your last commits without changing
+anything:
+
+```sh
+npx @pablozrrrr/jevguard-cli replay --last 5
+```
+
+Measured from a clean project on Windows with the build at hand: `init` 0.3 s and
+`replay --last 1` 0.5 s, ending in the first verdict — well under the five-minute
+goal. `npx` adds the package download on the very first run. The same steps through
+the global installer, when you prefer one plan for every host:
+
+```sh
+# prints the plan first; --yes applies it without asking
 npx @pablozrrrr/jevguard-cli setup
 
 # Only the API key, if you skip setup (stored in the OS credential store, shared by both hosts)
@@ -68,14 +95,15 @@ specific policy, and leaves planning, code generation, and correction with the
 coding agent.
 
 > [!WARNING]
-> JevGuard is in active development. The OpenCode plugin targets OpenCode `2.2.x`
-> (minimum `2.2.2`, `>=2.2.2 <2.3`) through the V2 plugin API and evaluates every rule
+> JevGuard is in active development. The OpenCode plugin targets OpenCode `2.2.x` and
+> `2.3.x` (minimum `2.2.2`, `>=2.2.2 <2.4`) through the V2 plugin API and evaluates every rule
 > block declared in `.jev/rules.md` plus the `SCOPE-CREEP`, `COMPLEXITY`, and
 > `TEST-ADEQUACY` built-ins.
 > Reviews are background and observe-only: they report results but never alter the
 > agent context or block a task. When remediation is enabled and a review has any
 > `FAIL`, the plugin asks for a proposal in an isolated, deny-all child session; the
-> proposal never edits code. See [OpenCode 2.2.x limitations](#opencode-22x-limitations).
+> proposal never edits code. See
+> [OpenCode 2.2.x and 2.3.x limitations](#opencode-22x-and-23x-limitations).
 > On Claude Code and OpenCode, a user who opts in with `delivery: agent` in their own
 > `claude-code.yaml` or `opencode.yaml` gets at most one visible message per reviewed unit
 > to the agent (the failing findings and the strategy), at most 3 per session; see
@@ -296,18 +324,21 @@ npx @pablozrrrr/jevguard-cli install --host opencode --project
 ```
 
 The installer asks for confirmation, edits only the `plugins` array, and is
-idempotent. It never writes the legacy `plugin` key, but an entry already there counts
-as installed. It only edits a `plugins` array of package strings or
-`{ "package": "..." }` objects; any other shape is left unchanged and the installer
-prints the manual snippet instead. `jevguard doctor` also checks that
-`opencode --version` is in the supported range `>=2.2.2 <2.3`. The plugin package no
-longer ships a `jevguard` binary; every command below runs through the CLI package, as
+idempotent. It writes the plugin pinned to the release the CLI was built with
+(`@pablozrrrr/jevguard@0.4.1`), so OpenCode resolves that version instead of `@latest`;
+an entry that is unpinned or pins another version is rewritten in place, and a legacy
+`plugin` entry is updated there without being moved to `plugins`. It only edits a list
+of package strings or `{ "package": "..." }` objects; any other shape is left unchanged
+and the installer prints the manual snippet instead. `jevguard doctor` warns when the
+registered pin differs from the CLI's version, and checks that `opencode --version` is
+in the supported range `>=2.2.2 <2.4`. The plugin package no longer ships a `jevguard`
+binary; every command below runs through the CLI package, as
 `npx @pablozrrrr/jevguard-cli <command>` or, once installed globally, as `jevguard <command>`.
 
 The manual alternative is one entry in `opencode.json`:
 
 ```json
-{ "plugins": ["@pablozrrrr/jevguard"] }
+{ "plugins": ["@pablozrrrr/jevguard@0.4.1"] }
 ```
 
 OpenCode resolves the package from the npm registry or its cache and loads it on the
@@ -443,7 +474,7 @@ jevguard login
 
 Known limitations:
 
-- Target host is OpenCode `2.2.x` (minimum `2.2.2`). The plugin does not load on
+- Target host is OpenCode `2.2.x` or `2.3.x` (minimum `2.2.2`). The plugin does not load on
   `2.1.x` or `1.x`. A real-host smoke on `2.2.2` (2026-11-02) covered observe
   and remediation (FAIL review, deny-all proposer). The single-delivery flow
   (`delivery: agent`) was re-smoked on the real host on `2.2.7` (2026-11-17,
@@ -457,10 +488,12 @@ Known limitations:
 - The plugin and CLI run on Bun, and the packed `jevguard` bin keeps a Bun
   shebang. Install and run the artifact with the Bun runtime.
 
-### OpenCode 2.2.x limitations
+### OpenCode 2.2.x and 2.3.x limitations
 
-- **Minimum version `2.2.2`.** The plugin declares `engines.opencode` `>=2.2.2 <2.3`
-  and is pinned to the `2.2.x` plugin API.
+- **Supported lines `2.2.x` and `2.3.x`, minimum version `2.2.2`.** The plugin declares
+  `engines.opencode` `>=2.2.2 <2.4`; the `2.3` plugin API only adds to the `2.2` one
+  ([ADR 0020](docs/adr/0020-opencode-2.3-supported-line.md)). A newer line fails the
+  version check, and the message names the newest supported line and how to pin it.
 - **Git-ignored files are out of scope.** The execution snapshot comes from the host's
   working-tree diff, which leaves out files ignored by Git; a write the diff cannot
   show makes the execution `UNAVAILABLE` (`INCOMPLETE_FILE_DIFF`) instead of reviewing
@@ -468,9 +501,15 @@ Known limitations:
 - **Interrupted or failed executions are not reviewed.** Their writes stay on disk and
   count as pre-existing changes for the next execution's snapshot, so they are not
   attributed to it.
-- **`opencode run --standalone`.** The review runs after the execution succeeds; a
-  standalone run can exit before it finishes. JevGuard reviews reliably in the TUI or
-  with `opencode serve` plus `opencode run --server`.
+- **One-shot `opencode run`.** The child loads the project plugin: loading was verified
+  on `2.3.0` on Linux and Windows, where the child starts the same server and loads the
+  entry in the project `opencode.json`. On Windows the host does not print the `loading
+  plugin` server line even with `--print-logs`, so loading there was observed through a
+  canary module's own side effects, not that line. A review finished before the exit was
+  observed on Linux only. The limit is timing, not loading, and it holds on any OS: the
+  process exits as soon as the turn ends and the shutdown drain is capped at 2 s, so a
+  review that still needs the Jev call can be cut. JevGuard reviews reliably in the TUI
+  or with `opencode serve` plus `opencode run --server`.
 - **Concurrent executions.** When two sessions run at once, or an execution starts
   while the previous one is still being finished, the review is `UNAVAILABLE`
   (`CONCURRENT_SESSIONS`, `BOUNDARY_RACE`) instead of mixing changes. Nested child
@@ -745,7 +784,7 @@ applies a change. Only a user who opts in with `delivery: agent` in their own
 session, at most 3 per session and never while the session is busy; see
 [OpenCode `delivery: agent`](docs/configuration.md#opencode-delivery-agent-one-delivery-per-unit). A real-host smoke on OpenCode `2.2.2` passed for observe, and `delivery: agent`
 was re-smoked on `2.2.7` (2026-11-17); see
-[OpenCode 2.2.x limitations](#opencode-22x-limitations).
+[OpenCode 2.2.x and 2.3.x limitations](#opencode-22x-and-23x-limitations).
 
 The Claude Code plugin reuses the same core, policy files, gate, and local history. It
 reviews closed units of work in a detached worker and shows results in the session
@@ -770,6 +809,7 @@ Use `pnpm check` to run format, lint, typecheck, and tests in sequence. See
 ## Documentation
 
 - [Configuration reference](./docs/configuration.md)
+- [Public benchmark](./docs/benchmarks/README.md)
 - [Security model](./docs/security.md)
 - [Architecture decisions](./docs/adr/README.md)
 - [Contributing](./CONTRIBUTING.md)

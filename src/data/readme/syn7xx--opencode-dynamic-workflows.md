@@ -338,22 +338,82 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 | `model` | The launching session's model as `"provider/model#variant"`, or `null` for a headless/synthetic caller. What `agent(…, { model: "inherit" })` and a bare `effort` inherit. |
 | `$`, `file`, `fetch` | Shell, files and HTTP, confined to the project and recorded in the Run's activity. |
 | `workflow(name, args?)` | Run a saved Workflow as one step of this Run (one level deep). |
-| `worktrees()` | The git worktrees kept by `isolation: "worktree"` Units that changed files. |
+| `worktrees()` | The git worktrees kept by `worktree: true` Units that changed files. |
 
 `agent()` options: `schema`, `label`, `phase`, `subagent` (alias `agentType`; default `general`), `model`
 (`"provider/model#variant"`, `{ providerID, modelID }`, or `"inherit"` for the launching session's model), `effort`
 (the reasoning variant; with no `model` the Unit inherits the caller's model at that effort), `retries` (repair turns,
-default 2), `timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged),
+default 2), `timeoutMs`, `permissions`, `worktree: true` (a fresh git worktree, removed if unchanged),
+`isolation` (narrow THIS Unit's policy below `meta.isolation`; see [Isolating a Run](#isolating-a-run)),
 `location` (another directory) and `session` (continue an existing session — see [Continuing a Unit](#continuing-a-unit)).
 `{ receipts: true }` and `{ keepSession: true }` are separate flags rather than options — see
 [Asserting what a Unit did](#asserting-what-a-unit-did) and [Continuing a Unit](#continuing-a-unit).
 
 `meta`: `name`, `description`, `whenToUse`, `phases`, `args` (zod), `concurrency`, `unitTimeout`, `budget` (a number,
-or `{ tokens, hard: true }` to stop at the limit), `permissions` (rules for every Unit), `limits`, and
-`interaction: { permissions: "ask" | "auto" | "deny", graceMs }`.
+or `{ tokens, hard: true }` to stop at the limit), `permissions` (rules for every Unit), `isolation` (skills,
+subagents, and MCP servers every Unit may use — deny-by-default; see [Isolating a Run](#isolating-a-run)), `limits`,
+and `interaction: { permissions: "ask" | "auto" | "deny", graceMs }`.
 
 Default to `pipeline`. Use `parallel` as a barrier only when a stage needs every result of the previous one, such as
 deduplicating findings across all files before verifying them.
+
+### Isolating a Run
+
+By default a Unit sees every skill, subagent, and MCP server the surrounding OpenCode config exposes. To bound that,
+declare `meta.isolation` — a **deny-by-default allow-list** (a name not listed cannot be used by any Unit of the Run):
+
+```ts
+export default defineWorkflow({
+  meta: {
+    name: "audit",
+    description: "Read-only audit",
+    isolation: { skills: ["code-markup"], subagents: ["explore"], mcp: ["playwright"] },
+  },
+  async run({ agent }) {
+    await agent("audit the repo", { subagent: "explore" })
+  },
+})
+```
+
+Each axis is independent: omit a field to leave that axis unrestricted; `[]` allows nothing. A Workflow that names a
+subagent outside `isolation.subagents` fails that Unit **before a session is created**, with a clear message.
+
+**Narrow-only at every level.** Three sources are intersected, so no level can widen another:
+
+| Level | Where | Role |
+| --- | --- | --- |
+| Workflow | `meta.isolation` | the author's contract |
+| Unit | `agent(prompt, { isolation })` | this one Unit tightens further |
+| Caller | `workflow({ isolation })` | ad-hoc bound for the caller |
+
+A Workflow can keep its policy in `workflows.json` and import it — the plugin reads no files of its own, an ordinary
+JSON import is inlined by the bundler:
+
+```ts
+import manifest from "./workflows.json"
+
+export default defineWorkflow({
+  meta: { name: "audit", description: "…", isolation: manifest.workflows.audit.isolation },
+  async run({ agent }) { /* … */ },
+})
+```
+
+Because every level is intersected, an imported policy is a floor: `meta.isolation` (when also set) and a Unit's
+a Unit `isolation` can tighten it, never loosen it.
+
+A Unit tightens with its own `isolation`:
+
+```ts
+await agent("review only", { subagent: "explore", isolation: { mcp: [] } })
+```
+
+For a region of the script where many Units share a tighter policy, `withIsolation(ctx, policy)` returns a view whose
+`agent` carries the narrower policy — sugar over the Unit `isolation`. It is **not** a security boundary: `parallel`/`pipeline`
+thunks close over whatever `ctx` is in scope, so a thunk that calls the original `ctx.agent` bypasses the view. Use
+the Unit `isolation` option when a Unit must be provably narrowed.
+
+MCP is enforced by hiding the disallowed servers' tools from the Unit's toolset and denying them by name as a second
+layer — a server not listed is not just refused, it is not shown to the model.
 
 ### Typed results
 

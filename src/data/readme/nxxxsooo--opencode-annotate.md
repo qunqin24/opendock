@@ -107,6 +107,27 @@ Browser setup is separate from the plugin install. Safari supports local notes a
 
 Numbered `/annotate N`, `/annotate-last` and `/annotate-web` are retired. Use `/annotate-pick` for earlier text, `/annotate` for the latest reply, and `/annotate <url-or-html>` for a page. Browser connection controls live in the extension's destination menu.
 
+## Herdr
+
+Run the bundled `annotate-tui` directly from a Herdr pane. Herdr needs an enabled
+`annotate` plugin with a `doc` pane entrypoint; see the [TUI setup](tui/README.md#herdr).
+OpenCode's `/annotate` keeps its own session delivery, even when OpenCode runs in Herdr.
+
+```sh
+annotate-tui herdr open docs/plan.md --placement split --deliver-to w1:p2
+annotate-tui herdr open docs/ --deliver-to w1:p2
+annotate-tui herdr last --deliver-to w1:p2
+annotate-tui herdr terminal --lines 20 --deliver-to w1:p2
+annotate-tui herdr terminal --lines 5 --print
+```
+
+- `open`, `last` and `terminal` accept `--placement overlay|split|tab|zoomed`. The default is `overlay`.
+- `last` opens a reply picker; add `--newest` to open the newest reply directly. With `--deliver-to`, it reads that pane's agent session.
+- `terminal` reviews recent output from the calling pane, even if feedback goes to a different pane. `--print` writes a fenced Markdown block to stdout instead of opening a reviewer.
+- Replace `w1:p2` with the receiving agent's pane ID. **Send** submits the feedback as a prompt, including Enter. If Herdr reports the agent is blocked at a dialog, no prompt is sent. Annotate keeps the notes pending and tries to copy the feedback to the terminal clipboard; resolve the dialog and retry when ready.
+
+Outside Herdr, use `annotate-tui docs/plan.md` to copy feedback via a terminal that supports OSC 52. `herdr open` requires a Herdr pane.
+
 ## Upgrading from the TUI-only package
 
 `opencode-annotate` replaces `opencode-plannotator-tui` (0.4.2 and earlier). To switch, run `opencode plugin remove opencode-plannotator-tui@latest` and then install this package as shown above.
@@ -176,7 +197,7 @@ After updates, run `npm run build:safari` with the signing variables again, then
 
 Click the destination beside **To** to filter sessions by title or directory and sort by recent activity, creation or title. The picker refreshes automatically and shows current session titles. **New session** creates an empty session with the chosen session's location/model, or the blank OpenCode home's current selection, without starting a model turn. **Disconnect** keeps the destination named and notes local; choosing that session again reconnects. A disconnected destination never silently switches to another session. Restarted receivers reconnect by stable provider/session identity, carrying any retry batch to the replacement.
 
-Choose **Pick element** or select text, then write a comment or question. The composer appears for that selection. **Send N notes & continue** saves current feedback and sends all pending notes across pages; **Add note** collects feedback locally. Cmd/Ctrl+Enter adds a note or saves an edit. Confirmed sends use `steer` / `resume: true`: idle sessions start immediately and running turns receive feedback at their next processing boundary. Registering, creating sessions and saving notes make no model call. Switching terminal tabs never changes the captured destination.
+Choose **Pick element**, drag a rectangle with **Select area**, or select text directly, then write a comment or question. Unsent areas stay marked: click a dashed outline or badge to activate it, drag the rectangle to move it, or drag a handle to resize. Esc cancels an adjustment. Area notes include the rectangle's position, visible text, and element hints, without a screenshot. **Send N notes & continue** saves current feedback and sends all pending notes across pages; **Add note** collects feedback locally. Cmd/Ctrl+Enter adds a note or saves an edit. Confirmed sends use `steer` / `resume: true`: idle sessions start immediately and running turns receive feedback at their next processing boundary. Registering, creating sessions and saving notes make no model call. Switching terminal tabs never changes the captured destination.
 
 The queue groups notes by page, with contiguous numbers matching page markers and delivered Markdown. Click a note's quoted target to show it on its page without activating the element; off-page notes can open their page. **Edit** changes the feedback, and **Undo** restores a deleted note. The delivery bar shows the whole round's count and destination; drafts remain page-local.
 

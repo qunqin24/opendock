@@ -124,7 +124,7 @@ Frame height follows the source aspect ratio.
 1. `ffmpeg -i <source> -an -vf fps=<fps>,scale=<pixels>:-2` writes numbered
    PNGs.
 2. The PNGs are read into memory as data URIs.
-3. A timer advances the frame index, and the panel redraws its `<image>` with
+3. A timer advances the frame index, and the panel sets its `<image>` source to
    the next entry.
 
 Extraction is cached per source path, size, modification time, and the settings
@@ -138,6 +138,13 @@ directory under `cacheDirectory` to fetch it again.
 
 ## Limits
 
+- **OpenCode 2.3.2 renders a panel contribution once.** The plugin loads, caches
+  the frames, and its timer runs, but the host does not repaint the panel, so
+  only the first frame is ever visible. A twenty-line plugin that increments a
+  number in a `session.panel` slot shows the same behaviour, and neither a
+  signal update nor re-opening the panel changes it. The panel starts animating
+  only once the host re-renders the slot; the frame extraction, cache and timer
+  here are ready for that.
 - No audio. A terminal image renderable cannot play sound.
 - Settings are fixed per clip. `fps` decides the frame rate, not the source
   file's own timing; a 60 fps clip at `fps: 12` plays at 12.
@@ -165,10 +172,16 @@ directory under `cacheDirectory` to fetch it again.
 
 ```bash
 npm install
-npm run check   # typecheck, lint, tests
+npm run check   # typecheck, lint, build, tests
 ```
 
 `npm run check` needs ffmpeg; the extraction tests skip themselves without it.
+
+The published package is `dist/`, built by `npm run build` (also run by
+`prepack`). The build is there on purpose: `babel-preset-solid` compiles the
+panel JSX to `@opentui/solid` with Solid's getter wrapping, so the package does
+not depend on the host's compiler being the right one. Babel is a
+devDependency; nothing is added to what a user installs.
 
 To try a local checkout, point `cli.json` at the directory:
 

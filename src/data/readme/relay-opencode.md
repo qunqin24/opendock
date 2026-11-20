@@ -55,6 +55,7 @@ The settings are shared by all your projects. The terminal app has no settings s
 | `/relay <message>` | Relay picks the mode and the model for this one message, switches the chat, and sends it. |
 | `/relay on` | Every message you send in this chat goes through Relay, without typing `/relay`. |
 | `/relay off` | This chat goes back to normal. |
+| `/relay-stats` | In the terminal app: what each model Relay used took and cost. The panel shows it too. |
 
 - **The Relay pill** above the chat box in Desktop shows whether Relay is on for that chat. Click it to turn Relay on or off.
 - **Plan and Review** use OpenCode's `plan` agent, which is meant for reading and planning. Only **Execute** uses `build`, which can change files.

@@ -65,7 +65,7 @@ It registers one keymap layer with `priority: 1000` and a single binding for ctr
 
 ## Requirements
 
-OpenCode 1.18.18 or newer (the TUI plugin API with keymap layers). Tested on 1.18.26.
+OpenCode 1.18.18 or newer (the TUI plugin API with keymap layers). Tested on 1.18.26 and 1.19.6.
 
 ## License
 

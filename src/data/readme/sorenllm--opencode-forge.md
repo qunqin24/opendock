@@ -108,7 +108,8 @@ runs and fresh sessions still land on forge under coexistence.
 
 ## Install
 
-Requires opencode ≥ 1.18.
+Requires opencode ≥ 1.18 (v1 hosts) or ≥ 2.0 (v2 hosts). Same install
+commands on both — the plugin ships both entries and the host picks one.
 
 ```bash
 # npm (recommended)
@@ -126,6 +127,23 @@ skill file).
 Note: do not enable opencode's experimental plan mode
 (`OPENCODE_EXPERIMENTAL_PLAN_MODE`) together with forge — two plan mechanisms
 would overlap.
+
+### v2-host notes (opencode 2.x)
+
+Full feature parity with v1 (agents, tools, permission belt and gates,
+session hooks, commands, goal/job engines), with two documented drifts:
+
+- **Model pins are v1-only.** A `forge.json` worker's `model` field is
+  honored on v1 hosts; on v2 hosts the pin is skipped (any model spelling
+  on the v2 agent draft breaks the host's agent registry). The
+  `thoughtLevel` pin works on both (it rides the runtime chat.params
+  lookup, not the agent record).
+- **`/plan` `/goal` `/crew` are execute-based commands on v2** (the
+  template text is sent into your session when you invoke them) and there
+  is no create-only guard — forge's `/goal` replaces the built-in one.
+  v2 hosts have no default per-turn auto-continue, so nothing fights the
+  goal loop; the plan/goal briefs survive compaction via the compaction
+  hook either way.
 
 ## Configuration
 
@@ -253,9 +271,14 @@ a `stop_reason` in the frontmatter — on: budget exhaustion, two consecutive
 no-progress continuation turns, three consecutive transport failures, or a
 live draft plan appearing in the session (the only plan/goal interop: a draft
 plan's write ban would wall the loop off, so the goal pauses instead of
-burning turns against it). `/goal pause` (or `goal_pause` with a blocker
-description) pauses by hand; `/goal resume` re-arms through another
-confirmation dialog.
+burning turns against it). Activity scoring is verification-honest: a turn
+that ran `goal_check` OR executed verification commands through
+`forge_shell`/`shell`/`bash` scores as active (a turn re-running the
+contract's checks is never mis-scored as no-progress); the continuation
+brief states the same per-turn discipline (land a verification command or a
+write — read-only turns are ledgered as no-progress). `/goal pause` (or
+`goal_pause` with a blocker description) pauses by hand; `/goal resume`
+re-arms through another confirmation dialog.
 
 **Completion is fail-closed.** `goal_complete` re-executes every check itself
 at the gate — results recorded in the Check Log never substitute for the
@@ -641,10 +664,37 @@ the single `[forge:dispatch-complete]` wake with the final report arrives at
 true terminal. While the child runs past each notification interval
 (default 10 minutes, tunable — see the env knobs below), a non-terminal
 `[forge:dispatch-progress]` notice keeps the owner informed — informational
-and idle-only, it never replaces or consumes the completion wake. A child
-that stays continuously idle with no reportable final message across a full
-notification interval ends honestly as a no-reportable-final-message finding
-naming the child session id.
+and idle-only, it never replaces or consumes the completion wake.
+
+**Dispatch outcome honesty (three outcome classes).** Every dispatch
+settles as exactly one of `completed` (exit 0, the real final report),
+`failed` (exit 1, an explicit error or a deliberate stale/abort action), or
+`stream-lost/unknown` (exit-null settle — the dispatch VIEW broke before a
+final report arrived: the poll view was unreadable for a sustained streak,
+or the result stream ended without a final report across a full
+notification interval). A stream-lost outcome NEVER files a death
+certificate: the wake and the ledger say "result stream lost; child state
+UNKNOWN (possibly still running)" and name the agreed report file — the
+child stays inspectable and natively abortable in the host TUI, and the
+journal records `stream-lost/unknown` with the last-observed activity
+timestamp.
+
+**Sync handoff presentation.** A sync dispatch whose child outlives the
+wait budget does not fail: the handoff surfaces as a normal informational
+notice — "sync wait budget ended — the dispatch continues in the
+background; collect with `forge_jobs`" — carrying every retrieval pointer
+(task id, child session, the agreed report path) plus the armed-wake
+contract. The error channel is reserved for genuine failures: gate/pool
+refusals and evidence-backed worker errors render as errors exactly as
+before.
+
+**Report-file delivery contract.** Every dispatch prompt carries a standing
+line naming the agreed report path `reports/<task-id>-report.md`
+(workspace-relative); workers with write access write their final report
+there in addition to replying on the result stream (readonly workers skip
+it — the reply is the report). When a view is lost, that file is the
+ground-truth recovery channel: read it (its mtime shows whether the worker
+landed its report) BEFORE considering a re-dispatch.
 
 **Dispatch poll env knobs** (read at call time; invalid values fall back to
 the default):

@@ -41,7 +41,7 @@ ATXF aims to be general enough to hold any of these formats without losing their
 | [`schema/v0.1/atxf.schema.json`](schema/v0.1/atxf.schema.json) | JSON Schema (draft 2020-12) for one record (one line) |
 | [`docs/mappings.md`](docs/mappings.md) | How Pi, Codex, Claude Code, OpenCode, Gemini CLI and ATIF map onto ATXF |
 | [`examples/`](examples) | Example transcripts in the style of each source |
-| [`packages/atxf-ts/`](packages/atxf-ts) | `@leostera/atxf`: types, validator, hashes and seals, context building, lossless converters for Pi, Claude Code, Codex, OpenCode and Gemini CLI (`@leostera/atxf/pi`, …), reconciliation (`@leostera/atxf/reconcile`) and the `atxf` CLI |
+| [`packages/atxf-ts/`](packages/atxf-ts) | `@leostera/atxf`: types, validator, hashes and seals, context building, lossless converters for Pi, Claude Code, Codex, OpenCode and Gemini CLI (`@leostera/atxf/pi`, …), reconciliation (`@leostera/atxf/reconcile`), linearization and the `atxf` CLI |
 | [`packages/atxf-rs/`](packages/atxf-rs) | The `atxf` Rust crate and binary: the same API, writing the same bytes and hashes as `@leostera/atxf` |
 | [`scripts/`](scripts) | `cross-check.sh` and `cross-check-generated.ts`: the TypeScript and Rust implementations must agree byte for byte |
 | [`fixtures/`](fixtures) | Native session files per agent, shared by the tests |
@@ -54,6 +54,7 @@ ATXF aims to be general enough to hold any of these formats without losing their
 npx @leostera/atxf validate path/to/session.atxf.jsonl      # Node 22+, or bunx
 npx @leostera/atxf convert --from pi --to codex session.jsonl > rollout.jsonl
 npx @leostera/atxf reconcile studio.atxf.jsonl laptop.atxf.jsonl > merged.atxf.jsonl
+npx @leostera/atxf linearize --from pi --to pi studio.jsonl laptop.jsonl > linear.jsonl   # every branch on one path
 ```
 
 In this repository, `bun run atxf` runs the same CLI from source:

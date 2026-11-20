@@ -98,7 +98,7 @@ codex plugin add posh@skatkov
 OpenCode 2:
 
 ```sh
-opencode plugin add github:skatkov/posh-mcp#main
+opencode plugin add opencode-posh
 ```
 
 GitHub Copilot CLI 1.0.112+:

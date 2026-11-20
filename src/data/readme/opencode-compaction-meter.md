@@ -95,7 +95,7 @@ The summary's own input size is deliberately not shown. OpenCode keeps a verbati
 - OpenCode 1.18.18 or newer (the TUI plugin API with render slots).
 - A terminal font with `↻`, or set `badge`.
 
-Tested on OpenCode 1.18.26 with llama.cpp-served models and the default TUI theme.
+Tested on OpenCode 1.18.26 and 1.19.6 with llama.cpp-served models and the default TUI theme.
 
 ## License
 

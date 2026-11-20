@@ -170,7 +170,7 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 | `QQ_WATCHDOG_INTERVAL_MS` | 300000 | 插件引导器巡检间隔（5min；计划任务侧由 service install 注册，默认 10min） |
 | `QQ_PERM_DEFER_MS` | 500 | 审批弹卡延迟判定窗（0~10s）：窗口内 ask 已被其他端处置则不推 QQ 卡，与桌面静默放行对齐 |
 | `QQ_QUEUE_RECEIPTS` | 关 | 队列完成回执「队列 #N 完成」（批量排空防刷，默认关） |
-| `QQ_LOG_FILE` | `~/.openqq/openqq.log`（detached 拉起为 `bot.out.log`） | 进程内文件日志路径 |
+| `QQ_LOG_FILE` | `~/.openqq/openqq.log`（统一日志，bot 与看门狗同文件） | 进程内文件日志路径；滚动 20MB×4 代、总预算 100MB（`QQ_LOG_MAX_MB`/`QQ_LOG_KEEP`/`QQ_LOG_TOTAL_MB` 可调） |
 | `QQBOT_DEFAULT_CWD` | bot 进程工作目录 | 新会话默认项目目录（目录继承链兜底值） |
 | `QQ_SANDBOX` | false | QQ 沙箱环境（REST 域切至 sandbox） |
 | `QQ_INSTANCE_LOCK` | 开 | 单实例文件锁（`false` 关闭，仅排查多实例问题时临时用） |
@@ -204,13 +204,13 @@ openqq service install|uninstall|status   # 自启注册：win32=schtasks / linu
 ```
 
 判活 = 锁文件 pid + `process.kill(pid, 0)` + 心跳新鲜度（>5 分钟触发重启，启动期有 60s 宽限）。
-`~/.openqq/` **只放运行时数据**（`.env`、台账、日志、`heartbeat`、`watchdog.log`），不放任何脚本。
+`~/.openqq/` **只放运行时数据**（`.env`、台账、统一日志 `openqq.log`、`heartbeat`），不放任何脚本。
 
 ## 排障
 
 | 症状 | 先看 |
 |---|---|
-| QQ 无响应 | 日志 `~/.openqq/bot.out.log`；看门狗 `~/.openqq/watchdog.log` |
+| QQ 无响应 | 统一日志 `~/.openqq/openqq.log`（bot 输出与看门狗审计同文件，滚动 20MB×4 代、总预算 100MB） |
 | 进程疑似僵死 | `openqq watchdog --once` —— 一次判定并自愈（先杀残留再拉起） |
 | ECONNREFUSED | 桌面服务端口漂移——重启 bot 会自动发现新端口（`~/.openqq/last-discovered.json` 留痕） |
 | 桌面弹窗卡住任务 | 后台等待会发带任务的停滞通告（含最近动作与无进展时长）；`/stop` 可终止 |

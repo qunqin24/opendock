@@ -30,12 +30,19 @@ preserved in image blocks". This plugin is that layer and more:
 
 ## Install
 
-Requires opencode ≥ 1.18 and, for actual desktop control, the cua-driver
-binary (a user operation — like installing opencode itself):
+Requires opencode ≥ 1.18 (v1) or ≥ 2.0 (v2) and, for actual desktop control,
+the cua-driver binary (a user operation — like installing opencode itself):
 
 ```bash
-# 1. plugin (npm spec)
+# 1a. plugin on opencode v1 (npm spec)
 opencode plugin @sorenllm/opencode-computer-use --global
+
+# 1b. plugin on opencode v2 — add to opencode.json(c) `plugins`
+#     (V2 shape: an ARRAY; local entries point at directories):
+#     "plugins": [ "@sorenllm/opencode-computer-use" ]
+#     Local dev without the installer: drop the repo folder under
+#     <project>/.opencode/plugins/ (V2 discovers it automatically), or
+#     "plugins": [ { "package": "file:///abs/path/to/opencode-computer-use" } ]
 
 # 2. driver — run this yourself in a terminal; the plugin never will
 # Windows (PowerShell):
@@ -134,7 +141,7 @@ If your host resolves skills before plugin config hooks, add the path
 manually (one line) or copy the folder:
 
 ```jsonc
-// opencode.json — manual fallback
+// opencode.json — manual fallback (opencode v1)
 {
   "skills": {
     "paths": [
@@ -143,6 +150,20 @@ manually (one line) or copy the folder:
   }
 }
 // or: copy skills/computer-use/ into ~/.config/opencode/skills/
+```
+
+On **opencode v2** the skill registers through the plugin API itself
+(`ctx.skill.transform` → a full Skill.Info), so no manual fallback is needed
+when the plugin loads. If you load the manual without the plugin, the v2
+fallback is one line in `opencode.json(c)`:
+
+```jsonc
+// opencode.json(c) — manual skill fallback (opencode v2): array of paths
+{
+  "skills": [
+    "~/.cache/opencode/packages/@sorenllm/opencode-computer-use/node_modules/@sorenllm/opencode-computer-use/skills"
+  ]
+}
 ```
 
 Per-skill gating is available through the host's permission system
@@ -207,6 +228,13 @@ Per-skill gating is available through the host's permission system
 
 ## Status
 
+0.5.0 — opencode v2 support (same package, dual-host entry
+`{ id, server, setup }`): v2 hosts load `setup(ctx)` for full parity —
+two-state tool registration via `ctx.tool.transform`, functional approval via
+`ctx.permission.assert` + the `evaluate` hook (the v1 config-side
+`permission.computer = "ask"` default becomes a functional gate), the bundled
+skill via `ctx.skill.transform`, and dispose as the setup-returned cleanup.
+Field shapes verified against opencode v2.3.2. v1 behavior unchanged.
 0.4.0 — removed the plugin-registered `/computer` command: hosts promote
 discovered skills to slash commands natively, making `/computer-use <task>`
 (full-manual template + appended args) the stronger activation entry. The

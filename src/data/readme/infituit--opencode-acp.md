@@ -109,7 +109,13 @@ ACP 使用自己的配置文件，按以下顺序加载：
 }
 ```
 
-上下文阈值接受 token 数或模型上下文窗口的百分比。`maxContextLimit` 是触发压缩提示的软阈值，不是硬性截断上限；达到阈值不代表模型一定立即执行压缩。根据模型的可用上下文调整阈值。
+上下文阈值接受 token 数或模型上下文窗口的百分比。`maxContextLimit` 是触发压缩提示的软阈值，不是模型的真实上下文窗口，也不是硬性截断上限；达到阈值不代表模型一定立即执行压缩。根据模型的可用上下文调整阈值。
+
+`compress.contextLimitFallback` 是模型上下文窗口未知时使用的备用 token 数，默认 `128000`，设为 `0` 可禁用此备用值。从 OpenCode 模型目录（catalog）等来源获知的有效模型窗口优先于 fallback；fallback 不会扩大模型的真实容量。
+
+- fallback 偏小，可能使压缩提醒（nudge）、GC 等依赖上下文窗口的机制提前触发；偏大则可能高估可用预算，来不及在真实窗口耗尽前提醒或回收。
+- 优先在 OpenCode 的 provider/model 配置中补齐或修正实际的 `limit.context`（参见 [OpenCode 模型配置](https://opencode.ai/v2/docs/models)），不要盲目调大 fallback 来延后提醒。
+- 禁用 fallback 后，若仍无法获知模型窗口，依赖该窗口的机制可能不可用；这不代表模型拥有无限上下文。
 
 ### 按 Provider / 按模型覆盖
 

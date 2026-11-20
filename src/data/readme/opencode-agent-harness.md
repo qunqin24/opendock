@@ -357,6 +357,20 @@ so agents see complete descriptions.
   follow the session into the worktree, and `archive` clears the pointer. `backlog archive
   <id>` removes the shipped feature's worktree + merged branch, so a session cleans up
   after itself on close.
+- **One project board, never a worktree copy**: board reads and writes are project-scoped.
+  A `backlog_*`/`backlog` command run inside a linked feature worktree resolves to the
+  shared board service, or — in legacy file mode — to the MAIN checkout's board, so a row
+  captured mid-feature (e.g. a security finding) is on the main board immediately. In
+  file mode, `archive` of a row already in the worktree's snapshot rides the feature branch
+  (so a failed `ship` cannot mark unlanded work done on main); a row captured after the
+  branch was cut has no local copy, so its archive resolves to main. A
+  project whose `.harness.json` declares `board.url` treats the service as mandatory: a
+  missing token fails loudly instead of silently falling back to a checkout-local
+  `BACKLOG.md` (the split-board defect); `board.backend: "file"` in `.harness.json` (durable),
+  `BACKLOG_BACKEND=file` (per shell), or an explicit `--root` is the deliberate legacy
+  opt-out. The client also reads the installed
+  `~/.config/agent-harness/board.env`, so an opencode server started outside the shell
+  hook still reaches the service.
 - **Single-authority board (main-checkout freshness)**: because a feature's commits reach
   `origin/main` from its own worktree, the MAIN checkout's board can lag origin until it is
   pulled. Every mutating command in the MAIN checkout is therefore a transaction

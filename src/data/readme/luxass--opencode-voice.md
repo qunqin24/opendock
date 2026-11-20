@@ -11,6 +11,7 @@ Extensions for [Pi](https://pi.dev) and [OpenCode](https://opencode.ai), publish
 | `@luxass/pi-cost-explorer` | Break down a session's cost by model, prompt, tool, and request.                  | [Cost explorer](packages/pi-cost-explorer/README.md) |
 | `@luxass/pi-personal`      | Load defaults and extensions tuned to a single personal workflow.                 | [personal](packages/pi-personal/README.md)           |
 | `@luxass/pi-resources`     | Browse loaded resources, registered tools, and loader diagnostics.                | [Resources](packages/pi-resources/README.md)         |
+| `@luxass/pi-subagents`     | Delegate tasks to named agents and follow their conversations.                    | [Subagents](packages/pi-subagents/README.md)         |
 | `@luxass/pi-voice`         | Record speech and transcribe it for your prompts.                                 | [Voice](packages/pi-voice/README.md)                 |
 | `@luxass/pi-whimsical`     | Display playful working messages while the agent runs.                            | [Whimsical](packages/pi-whimsical/README.md)         |
 

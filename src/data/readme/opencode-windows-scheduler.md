@@ -49,14 +49,16 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 26 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 29 agent tools, built-in agent skill |
 
 ### Language
 
-The interface ships in Russian (default), English and Simplified Chinese. The language
-selector sits in the scheduler panel header (🌐 Auto / Русский / English / 中文) and is
-also available through the `manage_settings` tool (`action: "update"`, `locale: "zh"`).
-`locale: "auto"` (the "Auto" option) follows the OpenCode interface language: the panel
+The interface ships in Russian, English and Simplified Chinese. By default the language
+selector is set to **Auto** — like OpenCode, it follows the OpenCode interface language;
+Russian, English and Chinese can be chosen explicitly. The selector sits in the scheduler
+panel header (🌐 Auto / Русский / English / 中文) and is also available through the
+`manage_settings` tool (`action: "update"`, `locale: "zh"`).
+`locale: "auto"` (the "Auto" option, used by default) follows the OpenCode interface language: the panel
 reacts to language changes immediately, and the resolved locale is sent to the server so
 notifications, digests and the dashboard use the same language. The switch applies
 without a restart. Dashboard localization is still being rolled out: some client-side
@@ -123,7 +125,7 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 26 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 29 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
@@ -153,6 +155,9 @@ The agent gets the full feature set — 26 tools covering scheduling, pipelines,
 | `manage_secrets` | `action`, `name?`, `value?` | Create, list or delete AES-256-GCM encrypted secrets used in task `env` |
 | `get_audit_log` | `action?`, `target?`, `actor?`, `since?`, `until?`, `limit?` | Mutation audit journal: who changed what, when and via which interface |
 | `emit_event` | `eventName`, `payload?` | Start tasks subscribed to an MCP event |
+| `pipeline_validate` | `path?`, `source?` | Validates `opencode.pipeline.yaml` without changing tasks |
+| `pipeline_apply` | `path?`, `source?`, `dryRun?` | Idempotently creates or updates pipeline tasks; `dryRun` only reports the diff |
+| `pipeline_export` | `pipeline` | Exports a pipeline's tasks back to YAML |
 
 `schedule_task` also accepts the full matrix configuration (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
 
@@ -199,6 +204,41 @@ The plugin registers a built-in skill, `scheduled-job-best-practices`, so the ag
 
 Each workspace gets a clone named `<parent>-matrix-<workspace>`. The parent never runs itself: it aggregates clone results into `success`, `error` or `partial`. Clones stay in sync with the parent when you edit it; running clones are never touched.
 
+## Pipeline as code
+
+Declare the whole workflow in one `opencode.pipeline.yaml` file instead of creating tasks one by one:
+
+```yaml
+version: 1
+name: nightly-release
+defaults:
+  retryCount: 1
+  retryDelay: 120
+steps:
+  - id: lint
+    schedule: "0 2 * * *"
+    prompt: Run the linter and fix what it reports.
+    qualityGate: npm run lint
+  - id: test
+    needs: [lint]
+    trigger: dag
+    prompt: Run the tests and fix failures.
+    qualityGate: npm test
+```
+
+`needs` becomes a DAG dependency, a step with `trigger: dag` runs only after its dependencies succeed, and `defaults` are inherited by every step. Each step becomes a task named `<pipeline> <step>`.
+
+```bash
+agent-steward pipeline validate opencode.pipeline.yaml
+agent-steward pipeline apply opencode.pipeline.yaml --dry-run
+agent-steward pipeline apply opencode.pipeline.yaml
+agent-steward pipeline export --pipeline nightly-release --out opencode.pipeline.yaml
+```
+
+Apply is idempotent: unchanged steps are skipped, edited steps are updated, and tasks outside the pipeline are never touched. Steps removed from the file are reported as stale, not deleted. The agent gets the same operations through `pipeline_validate`, `pipeline_apply` and `pipeline_export`.
+
+See [docs/PIPELINE.md](docs/PIPELINE.md) for the full format, matrix fan-out, validation rules and limitations, and the ready-to-copy [example](opencode.pipeline.yaml).
+
 ## GUI and dashboard
 
 The OpenCode sidebar shows jobs, history, logs, dry-run, templates, import/export, concurrency limit and matrix grouping. The local web dashboard adds per-workspace summaries, matrix tabs, a pipeline view and metrics.
@@ -239,9 +279,13 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 83 test suites, 600+ checks
+npm test             # 109 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
+
+`npm run test:chaos` runs `test-chaos-dag.mjs` separately — it is the 110th `test-*.mjs`
+file on disk but is intentionally not part of `npm test`. The **109** in `npm test`
+counts exactly the suites listed in that script.
 
 `npm run test:en` sets `OPENCODE_SCHEDULER_LOCALE=en` for every suite; the variable is a
 service hook, not a user setting.
@@ -255,6 +299,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [docs/FEATURES.md](docs/FEATURES.md) — full feature catalog with examples.
 - [docs/FAQ.md](docs/FAQ.md) — recovery scenarios, webhook replay, operational answers.
 - [docs/MIGRATION.md](docs/MIGRATION.md) — moving from cron, systemd, launchd or Task Scheduler.
+- [docs/PIPELINE.md](docs/PIPELINE.md) — pipeline-as-code: file format, CLI, idempotent apply.
 - [docs/SAVINGS.md](docs/SAVINGS.md) — how the "Saved $" estimate is calculated.
 - [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
 

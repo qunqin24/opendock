@@ -9,7 +9,7 @@ account in the actual host process, where hooks and MCP use the same key. GUI ap
 may not inherit your terminal environment, so quit and reopen them after setting a key. The plugin does
 not install the host or Node, or create an account. No backend clone or Estelle CLI is needed.
 
-Version: `0.0.19`.
+Version: `0.0.22`.
 
 [Release notes](docs/releases/v0.0.19.md)
 

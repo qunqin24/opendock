@@ -143,24 +143,28 @@ your full account authority; OAuth scopes do not apply to it.
 ## Try it
 
 ```text
-Fetch https://www.scrapethissite.com/pages/simple/ and summarize the page.
+Fetch https://www.scrapethissite.com and summarize the page.
 ```
 
 The server provides these tools. OpenCode 1 shows them as `mrscraper_<tool>`;
 OpenCode 2 reaches MCP tools through Code Mode by default.
 
-| Tool | Purpose |
+| Tool | Description |
 | --- | --- |
-| `scraperAPI` | Retrieve a known page as HTML, Markdown, a screenshot, or a combination. |
-| `webSearch` | Discover public pages through web search. |
-| `status` | Inspect subscription status, token usage, and remaining tokens. |
+| `status` | Return the raw account status API response without summarizing, redacting body fields, or adding calculated fields. |
+| `scrapeHtml` | Retrieve the raw HTML of a page. Browser rendering is optional. |
+| `scrapeMarkdown` | Retrieve a page as Markdown. Including HTML also enables browser rendering and returns both outputs as JSON. |
+| `getScreenshot` | Capture a base64 screenshot of the full page or top viewport. Browser rendering is always enabled. |
+| `scrapeBrand` | Extract a website's colors, typography, logos, and social links as JSON. |
+| `scrapeJson` | Extract structured JSON from a page using a natural-language prompt. Append Json Schema: and a JSON schema to shape the output. |
+| `webSearch` | Search the web and return ranked results with titles, URLs, descriptions, and sources. |
 
 ## Retrieve-first routing
 
 When a public URL is already known, the skills direct OpenCode to retrieve it
-with `scraperAPI` first and treat the raw response as the source of truth. The
-agent can read, summarize, compare, or derive structured output locally without
-losing details.
+with `scrapeMarkdown` or `scrapeHtml` first and treat the raw response as the
+source of truth. The agent can read, summarize, compare, or derive structured
+output locally without losing details.
 
 For roughly 100 known pages with a shared layout, the agent can retrieve pages
 concurrently, retain every raw response, and apply one reusable local
@@ -194,7 +198,7 @@ To control updates, pin a version and change it when you upgrade:
 
 ```json
 {
-  "plugin": ["@mrscraper/opencode@0.3.0"]
+  "plugin": ["@mrscraper/opencode@0.5.0"]
 }
 ```
 

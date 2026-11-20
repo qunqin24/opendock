@@ -5,8 +5,8 @@
 [![Publish](https://github.com/St1ggy/opencode-navigator/actions/workflows/publish.yml/badge.svg?event=release)](https://github.com/St1ggy/opencode-navigator/actions/workflows/publish.yml)
 [![License](https://img.shields.io/github/license/St1ggy/opencode-navigator)](LICENSE)
 
-[![OpenCode 1.x compatibility](https://img.shields.io/badge/OpenCode%201.x-1.19.5-4c8bf5)](#installation)
-[![OpenCode 2.x compatibility](https://img.shields.io/badge/OpenCode%202.x-2.2.6-4c8bf5)](#installation)
+[![OpenCode 1.x minimum: 1.19.5](https://img.shields.io/badge/OpenCode%201.x-min%201.19.5-4c8bf5)](#installation)
+[![OpenCode 2.x minimum: 2.2.6](https://img.shields.io/badge/OpenCode%202.x-min%202.2.6-4c8bf5)](#installation)
 [![Desktop experimental](https://img.shields.io/badge/Desktop-experimental-orange)](#experimental-opencode-desktop)
 [![Monthly npm downloads](https://img.shields.io/npm/dm/opencode-navigator?label=npm%20downloads%2Fmonth)](https://www.npmjs.com/package/opencode-navigator)
 
@@ -56,9 +56,10 @@ Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
-**Only the latest stable release in each major line is supported: OpenCode
-1.19.5 and 2.2.6.** Both have separate real-host checks. Older releases are not
-part of the supported compatibility matrix. The 2.2 integration uses OpenTUI 0.8
+**Minimum supported releases: OpenCode 1.19.5 (1.x) and 2.2.6 (2.x).**
+CI checks both these floors and the current stable endpoints, **1.19.6** and
+**2.3.2**. Future OpenCode major versions are outside these ranges. The 2.x
+integration uses the host's OpenTUI runtime
 and public host caches, events, keymap layers, and client APIs while retaining
 the separate 1.x adapter. See [Host API boundaries](HOST_API.md) for remaining
 capability gaps and removal conditions. On OpenCode 2, Navigator reads the same native Todo history as
@@ -286,9 +287,10 @@ the OpenCode 1.x launch must not load Navigator's 2.x server plugin.
 
 ### Experimental OpenCode Desktop
 
-Navigator 0.27.0 and newer also export `./gui-experimental` for **OpenCode Desktop
-2.2.6**. This is not browser Web support or a detached operating-system window.
-Earlier Navigator versions do not include the GUI export.
+Navigator exports `./gui-experimental` for **OpenCode Desktop 2.2.6 and newer
+within 2.x**. The packaged checks cover 2.2.6 and 2.3.2. This is not browser Web
+support or a detached operating-system window. Navigator versions before
+0.27.0 do not include the GUI export.
 
 Desktop discovers the GUI from its **global server plugin configuration**,
 `~/.config/opencode/opencode.json` (or the equivalent XDG location), not from

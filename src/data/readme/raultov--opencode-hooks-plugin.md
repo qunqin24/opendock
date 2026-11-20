@@ -1,7 +1,7 @@
 # opencode-hooks-plugin
 
-Runs Claude Code `SessionStart` and `PostToolUse` hooks in [opencode](https://opencode.ai), which has no hook
-system of its own.
+Runs Claude Code `SessionStart`, `PreToolUse` and `PostToolUse` hooks in [opencode](https://opencode.ai), which
+has no hook system of its own.
 
 One package serves **both opencode generations**: the dual entrypoint runs on opencode V2 and on opencode V1
 (1.18.29 or newer), with the same bridged behaviour in each.
@@ -31,6 +31,7 @@ package maps one onto the other.
 | Claude Code                       | opencode V1                                     | opencode V2                                      |
 | --------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
 | `SessionStart` + `matcher`         | the plugin function body (runs once at load)    | the `setup` body (runs once at load)             |
+| `PreToolUse` + `matcher`           | `tool.execute.before`                           | `tool.hook("execute.before")`                     |
 | `PostToolUse` + `matcher`          | `tool.execute.after`                            | `tool.hook("execute.after")`, completed calls    |
 | `type: "command"`                  | `sh -c` via opencode's shell                    | `sh -c` via `node:child_process`                 |
 | `${CLAUDE_PLUGIN_ROOT}`            | the `root` option                               | the `root` option                                |
@@ -146,13 +147,23 @@ Both layouts share the same shape, so either works:
 | ---------------------- | ------------------------ | --------------------------------------- | --------------------------------------------------------------------------- |
 | `root`                 | `string`                 | `$OPENCODE_HOOKS_ROOT`, else project dir | What `${CLAUDE_PLUGIN_ROOT}` expands to, and where the hooks file is probed. |
 | `hooksFile`            | `string`                 | `$OPENCODE_HOOKS_FILE`, else probed      | Explicit path to a hooks file.                                              |
-| `matchers`             | `string[]`               | `["startup", "resume", ""]`              | Matcher values to honour. An entry with no matcher always runs.              |
+| `matchers`             | `string[]`               | `["startup", "resume", ""]`              | Matcher values to honour. An entry with no matcher always runs, and `startup\|resume` runs when either is honoured. |
 | `skip`                 | `string[]`               | `[]`                                     | Substrings; a command containing any of them is not run.                    |
 | `timeoutMs`            | `number`                 | `20000`                                  | How long the **first model call** waits for the commands as a whole.        |
 | `commandTimeoutMs`     | `number`                 | `120000`                                 | How long **one command** is waited for before moving on to the next.        |
 | `injectSystemMessages` | `boolean`                | `true`                                   | Whether `systemMessage` directives reach the system prompt.                  |
 | `reportFailures`       | `boolean`                | `true`                                   | Whether a failed command adds a one-line notice to the system prompt.        |
 | `env`                  | `Record<string, string>` | `{}`                                     | Extra environment variables exported to every command.                      |
+
+## PreToolUse
+
+Before each opencode tool call, the `PreToolUse` commands whose `matcher` selects the Claude Code tool name run,
+in order. The tool mapping, matcher rules and payload are the same as for `PostToolUse` below, with
+`hook_event_name: "PreToolUse"`.
+
+Each command is awaited, so a hook that inspects the working tree sees it as the tool found it. Unlike in Claude
+Code, a `PreToolUse` hook cannot block or change the call: its exit code and stdout are ignored, and a failure is
+logged only.
 
 ## PostToolUse
 
@@ -172,6 +183,10 @@ Every other tool runs no command: there is no Claude Code payload this plugin co
 no longer exist, and Claude Code never reports an `Edit` on a missing file. `file_path` is always absolute,
 resolved against the project directory. The payload also carries `session_id`, `cwd` and `hook_event_name`; it
 carries no `transcript_path` and no `tool_response`.
+
+A shell call's `workdir` becomes a `cd` in front of `command`: `{ command: "ls", workdir: "/other" }` arrives as
+`cd '/other' && ls`. Claude Code's `Bash` has no `workdir`, so an agent there writes that `cd` itself, and hooks
+read the directory from the command. A `workdir` equal to the project directory leaves the command unchanged.
 
 It also carries `model`: the id of the model the session last called, as Claude Code puts it in its
 `SessionStart` payload. opencode can switch models mid-session, so it is read from the latest call (V1
@@ -220,9 +235,11 @@ Claude Code; put it in `skip`.
 
 ## Limitations
 
-- **Only `SessionStart` and `PostToolUse` are bridged.** The other Claude Code events have opencode
-  counterparts you can wire up directly in a plugin of your own: `PreToolUse` → `tool.execute.before`,
-  `Stop` → the `session.idle` event, `SessionEnd` → `session.deleted`.
+- **Only `SessionStart`, `PreToolUse` and `PostToolUse` are bridged.** The other Claude Code events have
+  opencode counterparts you can wire up directly in a plugin of your own: `Stop` → the `session.idle` event,
+  `SessionEnd` → `session.deleted`.
+- **A `PreToolUse` hook cannot block or change a call,** and no tool hook's stdout reaches the model. Claude
+  Code honours exit code 2, `permissionDecision` and `additionalContext`; this bridge only runs the command.
 - **`SessionStart` runs once per opencode process,** when the plugin loads, not once per session.
 - **`systemMessage` injection differs per generation.** opencode V2 uses the stable session request
   hooks, offering the block to every request kind that carries a system prompt (`context`, `compaction`,

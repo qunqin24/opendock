@@ -21,7 +21,7 @@ is also the document npm renders on the package page.
 
 ## Layout
 
-- `vcc-plugin/` — the product: `opencode-vcc-compaction@0.1.0` (Effect-direct hook + pure adapter + vendored engine + unit tests). Start here: [`vcc-plugin/README.md`](vcc-plugin/README.md).
+- `vcc-plugin/` — the product: `opencode-vcc-compaction@0.2.0` (Effect-direct hook + pure adapter + snapshot store + three server-only `/vcc-*` commands + vendored engine + unit tests). Start here: [`vcc-plugin/README.md`](vcc-plugin/README.md).
 - `compiler/` — deterministic reference engine (stages 1–4, verbatim port, dependency-free). Source of truth; vendored byte-identical into `vcc-plugin/engine/` (sync-enforced).
 - `.github/workflows/` — CI: typecheck, selftests, engine-sync, markdown lint; tag pushes publish to npm and cut GitHub releases.
 - `examples/` — scratch project registering `../vcc-plugin` with a cheap `compaction.buffer` trigger for live runs (never run from a real project).
@@ -75,10 +75,11 @@ Live compaction runs only with explicit approval + explicit `--model`, from a sc
 
 ## Status and limits
 
-- v0.1.0 ships the hook + verbatim summary only: no slash commands, no
-  recall tools. `(seq N)` pointers are 1-based ordinals over the compiled
-  messages (skipped messages consume no seq); OpenCode-native recall
-  (message/part-ID resolution) is follow-up work, detailed in the manual.
+- v0.2.0 ships the hook + three server-only slash commands
+  (`/vcc-recall`, `/vcc-search`, `/vcc-status`; no `./tui`).
+  `(seq N)` pointers are 1-based ordinals over the compiled
+  messages (skipped messages consume no seq); recall/search resolve them
+  against the per-session snapshot, detailed in the manual.
 - When the adapter cannot pick a `keepID` it abstains (`result` unset → host falls back to model compaction). Never a broken summary.
 - `effect` comes from the host instance (peer `effect ^4.0.0`, `@opencode/plugin ^2.0.0`), never bundled.
 

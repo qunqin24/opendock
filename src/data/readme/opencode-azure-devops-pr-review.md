@@ -47,7 +47,7 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
 
 ## Watch the workflow
 
-[![Real OpenCode run: a review starts, a panel beside the conversation lists its sessions, then shows the report and the comment preview rendered.](docs/assets/terminal-panel-teaser.gif)](docs/DEMO.md#the-terminal-panel)
+[![Real OpenCode run: a review starts and a panel beside the conversation lists its sessions, with a step at its foot that stops the run; the panel then shows the report and the comment preview rendered, with the next step at its foot, and the findings as a list.](docs/assets/terminal-panel-teaser.gif)](docs/DEMO.md#the-terminal-panel)
 
 *A 15-second edit of a real OpenCode 2.3.0 session on a dedicated test PR.
 Waiting time is shortened, so the length is not the review duration.
@@ -61,7 +61,7 @@ Waiting time is shortened, so the length is not the review duration.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.4.4
+   opencode plugin add opencode-azure-devops-pr-review@0.4.5
    ```
 
 2. In OpenCode's terminal UI, type `/pr-setup`. Dialogs ask for your Azure
@@ -92,9 +92,10 @@ without a model.
 
 In OpenCode's terminal UI a [panel](#terminal-panel) opens beside the
 conversation: it shows the report and the preview rendered, and at its foot
-what you can do next. Pick **Post N comments…** there, or leave findings out
-first with **Adjust findings…**, without typing a command; posting always asks
-once more.
+what you can do next, without typing a command. While the review runs that is
+**Stop this run…**. After the preview, pick **Post N comments…** there, or
+leave findings out first with **Adjust findings…**. Stopping and posting
+always ask once more.
 
 <details>
 <summary>Optional: adjust findings and publish after reading the preview</summary>
@@ -412,7 +413,8 @@ acknowledge `STARTED` and continue in the current OpenCode process; short
 `PROGRESS` notices and a final receipt return to the invoking conversation.
 They start no response of that conversation's own model; when you prompt it
 later, it reads them together with your prompt, in one request. Use
-the displayed `/pr-stop <run-id>` to cancel. `/pr-setup` (including `--help`),
+the displayed `/pr-stop <run-id>` to cancel, or **Stop this run…** at the
+foot of the [terminal panel](#terminal-panel). `/pr-setup` (including `--help`),
 `/pr-stop`, `/pr-comment --show`, an adjustment that changes nothing and a
 refused command answer directly, without a background run.
 Completed reviews, previews and publication ledgers are saved privately and
@@ -433,14 +435,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.4
+opencode plugin add opencode-azure-devops-pr-review@0.4.5
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.4'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.5'
 ```
 
 Add only one of them. OpenCode 2.3.0 loads the plugin into a running OpenCode
@@ -455,7 +457,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.4.4",
+    "package": "opencode-azure-devops-pr-review@0.4.5",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -480,7 +482,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.4 &&
+opencode plugin add opencode-azure-devops-pr-review@0.4.5 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -512,7 +514,8 @@ the first one (`Unknown setting settings.terminalPanel`) instead of starting. `o
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.4.4 release notes](docs/releases/v0.4.4.md) for what changed, the
+See the [0.4.5 release notes](docs/releases/v0.4.5.md) for what changed, the
+[0.4.4 release notes](docs/releases/v0.4.4.md) for the steps at the panel's foot, the
 [0.4.3 release notes](docs/releases/v0.4.3.md) for setup in the terminal UI, the
 [0.4.0 release notes](docs/releases/v0.4.0.md) for commands without review IDs and the
 [0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments. A
@@ -525,8 +528,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.4.4 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.4.tar.gz)
-and extract it, or check out tag `v0.4.4`. The installer needs POSIX `sh` and
+Download the [v0.4.5 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.5.tar.gz)
+and extract it, or check out tag `v0.4.5`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -903,7 +906,7 @@ troubleshooting.
 | `/pr-review <PR URL> [flag] [context]` | Sharded functional and risk reviews, then sharded verification. |
 | `/pr-deep <PR URL> [flag] [context]` | The same review with the stronger models of `models.deep`; usually slower and costlier. |
 | `/pr-quick <PR URL> [flag] [context]` | One reviewer per shard for both focuses, no verification; findings are reported, not verified. |
-| `/pr-stop [run-id]` | Cancel this conversation's active command. |
+| `/pr-stop [run-id]` | Cancel this conversation's active command. The terminal panel offers the same while a run is under way (**Stop this run…**). |
 | `/pr-comment [review-id]` | Preview comments for this conversation's current review. |
 | `/pr-comment [review-id] --publish` | Post the saved preview. A review that was never adjusted is planned first if needed; an adjusted one needs its new preview. Safe to repeat. |
 | `/pr-comment [review-id] --show` | Show the saved preview again; no model or Azure DevOps request. |
@@ -972,8 +975,9 @@ OpenCode shows what a plugin tells a conversation as plain text, so a report
 or a comment preview appears there as Markdown source. In OpenCode's terminal
 UI, AZPR therefore adds a panel beside the conversation: it shows the newest
 report or preview rendered, lists the sessions of the review so that you can
-open one, and after a preview lists what you can do next, so that you pick a
-step instead of typing its command. The
+open one, and lists at its foot what you can do next (stop a run that is
+under way; after a preview, post it or adjust its findings), so that you pick
+a step instead of typing its command. The
 [recording of a real review](docs/DEMO.md#the-terminal-panel) shows the report
 and the conversation side by side.
 
@@ -1025,10 +1029,24 @@ and the conversation side by side.
   when they are others by now, for instance after a command typed in the
   review's own session or in another client: nothing is posted that you have
   not read.
+
+  While a run is under way (a review, a preview that is being planned, a
+  publication), the row offers one thing instead:
+
+  ```text
+  [s] Stop this run…
+  ```
+
+  It asks first, with "No, let it run" first, and then sends `/pr-stop` for
+  that run, as if you had typed it: the run ends with its `CANCELLED`
+  receipt, and requests that were already sent may still be billed. If the
+  run has ended while the question was open, nothing is sent and the panel
+  says so. A run that an earlier AZPR started is stopped by typing the
+  command its STARTED notice shows.
 - **Keys.** `/pr-panel` shows and hides the panel; it is the panel's only
   command. A click inside its text gives it the keyboard: the arrow keys or
-  `j` and `k`, Page Up and Page Down, Home and End scroll, `p`, `a`, `u` and
-  `c` pick what the foot offers, and Escape or `q` closes it.
+  `j` and `k`, Page Up and Page Down, Home and End scroll, `p`, `a`, `u`,
+  `c` and `s` pick what the foot offers, and Escape or `q` closes it.
 - **A narrow terminal** (fewer than 108 columns) has no room for two panes,
   and OpenCode would show the panel in place of the conversation. There the
   panel does not open by itself; it says that something is ready, and
@@ -1036,8 +1054,9 @@ and the conversation side by side.
 
 The panel shows what AZPR already put into your conversation and into the
 session that holds a report. It sends nothing by itself and never a prompt:
-the one thing it sends is the `/pr-comment` command of a step you pick, which
-AZPR takes like a typed one, and posting always asks first. It comes with
+the one thing it sends is the command of a step you pick (`/pr-comment`, or
+`/pr-stop` for a run under way), which AZPR takes like a typed one, and
+posting and stopping always ask first. It comes with
 the package and needs no setup; `terminalPanel` is its one setting. Other
 OpenCode clients, such as the desktop app, do not load it and show AZPR's
 notices as before. The same terminal part brings the
@@ -1262,8 +1281,8 @@ dependency and is not built on your machine.
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.4.4` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.4'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.4.5` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.5'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -1276,7 +1295,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.4.4](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.4)
+release scope, [v0.4.5](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.5)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

@@ -6,7 +6,7 @@
 
 让 [Magpie](https://usemagpie.ai/) 通过你的 Google 账号使用 **Google AI Studio** 与 **Gemini 网页版**。插件在本机自动运行 [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) 与 [gemini-web2api-go](https://github.com/zexadev/gemini-web2api-go)，提供对话、原生工具调用、Nano Banana 图片生成与 Deep Research 等能力。
 
-> **新模型支持说明**：**Google AI Studio (`ai-studio`)** 默认自动跟随官方最新稳定版后端，现已直接支持 **`gemini-4-hydrogen`**（含 `xhigh` 思考档位）与 **`gemini-4-carbon`**（需账号具备对应权益，如 Google AI Ultra）。**Gemini Web (`gemini-web`)** 由后端 [`dorokuma/gemini-web2api-go` `v6.2.0`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.0) 原生支持 `gemini-4-carbon` / `gemini-4-hydrogen` / **`gemini-4-neon`** 专用模型 ID（含 `-thinking` 思考变体），`strict_model` 开启时也能正确互认槽位升降级；`gemini-4-neon` 系列为服务端内部思考模型，回复中不输出 `reasoning_content`。**对话模式与任务模式分离**：日常对话用 `gemini-4-neon` / `gemini-4-hydrogen` / `gemini-4-carbon`（`gemini-4-carbon` 及 `-thinking` / `-thinking-medium` 变体为纯对话模式），任务/工具密集型场景可选独立任务模式模型 **`gemini-4-neon-task`**、**`gemini-4-carbon-task`** 与 **`gemini-4-hydrogen-task`**（对应 Gemini Web 网页端「任务」开关）。
+> **新模型支持说明**：**Google AI Studio (`ai-studio`)** 默认自动跟随官方最新稳定版后端，现已直接支持 **`gemini-4-hydrogen`**（含 `xhigh` 思考档位）与 **`gemini-4-carbon`**（需账号具备对应权益，如 Google AI Ultra）。**Gemini Web (`gemini-web`)** 由后端 [`dorokuma/gemini-web2api-go` `v6.2.2`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 原生支持 `gemini-4-carbon` / `gemini-4-hydrogen` / **`gemini-4-neon`** 专用模型 ID（含 `-thinking` 思考变体），`strict_model` 开启时也能正确互认槽位升降级；`gemini-4-neon` 系列为服务端内部思考模型，回复中不输出 `reasoning_content`。**对话模式与任务模式分离**：日常对话用 `gemini-4-neon` / `gemini-4-hydrogen` / `gemini-4-carbon`（`gemini-4-carbon` 及 `-thinking` / `-thinking-medium` 变体为纯对话模式），任务/工具密集型场景可选独立任务模式模型 **`gemini-4-neon-task`**、**`gemini-4-carbon-task`** 与 **`gemini-4-hydrogen-task`**（对应 Gemini Web 网页端「任务」开关）。
 
 ## Fork 声明与致谢
 
@@ -19,7 +19,7 @@
 **与原版的主要差异**（完整历史见 [CHANGELOG](CHANGELOG.md)）：
 
 1. npm 包名迁移为作用域包 **`@dorokuma/magpie-gemini-web`**；原版无作用域包 `magpie-gemini-web` 仍由原作者维护，两者在 npm 上是相互独立的包。
-2. Gemini Web 后端固定使用 `dorokuma/gemini-web2api-go` 的**官方 Release 预编译二进制**（当前 `v6.2.0`，SHA-256 由脚本单向同步、禁止手改），移除本地补丁重编流水线。
+2. Gemini Web 后端固定使用 `dorokuma/gemini-web2api-go` 的**官方 Release 预编译二进制**（当前 `v6.2.2`，SHA-256 由脚本单向同步、禁止手改），移除本地补丁重编流水线。
 3. Gemini Web 新增 `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-4-neon` 模型 ID（含独立的任务模式模型 `gemini-4-neon-task` / `gemini-4-carbon-task` / `gemini-4-hydrogen-task`）与互认槽位校验；修复幻影会话、AI Studio 代理优先级、更新锁原子发布与自愈等问题。
 
 
@@ -35,9 +35,9 @@
 | **思考档位** | 按模型目录提供 `minimal` / `low` / `medium` / `high` / `xhigh`（Hydrogen）中支持的档位 | `low`（普通）/ `medium`（`-thinking-medium`，Carbon / Neon 系列）/ `high`（`-thinking` 扩展思考） |
 | **图片输入** | 默认开启，对话模型可以读图 | 默认开启，对话模型可以读图（需登录态挂 Cookie） |
 | **图片生成** | Nano Banana 系列模型，供 Magpie 的图片生成使用（需要 Magpie v0.1.2075+，见下文） | 不支持 |
-| **登录方式** | 自动安装官方后端，导入账号后确认连接 | 用无痕窗口登录并复制 `cookie` |
+| **登录方式** | 自动安装官方后端，导入账号后确认连接 | 本机向导页引导：无痕窗口登录并复制 `cookie` |
 | **额度卡片** | 显示冷却中的模型与恢复时间 | 同步网页版 **5 小时** 与 **每周** 用量及重置时间 |
-| **本地后端** | AIStudio2API（自动安装并跟随官方稳定版） | gemini-web2api-go (`v6.2.0` 固定 pin 二进制) |
+| **本地后端** | AIStudio2API（自动安装并跟随官方稳定版） | gemini-web2api-go (`v6.2.2` 固定 pin 二进制) |
 
 ---
 
@@ -84,13 +84,12 @@
 
 ### 方式二：Gemini Web (`gemini-web`)
 
-1. 在 Magpie 中登录 **Gemini Web**，选择 **「一键配置本地 Gemini Web（推荐）」**（若访问 Google 需要代理，可在第一步提示中直接填写代理地址，例如 `http://127.0.0.1:7890`，无需代理或已配置代理池可留空）。
-2. 按提示填写 **Google 账号索引**：复制 Cookie 的同一窗口地址若为 `/u/4/app`，填 `4`；单账号会话可留空（`0`）。无痕窗口中的索引可能不同，不能直接沿用日常窗口的编号。然后在浏览器**无痕 / 隐私窗口**（推荐 Firefox）获取 Cookie：
-   1. 访问 <https://gemini.google.com/app> 并登录 Google 账号；
-   2. 按 `F12`（macOS 按 `⌥⌘I`）切到 **Network（网络）**，刷新页面；
-   3. 点击任意 `gemini.google.com` 请求 → **Headers** → **Request Headers**，复制 `cookie` 的值粘贴回 Magpie；
-   4. **直接关闭无痕窗口，不要点退出登录**（点退出会使 Cookie 失效）。
-3. 插件验证账号可用后即完成登录。想添加更多账号，重复上述步骤即可。
+1. 在 Magpie 中登录 **Gemini Web**，选择 **「一键配置本地 Gemini Web（推荐）」**（若访问 Google 需要代理，可在第一步提示中直接填写代理地址，例如 `http://127.0.0.1:7890`，无需代理或已配置代理池可留空，也可稍后在本机登录向导页填写或修改）。
+2. Magpie 打开**本机登录向导页**（`127.0.0.1` 随机端口 + 随机路径，仅本机可访问），按页面三步走：
+   1. 点 **「打开无痕窗口登录 Gemini」**，插件会以无痕 / 隐私模式自动启动检测到的浏览器（优先 Firefox，其次 Chrome / Brave / Chromium / Edge）；找不到已知浏览器时页面给出链接，请手动开无痕窗口访问 <https://gemini.google.com/app> 登录 Google 账号；
+   2. 按 `F12`（macOS 按 `⌥⌘I`）切到 **Network（网络）**，刷新页面，点击任意 `gemini.google.com` 请求 → **Headers** → **Request Headers**，复制 `cookie` 的值粘贴回向导页；
+   3. 在同一表单填写 **Google 账号索引**（对照无痕窗口登录后地址栏 `/u/N/app` 的 `N`，单账号留空按 `0`）与可选的**代理地址**，点 **「验证并完成登录」**。校验失败会直接在页内显示原因，可原地修改后重试，无需取消重来。
+3. 页面显示绑定邮箱后即完成登录，此时**直接关闭无痕窗口，不要点退出登录**（点退出会使 Cookie 失效）。想添加更多账号，重复上述步骤即可。
 
 > **升级后提示后端不支持登录时绑定代理？** 旧后台进程可能仍在运行。请按提示先退出 Magpie，停止对应的 `gemini-web2api-go` 进程（Windows：任务管理器 → 详细信息 → `gemini-web2api-go.exe`），再运行提示中的完整安装命令。它会保留账号和配置，并切换到插件的托管后端；如下载需要代理，先设置 `GEMINI_WEB_PROXY`。完成后重新打开 Magpie 登录。
 
@@ -159,6 +158,7 @@ magpie plugin options @dorokuma/magpie-gemini-web '{"studio":{"proxy":"http://12
 | `proxy` | 无 | 仅 `gemini-web` | 一键配置后端访问 Google 的代理（`http` / `https` / `socks5` / `socks5h`），也可用环境变量 `GEMINI_WEB_PROXY` 或在登录第一步填写 |
 | `baseURL` | `http://127.0.0.1:8083/v1` | 仅 `gemini-web` | Gemini Web 默认后端地址 |
 | `contextLimit` / `outputLimit` | `1000000` / `8192` | 仅 `gemini-web` | 向客户端声明的上下文 / 输出上限 |
+| `per_ip_concurrent` / `per_ip_rpm` / `per_ip_rph` | `5` / `30` / `80` | 仅 `gemini-web` | 本地受管后端的单 IP 限流：瞬时并发 / 每分钟 / 每小时请求上限，`0` 表示不限。可在 Magpie 参数区直接配置，保存后写入 `config.json` 并热同步到运行中的后端，无需重启；连接自建后端时仅作校验，不会改动外部实例 |
 | `studio.proxy` | 无 | 仅 `ai-studio` | 访问 Google 的代理（`http` / `https` / `socks5`），也可用环境变量 `AI_STUDIO_PROXY`；设置后优先于管理页里保存的代理。未设置时沿用环境变量或管理页保存的代理；显式设为空字符串 `""` 时不使用环境变量与管理页里保存的代理（macOS/Windows 上后端自身的系统代理检测仍可能生效） |
 | `studio.accountOrder` | 无 | 仅 `ai-studio` | 账号优先顺序（逗号分隔字符串或字符串数组，如 `["b@gmail.com","a@gmail.com"]`）；当 `.env` 中未保存或为空时作为初始值写入，管理页保存非空值后优先保留管理页设置 |
 | `studio.modelAccounts` | 无 | 仅 `ai-studio` | 模型专属账号绑定（`"model:acc1|acc2"` 字符串或 `{ "gemini-3.1-pro-preview": ["acc1", "acc2"] }` 对象）；当 `.env` 中未保存或为空时作为初始值写入，管理页保存非空值后优先保留管理页设置 |
@@ -244,13 +244,13 @@ magpie plugin options @dorokuma/magpie-gemini-web '{"studio":{"proxy":"http://12
 - 模型列表过滤 `-build` / `assistant_route` 模型：这类模型附带 Build 写代码助手的系统提示词，不作为普通 Agent 模型提供。升级后可执行 `magpie provider models ai-studio` 刷新列表。
 
 **Gemini Web 优化后端升级与回退：**
-- [#53](https://github.com/dorokuma/magpie-gemini-web/issues/53) 的多账号索引漏传已修复，需重新导入受影响的 Cookie 或在后端账号管理中修正索引。后端 [`dorokuma/gemini-web2api-go` `v6.2.0`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.0) 已原生收录 `gemini-4-carbon`、`gemini-4-hydrogen` 与 `gemini-4-neon` 模型 ID（含 `-thinking` 思考变体，Neon 系列为服务端内部思考、不输出 `reasoning_content`），同时移除了 Gemini Web 对外 `gemini-4-argon*`（原 Argon 槽位在上游目录中原位改名为 4 Carbon，谷歌已下架 Argon，请改用 `gemini-4-carbon*` 或 `gemini-4-neon*`）；`strict_model` 槽位校验按显示名家族互认升级/降级，付费账号请求 `gemini-3.8-flash` 被路由至 `4 Hydrogen` 时也能正确识别，不会误报 `429 model_downgraded`。
-- 插件默认固定使用后端仓发布的 [v6.2.0](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.0) 预编译二进制（一仓一制品，6 平台 SHA-256 pin 在 `lib/backend-release.json`，不再由插件仓打补丁重编）。对话请求按上游沉默计时：Google 让请求排队时每 60 秒发一次心跳，后端会一直等到出字；连续 `request_timeout_sec`（默认 180 秒）没有任何数据才放弃这一次并重试，还在出字的长回复也不会被截断。
-- **旧版升级**：插件加载时若识别到托管的旧版后端进程，会自动回收并升级到当前 pin 的 `v6.2.0`，这可能中断正在进行的生成请求；建议升级前先等待在途请求结束，或手动停止旧进程（PID 见数据目录 `backend.pid`）。非插件托管或无法识别的实例不保证自动更新。升级后保留原有配置与账号。
+- [#53](https://github.com/dorokuma/magpie-gemini-web/issues/53) 的多账号索引漏传已修复，需重新导入受影响的 Cookie 或在后端账号管理中修正索引。后端 [`dorokuma/gemini-web2api-go` `v6.2.2`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 已原生收录 `gemini-4-carbon`、`gemini-4-hydrogen` 与 `gemini-4-neon` 模型 ID（含 `-thinking` 思考变体，Neon 系列为服务端内部思考、不输出 `reasoning_content`），同时移除了 Gemini Web 对外 `gemini-4-argon*`（原 Argon 槽位在上游目录中原位改名为 4 Carbon，谷歌已下架 Argon，请改用 `gemini-4-carbon*` 或 `gemini-4-neon*`）；`strict_model` 槽位校验按显示名家族互认升级/降级，付费账号请求 `gemini-3.8-flash` 被路由至 `4 Hydrogen` 时也能正确识别，不会误报 `429 model_downgraded`。
+- 插件默认固定使用后端仓发布的 [v6.2.2](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 预编译二进制（一仓一制品，6 平台 SHA-256 pin 在 `lib/backend-release.json`，不再由插件仓打补丁重编）。对话请求按上游沉默计时：Google 让请求排队时每 60 秒发一次心跳，后端会一直等到出字；连续 `request_timeout_sec`（默认 180 秒）没有任何数据才放弃这一次并重试，还在出字的长回复也不会被截断。
+- **旧版升级**：插件加载时若识别到托管的旧版后端进程，会自动回收并升级到当前 pin 的 `v6.2.2`，这可能中断正在进行的生成请求；建议升级前先等待在途请求结束，或手动停止旧进程（PID 见数据目录 `backend.pid`）。非插件托管或无法识别的实例不保证自动更新。升级后保留原有配置与账号。
 - **回退官方上游版 / 恢复 pin 版**（停止后端后在插件目录执行）：
   ```bash
   npm run backend:install:upstream  # 回退并固定使用上游 zexadev v4.28.0
-  npm run backend:install           # 恢复默认 pin 的 v6.2.0
+  npm run backend:install           # 恢复默认 pin 的 v6.2.2
   ```
 - pin 同步、校验与冒烟流程见 [docs/backend-release.md](docs/backend-release.md)。
 

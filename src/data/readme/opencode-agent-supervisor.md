@@ -77,7 +77,7 @@ Requires OpenCode **1.19.0** or later.
 ### 3.1 Install for yourself
 
 ```bash
-opencode plugin opencode-agent-supervisor@2.12.0 --global
+opencode plugin opencode-agent-supervisor@2.14.0 --global
 ```
 
 OpenCode downloads the package and adds it to the `plugin` array of
@@ -93,7 +93,7 @@ the repository runs the same supervisor version:
 
 ```json
 {
-  "plugin": ["opencode-agent-supervisor@2.12.0"]
+  "plugin": ["opencode-agent-supervisor@2.14.0"]
 }
 ```
 
@@ -689,6 +689,38 @@ The supervisor's tool-arg repair keeps argument keys other plugins
 add (Section 4.5), so plugin order in `tool.execute.before` does not
 matter for injected keys.
 
+**Plugin-injected arguments (FR-106).** OpenCode stores a tool call's
+input after every `tool.execute.before` hook has run. When another
+plugin fills in an argument, the agent sees it in its own call and
+may reason as if it chose it, and the auditor would then flag a
+"deviation". So the supervisor reads what other plugins say they
+injected and lists it in the audit prompt, under a note that the
+agent did not write those values. A plugin that changes args can
+publish them like this:
+
+```ts
+type InjectedArgsRecord = { sessionID: string; tool: string; args: Record<string, unknown> };
+// On the plugin's own shared state:
+//   globalThis[Symbol.for('<plugin>.shared-state')].injectedArgs: Map<callID, InjectedArgsRecord>
+```
+
+- **`args`** holds only the injected part: the whole value for a key
+  the model left out, only the appended elements for an array, the
+  new value for a changed scalar.
+- **Written** in the plugin's `tool.execute.before`, before the tool
+  runs. Keep the map bounded (the harness keeps 512 callIDs).
+- **Read** by the supervisor at each audit: the session's 12 most
+  recent records, each value cut at 200 characters. A missing or
+  malformed state counts as nothing injected.
+- **Producers** are listed in `INJECTED_ARGS_PRODUCERS`
+  (`src/plugin-injected.ts`). Today that is
+  `opencode-research-harness`
+  (`Symbol.for('opencode-research-harness.shared-state')`); its README
+  documents its side.
+
+The tool guard is not affected: it checks the args as they are when
+its own hook runs.
+
 ## 5. The Agent Console
 
 The plugin registers five tools (`Hooks.tool`) the supervised agent
@@ -1211,8 +1243,8 @@ opencode-supervisor is loaded more than once for /path/to/project
 
 The plugin is listed twice, for example as `opencode-agent-supervisor@x.y.z`
 in your global config and as a path to a local checkout in the
-project's `opencode.json`. Remove one entry. Since the next release
-after 2.12.0, two copies no longer audit each other's side sessions.
+project's `opencode.json`. Remove one entry. Since 2.13.0, two
+copies no longer audit each other's side sessions.
 Every auditor side session also runs with no tools, gives up after
 180 s, and at most 4 run at once; anything past those limits passes
 unaudited and is logged. Earlier versions could audit each other's

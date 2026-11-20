@@ -43,6 +43,8 @@ re-arms opencode's own sticky scroll, so follow-the-output resumes.
 
 ## Verified against opencode 1.18.27
 
+On 1.19.6 it loads cleanly and the first case below was rechecked.
+
 | Case | Result |
 |---|---|
 | Scroll up, type one character | Snaps to bottom |

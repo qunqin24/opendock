@@ -5,13 +5,14 @@ Not an official Mistral or OpenCode plugin.
 
 Adds **Mistral Vibe** to `/connect` and its account-specific model catalog to `/models`.
 Requires OpenCode 2.2.5+ and **mistral-vibe 3.1.x** on the OpenCode server host.
+The local-fixture integration tests cover Vibe 3.1.0 through 3.1.3.
 
 ## Install
 
 On the machine running the OpenCode server:
 
 ```sh
-uv tool install mistral-vibe==3.1.0
+uv tool install mistral-vibe==3.1.3
 vibe --setup
 opencode plugin add github:itsSivvis/opencode-mistral-vibe
 ```
@@ -64,6 +65,8 @@ of conversation history.
 - OpenCode owns instructions, history, tools, approvals, compaction and subagents.
 - Vibe owns model transport and credential resolution (environment, its `.env`,
   keyring or CLI OIDC credential, as supported by Vibe).
+- Model requests carry Vibe's own client user-agent (`Mistral-Vibe/<version>`),
+  so Mistral meters them like `vibe` CLI requests, not as raw API usage.
 - Text/reasoning stream live; tool calls return to OpenCode for execution. Tool
   results preserve native roles and call IDs on the next request.
 - Cancellation terminates only the bridge process belonging to the request.
@@ -74,6 +77,8 @@ of conversation history.
 
 The Python adapter API is internal to Vibe, so this release checks the 3.1.x
 version boundary. Update and retest the adapter before supporting another minor.
+Patch releases changed these interfaces within 3.1.x; the bridge supports both
+catalog API generations (3.1.0/3.1.1 and 3.1.2+).
 
 ## Paths
 
@@ -82,6 +87,12 @@ version boundary. Update and retest the adapter before supporting another minor.
   useful for pip installs, wrappers or Windows. With uv, the sibling `python` in
   Vibe's resolved environment is discovered automatically.
 - `VIBE_HOME`: honored by Vibe for user configuration and authentication.
+- `OPENCODE_VIBE_PREWARM`: set to `0` to start the Python bridge cold for every
+  request. By default one idle bridge with Vibe already imported waits for the next
+  model request (about 0.6 s faster per request, about 85 MB of memory) and stops
+  after 10 idle minutes. Each request still runs in its own process and reads
+  configuration and credentials at request time; the idle bridge is discarded when
+  the server's environment changes.
 
 Set these in the **server's environment**, not just the terminal client.
 

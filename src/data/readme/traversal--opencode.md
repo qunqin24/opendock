@@ -39,13 +39,10 @@ Then install **Traversal** from the plugin list.
 
 ### OpenCode
 
-Requires OpenCode 2. Add the plugin to your `opencode.json`, then sign in:
-
-```jsonc
-{ "plugins": ["@traversal/opencode"] }
-```
+Requires OpenCode 2.
 
 ```bash
+opencode plugin add @traversal/opencode
 opencode mcp auth traversal
 ```
 

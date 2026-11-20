@@ -53,9 +53,10 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
 ### 语言
 
-界面提供俄语（默认）、英语和中文。语言选择器位于调度器面板顶部（🌐 自动 / Русский / English / 中文），
+界面提供俄语、英语和中文。默认选择「自动」模式——与 OpenCode 一样，界面语言跟随 OpenCode；
+也可以显式选择俄语、英语或中文。语言选择器位于调度器面板顶部（🌐 自动 / Русский / English / 中文），
 也可通过 `manage_settings` 工具切换（`action: "update"`，`locale: "zh"` 等）。
-`locale: "auto"`（「自动」）跟随 OpenCode 界面语言：面板会立即响应语言切换，
+`locale: "auto"`（「自动」，默认）跟随 OpenCode 界面语言：面板会立即响应语言切换，
 并将解析后的语言发送到服务器，使通知、摘要和仪表盘保持一致。切换无需重启。
 仪表盘的本地化仍在推进：部分客户端字符串目前仍为俄语。按设计，agent 工具描述
 与 schema 保持英语，输出到控制台的诊断信息保持俄语。
@@ -115,7 +116,7 @@ npm run build && npm run build:gui
 
 ## Agent 工具
 
-agent 可获得完整功能 —— 26 个工具，覆盖调度、流水线、运维、可观测性与管理：
+agent 可获得完整功能 —— 29 个工具，覆盖调度、流水线、运维、可观测性与管理：
 
 | 工具 | 参数 | 作用 |
 |---|---|---|
@@ -145,6 +146,9 @@ agent 可获得完整功能 —— 26 个工具，覆盖调度、流水线、运
 | `manage_secrets` | `action`、`name?`、`value?` | 创建、列出或删除用于任务 `env` 的 AES-256-GCM 加密密钥 |
 | `get_audit_log` | `action?`、`target?`、`actor?`、`since?`、`until?`、`limit?` | 变更审计日志：谁、何时、通过哪个界面改了什么 |
 | `emit_event` | `eventName`、`payload?` | 启动订阅该 MCP 事件的任务 |
+| `pipeline_validate` | `path?`、`source?` | 校验 `opencode.pipeline.yaml`，不修改任务 |
+| `pipeline_apply` | `path?`、`source?`、`dryRun?` | 幂等地创建/更新流水线任务；`dryRun` 只报告差异 |
+| `pipeline_export` | `pipeline` | 将流水线任务导出回 YAML |
 
 `schedule_task` 还接受完整的矩阵配置（`workspaceIds`、`strategy`、`failureMode`、`aggregation`、`concurrency`、`overrides`、`createAggregator`）。
 
@@ -190,6 +194,41 @@ Agent 任务以 `opencode run --auto` 运行，因此其工具策略必须显式
 ```
 
 每个 workspace 会得到一个名为 `<parent>-matrix-<workspace>` 的克隆。父任务自身从不运行：它把克隆结果聚合为 `success`、`error` 或 `partial`。编辑父任务时克隆会保持同步；正在运行的克隆不会被改动。
+
+## Pipeline 即代码
+
+用一个 `opencode.pipeline.yaml` 文件描述整个工作流，而不是逐个创建任务：
+
+```yaml
+version: 1
+name: nightly-release
+defaults:
+  retryCount: 1
+  retryDelay: 120
+steps:
+  - id: lint
+    schedule: "0 2 * * *"
+    prompt: Run the linter and fix what it reports.
+    qualityGate: npm run lint
+  - id: test
+    needs: [lint]
+    trigger: dag
+    prompt: Run the tests and fix failures.
+    qualityGate: npm test
+```
+
+`needs` 会变成 DAG 依赖，`trigger: dag` 的步骤只在其依赖成功后运行，`defaults` 由所有步骤继承。每个步骤都会成为名为 `<pipeline> <step>` 的任务。
+
+```bash
+agent-steward pipeline validate opencode.pipeline.yaml
+agent-steward pipeline apply opencode.pipeline.yaml --dry-run
+agent-steward pipeline apply opencode.pipeline.yaml
+agent-steward pipeline export --pipeline nightly-release --out opencode.pipeline.yaml
+```
+
+apply 是幂等的：未变化的步骤会跳过，修改过的步骤会更新，流水线之外的任务不会被触碰。从文件中删除的步骤会被标记为 stale，但不会自动删除。agent 可通过 `pipeline_validate`、`pipeline_apply` 和 `pipeline_export` 使用同样的操作。
+
+完整格式、矩阵扇出、校验规则与限制见 [docs/PIPELINE.md](PIPELINE.md)，可直接复制的示例见 [opencode.pipeline.yaml](../opencode.pipeline.yaml)。
 
 ## GUI 与仪表盘
 
@@ -247,6 +286,7 @@ npm run test:en      # same suites with the English locale
 - [docs/FEATURES.md](FEATURES.md) —— 带示例的完整功能目录。
 - [docs/FAQ.md](FAQ.md) —— 恢复场景与运维问答。
 - [docs/MIGRATION.md](MIGRATION.md) —— 从 cron、systemd、launchd 或任务计划程序迁移。
+- [docs/PIPELINE.md](PIPELINE.md) —— 流水线即代码：文件格式、CLI、幂等 apply。
 - [docs/SAVINGS.md](SAVINGS.md) —— "Saved $" 估算如何计算。
 - [CROSS_PLATFORM.md](../CROSS_PLATFORM.md) —— Windows / macOS / Linux 的差异与后端。
 

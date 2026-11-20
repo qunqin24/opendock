@@ -110,9 +110,9 @@ Do not put the files in `~/.config/opencode/plugin/`. That directory is auto-dis
 
 ## Status
 
-`node --test test/` covers it: 15 tests, including a replay over three of my real sessions with every string stripped out (`test/session.json` — token counts, finish reasons, part types, tool names, reasoning lengths and durations only, under synthetic ids, with timestamps rebased to the start of each session). The replay pins the numbers this plugin exists to produce: 21 cutoffs, 18 mid-thought, 14 attributed to the context wall and 7 to the output cap, none unattributed. The sidebar lines are asserted to fit 37 columns.
+`npm test` covers it: 15 tests, including a replay over three of my real sessions with every string stripped out (`test/session.json` — token counts, finish reasons, part types, tool names, reasoning lengths and durations only, under synthetic ids, with timestamps rebased to the start of each session). The replay pins the numbers this plugin exists to produce: 21 cutoffs, 18 mid-thought, 14 attributed to the context wall and 7 to the output cap, none unattributed. The sidebar lines are asserted to fit 37 columns.
 
-What the tests do not cover is how it looks in a terminal, which needs a real one. The sidebar placement in particular: opencode puts a blank line between sidebar slots, so "headerless, under Context" means one line of gap, not a seamless continuation of that block.
+What the tests do not cover is how it looks in a terminal, which needs a real one. The sidebar placement in particular: opencode puts a blank line between sidebar slots, so "headerless, under Context" means one line of gap, not a seamless continuation of that block. It has been checked in a terminal on opencode 1.19.6.
 
 ## License
 
