@@ -70,11 +70,32 @@ export interface Plugin {
   opencode?: OpencodeTarget;
   /** True when `opencode` is 'v1' only because the release predates V2. */
   opencodeInferred?: boolean;
+  /**
+   * Which OpenCode hosts load a part of the package (scripts/lib/compat.mjs
+   * `detectSurfaces`). Optional: older snapshots don't carry it.
+   */
+  surfaces?: Surface[];
   /** Slug of the package this one republishes under another scope (set at load, see disambiguate.ts). */
   republishOf?: string;
 }
 
 export type OpencodeTarget = 'v1' | 'v2' | 'both' | null;
+
+/** `server`: opencode.json server plugin; `tui`: terminal UI; `gui`: native OpenCode Desktop UI. */
+export type Surface = 'server' | 'tui' | 'gui';
+
+/** Adds native UI to OpenCode Desktop (ships a `./gui-experimental` entry). */
+export function hasDesktopUi(p: { surfaces?: Surface[] | null }): boolean {
+  return Boolean(p.surfaces?.includes('gui'));
+}
+
+/**
+ * Loaded only by the terminal UI, so it goes in cli.json rather than
+ * opencode.json (V2).
+ */
+export function isTuiOnly(p: { surfaces?: Surface[] | null }): boolean {
+  return p.surfaces?.length === 1 && p.surfaces[0] === 'tui';
+}
 
 /** Whether a plugin is known to run on a given OpenCode major. */
 export function supports(p: Pick<Plugin, 'opencode'>, major: 'v1' | 'v2'): boolean {
@@ -254,6 +275,8 @@ export interface SearchDoc {
   featured: boolean;
   opencode: OpencodeTarget;
   opencodeInferred: boolean;
+  /** Ships native OpenCode Desktop UI (see `hasDesktopUi`). */
+  desktop: boolean;
   /** A republished copy of another listed package (see disambiguate.ts). */
   republished: boolean;
 }
@@ -278,6 +301,7 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   featured: p.featured,
   opencode: p.opencode ?? null,
   opencodeInferred: p.opencodeInferred ?? false,
+  desktop: hasDesktopUi(p),
   republished: Boolean(p.republishOf),
 }));
 

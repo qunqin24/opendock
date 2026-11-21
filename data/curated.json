@@ -1,5 +1,5 @@
 {
-  "$comment": "人工精选层。自动抓取负责广度，这个文件负责质量：首页精选、垃圾包过滤、分类纠错。",
+  "$comment": "人工精选层。自动抓取负责广度，这个文件负责质量：首页精选、垃圾包过滤、分类纠错。overrides 里的 surfaces 用于标注没有 exports、在包根目录放 gui-experimental.cjs 的桌面版插件（清单里看不出来）。",
 
   "featured": [
     "oh-my-opencode-slim",
@@ -15,6 +15,9 @@
   ],
 
   "overrides": {
-    "@hamzaabili/opencode-sandbox": { "category": "infra" }
+    "@hamzaabili/opencode-sandbox": { "category": "infra" },
+    "opencode-dev-framework": { "category": "testing" },
+    "opencode-file-editor": { "surfaces": ["server", "gui"] },
+    "@qthinker/opencode-deepseek-search": { "surfaces": ["server", "tui", "gui"] }
   }
 }
