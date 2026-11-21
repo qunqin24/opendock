@@ -16,8 +16,10 @@ const t = useTranslations(lang);
  *   V1  server → opencode.json   "plugin"     TUI only → tui.json  "plugin"
  *   V2  server → opencode.json   "plugins"    TUI only → cli.json  "plugins"
  *
- * V2 also has `opencode plugin add`, and OpenCode Desktop only loads plugins
- * from the global opencode.json. Plugins that support V2, or don't say, get
+ * cli.json is global only. V2 also has `opencode plugin add` (installs into the
+ * global config), and OpenCode Desktop loads the GUI parts of the plugins in
+ * the global opencode.json only. Source: opencode.ai/docs/plugins,
+ * /docs/build/plugins, /docs/cli/plugins and the V1 migration guide. Plugins that support V2, or don't say, get
  * the V2 form with a note for V1; V1-only plugins keep the V1 form.
  */
 const spec = p.version ? `${p.name}@${p.version}` : p.name;
@@ -45,7 +47,7 @@ if (v1Only) {
 } else if (tuiOnly) {
   tabs = [
     { id: 'cli', label: t('install.command'), hint: t('install.commandHint'), file: 'shell', code: `opencode plugin add ${p.name}` },
-    { id: 'global', label: t('install.global'), hint: t('install.tuiOnlyHint'), file: '~/.config/opencode/cli.json', code: json(null, 'plugins') },
+    { id: 'global', label: t('install.global'), hint: t('install.tuiOnlyHint'), file: '~/.config/opencode/cli.json', code: json('https://opencode.ai/v2/cli.json', 'plugins') },
     source,
   ];
   if (p.opencode !== 'v2') note = t('install.v1NoteTui');
