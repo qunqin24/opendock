@@ -54,6 +54,17 @@ test('detectSurfaces reads server, TUI and Desktop entries from exports', () => 
   assert.deepEqual(detectSurfaces(null), []);
 });
 
+test('detectSurfaces counts a GUI entry only when it resolves to a JS bundle', () => {
+  const gui = (entry) => detectSurfaces({ exports: { '.': './a.js', './gui-experimental': entry } }).includes('gui');
+  assert.equal(gui('./dist/gui-experimental.cjs'), true);
+  assert.equal(gui({ import: './dist/gui.js', types: './dist/gui.d.ts' }), true);
+  assert.equal(gui({ bun: './gui.js' }), true);
+  assert.equal(gui([{ types: './gui.d.ts' }, './gui.cjs']), true);
+  assert.equal(gui('./src/gui.tsx'), false);
+  assert.equal(gui({ types: './gui.d.ts' }), false);
+  assert.equal(gui(null), false);
+});
+
 test('detectCompat counts a Desktop GUI entry as V2', () => {
   // @rizal72/oc-git@0.2.4 declares no SDK at all
   assert.deepEqual(

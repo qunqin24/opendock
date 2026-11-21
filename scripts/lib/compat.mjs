@@ -14,6 +14,32 @@ export const V2_FIRST_PUBLISHED = '2026-09-02';
 
 const V1_SDK = ['@opencode-ai/plugin', '@opencode-ai/sdk'];
 const V2_SDK = ['@opencode/plugin', '@opencode/client', '@opencode/schema'];
+const NODE_CONDITIONS = new Set(['default', 'import', 'node', 'node-addons']);
+const BUN_CONDITIONS = new Set(['default', 'import', 'node', 'bun']);
+
+/** Resolves an export target through the common npm conditions, without downloading the package. */
+function importTarget(target, conditions) {
+  if (target === null) return null;
+  if (typeof target === 'string') return target.startsWith('./') ? target : undefined;
+  if (Array.isArray(target)) {
+    for (const item of target) {
+      const resolved = importTarget(item, conditions);
+      if (resolved) return resolved;
+    }
+  } else if (target && typeof target === 'object') {
+    for (const [key, value] of Object.entries(target)) {
+      if (!conditions.has(key)) continue;
+      const resolved = importTarget(value, conditions);
+      if (resolved !== undefined) return resolved;
+    }
+  }
+  return undefined;
+}
+
+/** Desktop loads the GUI part as a prebuilt bundle, so the export must point at a .js/.cjs file. */
+function isGuiBundle(entry) {
+  return [NODE_CONDITIONS, BUN_CONDITIONS].some((c) => /^\.\/.+\.c?js$/.test(importTarget(entry, c) ?? ''));
+}
 
 /**
  * Majors (1 and/or 2) an `engines.opencode` range admits. Deliberately small:
@@ -89,9 +115,12 @@ export function detectCompat(manifest, publishedAt) {
  * - `server`: the `.` (or `./server`) entry, loaded by the server from
  *   `opencode.json`. A package without subpath exports is a plain server plugin.
  * - `tui`: a `./tui` entry, loaded by the terminal UI.
- * - `gui`: a `./gui-experimental` entry, the native OpenCode Desktop UI
- *   (panels, pills, dialogs). Desktop notifications sent from a TUI or server
- *   plugin don't count: those packages have no such entry.
+ * - `gui`: a `./gui-experimental` entry that resolves to a .js/.cjs bundle,
+ *   the native OpenCode Desktop UI (panels, pills, dialogs). Desktop
+ *   notifications sent from a TUI or server plugin don't count: those
+ *   packages have no such entry. A package without `exports` can also ship
+ *   `gui-experimental.cjs` at its root; the manifest doesn't show that, so
+ *   such packages are marked through `surfaces` in data/curated.json.
  *
  * @param {object | null} manifest the latest version's package.json
  * @returns {Array<'server' | 'tui' | 'gui'>}
@@ -102,7 +131,7 @@ export function detectSurfaces(manifest) {
   const subpaths = ex && typeof ex === 'object' && !Array.isArray(ex) ? Object.keys(ex).filter((k) => k.startsWith('.')) : [];
   if (!subpaths.length) return ['server'];
   const tui = subpaths.includes('./tui');
-  const gui = subpaths.includes('./gui-experimental');
+  const gui = subpaths.includes('./gui-experimental') && isGuiBundle(ex['./gui-experimental']);
   // With neither UI entry, whatever the package exports is its server plugin.
   const server = subpaths.includes('.') || subpaths.includes('./server') || (!tui && !gui);
   return [server && 'server', tui && 'tui', gui && 'gui'].filter(Boolean);
