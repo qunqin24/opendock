@@ -29,7 +29,13 @@ interface Entry {
  * again, in order (opencode.ai/docs/plugins#control): `*`, `-acme`,
  * `-opencode.provider.*`, `opencode.provider.openai`.
  */
-const isControl = (spec: string) => /^-|\*/.test(spec.trim()) || /^opencode\.[a-z0-9.-]+$/i.test(spec.trim());
+const isControl = (spec: string) => {
+  const s = spec.trim();
+  // Only a wildcard in the ID counts: `name@*` and `name@1.*` are version ranges.
+  const at = s.indexOf('@', s.startsWith('@') ? 1 : 0);
+  const id = at > 0 ? s.slice(0, at) : s;
+  return s.startsWith('-') || id.includes('*') || /^opencode\.[a-z0-9.-]+$/i.test(s);
+};
 
 /** The same list item with its spec replaced, options untouched. */
 function withSpec(item: unknown, spec: string): unknown {
