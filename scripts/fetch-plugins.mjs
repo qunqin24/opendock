@@ -36,7 +36,7 @@ import { computeScore, healthSignals, credibleStars } from './lib/score.mjs';
 import { BingTranslator } from './lib/translate.mjs';
 import { TranslationCache, translateDescriptions, formatStats } from './lib/descriptions.mjs';
 import { findReadmeVariants, guessLang } from './lib/readme-langs.mjs';
-import { detectCompat, recentVersions } from './lib/compat.mjs';
+import { detectCompat, detectSurfaces, recentVersions } from './lib/compat.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -113,6 +113,7 @@ async function fetchPackument(name) {
     keywords: latest?.keywords ?? doc.keywords ?? [],
     description: latest?.description ?? doc.description ?? null,
     compat: detectCompat(latest, latestTag ? (doc.time?.[latestTag] ?? null) : null),
+    surfaces: detectSurfaces(latest),
     versions: recentVersions(doc.time),
   };
 }
@@ -370,7 +371,7 @@ async function main() {
   // Downloads move slowly and packuments rarely change within a day; repo
   // metadata gets a shorter TTL because stars are the point of the site.
   // Versioned names: entries cached before a field was added would hide it for a day.
-  const pkgCache = await cache('packuments-v2.json', 20);
+  const pkgCache = await cache('packuments-v3.json', 20);
   const repoCache = await cache('repos-v2.json', 20);
   const dlCache = await cache('downloads.json', 20);
 
@@ -412,6 +413,7 @@ async function main() {
       createdAt: doc.createdAt ?? p.date ?? null,
       modifiedAt: doc.modifiedAt ?? p.date ?? null,
       compat: doc.compat ?? { target: null, inferred: false },
+      surfaces: doc.surfaces ?? [],
       versions: doc.versions ?? [],
       gh: parseGitHub(repoUrl),
     };
@@ -439,11 +441,17 @@ async function main() {
 
   // ------------------------------------------------------------- assemble
   const plugins = records.map((r) => {
+    const override = curated.overrides?.[r.name] ?? {};
+    const surfaces = override.surfaces ?? r.surfaces;
+    // Only OpenCode Desktop (V2) loads a GUI part, so a GUI surface set in
+    // curated.json implies V2 just like a detected one does.
+    let target = r.compat.target;
+    if (surfaces.includes('gui') && target !== 'v2' && target !== 'both') target = target === 'v1' ? 'both' : 'v2';
+    const inferred = target === r.compat.target && r.compat.inferred;
     const repo = r.gh ? repos.get(`${r.gh.owner}/${r.gh.repo}`.toLowerCase()) : null;
     const topics = repo?.repositoryTopics?.nodes?.map((n) => n.topic.name) ?? [];
     const readme = repo?.readme?.text ?? repo?.readmeLower?.text ?? null;
     const stars = repo?.stargazerCount ?? 0;
-    const override = curated.overrides?.[r.name] ?? {};
 
     if (stars > 0) {
       (history[r.name] ??= {})[today] = stars;
@@ -479,8 +487,10 @@ async function main() {
       readme,
       hasReadme: Boolean(readme && readme.length > 200),
       featured: featured.has(r.name),
-      opencode: r.compat.target,
-      opencodeInferred: r.compat.inferred,
+      opencode: target,
+      opencodeInferred: inferred,
+      // Which hosts load it: server, terminal UI (tui), OpenCode Desktop (gui).
+      surfaces,
       // Transient, written to details/<slug>.json and removed from the snapshot.
       details: buildDetails(r, repo, (repoShare.get(r.gh ? `${r.gh.owner}/${r.gh.repo}`.toLowerCase() : '') ?? 0) > 1),
     };
