@@ -32,6 +32,27 @@ For plain articles, APIs, and static HTML, the host's normal `web_fetch` is ligh
 
 All three adapters use the same browser core and the installed `moli` engine.
 
+### Why DSH exposes fewer tools
+
+The DSH adapter registers two tools where Codex and OpenCode register four. That is a difference in
+how each host represents a capability, not in what the plugin can do:
+
+- **Screenshots and PDFs are `moli_fetch`.** `moli_fetch` already takes `dump` and `writeTo`, so
+  `dump=screenshot` (or `pdf`) with an absolute `writeTo` is the whole capture path. Codex and
+  OpenCode expose the same call under a separate `moli_capture` name because their tool protocols
+  carry a read-only vs. write annotation, and a tool that writes a file should not share the
+  read-only one. DSH's tool contract has no such annotation (only `isConcurrencySafe`), so a second
+  name would add a second schema and a second choice for the model while granting nothing.
+- **Search belongs to the host on DSH.** DSH provides its own `web_search` tool over a pluggable
+  provider seam (`ctx.web.registerSearchProvider`). A browser-backed search is a provider there,
+  selected from the settings page or `DSH_WEB_SEARCH_PROVIDER`, and it inherits citation rendering,
+  cancellation, error codes, and session replay from the host. A separate `moli_search` tool would
+  give the model two search entry points and bypass those. Codex has no such seam, so the capability
+  is a tool there (`moli_search`); OpenCode's seam is a websearch provider, which is what it
+  registers.
+
+A Moli-backed DSH search provider is not part of this release.
+
 ## Install
 
 Requirements: Node.js `>=20.12` and a Moli engine. The engine is installed separately because it is a
@@ -87,14 +108,14 @@ Codex plugin: [Awesome Codex Plugins](https://github.com/hashgraph-online/awesom
 #### OpenCode
 
 ```powershell
-opencode plugin add opencode-moli@3.1.0
+opencode plugin add opencode-moli@3.2.0
 ```
 
 Or add it to `opencode.json` / `opencode.jsonc`:
 
 ```json
 {
-  "plugins": ["opencode-moli@3.1.0"]
+  "plugins": ["opencode-moli@3.2.0"]
 }
 ```
 
@@ -143,6 +164,10 @@ moli_fetch url=https://example.com dump=pdf writeTo=/absolute/path/page.pdf
 moli_fetch url=https://example.com/missing failOnHttpError=true
 ```
 
+`writeTo` creates missing parent directories, so the screenshot or PDF path does not have to exist
+in advance. The call fails only when the path is an existing directory or the directory cannot be
+created.
+
 ### Use `selector` for lists
 
 `selector` returns only the matched elements instead of sending the whole page to the model:
@@ -153,6 +178,8 @@ moli_fetch url=https://example.com/feed selector=".video-card"
 
 It is usually the cheapest and most accurate way to read search results, feeds, tables, and product
 lists. A selector with no match is an error. `selector` cannot be combined with `dump` or `eval`.
+The saving is large in practice: on a GitHub README page the whole page as Markdown was 46,305
+characters, while `selector="article"` returned 13,135 — about 72% less for the same content.
 
 ### Wait for the actual response
 
@@ -191,10 +218,15 @@ Codex reads these environment variables:
 |---|---|
 | `MOLI_BIN` | auto-detected engine path |
 | `MOLI_PROXY` | existing `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY` |
-| `MOLI_SEARCH_URLS` | Bing → DuckDuckGo HTML → Brave |
+| `MOLI_SEARCH_URLS` | DuckDuckGo HTML → Baidu → Bing → Brave |
 | `MOLI_TIMEOUT_MS` | `30000` |
 | `MOLI_MAX_CHARS` | `200000` |
 | `MOLI_INSECURE_TLS` | `0` |
+
+Proxy settings apply to every Moli call, not only to page loads: `MOLI_PROXY`, `HTTPS_PROXY`,
+`HTTP_PROXY`, `ALL_PROXY`, and the per-call `proxy` option cover `fetch`, search, capture, and
+`probe`. In Codex and OpenCode, `moli_probe` also reports the configured search providers and the
+resolved proxy.
 
 To make Moli the normal search path in Codex, place this before the first TOML table:
 
@@ -207,6 +239,25 @@ enabled = true
 
 OpenCode accepts equivalent options in its plugin entry and reads the same `MOLI_*` environment
 variables. See [`plugins/opencode-moli/README.md`](plugins/opencode-moli/README.md).
+
+## Search
+
+Codex's `moli_search` and the OpenCode `moli` websearch provider render one of the configured public
+result pages with Moli and extract the ordinary result links. Providers are tried in order:
+DuckDuckGo HTML, Baidu, Bing, Brave. Searches wait for `domcontentloaded`; in testing DuckDuckGo HTML
+returned ten results in about 1.0–1.2 seconds.
+
+Results are validated for relevance before they are accepted. When none of the titles, URLs, or
+snippets contains a query term, the attempt counts as invalid — that is what a mixed-up intermediate
+response or an anti-bot page looks like — and the next provider is tried. If every provider fails or
+is rejected, the call returns `ok: false` with an `attempts` record for each provider instead of
+passing unrelated results off as a success.
+
+Result links are unwrapped: Bing's `u=a1...` redirects and DuckDuckGo's `/l/?uddg=` links are
+decoded to the real target URL. Baidu's `link?url=` links still need one more redirect hop.
+
+Search is free and keyless, but result quality and anti-bot behavior are those of the public search
+pages, not a paid search API.
 
 ## Platform support
 
@@ -250,14 +301,20 @@ Local execution, network, proxy, cookie, TLS, and installer boundaries are docum
 
 ## Versions
 
-### 3.1.0
+### 3.2.0
 
-Adds the native OpenCode V2 adapter, including keyless websearch, `moli_fetch`, `moli_capture`, and
-`moli_probe`. DSH and Codex tool contracts are unchanged.
+Search defaults to DuckDuckGo HTML → Baidu → Bing → Brave and waits for `domcontentloaded`. A
+provider whose results share no term with the query is treated as an invalid attempt so the next
+one is tried; when all providers fail, the call returns `ok: false` with per-provider `attempts`.
+The proxy flag is placed before the `--` separator, so `MOLI_PROXY`, `HTTPS_PROXY`, `HTTP_PROXY`,
+`ALL_PROXY`, and the per-call `proxy` option now reach fetch, search, capture, and probe. `writeTo`
+creates missing parent directories, and `moli_probe` reports the configured search providers and
+proxy state.
 
 <details>
 <summary>Earlier releases</summary>
 
+- **3.1.0** — native OpenCode V2 adapter, including keyless websearch, `moli_fetch`, `moli_capture`, and `moli_probe`. DSH and Codex tool contracts are unchanged.
 - **2.1.1** — Codex directory metadata, security files, pinned Actions, and HOL scanner workflow.
 - **2.1.0** — Codex MCP adapter with search, fetch, capture, and probe tools.
 - **1.1.11 / 1.1.12** — deprecated; use a maintained release.

@@ -116,7 +116,7 @@ npm run build && npm run build:gui
 
 ## Agent 工具
 
-agent 可获得完整功能 —— 29 个工具，覆盖调度、流水线、运维、可观测性与管理：
+agent 可获得完整功能 —— 30 个工具，覆盖调度、流水线、运维、可观测性与管理：
 
 | 工具 | 参数 | 作用 |
 |---|---|---|
@@ -270,7 +270,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 83 test suites, 600+ checks
+npm test             # 115 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 

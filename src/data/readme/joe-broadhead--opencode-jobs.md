@@ -16,7 +16,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/jobs-status`.
@@ -50,11 +50,12 @@ A job is one of four things:
 
 - a **prompt** the job's agent runs in a fresh session;
 - a **command**, such as `/morning`, run in that session;
-- a **reminder**, posted into a session you name with no model turn;
+- a **reminder**, posted into a session you name with no model turn, unless `wake` is set: then the agent resumes and takes a turn;
 - a **script**, a confined program that calls named plugin tools and no model. Its approval covers its source, tools and
   declared files and is re-checked every slot; changes can require `/jobs-approve`.
 
 A script is the no-model path: `uses` names the tools it can reach, it cannot ask, and the record keeps only what each call did.
+Jobs adds no provider bill of its own. A prompt, a command, and a reminder set to wake the agent use the agent's model; a plain reminder and a script run no model turn, and the source reads only this machine.
 A job may also declare files it reads and writes, so a script can keep state between runs:
 
 ```yaml
@@ -111,9 +112,16 @@ is a full file to copy.
 ## The `jobs.runs` source
 
 Jobs declares one source for Memory and other consumers, in `package.json`'s `sources` key (the source contract,
-version 1): `jobs.runs`, this machine's finished job runs as events. A consumer reads it through the tools RPC
+version 1): `jobs.runs`, this machine's finished job runs as events, and `jobs.runs.list`, the same runs as a list an app can render. `jobs.runs` is not renamed. The list leaves out run summaries. A consumer reads it through the tools RPC
 (`jobs.scheduler.tools`): `probe` names whose runs they are, and `events_list` lists them after a cursor, in a session
-fenced to the source's grants.
+fenced to the source's grants. The list is read from the same method the model's `jobs_history` tool uses, with
+`{ "source": "runs", "list": "runs" }` and the account `probe` named: it answers `{ account, data: { items,
+editable: false }, asOf, trust }`, at most 50 runs, each the job's name and its status, and a run whose name holds a
+secret is left out. No `list` input is part of the model's tool. The source's one grant, `jobs_history`, is the method
+the list rides, so a consumer's fenced session with that grant can also call the method without `list` and get run
+summaries and script results. A broker that sends only the declared input never does, and this release states it rather
+than narrowing the grant: the next change gives the list its own RPC-only method and action, as the family's list rule
+allows, so the grant matches what the list reads.
 
 - **One event per finished run**: succeeded, failed, timed out, interrupted or skipped. Its kind is `x-jobs/run`, its
   `external_id` is `<job id>/<slot>/<attempt>`, its `thread` is `jobs-job:<job id>`, and it has no actors and no link.
@@ -211,7 +219,7 @@ Set options with the object form of the plugin entry. Every option is optional.
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-jobs#v0.0.3",
+      "package": "github:joe-broadhead/opencode-jobs#v0.0.4",
       "options": { "enabled": true, "concurrency": 2, "keepAliveMinutes": 20 }
     }
   ]
@@ -231,7 +239,7 @@ Put the plugin entry in the system config: `/Library/Application Support/opencod
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.3", "options": { "concurrency": 2 } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.4", "options": { "concurrency": 2 } }],
   "experimental": { "location_idle_timeout": "60 minutes" }
 }
 ```
@@ -298,7 +306,7 @@ Run `/jobs-status` first. Its last line is the next step.
 ## Uninstall
 
 1. Pause first if a job is mid-run: `/jobs-pause`.
-2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.3`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.4`, then `opencode reload`.
 3. Remove the agent block you copied into `opencode.json`, or the job agent's Markdown file.
 
 The plugin's storage stays in OpenCode's own database; removing the plugin does not delete it.

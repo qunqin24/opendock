@@ -31,9 +31,7 @@ In OpenCode, press **`Ctrl + P`** to open the command palette, find **`plugin`**
 opencode-glm-vistatus
 ```
 
-Press Enter to complete the installation and configuration. The host writes
-the right config file for its own version (V2 → `cli.json`, V1 →
-`tui.jsonc`) and pulls the plugin from npm — no manual file editing needed.
+Press Enter to complete the installation and configuration. The host writes the right config file for its own version (V2 → `cli.json`, V1 → `tui.jsonc`) and pulls the plugin from npm — no manual file editing needed.
 
 ### Option 2: manual configuration (fallback)
 
@@ -159,15 +157,14 @@ Progress bar color rules:
 
 ```bash
 npm install          # install dev deps only (runtime deps are host-provided; the published package has zero deps)
+npm run sync-version # generates src/_version.ts
 npm run build        # tsc output + esbuild bundle → dist/tui.js
 npm run typecheck    # tsc --noEmit
 ```
 
 Build artifacts:
 
-- `dist/tui.js` — dual-format TUI plugin bundle (`{ id, tui, setup }`); this IS
-  the `./tui` export target: V1 hosts read the `tui` field, V2 hosts read
-  the `setup` field
+- `dist/tui.js` — dual-format TUI plugin bundle (`{ id, tui, setup }`); this IS the `./tui` export target: V1 hosts read the `tui` field, V2 hosts read the `setup` field
 
 ## Architecture
 

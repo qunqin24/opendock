@@ -30,7 +30,7 @@ you change the number:
 
 ```json
 {
-  "plugins": ["opencode-git-config-sync@0.1.0"]
+  "plugins": ["opencode-git-config-sync@0.1.3"]
 }
 ```
 
@@ -44,7 +44,8 @@ HTTPS). The plugin never asks for passwords; git fails with an error instead.
 
 | Command                | What it does                                                                             |
 | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `/config-sync`         | Stage all changes, commit (asks for a message, with a proposed one), pull --rebase, push. Cancelling leaves the changes staged. |
+| `/config-sync`         | Stage all changes, commit (asks for a message, with a proposed one), pull --rebase, push. Cancelling leaves the changes staged. The result toast reports how many commits were pushed and pulled. |
+| `/config-sync-fetch`   | Force a `git fetch` now (ignoring the 24h gate) and refresh the status, so the ahead/behind counts reflect the remote. |
 | `/config-sync-refresh` | Refresh the status now, and show the outdated warning again if it applies.               |
 | `/config-sync-setup`   | Set up the config folder: **Start new** or **Pull existing config**.                     |
 
@@ -67,7 +68,9 @@ If the config folder is not a repository, the plugin suggests setup once a day.
 
 - The status refreshes when files in the config folder change (recursive file watcher), after every model turn, and
   every 5 minutes.
-- It runs `git fetch` at most once per 24h. It never pulls or pushes on its own.
+- It runs `git fetch` at most once per 24h. It never pulls or pushes on its own. `/config-sync-fetch` forces a fetch at any time.
+  The background fetch never prompts: ssh runs in batch mode (keeping your `core.sshCommand`), and the fetch gives up
+  after 60s, so an unknown host key or a passphrase prompt can't hang the status.
 - Submodules are updated (`git submodule update --init --recursive`) after a pull.
 - A submodule that moved to a new commit counts as a change: `/config-sync` commits the new pointer like any other
   file.
@@ -177,6 +180,14 @@ bun, `./scripts/docker.sh` runs the same in the bun image CI uses (pass a comman
   submodules, sync, rebase conflicts, and setup including its undo.
 - `test/tui.test.tsx` runs the plugin against a fake opencode context and renders the sidebar and status bar with
   opentui's test renderer, checking the text and colors, and the `/config-sync` dialogs.
+
+- `test/dist.test.ts` checks that the committed `dist/tui.js` matches `src` and imports only modules opencode provides.
+
+opencode loads `dist/tui.js`, built by `bun run build` (part of `bun run check`). It is committed, so a git checkout
+(e.g. a submodule in your config folder) works without a build step: rebuild and commit it with every change to `src`.
+The plugin ships compiled JavaScript because opencode's Solid JSX transform skips `.tsx` files installed under
+`node_modules` ([anomalyco/opencode#39986](https://github.com/anomalyco/opencode/issues/39986)); such a plugin loads
+its own copy of solid-js and its status never updates.
 
 `npm publish` runs the checks first (`prepublishOnly`).
 

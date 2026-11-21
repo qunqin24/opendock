@@ -4,7 +4,7 @@
 
 ---
 
-### Operator Memory: The self-improving context engine for coding agents.
+### Operator Memory: The self-improving context engine for coding agents
 
 Operator Memory gives your agent a brain for documenting all their work. As the agent works, it automatically documents within this brain — specs, decisions, standards, research, lessons. Every new session starts knowing everything the last one learned.
 

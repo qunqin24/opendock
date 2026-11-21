@@ -128,6 +128,25 @@ Note: do not enable opencode's experimental plan mode
 (`OPENCODE_EXPERIMENTAL_PLAN_MODE`) together with forge — two plan mechanisms
 would overlap.
 
+### Upgrading (verified installer behavior)
+
+`opencode plugin add` APPENDS — it never replaces an existing entry for the
+same plugin id, so a bare `opencode plugin @sorenllm/opencode-forge --global`
+over an existing install fails with `Duplicate plugin ID: forge`. The
+verified upgrade path:
+
+1. Remove the old entry first (uninstall step 1 below: edit the `plugin`
+   array in `~/.config/opencode/opencode.json`).
+2. Install the new source: `opencode plugin @sorenllm/opencode-forge --global`.
+3. Smoke-check (`opencode agent list` shows forge + forge-* workers), then
+   clean the stale store dir (uninstall step 2) if you switched sources.
+
+Also verified on the 2.x installer: `remove` only removes the config entry
+of its own registered source; the `npm:` prefix is not accepted by `add`
+(use the bare package name); and the store path is derived from the
+specifier spelling, so switching between npm and github sources leaves both
+store dirs behind — delete the stale one.
+
 ### v2-host notes (opencode 2.x)
 
 Full feature parity with v1 (agents, tools, permission belt and gates,
@@ -144,6 +163,63 @@ session hooks, commands, goal/job engines), with two documented drifts:
   v2 hosts have no default per-turn auto-continue, so nothing fights the
   goal loop; the plan/goal briefs survive compaction via the compaction
   hook either way.
+
+#### v2 single-agent surface (hide natives, forge default, no builtin shell)
+
+On a v2 host the plugin additionally delivers the single-agent surface as
+**pure runtime agent-layer state**:
+
+- The native `build` and `plan` primaries are **hidden** (never removed —
+  sessions referencing them keep working; no other field is touched), so
+  the agent picker offers `forge` as the visible primary. `general`,
+  `explore`, and host-internal agents stay untouched.
+- New sessions **default to `forge`** where the host's agent draft editor
+  exposes a default setter (2.3.2 does). An explicit `default_agent` in
+  your opencode config still wins — the host merges user config agent
+  entries after plugin transforms.
+- Every forge-family record (the `forge` primary and each materialized
+  `forge-*` worker) carries a deny permission
+  (`{action:"shell", resource:"*", effect:"deny"}`), so the model-facing
+  tool surface never offers the builtin shell to the forge family. The
+  permission-belt refusals remain underneath as belt-in-depth.
+
+**Zero pollution:** none of this is written to your opencode config or any
+file outside the plugin's own domain — uninstall the plugin and the next
+agent-layer rebuild restores the native primaries and the default subject,
+byte-identical, with zero residue.
+
+Opt-out (keep the native `build`/`plan` primaries visible) — the plugin's
+own config file, the GLOBAL forge.json layer (`~/.config/opencode/forge.json`
+on POSIX, `%USERPROFILE%\.config\opencode\forge.json` on Windows):
+
+```jsonc
+{
+  "hideNativeAgents": false
+}
+```
+
+`agent.forge.disable = true` remains the whole-plugin off switch. A user's
+explicit `agent.build.hidden: false` in opencode config also wins on 2.3.2
+(config merge runs after plugin transforms).
+
+#### v1-host config recipe (hide the extra primaries manually)
+
+The v1 loader cannot touch native agent records (the config hook returns
+its own entries only). If you want the same single-agent picker on a v1
+host, hide the natives yourself — your config, your files:
+
+```jsonc
+{
+  "agent": {
+    "build": { "hidden": true },
+    "plan": { "hidden": true }
+  },
+  "default_agent": "forge"
+}
+```
+
+`hidden` is a first-class, hot-reloadable field on opencode 2.3.x — the
+picker updates without a restart. Remove the lines to restore the natives.
 
 ## Configuration
 
@@ -212,7 +288,7 @@ What this plugin touches, exhaustively:
 | `<project>/.opencode/plan/*.md` | plan files | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/goal/*.md` | goal files (contract, Check Log, Turn Ledger) | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/crew/*.md` | crew records (declared plan + arm/convert/abandon/close history; written at `crew_begin` registration, appended at each transition; record-only — never a resume mechanism) | user data — kept forever, uninstall never deletes |
-| merged config object (RAM only) | forge agent, static `forge-<ns>-<id>` subagents (every pool family namespaced; the global fallback family `forge-global-<id>`), tool-partition injections (forge family shell hide, non-forge forge-tool hide, native build/plan/general/explore minimal entries), `command.plan`, `command.goal`, `command.crew`, goal permission keys, `permission.forge_shell`, `permission.crew_close` | vanishes when the plugin is removed; nothing is written to disk |
+| merged config object (RAM only) | forge agent, static `forge-<ns>-<id>` subagents (every pool family namespaced; the global fallback family `forge-global-<id>`), tool-partition injections (forge family shell hide, non-forge forge-tool hide, native build/plan/general/explore minimal entries), `command.plan`, `command.goal`, `command.crew`, `command.forge`, goal permission keys, `permission.forge_shell`, `permission.crew_close` | vanishes when the plugin is removed; nothing is written to disk |
 | `<tmp>/opencode-forge/jobs/<jobId>.log` | job output tee (full output; oldest rotated out above 50 files) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/ledger.jsonl` | job registry ledger (bounded: 1 MB reset, 200 entries) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
@@ -220,13 +296,18 @@ What this plugin touches, exhaustively:
 | `<tmp>/opencode-forge/session-anchors.jsonl` | session-anchor ledger — persisted evidence of the pooled worktrees where live activity bound sessions (pooled binds only, FIFO-capped to 200, fail-soft IO); a restart-resumed session whose record is pool-less and whose in-memory map is empty re-binds its OWN pool from here, only while the recorded pool file still exists on disk | runtime debris — delete freely; losing it only costs the restart-resume own-pool re-bind (sessions re-learn their pool from live activity) |
 | `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (dispatch records — including async orphans — live in the jobs ledger; this separate file dates from the retired `forge_dispatch` tool) | runtime debris — delete freely |
 | `<project>/.opencode/forge/dispatch-log.jsonl` | dispatch journal (fold E) — append-only per-workspace record of every async dispatch state transition (`dispatched` / `queued` / `started` / `retry-pending` / `terminal`); bounded by `FORGE_DISPATCH_JOURNAL_MAX` (default 200, terminal-first rotation); prompt text retained while a record is non-terminal, redacted on terminal; corrupt lines skipped. This is what restart recovery replays — a live child re-arms, a finished-while-down child wakes its owner exactly once, queued wishes re-enter the queue, retry chains resume | runtime data — deleting it only loses cross-restart recovery for in-flight dispatches; uninstall leaves it behind (add `.opencode/forge/` to your ignore file if you don't want it versioned) |
+| `<project>/.opencode/agent/forge-<ns>-<id>.md` | compiled native agent files — `forge_sync` output on v2 native mode (GENERATED header, `forge-` prefix + marker; GC'd by sync when the recipe entry disappears; a transient `forge-*.md.new` temp lives microseconds during atomic writes and is best-effort cleaned on failure) | compiled artifacts — version them: they travel with the workspace (a fresh machine pulling the project needs no init) |
+| `<home>/.config/opencode/agent/forge-global-<id>.md` | compiled GLOBAL-roster agents — when (and only when) a global `~/.config/opencode/forge.json` exists, `forge_sync` also compiles its fallback family into the host's own global agent dir (same GENERATED header + marker + GC discipline; non-forge files there are never touched) | compiled artifacts — delete freely; with the plugin gone the host simply loses those extra global agents |
+| `<global agent dir>/general.md`, `<global agent dir>/explore.md` | built-in override artifacts (0.31.0) — `forge_sync` output when the GLOBAL forge.json's `override` node activates an entry. No `forge-` prefix (the lowercase id stem IS the override key — case-sensitive); GC keys on the in-content GENERATED marker, so re-commenting the entry removes the file; a hand-written file of the same name is never overwritten (sync refuses + discloses). Global agent dir: `OPENCODE_CONFIG_DIR/agent` when set, else `~/.config/opencode/agent/` | compiled artifacts — delete freely; with the plugin gone the built-ins return to official behavior |
 | `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
 | `~/.cache/opencode/packages/...` | installed package copy | written by the `opencode plugin` installer, not the plugin |
 | `~/.config/opencode/opencode.json` | `plugin` array entry | written by the installer |
 
-The plugin writes no temp files, no logs, nothing outside the table (a
-`FORGE_GOAL_PROBE=1` env opt-in appends continuation diagnostics to the OS
-temp dir for debugging).
+Nothing is written outside the table above, with two disclosed
+transients: the microsecond `forge-*.md.new` temp of an atomic sync
+write (best-effort cleaned on failure — a target file is never
+half-written) and the `FORGE_GOAL_PROBE=1` env opt-in continuation
+diagnostics in the OS temp dir for debugging.
 
 ## Goal mode (autonomous, host-verified objectives)
 
@@ -609,7 +690,165 @@ workspace's pool / the global layer. The `/crew` roster and the
 fallback) and list every other host pool as NOT dispatchable with its
  origin path.
 
+### Native roster compilation (`forge_sync`) — v2 hosts
+
+The plugin's slash commands are `/plan`, `/goal`, `/crew`, and the
+**`/forge` roster levers** (0.31.0) — one command routing on its argument:
+
+| form | what it does |
+| --- | --- |
+| `/forge sync` | force an immediate `forge_sync` NOW and report the diff verbatim (created/updated/GC'd/errors) — the manual force/debug/fallback lever; the default staleness-gate posture and the `sync:"auto"` opt-in are unchanged |
+| `/forge init` | draft **this workspace's** `.opencode/forge.json` in-band with the forge agent (brief interview or from project context: pool namespace, roles, shapes); **refuses when a recipe already exists** — it offers a review of the existing one instead, never an overwrite |
+| `/forge init global` | draft the **global** `~/.config/opencode/forge.json` the same way; the scaffold ships the built-in override entries **commented out** (see [Built-in overrides](#built-in-subagent-overrides-general--explore) below) |
+
+All three are family-guarded templates (a non-forge session is told to
+switch to the forge agent and rerun), and the commands themselves write
+nothing — every effect lands in the transcript through the in-band tools;
+`forge_sync` remains a **tool** the forge agent calls.
+
+On **v2 hosts** (opencode 2.x) the roster materializes **natively by
+default** (`materialize: "native"`): forge **compiles** forge.json into
+real host agent files — `.opencode/agent/forge-<ns>-<id>.md` — instead of
+injecting drafts at runtime. The workspace recipe compiles into the
+project's `.opencode/agent/`; the GLOBAL recipe's fallback family
+(`forge-global-*`) compiles into the host's own global agent dir
+(`~/.config/opencode/agent/`) so those workers are machine-wide — a
+write that only ever happens on machines where a global forge.json
+actually exists. The recipe stays the **sole semantic
+authority** (pools, session-domain gating, crew rosters, compliance keep
+reading forge.json); the native files are only its projection. **v1 hosts
+stay on the runtime path forever** (behavior byte-equal — the knob is
+pinned by host generation); on v2, `"materialize": "runtime"` in the
+GLOBAL forge.json is the escape hatch back to draft materialization.
+
+Compilation happens through the **`forge_sync` tool** — the forge agent
+calls it in-band (every effect transcript-visible), it writes atomically
+(temp+rename), garbage-collects files whose entries left the recipe, and
+discloses the full diff (created/updated/GC'd). The host **hot-applies**
+the files — no restart. **Staleness gate**: `crew_begin` refuses
+registration while the compiled artifacts are older than the recipe (or
+missing), with the one-step fix *call forge_sync now*; a plain dispatch
+against a missing worker on a native host surfaces the same guidance.
+`"sync": "auto"` in a pool file opts that pool into silent regeneration
+at session start when stale (disclosed via a console finding); without
+it the plugin never writes files uninvited.
+
+**Visibility note**: native agent scoping is the host's up-tree merge —
+agents in a parent directory's `.opencode/agent/` are also visible from
+nested workspaces. This is a disclosed difference from the recipe's
+nearest-exclusive pool scoping; dispatch gating still follows the
+recipe, so visibility never grants cross-pool dispatch.
+
+**Recipe field reference** (per agent entry):
+
+| field | meaning | notes |
+| --- | --- | --- |
+| `model` | `"provider/model"` — the pinned brain | pairs with `thoughtLevel`; both absent = Auto worker |
+| `thoughtLevel` | depth word (`none minimal low medium high xhigh max`) | `low`/`medium`/`high` compile into the model string as a variant (`model#low`); the other words ride the per-spawn chat.params injection |
+| `prompt` | role text (1–2 sentences) | defaults: `research`/`review` built-ins, else a generic worker |
+| `shape` | `"readonly"` or `"write"` | **absent = write** (open); readonly compiles to the native tools seal |
+| `permission` | per-tool overrides (`{"edit":"ask"}`) | merges over the shape face; the recursion ban never lifts |
+
+Top-level: `pool` (namespace, required for crew-governed dispatch),
+`shared` (pool-wide prompt base), `materialize` (global layer only),
+`sync` (`"auto"` opt-in), and `override` (built-in overrides — **global
+layer file only**, see below).
+
+**Starter recipes** (drop into `.opencode/forge.json`):
+
+```jsonc
+{
+  "pool": "myproj",
+  "agents": {
+    // readonly scout: breadth evidence, no write surface at all
+    "scout":   { "model": "your-provider/your-model", "thoughtLevel": "low",
+                 "shape": "readonly", "prompt": "Search, read, and run read-only checks; report a compact brief with file:line evidence." },
+    // write coder: executes scoped implementation tasks
+    "coder":   { "model": "your-provider/your-model", "thoughtLevel": "high",
+                 "shape": "write", "prompt": "Implement the assigned task exactly as scoped; no refactoring beyond scope." },
+    // readonly reviewer: diff/file review with prioritized findings
+    "reviewer":{ "model": "your-provider/your-model", "thoughtLevel": "medium",
+                 "shape": "readonly", "prompt": "Read the diff or files under review; report prioritized findings with file:line evidence and a fix suggestion." }
+  }
+}
+```
+
+**Hand-writing native agent files? Two traps.** (1) Always write
+`mode: subagent` — the default is `primary`, and a primary worker makes
+task dispatch **silently fall back to a general dispatch** with no error.
+(2) The **host tool vocabulary drifts**: on 2.3.2 the shell channel is
+`execute` (not bash) and the dispatch tool is `subagent` (a
+`tools.task:false` key is host-mapped onto it). The compiler emits from
+one locked vocabulary constant; after a host rename, re-run
+`forge_sync` to re-emit the current names.
+
+**Cross-machine story (lockfile pattern).** Commit the generated
+`.opencode/agent/forge-*.md` files next to the recipe. A fresh machine
+pulling the workspace needs **zero initialization** — the artifacts
+arrive with the recipe in the same pull, and the staleness check passes
+because both files travelled together (the check is content-based: a
+touched-but-identical recipe is not stale). **Upgrade recipe**:
+`opencode plugin remove opencode-forge` → clear the plugin store
+(`~/.cache/opencode/packages/`) → `opencode plugin "git+file:///<abs
+repo path>" --global` (or the github: form) → run `forge_sync` once per
+workspace if the compiled format changed.
+
+### Built-in subagent overrides (`general` / `explore`)
+
+The host ships two built-in subagents — **General** (`general`) and
+**Explore** (`explore`). The **GLOBAL** forge.json can override them
+machine-wide through a top-level `override` node:
+
+```jsonc
+{
+  // ... optional forge-global-* agents ...
+  "override": {
+    "explore": { "model": "your-provider/your-model", "thoughtLevel": "low",
+                 "shape": "readonly", "prompt": "You are my codebase scout. ..." }
+  }
+}
+```
+
+How it works, and the honest disclosures:
+
+- **Identity key = exact LOWERCASE id stem** (probe-verified on 2.3.2,
+  `reports/probe-builtin-override.md`): `forge_sync` compiles an active
+  entry to a same-name, **non-namespaced** file in the host's global agent
+  dir — `general.md` / `explore.md`, GENERATED marker, `mode: subagent`,
+  the same model+variant and tools-face rules as workers. A **capitalized**
+  file (`General.md`) does **not** override — it creates an ambiguous
+  duplicate entry in the agent list; the compiler never emits one, and you
+  should never hand-write one.
+- **Activating an override replaces the built-in's prompt wholesale.** This
+  is not "just pin a model": description/system/model are fully replaced
+  (permissions end up builtin-base ∪ appended). **We never copy the
+  vendor's prompt text** — it drifts every host version — so an active
+  entry without your own `prompt` gets only a minimal generic body.
+  **Write your own general/explore.**
+- **Inert by default.** The `/forge init global` scaffold (and the
+  in-band ask the unconfigured-crew refusal offers) ships the `override`
+  node **fully commented out**; uncommenting and filling an entry is your
+  act. Not configured = official built-in behavior, byte-equal (the Auto
+  worker — no `model` — inherits the parent session's model, which IS the
+  built-in default).
+- **Global layer only.** A `override` node in a workspace pool file is
+  ignored with a warning — workspace agents always compile namespaced
+  (`forge-<ns>-<id>`); per-project built-in overrides are a non-goal.
+  Unknown override ids (anything but `general`/`explore`) warn + skip,
+  fail-soft.
+- **Collision redline.** If a hand-written `general.md` / `explore.md`
+  already exists in the global agent dir, sync **refuses and discloses** —
+  never overwrites (your file stays byte-identical).
+- **GC keys on the GENERATED marker**, not the `forge-` prefix:
+  re-comment or remove the entry and sync again → the compiled file is
+  garbage-collected; a hand-written file of the same name is never touched.
+- **Where is the global agent dir?** It mirrors the host's own resolution:
+  `OPENCODE_CONFIG_DIR` set → `$CONFIG_DIR/agent`; unset →
+  `~/.config/opencode/agent/`.
+
 ### task — the single dispatch surface (native name, forge engine)
+
+
 
 The plugin registers its dispatch implementation under the tool name
 **`task`**, shadowing the native task tool host-wide (removed with the whole
@@ -793,6 +1032,11 @@ out of a materialized id.
 
 ```jsonc
 {
+  // OPTIONAL editor support: point $schema at the published copy for
+  // completion/validation of the fields below.
+  // "$schema": "https://unpkg.com/@sorenllm/opencode-forge@latest/dist/forge.schema.json",
+  // local install form (same file, no network): pin the major you run.
+  // "$schema": "./node_modules/@sorenllm/opencode-forge/dist/forge.schema.json",
   // namespace for this pool's ids (forge-<ns>-<id> — EVERY pool is
   // namespaced; declare it instead of riding the directory name).
   // Short, stable, [a-z0-9-] up to 24 chars — ids survive directory renames.
@@ -827,6 +1071,15 @@ out of a materialized id.
 ```
 
 **The atomic pair — the one rule that matters:**
+
+> **`$schema` editor support:** the two commented lines at the top of the
+> snippet are optional — the plugin silently tolerates the `$schema` key (and
+> any unknown key) in both parse paths. One editor-side caveat: forge.json is
+> a JSONC file with a `.json` extension, so comments and trailing commas draw
+> squiggles from the editor's *own* plain-JSON association (unrelated to the
+> schema). A one-line file association fixes both validation and the
+> squiggles: `"files.associations": { "**/.opencode/forge.json": "jsonc" }`
+> (schema validation works under a jsonc association too).
 
 | `model` | `thoughtLevel` | result |
 | --- | --- | --- |

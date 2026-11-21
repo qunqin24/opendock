@@ -208,8 +208,8 @@ when it is unavailable. Copilot skips all hooks without Node.
 
 Session markers are scoped by project and gem, and live in the plugin's data
 directory (or `$XDG_CACHE_HOME/posh/nudged`, defaulting to
-`~/.cache/posh/nudged`). [`evals/`](evals/README.md) measures whether this
-changes what the agent does; its live-agent suite currently targets Claude Code.
+`~/.cache/posh/nudged`). The [live evals](evals/README.md) compare behavior with
+and without POSH in Claude Code and Codex.
 
 ### Cursor plugin
 

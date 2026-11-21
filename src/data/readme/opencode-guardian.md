@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: V2 (>=2.3.0)](https://img.shields.io/badge/OpenCode-V2%20(%3E%3D2.3.0)-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
 [![V2 host baseline](https://img.shields.io/badge/Host%20baseline-v2.3.2%20verified-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v2.md)
-[![Tests: 781/781 Passing](https://img.shields.io/badge/Tests-781%2F781%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
+[![Tests: 789/789 Passing](https://img.shields.io/badge/Tests-789%2F789%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,17 +21,17 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> Guardian **v0.15.2** was verified on **19 November 2026** against live **OpenCode v2.3.2** on Node **26.13.1** and Bun **1.4.4**.
+> Guardian **v0.16.0** was verified on **20 November 2026** against live **OpenCode v2.3.2** on Node **26.13.1** and Bun **1.4.4**.
 
-- **Current Automated Verification:** **781 / 781** unit, security, toast notification, and regression tests passing.
+- **Current Automated Verification:** **789 / 789** unit, security, mesh interoperability, project scope isolation, toast notification, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Live V2 Host Acceptance:** **10 / 10** real-host checks verified (packed `.tgz` in Node 26.13.1 + Bun 1.4.4, full V2.3.2 server hooks + `./rpc` + TUI slots/commands, and live `opencode v2.3.2` CLI host).
-- **Static Analysis:** standard and strict TypeScript gates pass (`--strict --exactOptionalPropertyTypes`); Oxlint reports **0 warnings / 0 errors** across 109 files.
-- **Low-I/O Telemetry Architecture:** Default `violations` mode eliminates 90–95% of disk syscalls, caching directory verification and bounding logs to 512 KiB.
+- **Static Analysis:** standard and strict TypeScript gates pass (`--strict --exactOptionalPropertyTypes`); Oxlint reports **0 warnings / 0 errors** across 112 files.
+- **Low-I/O & Zero-Pollution Telemetry Architecture:** Default `violations` mode eliminates 90–95% of disk syscalls, caching directory verification, bounding logs to 512 KiB, and isolating per-project audit logs in `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` without polluting project `.opencode/` directories.
 
 Read the comprehensive [V2 Acceptance Report](docs/acceptance-v2.md) and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
-See the [0.15.2 release notes](CHANGELOG.md) for OpenCode `v2.3.1`–`v2.3.2` alignment (background/timed-out `shell` handling, Code Mode `execute` inspection, `experimental.idle`, structured `read` outputs, `Permission.merge`), secret-key precision, and live OpenCode v2.3.2 + Bun 1.4.4 verification details.
+See the [0.16.0 release notes](CHANGELOG.md) for the Universal OpenCode V2 Plugin Mesh Bridge (`src/bridge.ts` v2.2.0), N-way `opencode-hi` & `opencode-smart-questions` coordination, external per-project state isolation, and local-vs-global scope boundaries.
 
 ## ✨ Key Highlights
 
@@ -39,7 +39,9 @@ See the [0.15.2 release notes](CHANGELOG.md) for OpenCode `v2.3.1`–`v2.3.2` al
 - **Compact TUI Sidebar:** A compact two-column status widget (`sidebar.content` & `session.composer.top`) that expands to show Guardian diagnostics with a single click.
 - **In-App Update Indicator:** Shows a green `(↑)` header icon and places `Update available` first in the sidebar when npm reports a newer release.
 - **Guardian Commands:** Ctrl+P and slash commands display detailed status, activity, diagnostics, rules, configuration and version; confirmed statistics reset preserves audit history.
-- **Project-Scoped Audit Log:** Stores safe event codes, reasons and intervention outcomes in `<project>/.opencode/guardian-events.jsonl` with `0600` POSIX permissions, a default 512 KiB limit (configurable via `telemetry.maxBytes`) and one rotated archive. Never stores prompt or command text.
+- **Isolated Per-Project Audit Log (Zero Repository Pollution):** Stores safe event codes, reasons and intervention outcomes in `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` with `0600` POSIX permissions, a default 512 KiB limit (configurable via `telemetry.maxBytes`) and one rotated archive. Never writes files into `<project>/.opencode/` and never stores prompt or command text.
+- **Local vs. Global Scope Isolation:** Project-local installations strictly supervise only their own project directory (and subdirectories), never interfering with unrelated workspaces sharing an OpenCode background server. Global installations supervise all opened projects while respecting per-project overrides.
+- **Universal V2 Plugin Mesh Bridge (`src/bridge.ts`):** Zero-dependency N-way interoperability with **[OpenCode Hi](https://github.com/huseyincig/opencode-hi)**, **[OpenCode Smart Questions](https://github.com/huseyincig/opencode-smart-questions)**, and sibling V2 plugins via cryptographic session provenance tokens, coordinated session leases (`user_interaction`, `active_remediation`, `orchestration_dispatch`), deterministic intervention records, role capability resolution, and `opencode-mesh.state` RPC.
 - **V2 Session & Fork Isolation:** Native `session.deleted`, `session.moved`, and new human prompts (including attachment-only messages) cancel stale `idleQueue` work and clear stale contracts; `session.fork` / `session.forked` are treated as independent root sessions.
 - **Error Redaction:** Nested Error metadata, non-enumerable causes and aggregate errors are sanitized; executable serialization callbacks are removed and reserved JSON fields remain safe own properties.
 - **Evidence-Based Task Contracts:** Analyzes human requests across 13 languages to extract required verifications (tests, builds, source reviews) and detects premature completion claims. When the host provides a tool-after observation, SHA-256 evidence is tied to the observed file contents.
@@ -53,29 +55,105 @@ See the [0.15.2 release notes](CHANGELOG.md) for OpenCode `v2.3.1`–`v2.3.2` al
 
 ## 📦 Installation
 
-Add `opencode-guardian` to your OpenCode V2 (`>=2.3.0`) configuration (`opencode.json` or `opencode.jsonc` in your project, or `~/.config/opencode/opencode.json`):
+OpenCode Guardian supports **Global**, **Project-Local**, **Local `.opencode/plugins/` Loader / Symlink**, **Local Development (`file://`)**, and **Remote TUI Client (`cli.json`)** installation modes on OpenCode V2 (`>=2.3.0`).
+
+> [!IMPORTANT]
+> OpenCode V2 automatically discovers `./tui` and `./rpc` from `package.json` `exports` when loading `opencode-guardian` — do **not** duplicate `"opencode-guardian/tui"` in `opencode.json`.
+
+### 1. Global Installation (All Projects — Recommended for Workstations)
+
+To enable Guardian across **all** repositories and workspaces on your machine, add `opencode-guardian@latest` to your global OpenCode configuration file (`~/.config/opencode/opencode.json`, `$XDG_CONFIG_HOME/opencode/opencode.json`, or `$OPENCODE_CONFIG_DIR/opencode.json`):
 
 ```json
 {
-  "plugins": [
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
     "opencode-guardian@latest"
   ]
 }
 ```
 
-OpenCode V2 CLI automatically discovers `./tui` from `package.json` `exports` when loading `opencode-guardian` — do **not** duplicate `"opencode-guardian/tui"` in `opencode.json`.
+- **Global Behavior:** Protects every project opened in OpenCode using your global defaults (`~/.config/opencode/opencode-guardian.json`, if present) and applies any project-specific overrides found in `<project>/opencode-guardian.json` or `<project>/.opencode/opencode-guardian.json`.
+- **Per-Project Opt-Out:** To disable a globally installed Guardian for one specific repository, create `<project>/opencode-guardian.json` (or `<project>/.opencode/opencode-guardian.json`) with `{ "enabled": false }`.
+- **Clean Git Working Trees:** Per-project telemetry is stored externally in `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` (`0600`), so global installation never creates untracked files inside any repository's `.opencode/` folder.
 
-For local development, use a `file://` URL:
+### 2. Project-Local Installation (Single Repository / Team Setup)
+
+To enable Guardian **only** for a specific repository, add `opencode-guardian@latest` to `<project>/opencode.json` (or `<project>/.opencode/opencode.json`):
 
 ```json
 {
-  "plugins": [
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "opencode-guardian@latest"
+  ]
+}
+```
+
+- **Strict Project Scope Isolation:** When installed locally in a project, Guardian scopes all hooks, stream watchers, preflight checks, and idle inspections strictly to that project's directory (and its subdirectories). It will **never** interfere with other projects running on the same shared OpenCode background server.
+
+### 3. `.opencode/plugins/` Local Wrapper / Symlink Installation (Monorepo & Air-Gapped)
+
+If you manage plugins via OpenCode's `.opencode/plugins/` directory (either project-locally at `<project>/.opencode/plugins/opencode-guardian` or globally at `~/.config/opencode/plugins/opencode-guardian`) with a local or symlinked package in `.opencode/node_modules/opencode-guardian`:
+
+1. Install or symlink the package into `.opencode/node_modules/opencode-guardian`:
+   ```bash
+   mkdir -p .opencode/node_modules
+   ln -s /path/to/opencode-guardian .opencode/node_modules/opencode-guardian
+   ```
+2. Create the plugin loader wrapper in `.opencode/plugins/opencode-guardian/`:
+   - `.opencode/plugins/opencode-guardian/package.json`:
+     ```json
+     {
+       "name": "opencode-guardian-local",
+       "private": true,
+       "type": "module",
+       "exports": {
+         ".": "./index.ts",
+         "./tui": "./tui.tsx"
+       }
+     }
+     ```
+   - `.opencode/plugins/opencode-guardian/index.ts`:
+     ```ts
+     export { default } from "opencode-guardian";
+     ```
+   - `.opencode/plugins/opencode-guardian/tui.tsx`:
+     ```tsx
+     export { default } from "opencode-guardian/tui";
+     ```
+
+### 4. Local Development (`file://` Source Checkout)
+
+To load Guardian directly from a local git checkout (after running `npm run build`):
+
+```json
+{
+  "plugin": [
     "file:///path/to/opencode-guardian"
   ]
 }
 ```
 
-For CLI-only remote-server connections where the server runs separately from the local TUI client, configure `"plugins": ["opencode-guardian/tui"]` in `~/.config/opencode/cli.json`.
+### 5. Remote Server / Split TUI Client (`cli.json`)
+
+For CLI-only remote-server connections where the OpenCode server runs on a remote host and your local terminal runs only the TUI client, configure `"plugin": ["opencode-guardian/tui"]` in `~/.config/opencode/cli.json`:
+
+```json
+{
+  "plugin": [
+    "opencode-guardian/tui"
+  ]
+}
+```
+
+### Installation Scope & State Summary
+
+| Installation Mode | Config / Loader Location | Active Scope | Audit Log Location (`0600`) | Touches `<project>/.opencode/`? |
+| :--- | :--- | :--- | :--- | :---: |
+| **Global** | `~/.config/opencode/opencode.json` or `~/.config/opencode/plugins/opencode-guardian` | All projects (unless disabled per-project) | `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` | **No** |
+| **Project-Local** | `<project>/opencode.json`, `<project>/.opencode/opencode.json`, or `<project>/.opencode/plugins/opencode-guardian` | Strictly `<project>` (and subdirectories) | `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` | **No** |
+| **Custom Override** | `OPENCODE_GUARDIAN_STATE_DIR=/custom/dir` | Active scope | `/custom/dir/guardian-events.jsonl` | **No** |
 
 > **Using OpenCode 1.x?** Pin `opencode-guardian@0.14.0`, the final release supporting OpenCode V1.
 
@@ -98,7 +176,7 @@ In OpenCode V2, terminal UI widgets are automatically discovered from the packag
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.15.2
+▶ Guardian                 v0.16.0
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -112,7 +190,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.15.2
+▼ Guardian                 v0.16.0
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -125,7 +203,7 @@ Remediations                        0
 - **Blocked** counts only commands denied by active preflight; post-turn remediation requests are tracked separately.
 - **Warnings / Remediations:** Detailed intervention statistics for the active project.
 - **Update available:** The first row immediately below the header in both views shows the newer published version; it stays hidden when there is no update.
-- **Auto-Refresh:** The widget polls the project event log (`.opencode/guardian-events.jsonl`) every 2.5 seconds to reflect live metrics without reloading.
+- **Auto-Refresh:** The widget polls the isolated project event log (`~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl`) every 2.5 seconds to reflect live metrics without reloading.
 - **Hiding / Disabling:** Setting `"enabled": false` in `opencode-guardian.json` automatically unregisters and hides the TUI sidebar.
 
 ### ⌨️ Guardian Commands (Ctrl+P / Command Palette)
@@ -150,7 +228,7 @@ Reset appends a local `statistics-reset` event rather than wiping the audit log 
 
 ## 🔒 Privacy-Safe Audit Events
 
-Guardian stores a structured JSONL audit in `<project>/.opencode/guardian-events.jsonl` (or the configured state directory). Each entry has a timestamp, random event ID, event kind, action and outcome. Findings include only the **rule ID and a predefined reason code**, such as `masked-verification-failure`, `destructive-operation-not-authorized` or `missing-follow-up-review`. The session ID is reduced to a 16-character SHA-256 fingerprint. Custom tool names are replaced with a generic category.
+Guardian stores a structured JSONL audit in `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` (or `$OPENCODE_GUARDIAN_STATE_DIR/guardian-events.jsonl` when overridden) — never polluting `<project>/.opencode/`. Each entry has a timestamp, random event ID, event kind, action and outcome. Findings include only the **rule ID and a predefined reason code**, such as `masked-verification-failure`, `destructive-operation-not-authorized` or `missing-follow-up-review`. The session ID is reduced to a 16-character SHA-256 fingerprint. Custom tool names are replaced with a generic category.
 
 ```json
 {"at":"2026-10-04T00:00:00.000Z","id":"123e4567-e89b-42d3-a456-426614174000","kind":"post-remediation","action":"remediation-requested","outcome":"unverified","rules":["task/completion-gate"],"reasons":[{"rule":"task/completion-gate","code":"missing-follow-up-review"}]}
@@ -160,7 +238,7 @@ Guardian stores a structured JSONL audit in `<project>/.opencode/guardian-events
 - A warning uses `reported`; a preflight denial uses `prevented` only when the command was actually rejected before execution.
 - No prompts, assistant responses, raw commands, file contents, finding snippets, original session IDs, credentials or secrets are written.
 - The active log is bounded to 512 KiB by default (configurable up to 2 MiB via `telemetry.maxBytes` or `OPENCODE_GUARDIAN_MAX_LOG_BYTES`), with one rotated archive (`guardian-events.jsonl.1`). In default `violations` mode, high-frequency benign events bypass disk writes completely.
-- To inspect recent events, run `tail -n 20 .opencode/guardian-events.jsonl`.
+- To inspect the exact log path and counters for a project, run `opencode-guardian-status /path/to/project`.
 
 ---
 
@@ -240,9 +318,10 @@ Guardian works out of the box with zero configuration. You can customize rules a
   - `"violations"`: (Default) Logs only security violations, preflight blocks, warnings, and remediation actions. Bypasses clean turns and benign commands (`preflight-allowed`, `post-inspected`), reducing disk I/O by 90–95%.
   - `"all"`: Logs all events including benign command executions and clean turn evaluations.
   - `"off"`: Disables all file writes (zero I/O), ideal for headless CI/CD runs.
-- `telemetry.maxBytes`: Maximum size before rotating to `.opencode/guardian-events.jsonl.1` (default: 512 KiB).
+- `telemetry.maxBytes`: Maximum size before rotating to `guardian-events.jsonl.1` (default: 512 KiB).
 
 ### 🌐 Environment Variables (Pipeline & CI Overrides):
+- `OPENCODE_GUARDIAN_STATE_DIR=/path/to/state`: Explicit override for the telemetry state directory.
 - `OPENCODE_GUARDIAN_LOG_LEVEL=violations|all|off`: Dynamically sets audit log verbosity.
 - `OPENCODE_GUARDIAN_TELEMETRY=off`: Completely silences disk writes without altering config files.
 - `OPENCODE_GUARDIAN_MAX_LOG_BYTES=<number>`: Dynamic rotation threshold override.
@@ -322,10 +401,11 @@ Guardian Pipeline
 
 ## 📈 Telemetry & CLI Status
 
-Guardian maintains a private, redacted log of local events:
-- **Project Log:** `<project>/.opencode/guardian-events.jsonl` (mode `0600`).
+Guardian maintains a private, redacted log of local events outside your project repository:
+- **Per-Project Log:** `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` (mode `0600`, directory mode `0700`).
 - **Global Fallback:** `~/.local/state/opencode-guardian/guardian-events.jsonl`.
-- **Privacy:** Contains only rule codes and SHA-256 session fingerprints. **Never** stores commands, file contents, secrets, or prompts.
+- **Test Isolation (`NODE_TEST_CONTEXT`):** `os.tmpdir()/opencode-guardian-tests-<pid>/projects/<projectHash>/guardian-events.jsonl` (automatically removed on process exit).
+- **Privacy:** Contains only rule codes and SHA-256 session fingerprints. **Never** stores commands, file contents, secrets, or prompts, and **never** creates files inside `<project>/.opencode/`.
 
 ### 💻 Command Line Interface
 
@@ -342,9 +422,9 @@ opencode-guardian-status /path/to/project
 Example output:
 ```text
 Guardian | preflight at last start: active
-Shell inspected: 14 | blocked: 2
+Inspections (tool + turn): 14 | blocked tools (preflight): 2
 Post-turn warnings: 2 | remediations: 1 | errors: 0
-Event log: /path/to/project/.opencode/guardian-events.jsonl
+Event log: /home/user/.local/state/opencode-guardian/projects/9f86d081884c7d65/guardian-events.jsonl
 ```
 
 ---
@@ -384,7 +464,7 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the **v0.15.2** pure OpenCode V2 (`>=2.3.0`) runtime, wired via `setup(ctx)` hooks (`session.hook("prompt")`, `session.hook("context")`, `session.hook("experimental.idle")`, `tool.hook("execute.before")`, `tool.hook("execute.after")`, `shell.hook("create.before")`, `stream.hook`, `event.subscribe`), typed `./rpc` intervention endpoints (`opencode-guardian/rpc`), and `session.fork` / `session.forked` root-session isolation. Strict preflight is **opt-in** and evaluates recognized or configured tools and shell creations; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. Supported whole-file writes also use before/after observations for advisory content-loss detection; missing before hooks cannot reconstruct old file content. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the **v0.16.0** pure OpenCode V2 (`>=2.3.0`) runtime, wired via `setup(ctx)` hooks (`session.hook("prompt")`, `session.hook("context")`, `session.hook("experimental.idle")`, `tool.hook("execute.before")`, `tool.hook("execute.after")`, `shell.hook("create.before")`, `stream.hook`, `event.subscribe`), typed `./rpc` intervention endpoints (`opencode-guardian/rpc`), `opencode-mesh.state` RPC (`src/bridge.ts`), and `session.fork` / `session.forked` root-session isolation. Strict preflight is **opt-in** and evaluates recognized or configured tools and shell creations; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. Supported whole-file writes also use before/after observations for advisory content-loss detection; missing before hooks cannot reconstruct old file content. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
 For delegated `subagent` work, Guardian preserves capability-aware remediation isolation: synchronous write-capable subagents retain bounded remediation before parent release, read-only subagents avoid synthetic remediation loops, background subagents (`background === true`) are isolated from the foreground handoff barrier so sibling background subagents are never starved, and per-rule fingerprints distinguish substantive errors. Teardown remains idempotent across `AbortController` signals and LIFO hook rollback; background polling/cleanup intervals call `.unref?.()`, while active one-shot coalesce and retry timers keep the event loop alive until completion or abort.
 

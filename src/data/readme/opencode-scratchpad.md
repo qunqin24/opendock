@@ -1,0 +1,166 @@
+# opencode-scratchpad
+
+Per-project scratchpad TUI plugin for OpenCode: capture and edit notes per project, stored privately outside your repo.
+
+## Why
+
+OpenCode sessions come and go, but every project accumulates little things worth keeping: a command you keep re-deriving, a decision and its rationale, the next step you don't want to lose. Context switching to an external notes app breaks your flow and scatters your notes across tools.
+
+`opencode-scratchpad` gives each project **one private scratchpad** — a single free-form text document you can capture into and edit without leaving the TUI. It is not a list of notes or a task manager; it is one document per project, always in the same place.
+
+## Features
+
+- **One scratchpad per project**, keyed by the project's absolute path.
+- **`/scratch` command**
+  - `/scratch <text>` appends a line of text to the current project's scratchpad and shows a confirmation toast.
+  - `/scratch` (no argument) opens the modal editor — on any terminal width.
+- **Modal editor** — a command-palette-style dialog with an editable textarea, a key hint, and a saved indicator. `Enter` adds a new line; `Esc` saves and closes.
+- **Sidebar preview** — the session sidebar shows an always-present collapsed **Scratchpad** dropdown. Click it to expand a read-only, truncated preview of the current notes; click again to collapse. It is never editable.
+- **Private and local** — no network calls, no telemetry, and nothing written into your git repo.
+- **Plain Markdown on disk** — one file per project, easy to back up, grep, or delete.
+
+## Requirements
+
+- **OpenCode v2.** Verified against OpenCode v2.0.27.
+- The V2 TUI plugin API is currently **beta**. The plugin pins `@opencode/plugin@2.0.27`, and you should pin versions too — the API may change between releases.
+- Runtime peers: `@opentui/core`, `@opentui/solid`, and `solid-js` (installed transitively by OpenCode).
+
+## Installation
+
+### From npm
+
+OpenCode installs published plugins itself — do not `npm install` it into your project:
+
+```sh
+opencode plugin add opencode-scratchpad
+```
+
+That installs the package and adds it to your global config. To configure it by hand instead, add it to `plugins` in `opencode.json(c)` (V2 uses the `plugins` key); OpenCode installs any missing package at startup. See [`examples/opencode.json`](./examples/opencode.json) for a minimal config:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-scratchpad"]
+}
+```
+
+Pin an exact version in production (e.g. `opencode-scratchpad@0.2.0`), since the V2 TUI plugin API is beta.
+
+Because this package exports a server part (`.`) alongside its TUI part (`./tui`), `opencode.json` is the correct file — `cli.json` is only for packages with a TUI part and no server part.
+
+### Local development install
+
+To use a working copy, register it by absolute `file://` path:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["file:///absolute/path/to/opencode-scratchpad"]
+}
+```
+
+OpenCode loads the local directory through the `tui.js` and `server.js` entry forwarders shipped at the repository root. Restart OpenCode afterwards. When you install the published npm package by name instead, OpenCode resolves the `./tui` and `./server` package exports and the forwarders are not used.
+
+## Usage
+
+### Capture a line
+
+```
+/scratch Remember to regenerate the API client after schema changes
+```
+
+The line is appended to the current project's scratchpad and a toast confirms the write.
+
+### Open the editor
+
+```
+/scratch
+```
+
+The editor opens as a modal dialog styled like the command palette (`Ctrl+P`), on any terminal width. You can also run **Scratchpad** from the command palette (`Ctrl+P`).
+
+| Key   | Action           |
+| ----- | ---------------- |
+| `Esc` | Save and close   |
+| `<leader>e` | Open the scratchpad in `$VISUAL`/`$EDITOR` |
+
+`Enter` adds a new line, so multi-line notes stay easy to write. Your edits are written to disk when you close the editor. The `<leader>e` shortcut is a bindable command with id `opencode-scratchpad.editor`, configurable via `keybinds` in `tui.json` (e.g. `"keybinds": { "opencode-scratchpad.editor": "<leader>e" }`).
+
+#### Sidebar preview
+
+The session sidebar also carries an always-present **Scratchpad** row. Collapsed by default, it expands on click to a read-only preview of the current notes — the first ~10 lines, with an ellipsis when there is more. Click the row again to collapse it. The preview re-reads the file each time you expand it, so edits you make in the modal show up the next time you open it.
+
+> **Sidebar visibility is host-controlled.** The sidebar is shown by default only on wider terminals (more than 120 columns) and can be toggled on narrower ones. A plugin cannot force it visible; when it is hidden, the `/scratch` modal editor still works.
+
+## Storage & Privacy
+
+Everything is **local**. The plugin makes no network calls, collects no telemetry, and writes nothing into the git repo.
+
+One Markdown file per project is stored at:
+
+```
+$OPENCODE_DATA_DIR/scratchpad/<projectKey>.md
+```
+
+`OPENCODE_DATA_DIR` defaults to `~/.local/share/opencode`, so the default path is:
+
+```
+~/.local/share/opencode/scratchpad/<projectKey>.md
+```
+
+`<projectKey>` is a slug of the project directory basename plus an 8-char hash of the absolute directory path, which keeps same-named directories in different locations from colliding.
+
+- **Override the base directory** with the `OPENCODE_DATA_DIR` environment variable.
+- **Notes are plaintext on disk.** For sensitive notes, rely on OS-level disk encryption.
+- **Storage is keyed by absolute project path**, so moving or renaming a project directory creates a new scratchpad rather than following the project.
+
+## Configuration
+
+The plugin reads `options` from the OpenCode plugin context (`context.options`):
+
+| Option    | Type     | Default                          | Description                          |
+| --------- | -------- | -------------------------------- | ------------------------------------ |
+| `dataDir` | `string` | `$OPENCODE_DATA_DIR` (or `~/.local/share/opencode`) | Base data directory to store scratchpads under. |
+| `ext`     | `string` | `"md"`                           | File extension for scratchpad files. |
+
+Pass options using the object form of a `plugins` entry (OpenCode reads them as `context.options`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-scratchpad",
+      "options": {
+        "dataDir": "/absolute/path/to/notes",
+        "ext": "md"
+      }
+    }
+  ]
+}
+```
+
+`dataDir` must be an absolute path (the plugin does not expand `~`). When `dataDir` is omitted, the `OPENCODE_DATA_DIR` environment variable is used if set, otherwise `~/.local/share/opencode`.
+
+## Development
+
+```sh
+bun install       # install dependencies
+bun test          # run the test suite
+bun run typecheck # type-check with tsc --noEmit
+```
+
+## Roadmap
+
+- Search within the scratchpad.
+- Timestamped captures.
+- Optional per-project scratchpad templates.
+- Configurable keybindings.
+
+## Contributing
+
+Issues and pull requests are welcome at `https://github.com/adikpb/opencode-scratchpad`. Please run `bun test` and `bun run typecheck` before opening a PR, and keep the scope focused on the single-scratchpad-per-project model.
+
+## License
+
+[MIT](./LICENSE) © 2026 adikpb

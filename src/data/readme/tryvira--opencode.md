@@ -40,6 +40,12 @@
   </tr>
 </table>
 
+<p align="center">
+  <a href="https://mcprush.com/to/vira-own-how-your-ai-behaves-mcp?ref=badge">
+    <img src="https://mcprush.com/badge/vira-own-how-your-ai-behaves-mcp/card.svg" alt="Vira on MCPRush" width="420" />
+  </a>
+</p>
+
 > **Early access:** The SDKs, Agent Skills and examples are public. Live Vira operations require a provisioned account; **Studio is optional for SDK-supported operations**. [See what you can try today](docs/start-here.md).
 
 ## Operate Vira directly from your coding agent
@@ -113,7 +119,7 @@ Vira is not limited to one industry or to complex agents. Start simple, then mov
 
 Start with a single task, or govern a process with several steps or coordinated tasks. Vira's AUTO TaskRun can select among eligible SINGLE, STRATEGY, COMPOUND and HYBRID execution paths, depending on the connected application and released behavior.
 
-[Execution modes](docs/execution-modes.md) · [TaskRun example](examples/javascript/taskrun-modes.mjs)
+[Execution modes](docs/execution-modes.md) · [TaskRun example](examples/javascript/taskrun-modes.mjs) · [Integration compatibility](docs/integration-compatibility.md)
 
 ## Learn to author high-quality Behavior Packs
 
@@ -181,6 +187,7 @@ The sample is intended for local development. Add authentication, rate limits an
 | JavaScript / TypeScript | `npm install @tryvira/sdk` | [SDK guide](docs/reference/javascript-sdk.md) |
 | Python | `python -m pip install tryvira-sdk` | [Python guide](docs/reference/python-sdk.md) |
 | MCP | `npx -y @tryvira/mcp` | [MCP setup and tool discovery](docs/reference/mcp.md) |
+| OpenCode plugin | Configure `@tryvira/opencode` in OpenCode | [OpenCode host integration](plugins/opencode/README.md) |
 | HTTP | Customer deployment's documented API | [HTTP integration boundaries](docs/reference/api.md) |
 | Agent Skills | Task-specific guidance for coding agents | [Skills library](skills/README.md) |
 
@@ -193,6 +200,10 @@ Each integration has its own supported operations. Check the [compatibility guid
 - **Evaluating it for a team?** [Use cases](docs/use-cases.md), [approach comparison](docs/approach-comparison.md), [Team evaluation guide](docs/for-teams.md), [product overview](docs/product-positioning.md), and [FAQ](docs/faq.md).
 - **Working with behavior changes?** [Packs](docs/packs.md), [Teach AI](docs/teach.md), [evaluation](docs/evaluation-and-approval.md), and [runtime](docs/runtime.md).
 - **Contributing?** [Contribution guide](CONTRIBUTING.md), [support](SUPPORT.md), and [security reporting](SECURITY.md).
+
+## Legal
+
+[Terms (EN)](docs/legal/terms.en.md) · [Terms (TR)](docs/legal/terms.tr.md) · [Privacy (EN)](docs/legal/privacy.en.md) · [Privacy (TR)](docs/legal/privacy.tr.md) · [Cookies (EN)](docs/legal/cookies.en.md) · [Cookies (TR)](docs/legal/cookies.tr.md) · [AUP (EN)](docs/legal/acceptable-use.en.md) · [Complete legal directory (DPA, KVKK, billing, regional EU/US/TR addenda)](docs/legal/README.md)
 
 ## Trust, limits, and licensing
 

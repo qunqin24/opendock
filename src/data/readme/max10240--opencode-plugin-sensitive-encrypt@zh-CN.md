@@ -62,6 +62,8 @@ prompt、在很长的对话里找不到某个决定、密钥不小心进了上�
 | [记事本](./packages/opencode-plugin-notepad/README.zh-CN.md) | 按文件夹或全局保存随手笔记 | 突然想到一个后续事项，不想打断当前 Agent |
 | [敏感信息加密](./packages/opencode-plugin-sensitive-encrypt/README.zh-CN.md) | 用公钥加密文本或文件，只解密到文件 | 需要保存、传递或交给 Agent 处理密钥，但不能暴露明文 |
 | [敏感信息保护](./packages/opencode-plugin-sensitive-protection/README.zh-CN.md) | 保护凭据文件，在进入模型前脱敏 secret 值 | 机器上有凭据、token 或私钥 |
+| [延迟队列](./packages/opencode-plugin-delayed-queue/README.zh-CN.md) | 先入队，等会话空闲且所有后台工作结束后再执行 | 想追加一条消息，但不想打断当前回合或正在运行的 shell/subagent |
+| [Retry](./packages/opencode-plugin-retry/README.zh-CN.md) | 打断当前回合并发送 Continue；空闲时直接发送 | 模型卡住时，不想重新输入提示词，只想让它继续 |
 | [推荐配置](./packages/opencode-plugin-recomended-opencode-config/README.zh-CN.md) | 补充精选规则和命令，并为 OpenAI 设置 `store:false` | 想要一套更安全、更一致的 OpenCode 基线，又不想自己写规则 |
 
 ## 只安装需要的插件
@@ -79,6 +81,8 @@ prompt、在很长的对话里找不到某个决定、密钥不小心进了上�
 - [记事本](./packages/opencode-plugin-notepad/README.zh-CN.md)
 - [敏感信息加密](./packages/opencode-plugin-sensitive-encrypt/README.zh-CN.md)
 - [敏感信息保护](./packages/opencode-plugin-sensitive-protection/README.zh-CN.md)
+- [延迟队列](./packages/opencode-plugin-delayed-queue/README.zh-CN.md)
+- [Retry](./packages/opencode-plugin-retry/README.zh-CN.md)
 - [推荐配置](./packages/opencode-plugin-recomended-opencode-config/README.zh-CN.md)
 
 Server 端功能配置在 `opencode.jsonc`，TUI 功能配置在 `cli.json`。有些插件两端都会用到。

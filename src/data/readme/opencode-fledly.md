@@ -98,7 +98,8 @@ Restart OpenCode. The first Fledly tool call opens the sign-in page; you can als
 | `skills/fledly/SKILL.md` | The skill, shared by every client |
 | `plugin.json`, `mcp.json` | Agent Plugins v1 package (Hermes Agent) |
 | `.cursor-plugin/`, `cursor-mcp.json` | Cursor Marketplace plugin (skill + hosted MCP server) |
-| `.mcp.json`, `.claude-plugin/` | Claude Code plugin and marketplace |
+| `claude/`, `.claude-plugin/marketplace.json` | Claude Code plugin (skill copy + hosted MCP server) and its marketplace |
+| `.mcp.json` | Project MCP config for clients that read it from the repo root |
 | `index.js`, `package.json` | The `opencode-fledly` npm package for OpenCode |
 | `gemini-extension.json` | Gemini CLI extension (skill + hosted MCP server) |
 

@@ -23,7 +23,7 @@ Every figure here carries a marker: **measured** (read off a live store), **benc
 
 After that, memory is just conversation: ask the agent to remember something and it sticks.
 
-Other install routes — `opencode plugin add`, the Bun version floor, how an unpinned entry resolves `@latest`, and pointing the entry at a checkout: [docs/install.md](docs/install.md).
+Other install routes — `opencode plugin add`, the Bun version floor, how an unpinned entry resolves `@latest`, and pointing the entry at a checkout: [docs/reference/install.md](docs/reference/install.md).
 
 ## What you get
 
@@ -36,9 +36,9 @@ Think of it as a lab notebook the agent keeps for your repo, plus a librarian wh
 - **Memory-aware compaction** — a long session hands its durable facts to the summarizer instead of losing them.
 - **Safe across concurrent sessions** — a reader sees the previous store file or the new one, never half of either.
 - **Decay and consolidation** — `memory_decay` retires stale open threads, `memory_consolidate` proposes near-duplicate merges. Both are dry-run-first and write nothing you did not approve.
-- **Export / import (JSONL)** — back the store up or move it between machines; every imported row re-enters through the same gates. See [Export and move between machines](docs/export-import.md).
-- **Surfaces** — a footer badge, the `/memory` panel, `/memory-report` for chat clients, and a browser admin editor. See [docs/surfaces.md](docs/surfaces.md).
-- **Secret redaction** — credential-shaped values become `[redacted]`. See [docs/secret-redaction.md](docs/secret-redaction.md).
+- **Export / import (JSONL)** — back the store up or move it between machines; every imported row re-enters through the same gates. See [Export and move between machines](docs/internals/export-import.md).
+- **Surfaces** — a footer badge, the `/memory` panel, `/memory-report` for chat clients, and a browser admin editor. See [docs/reference/surfaces.md](docs/reference/surfaces.md).
+- **Secret redaction** — credential-shaped values become `[redacted]`. See [docs/internals/secret-redaction.md](docs/internals/secret-redaction.md).
 - **`memory_*` tools** — `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_undo`, `memory_status`, `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`, `memory_consolidate`, `memory_merge_review`, `memory_list`, `memory_init`.
 - **Auto-capture** — at the end of a turn, and again at compaction, one cheap model pass reads what just happened and proposes facts worth keeping. They face the same write gates as anything you save by hand. On by default, and it inherits your session's model; `autoCapture: false` turns it off. See [Auto-capture](#auto-capture).
 
@@ -53,7 +53,7 @@ Zero configuration is the default. Two options change what the model sees:
 | `injectBudget` | `1200` | Character cap on the injected relevance block and each contextual pull. |
 | `frontierBudget` | `3 × injectBudget` | Character cap on the session-start open-threads block. A thread longer than the budget is not injected and is reported as omitted. |
 
-Everything else goes in the object form of the plugin entry, and is documented once with its invalid-value rule: the capture options, `contradictionSurface`, `notifyBlocked`, and every environment variable in [docs/options.md](docs/options.md). Read [docs/flags.md](docs/flags.md) before flipping `OPENCODE_MEMORY_DEDUP`, `OPENCODE_MEMORY_SYMPTOM` or `OPENCODE_MEMORY_QUERY_GATE` — each switches off behaviour a measurement decided, and each has an invalid-value rule that surprises people.
+Everything else goes in the object form of the plugin entry, and is documented once with its invalid-value rule: the capture options, `contradictionSurface`, `notifyBlocked`, the contextual pull's scope (`pullOutputChars`, `pullTools`, with the bench behind each default), and every environment variable in [docs/reference/options.md](docs/reference/options.md). Read [docs/reference/flags.md](docs/reference/flags.md) before flipping `OPENCODE_MEMORY_DEDUP`, `OPENCODE_MEMORY_SYMPTOM` or `OPENCODE_MEMORY_QUERY_GATE` — each switches off behaviour a measurement decided, and each has an invalid-value rule that surprises people.
 
 ## Auto-capture
 
@@ -71,7 +71,7 @@ It is **on by default** and needs no model name to run. With `captureModel` unse
 
 **The honest caveat.** The trigger fires and the write survives on a real host: `e2e/capture.test.ts` drives `opencode run` and a capture pass starts in 12 of 12 runs. What has not been seen is a live store completing a pass — no `auto_capture_*` line exists anywhere in the maintainer's evidence history — and nothing about quality is measured: what auto-capture would write, how often it duplicates a memory you would have written yourself, and what it costs. Because the switch is on by default, that unmeasured pass runs on every install unless you turn it off; `autoCapture: false` is the one-line answer if you would rather wait for the numbers.
 
-What has been established, and by which kind of evidence, is itemised in [docs/auto-capture-evidence.md](docs/auto-capture-evidence.md). Read that file before quoting any figure in it — two of the entries are defects found in the measuring bench itself, and the corrected numbers are the ones recorded there. `bench/capture-trigger-results.md` is a **bench** simulation of trigger *timing* with a scripted extractor; it answers "which moment is worth mining", not "does this earn its keep".
+What has been established, and by which kind of evidence, is itemised in [docs/internals/auto-capture-evidence.md](docs/internals/auto-capture-evidence.md). Read that file before quoting any figure in it — two of the entries are defects found in the measuring bench itself, and the corrected numbers are the ones recorded there. `bench/capture-trigger-results.md` is a **bench** simulation of trigger *timing* with a scripted extractor; it answers "which moment is worth mining", not "does this earn its keep".
 
 **Am I armed?** `memory_evidence` answers on the `plugin_load` line: `capture=on` (the default), `capture=off` (`autoCapture: false`), `invalid_model`, `no_capabilities`, or `switch_mismatch`. `capture=on` plus no `auto_capture_*` line after a session means the pass did not complete, not that your configuration is wrong; #404 found that mechanism and its fix is merged. On desktop this needs `opencode service restart` after an edit — relaunching the app keeps the old service and its already-parsed options alive.
 
@@ -84,13 +84,13 @@ A memory is a claim about your code, so it gets checked like one. Four gates run
 3. **GATE-3 — no duplicates.** Near-duplicates collapse into the existing row; a contradiction with a superseded memory is rejected.
 4. **GATE-4 — promotion or block.** The row lands, or the call returns the reason.
 
-Nothing is deleted. `memory_update` supersedes the old row and `memory_forget` records a retirement, so history stays readable, and `memory_undo` restores a snapshot when a change turns out wrong. `memory_update` picks its row by `query` — an id, a clock fragment such as `00:11:22.123`, or a unique substring of its text — and a query that matches nothing, or several rows, writes nothing and says so. What carries over to the new row, what a `PARTIAL` reply means for the rows on disk, and what promotion evidence samples: [docs/write-gates.md](docs/write-gates.md).
+Nothing is deleted. `memory_update` supersedes the old row and `memory_forget` records a retirement, so history stays readable, and `memory_undo` restores a snapshot when a change turns out wrong. `memory_update` picks its row by `query` — an id, a clock fragment such as `00:11:22.123`, or a unique substring of its text — and a query that matches nothing, or several rows, writes nothing and says so. What carries over to the new row, what a `PARTIAL` reply means for the rows on disk, and what promotion evidence samples: [docs/internals/write-gates.md](docs/internals/write-gates.md).
 
-**Guided constants (#349 / #351, experimental).** You and the code disagree about a constant, and who is right depends on what you said: capture records whether you stated the required value (`spec` — you are the authority) or described how working code behaves (`behavior` — code is the authority), and the CONFLICT verdict follows that class. The verdict table, what the code check will read, and the accepted residual: [docs/contradiction-authority.md](docs/contradiction-authority.md).
+**Guided constants (#349 / #351, experimental).** You and the code disagree about a constant, and who is right depends on what you said: capture records whether you stated the required value (`spec` — you are the authority) or described how working code behaves (`behavior` — code is the authority), and the CONFLICT verdict follows that class. The verdict table, what the code check will read, and the accepted residual: [docs/internals/contradiction-authority.md](docs/internals/contradiction-authority.md).
 
 ## Repo scoping
 
-Rows are stamped with your git origin (an id that survives re-clones and moves between machines) or, without an origin, a hash of the normalized directory path. Reads — injection, recall, the frontier block, compaction, `memory_forget` and decay — see the current repo plus global rows. Writes follow the stricter direction: a named session whose repository cannot be resolved has **no write target**, so `memory_remember`, `memory_update`, `memory_import` and auto-capture refuse it (evidence `write_refused`) rather than stamp your content into another workspace or publish it as an unstamped row. Preferences that should follow you everywhere go in with `memory_remember global: true`. Identity derivation and legacy hashes, evidence attribution when a session moves repositories mid-operation, and the viewer's separate admin seat: [docs/repo-scoping.md](docs/repo-scoping.md).
+Rows are stamped with your git origin (an id that survives re-clones and moves between machines) or, without an origin, a hash of the normalized directory path. Reads — injection, recall, the frontier block, compaction, `memory_forget` and decay — see the current repo plus global rows. Writes follow the stricter direction: a named session whose repository cannot be resolved has **no write target**, so `memory_remember`, `memory_update`, `memory_import` and auto-capture refuse it (evidence `write_refused`) rather than stamp your content into another workspace or publish it as an unstamped row. Preferences that should follow you everywhere go in with `memory_remember global: true`. Identity derivation and legacy hashes, evidence attribution when a session moves repositories mid-operation, and the viewer's separate admin seat: [docs/internals/repo-scoping.md](docs/internals/repo-scoping.md).
 
 ## What memory is worth, measured
 
@@ -105,7 +105,7 @@ Two results. Only two are quoted, each with its `n` and the seat it ran on, beca
 
 **What is not claimed here.** No token saving. No dollar figure. The seat above is a local box with no cache price; on a hosted provider a cache miss costs roughly 0.1× read and 1.25× write, which is a different claim and cannot be quoted from these numbers.
 
-**Rules for any cost claim in this repository** — the published numbers live in `bench/claims.json`, and `test/claims.test.ts` enforces that file and this one in CI:
+**Rules for any cost claim in this repository** — the published numbers live in `bench/claims.json`, and `test/host/claims.test.ts` enforces that file and this one in CI:
 
 - No cost claim below **n=6 pairs per arm**. A ratio at `6 ≤ n < 21` is labelled **"20% resolution"**.
 - A **seat** and a **metric** are named on the same line as the number.
@@ -123,7 +123,7 @@ Injecting memory costs prompt bytes, and prompt bytes are what a provider bills 
 - **Things you said outright ride first.** A row auto-capture tagged `user-guided` — "the correct sales tax rate is 8.25%" — rides ahead of the lexical picks, newest-first, at most three, inside the budget. Only auto-capture mints the tag; `memory_remember`, updates and imports strip it, because always-riding priority is a poisoning amplifier.
 - **Budgets are hard, receipts are real.** The block and each pull are capped at `injectBudget` characters, the frontier at `frontierBudget`, trimmed at whole-memory boundaries. The badge shows the provider's own `tokens.cache` accounting; a host that reports nothing shows nothing. Auto-capture is the one place with no receipt at all — it is its own call after the turn — so `memory_status` prints it as `receipt=none`, an estimate.
 
-**Bench** — on a deterministic workload the shipped policy injects **12.3% fewer characters** than the naive policy, measured over the whole memory section: bytes on a synthetic run, not tokens and not a provider bill. The four-policy table, what the invalidation counter does and does not count, what the workload cannot show, and an author-reported provider audit (input tokens only, not a total and not a saving): [docs/injection-cost.md](docs/injection-cost.md). Reproduce the byte workload with `bun run bench`.
+**Bench** — on a deterministic workload the shipped policy injects **12.3% fewer characters** than the naive policy, measured over the whole memory section: bytes on a synthetic run, not tokens and not a provider bill. The four-policy table, what the invalidation counter does and does not count, what the workload cannot show, and an author-reported provider audit (input tokens only, not a total and not a saving): [docs/internals/injection-cost.md](docs/internals/injection-cost.md). Reproduce the byte workload with `bun run bench`.
 
 ## Recall quality
 
@@ -142,11 +142,11 @@ No vector database, no embedding model, no API key: a keyword matcher. That is a
 - **Exact keyword lookup.** In a long `memory_recall` query, one complete authored keyword can identify a single visible candidate. Automatic prompt injection still requires two shared concepts for long queries.
 - **`memory_recall` returns 5 rows, not 20.** A live audit of 1,090 recall events found a rank-1 row used in a later tool call at 3.4x the rate of a random store row, and ranks 11–20 at 1.16x — noise. Pass `limit` for a wider sweep.
 
-The abstain-by-design rule, the permutation control behind the `kw` numbers, and the eval's caveats — a synthetic dataset, an adversarial class mix, single-gold scoring: [docs/recall-quality.md](docs/recall-quality.md). Full methodology and all store sizes: `bench/recall-results.md`. Reproduce with `bun run bench:recall`.
+The abstain-by-design rule, the permutation control behind the `kw` numbers, and the eval's caveats — a synthetic dataset, an adversarial class mix, single-gold scoring: [docs/internals/recall-quality.md](docs/internals/recall-quality.md). Full methodology and all store sizes: `bench/recall-results.md`. Reproduce with `bun run bench:recall`.
 
 ## Write latency
 
-A write that cites code references builds one tree index — a single recursive walk that prunes `node_modules` and VCS directories — shared by GATE-1 and GATE-2, and reads each source file at most once. **Bench** on a 5,300-file fixture: 17ms, 15ms and 20ms for 1, 3 and 5 embedded call forms, against 105ms, 136ms and 169ms for one scan per form. The shipped column is flat because the tree is walked once no matter how many references the write cites. The fixture, the table and `bun run bench:write`: [docs/write-latency.md](docs/write-latency.md).
+A write that cites code references builds one tree index — a single recursive walk that prunes `node_modules` and VCS directories — shared by GATE-1 and GATE-2, and reads each source file at most once. **Bench** on a 5,300-file fixture: 17ms, 15ms and 20ms for 1, 3 and 5 embedded call forms, against 105ms, 136ms and 169ms for one scan per form. The shipped column is flat because the tree is walked once no matter how many references the write cites. The fixture, the table and `bun run bench:write`: [docs/internals/write-latency.md](docs/internals/write-latency.md).
 
 ## The store keeps score
 
@@ -163,7 +163,7 @@ two distinct failing turns and two rides with unknown outcomes. Totals cover
 the store; individual rows follow repository visibility. Check the underlying
 memory before acting on a candidate. Gate failures alone cannot establish harm.
 
-Sample `STORE` output, the credit rule and its throttle, the consolidation tie-break, and capture lag: [docs/use-ledger.md](docs/use-ledger.md).
+Sample `STORE` output, the credit rule and its throttle, the consolidation tie-break, and capture lag: [docs/internals/use-ledger.md](docs/internals/use-ledger.md).
 
 ## Consolidation
 
@@ -174,19 +174,23 @@ The rule is: never merge two entries unless every question that used to find eit
 - **Deterministic.** The canonical row is the survivor's prose verbatim plus the absorbed rows' aliases as keywords. No model rewrites anything.
 - **Proven by recorded reads.** Every read the ledger recorded for a cluster is replayed against the merged store, and a merge is proposed only when the canonical row catches at least as many of the cluster's own reads as the best single member did alone. A cluster with no recorded reads is reported as *unmeasured* and never merged on resemblance.
 
-**Bench** — on the eval dataset the pass takes 200 rows to 52 with **R@3 52 → 53 and R@1 52 → 50**, and store-wide injected characters 25 945c → 6 933c. Both the regression and the budget swap are bounded in CI (`test/consolidate-bench.test.ts`).
+**Bench** — on the eval dataset the pass takes 200 rows to 52 with **R@3 52 → 53 and R@1 52 → 50**, and store-wide injected characters 25 945c → 6 933c. Both the regression and the budget swap are bounded in CI (`test/consolidate/consolidate-bench.test.ts`).
 
 ## Secret redaction
 
-One best-effort credential rule set (`src/secrets.ts`) replaces recognized values with `[redacted]`, and it runs at every boundary a credential could persist: the auto-capture prompt before it leaves the plugin, the write gate before content is hashed or analysed, the final write choke point used by gated writes and the viewer's edit and restore paths, and every durable audit line. Covered patterns, and the limits that matter — hex-only secrets and prose credentials it can miss, forward-only scrubbing, and the fact that deleting a row copies it rather than scrubbing it: [docs/secret-redaction.md](docs/secret-redaction.md).
+One best-effort credential rule set (`src/secrets.ts`) replaces recognized values with `[redacted]`, and it runs at every boundary a credential could persist: the auto-capture prompt before it leaves the plugin, the write gate before content is hashed or analysed, the final write choke point used by gated writes and the viewer's edit and restore paths, and every durable audit line. Covered patterns, and the limits that matter — hex-only secrets and prose credentials it can miss, forward-only scrubbing, and the fact that deleting a row copies it rather than scrubbing it: [docs/internals/secret-redaction.md](docs/internals/secret-redaction.md).
 
 ## Export and move between machines
 
-`memory_export` writes the store as JSONL **as its caller can read it**: from a plugin session that means your repository plus global rows. `memory_import` reads such a file back, and every imported row re-enters through the same four gates as `memory_remember` (tagged `import`, original tags preserved). Both tools are model-facing, so a path is not a privilege: it must stay inside the store, and a symbolic link cannot carry a request out of it. The reply is a tally — `promoted`, `collapsed`, `blocked`, `skipped`, `downgraded` — not a yes/no. The move step by step, the file format, the confinement limits and the quarantine screen: [docs/export-import.md](docs/export-import.md).
+`memory_export` writes the store as JSONL **as its caller can read it**: from a plugin session that means your repository plus global rows. `memory_import` reads such a file back, and every imported row re-enters through the same four gates as `memory_remember` (tagged `import`, original tags preserved). Both tools are model-facing, so a path is not a privilege: it must stay inside the store, and a symbolic link cannot carry a request out of it. The reply is a tally — `promoted`, `collapsed`, `blocked`, `skipped`, `downgraded` — not a yes/no. The move step by step, the file format, the confinement limits and the quarantine screen: [docs/internals/export-import.md](docs/internals/export-import.md).
 
 ## Surfaces
 
-Same data behind each one (`memory_status`; no model call): the terminal **footer badge** — the injected block against its budget plus the measured session prompt-cache hit rate, with the dot color telling you whether the cache is warm — the **`/memory`** session panel, **`/memory-report`** for chat clients where the terminal slots do not exist, and a loopback-only **browser editor** (`bun memory-view`). What each shows, the badge colors, and what binding the editor to a non-loopback host costs you: [docs/surfaces.md](docs/surfaces.md).
+Same data behind each one (`memory_status`; no model call): the terminal **footer badge** — the injected block against its budget plus the measured session prompt-cache hit rate, with the dot color telling you whether the cache is warm — the **`/memory`** session panel, **`/memory-report`** for chat clients where the terminal slots do not exist, and a loopback-only **browser editor** (`bun memory-view`). What each shows, the badge colors, and what binding the editor to a non-loopback host costs you: [docs/reference/surfaces.md](docs/reference/surfaces.md).
+
+## Documentation
+
+Every document under `docs/`, one line each with its audience and summary: [docs/README.md](docs/README.md). The accepted architecture decisions, with status and supersession: [docs/adr/README.md](docs/adr/README.md).
 
 ## Development
 
@@ -202,8 +206,22 @@ Use Bun **1.4.4** for development checks, matching CI. `bun run test` and `bun r
 
 **Feature order is BDD-first.** A new feature starts by adding or fixing a scenario in `e2e/` that describes the behavior as a user would observe it — before implementation code and before unit tests. If no scenario turns red first, the feature has no observable contract. `e2e/` boots the **real opencode CLI** in a fully isolated instance against a scripted fake model — no API keys, no shared store. It needs `opencode` on `PATH` locally, or `OPENCODE_BIN`.
 
-How the local commands map to CI job names, what the smoke suite really boots, why the published surface is decided by `package.json` `files`, and the pre-release mutation sweep with its artifact policy: [docs/development.md](docs/development.md) and [docs/pre-release-ritual.md](docs/pre-release-ritual.md).
+How the local commands map to CI job names, what the smoke suite really boots, why the published surface is decided by `package.json` `files`, and the pre-release mutation sweep with its artifact policy: [docs/internals/development.md](docs/internals/development.md) and [docs/internals/pre-release-ritual.md](docs/internals/pre-release-ritual.md).
+
+## Layout
+
+Two root files are shims, and both exist because OpenCode finds plugins two
+different ways. **Loose plugin discovery** reads `<config>/plugins/<name>/index.ts`
+and, next to it, a sibling `tui.ts` — so the repository root carries `index.ts`
+(re-exporting `src/index.ts`) and `tui.ts` (re-exporting the default of
+`src/tui/panel.tsx`). **Package installs** resolve through `package.json`
+`exports` instead: `"."` → `./index.ts` and `"./tui"` → `./src/tui/panel.tsx`.
+Real code lives under `src/`, one directory per module. Loose discovery installs
+nothing, so run `bun install` inside the copied directory: the plugin has runtime
+dependencies, and one that cannot be resolved fails the load with an error about
+the default export rather than the missing package
+([#464](https://github.com/abogartz/opencode-self-improvement/issues/464)).
 
 ## Troubleshooting
 
-The whole list, one row per problem with its fix, is in [docs/troubleshooting.md](docs/troubleshooting.md): tools not available, a blocked `memory_remember`, an argument-schema rejection, `memory store is busy`, a store on a network share, a stale plugin after an update, auto-capture doing nothing, malformed rows, stray lock files, a missing `/repo-init`, and a clean reset on Windows.
+The whole list, one row per problem with its fix, is in [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md): tools not available, a load error that blames the default export when a dependency is missing, a blocked `memory_remember`, an argument-schema rejection, `memory store is busy`, a store on a network share, a stale plugin after an update, auto-capture doing nothing, malformed rows, stray lock files, a missing `/repo-init`, and a clean reset on Windows.

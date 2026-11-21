@@ -1,6 +1,7 @@
 # Estelle plugins
 
-Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode and Pi. Each host has its own package
+Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode, Pi, Qwen Code, Hermes Agent, mini-swe-agent,
+OpenClaw and fx. Each host has its own package
 under `plugins/`. They connect to `https://api.fatelabs.ca/mcp`.
 
 Install your coding host first, with external Node.js 22+. Claude Code signs in to MCP with OAuth and
@@ -9,7 +10,7 @@ account in the actual host process, where hooks and MCP use the same key. GUI ap
 may not inherit your terminal environment, so quit and reopen them after setting a key. The plugin does
 not install the host or Node, or create an account. No backend clone or Estelle CLI is needed.
 
-Version: `0.0.22`.
+Version: `0.0.23`.
 
 [Release notes](docs/releases/v0.0.19.md)
 
@@ -23,6 +24,11 @@ Version: `0.0.22`.
 | Cursor | [Cursor](docs/install/cursor.md) |
 | OpenCode | [OpenCode](docs/install/opencode.md) · [what it supports](docs/hosts/opencode.md) · npm [`@fatelabs/opencode-estelle`](https://www.npmjs.com/package/@fatelabs/opencode-estelle) |
 | Pi | [Pi](docs/install/pi.md) · [what it supports](docs/hosts/pi.md) · npm [`@fatelabs/pi-estelle`](https://www.npmjs.com/package/@fatelabs/pi-estelle) · [pi.dev packages](https://pi.dev/packages) |
+| Qwen Code | [Qwen Code](docs/install/qwen.md) · [what it supports](docs/hosts/qwen.md) |
+| Hermes Agent | [Hermes](docs/install/hermes.md) · [what it supports](docs/hosts/hermes.md) |
+| mini-swe-agent (MCP tools through bash, no capture) | [mini-swe-agent](docs/install/mini-swe-agent.md) · [what it supports](docs/hosts/mini-swe-agent.md) |
+| OpenClaw (skills and MCP, no capture yet) | [OpenClaw](docs/install/openclaw.md) · [what it supports](docs/hosts/openclaw.md) |
+| fx (skills and MCP, no capture) | [fx](docs/install/fx.md) · [what it supports](docs/hosts/fx.md) |
 
 OpenCode and Pi install from npm with one command each:
 

@@ -4,14 +4,14 @@ dibs is a task store that several coding agents share. Pi, Claude Code, Codex, o
 
 ## Quick start
 
-dibs needs [Bun](https://bun.sh) 1.4 or later. Run the CLI without installing it:
+dibs needs [Node.js](https://nodejs.org) 26 or later. Run the CLI without installing it:
 
 ```sh
-bunx @dibs.ai/dibs create "Write tests"
-bunx @dibs.ai/dibs list
+npx -y @dibs.ai/dibs create "Write tests"
+npx -y @dibs.ai/dibs list
 ```
 
-`npx @dibs.ai/dibs` works too once Bun is installed. To keep a `dibs` command on your PATH, run `bun i -g @dibs.ai/dibs`.
+To keep a `dibs` command on your PATH, run `npm i -g @dibs.ai/dibs`.
 
 Then connect your agent:
 
@@ -23,12 +23,12 @@ Then connect your agent:
 | opencode | `dibs` skill, MCP tools, task panel | [agents/opencode](agents/opencode/README.md) |
 | Cursor | `dibs` skill, MCP tools | [agents/cursor](agents/cursor/README.md) |
 
-Pi loads dibs as a library. Every other agent runs the CLI through `bunx @dibs.ai/dibs`.
+Pi loads dibs as a library. Every other agent runs the CLI through `npx -y @dibs.ai/dibs`.
 
 ## CLI
 
 ```sh
-bunx @dibs.ai/dibs --help
+npx -y @dibs.ai/dibs --help
 ```
 
 | Command | Effect |

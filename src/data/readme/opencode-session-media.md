@@ -59,7 +59,7 @@ Then add the checkout's absolute path to `plugins`.
 ## Use
 
 <p align="center">
-  <img src="./screenshot-viewer.jpg" alt="The full-window viewer with a screenshot open, arrows and a 1 / 7 counter" width="900" />
+  <img src="./screenshot-viewer.jpg" alt="The full-window viewer with a screenshot open, arrows and a 9 / 26 counter" width="900" />
 </p>
 
 Open a session, then pick **Media** from the session panel menu, or run

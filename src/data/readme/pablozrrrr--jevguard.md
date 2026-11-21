@@ -643,6 +643,27 @@ no `UNAVAILABLE`; `1` at least one rule `FAIL`ed; `2` it could not check complet
 `UNAVAILABLE` result). See [configuration](./docs/configuration.md#cli-diagnostics-and-on-demand-rule-checks)
 for the full contract.
 
+## Check a pull request in CI
+
+`jevguard check` judges a change that is already committed, with no plugin on the
+host — the cheapest way to put a policy in front of every pull request:
+
+```sh
+jevguard check --range origin/main..HEAD
+jevguard check --range origin/main..HEAD --last 5 --json
+jevguard check --range origin/main..HEAD --annotations   # GitHub Actions
+```
+
+Each non-merge commit's own patch is the unit and its subject is the task; merge
+commits are skipped. Exit codes: `0` for pass or warnings, `1` when a rule with
+severity `error` failed, `2` when the check could not run. `UNAVAILABLE` never fails:
+it exits `0` with a warning, or `1` with `--strict`. The report, the JSON and the
+GitHub annotations carry rule IDs, outcomes, probabilities, severities, typed reason
+codes and commit revisions — never the diff, the commit subject or a credential — and
+the command writes nothing.
+The Jev key goes in a repository secret. See [check mode](./docs/check-mode.md) for the
+workflow example and the `SCOPE-001` caveat.
+
 ## Implemented behavior
 
 The current release implements the full local review path:
@@ -715,7 +736,8 @@ ordinary turn is reviewed normally.
 Implemented so far: multi-rule reviews, the `SCOPE-CREEP`, `COMPLEXITY`, and
 `TEST-ADEQUACY` built-ins, the `jev-init` policy bootstrap, local review history with
 feedback and calibration (`jevguard report`, `jevguard feedback`), on-demand checks
-(`jevguard rules check`, `jevguard doctor`), and the Claude Code plugin. Planned work:
+(`jevguard rules check`, `jevguard check` in CI, `jevguard doctor`), and the Claude
+Code plugin. Planned work:
 
 ```text
 V0.3  Remaining built-in semantic check: test adequacy        done
@@ -733,6 +755,13 @@ configuration asks for a strategy in an isolated, deny-all child session, and ne
 applies a change. The `V0.6` entry remains the
 future, unattended corrective loop; the proposer is a bounded, strategy-only step, not
 that loop.
+
+The enforce design is accepted and not implemented: [ADR 0022](./docs/adr/0022-enforce-fail-via-stop-hook.md)
+fixes the decisions — Claude Code only, opt-in in the user's own `claude-code.yaml`,
+interactive sessions only, `error` rules from the user's allowlist (the pilot uses
+`SECRETS-001` and `DESTRUCTIVE-001`), one block per unit, an 8 s budget, never a
+built-in, coexisting with remediation delivery, and `jevguard ack` as the user's
+per-unit override.
 
 The `V0.4` `jev-init` skill is implemented: when no policy exists it bootstraps
 `.jev/rules.md` and `.jev/config.yaml` from the user's explicit constraints and
@@ -809,6 +838,7 @@ Use `pnpm check` to run format, lint, typecheck, and tests in sequence. See
 ## Documentation
 
 - [Configuration reference](./docs/configuration.md)
+- [Rule packs](./docs/rule-packs.md)
 - [Public benchmark](./docs/benchmarks/README.md)
 - [Security model](./docs/security.md)
 - [Architecture decisions](./docs/adr/README.md)

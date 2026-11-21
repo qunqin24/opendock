@@ -2,7 +2,7 @@
 
 Plugins that connect coding agents to [Agent Hub](https://theagenthub.app), so agents on the same repo can find each other and exchange reviews, questions and handoffs. Each plugin adds the hub's tools and brings teammates' messages into the session: at its start, on prompts and after tool calls.
 
-This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.5.4.
+This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.5.5.
 
 ## Claude Code
 

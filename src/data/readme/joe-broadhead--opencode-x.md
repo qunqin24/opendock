@@ -46,7 +46,7 @@ X is a trademark of X Corp.; this unofficial plugin is not endorsed by them.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-x#v0.0.7
+opencode plugin add github:joe-broadhead/opencode-x#v0.0.9
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/x-status`: it shows `not configured` until you save your X
@@ -56,12 +56,12 @@ The plugin registers X's MCP server under the name `x`, adds default permission 
 `/x` status view and two skills. Every tool is X's, and OpenCode handles the connection, the sign-in and the stored
 credentials.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.6`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.7`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.7" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.9" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -144,7 +144,7 @@ script's result carries a cost line on every method X prices, and says the price
 ### Sources
 
 X's mentions, bookmarks and home timeline are sources under the shared source contract, declared in `package.json`
-(`x.mentions`, `x.bookmarks`, `x.timeline`), so Memory and other projects read them the same way. `x_events_list` is
+(`x.mentions`, `x.bookmarks`, `x.timeline`), so Memory and other projects read them the same way. `x.bookmarks.list` and `x.posts` are the same reads as the contract's `list` output, for an app that renders a list and does not know X; they are read through the tools RPC method, and the model's tool takes no `list`. `x.bookmarks` is not renamed. `x_events_list` is
 for their collectors, not for answering questions: it lists, since a cursor, one feed (or, as source `x`, every feed
 `events.feeds` names) as normalised events, oldest first, each with its author's handle and link. The tools RPC's
 `probe` says who is signed in. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default,
@@ -228,7 +228,7 @@ Set options with the object form of the plugin entry:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.7",
+      "package": "github:joe-broadhead/opencode-x#v0.0.9",
       "options": {
         "oauth": { "client_id": "YOUR_X_CLIENT_ID", "client_secret": "{env:X_CLIENT_SECRET}" }
       }
@@ -269,7 +269,7 @@ on macOS, or `/etc/opencode/opencode.json` on Linux. Members then only run `/con
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-x#v0.0.7",
+      "package": "github:joe-broadhead/opencode-x#v0.0.9",
       "options": { "oauth": { "client_id": "YOUR_TEAM_APP_CLIENT_ID" } }
     }
   ]
@@ -395,7 +395,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out: `opencode mcp logout x`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: x` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **X**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.7`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.9`, then `opencode reload`.
    `opencode mcp list` no longer lists `x`.
 4. Remove the **X app** entry: `opencode auth logout x-app` from a terminal, or in `/connect`. Remove any X rules you
    copied into your agents' own `permissions`.

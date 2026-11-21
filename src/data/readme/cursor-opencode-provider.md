@@ -124,6 +124,8 @@ Then choose a method:
 
 After login, the plugin fetches your available models and writes them to `<host-cache>/cursor-models.json`. On later startups, a missing, empty, expired, or old-schema cache is refreshed during config load when Cursor auth is available; an existing stale cache remains usable if refresh fails. Completed conversation state is stored separately under `<host-cache>/cursor-conversations/`, with one independently replaced gzip-compressed protobuf snapshot per stable host session. Snapshots are refreshed at each successful Cursor `TurnEnded`, while a turn waits on a host tool, and when OpenCode 2.x stops a turn or shuts down, and restored on demand after provider restarts. A session loads only its own snapshot; it never waits for a directory-wide cleanup. Records not updated within [`CURSOR_PROVIDER_CACHE_TTL_MS`](#environment-variables) (24 hours by default) are rejected on load and collected independently using bounded reads of their persisted metadata, without relying on filesystem modification times; the same 24-hour rule collects temp files left by an interrupted save. Full payload and gzip integrity checks run when a snapshot is restored. Cursor's checkpoint is an index of content-addressed KV blobs rather than a self-contained transcript, so the snapshot retains the blobs reachable from the latest checkpoint and discards superseded blobs. This private Cursor state is not a copy of the host's session database.
 
+OpenCode 2.x also rechecks the model catalog on host activity after its 24-hour expiry. A successful refresh updates the picker without reloading the Location; a failed refresh keeps the last good catalog.
+
 ### Paths (host cache)
 
 Model/version caches and Cursor project metadata live under a **host cache root**, resolved in this order:
@@ -196,13 +198,13 @@ so both hosts can select its parameters.
 
 #### Fast variants with distinct prices
 
-When Cursor publishes a different Fast rate for a model (currently Composer and Grok), the plugin emits a separate OpenCode entry `<model-id>-fast` (for example `composer-2.5-fast`) using the same pattern as `-1m`:
+When a model has a published Fast rate, the plugin exposes a separate OpenCode entry `<model-id>-fast`, such as `composer-2.5-fast`, `gpt-5.5-fast`, or `claude-fable-5-2-fast`:
 
 - only the Fast variants in its picker, with `" Fast"` in the catalog name
 - the real Cursor model id in `options.cursorModelId`, plus default Fast variant parameters
 - its own `cost` row (`composer-2.5-fast` is not nested under `composer-2.5`)
 
-Claude Fast variants stay on the base entry: Cursor does not publish a separate Fast price for them, so they remain picker variants instead of a second catalog id. Combinations with long context use `<id>-1m-fast`.
+Combinations with long context use `<id>-1m-fast` where Cursor offers them. If you saved a Fast variant under a base model that now has a separate Fast entry, select the new model and pick its effort again.
 
 #### Context limit sources
 

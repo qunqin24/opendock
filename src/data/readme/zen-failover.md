@@ -2,18 +2,34 @@
 
 [![skills.sh](https://skills.sh/b/AlexeyShirshov/skills)](https://skills.sh/AlexeyShirshov/skills)
 
-Reusable agent skills for [opencode](https://opencode.ai). Each skill is a directory with a
-`SKILL.md` entry point (YAML frontmatter: `name`, `description`) plus optional `assets/`,
-`scripts/`, and `tests/`.
+Use PDCA when you need an agent to show what it delivered and what proves it. You give it the
+goal; a separate CHECK judges the result against the acceptance criteria. For work that doesn't
+need a cycle, ask for the task directly.
 
-At runtime everything a skill writes lives in one project-local workspace root, `.pdca/` — helpers
+## Start here
+
+1. [Set up your host](docs/install.md): install the skill contracts and their role agents.
+2. [Run your first cycle](docs/guide/first-cycle.md): try a read-only repository task and approve its plan.
+3. [Read the result](docs/guide/read-the-result.md): check the verdict against the recorded evidence.
+
+For example, in a repository with a root README, send this to your agent:
+
+```text
+Use pdca in normal mode. List the existing local files linked from the
+root README.md. Don't edit product files or commit.
+```
+
+See the [user guide](docs/guide/README.md), [руководство пользователя](docs/ru/guide/README.md),
+[technical guide](docs/pdca-guide.md), or [Russian slide deck (PDF)](docs/ru/pdca-slides/slides-export.pdf).
+
+Persistent PDCA state and proof live under the project root, in `.pdca/` — helpers
 it runs (`.pdca/scripts/`), cycle status files (`.pdca/status/`) and evidence
 (`.pdca/<task>/rv<k>/`). The skill's own `scripts/` is the source of those helpers; the project runs
-its copies from `.pdca/scripts/`.
+its copies from `.pdca/scripts/`. Product files stay in their checkout.
 
 ## Contents
 
-Skills live under [`skills/`](skills/).
+See the [skill catalog](skills/README.md) for direct links to each contract.
 
 | Skill | Description |
 | --- | --- |
@@ -32,6 +48,9 @@ common contract and add only their container. The driver is the primary in norma
 obtained is a STOP rather than an open question.
 
 ## Install
+
+<details>
+<summary>Installation commands and host adapters</summary>
 
 Install a single skill with the [skills](https://skills.sh) CLI — one command per skill:
 
@@ -57,7 +76,7 @@ the six shared roles — `pdca-scout`, `pdca-planner`, `pdca-executor`, `pdca-ch
 `pdca-orchestrator` — are canonical in `pdca` and byte-identical mirrors in the overlays;
 `pdca-coder` and `pdca-dotnet` add only the `pdca-security-auditor` specialist, while the forms
 `pdca-collection` and `pdca-incremental` carry only the driver mirror; check or regenerate the
-mirrors with `python3 skills/pdca/scripts/sync_role_assets.py --check` / `--fix`),
+mirrors with `python3 tools/pdca/sync_role_assets.py --check` / `--fix`),
 nested delegation (`experimental.subagent_depth`) and `subagent` permissions. Every agent id is
 `pdca-`prefixed (`pdca-planner`, `pdca-executor`, `pdca-check`, `pdca-escalate`, `pdca-scout`,
 `pdca-security-auditor`, `pdca-orchestrator`), so it cannot collide with an existing
@@ -69,7 +88,7 @@ Nothing has to be copied by hand. The role agents ship in three ready-to-copy se
 per harness, one body: `assets/opencode-agents/` (canonical), `assets/claude-agents/*.md`
 (`name`/`description`/`tools`) and `assets/codex-agents/*.toml`
 (`name`/`description`/`developer_instructions`). The last two are generated from the canonical assets
-by `skills/pdca/scripts/gen_host_agents.py` and checked in CI. `pdca` checks the roles before its
+by `tools/pdca/gen_host_agents.py` and checked in CI. `pdca` checks the roles before its
 first dispatch and, when one does not resolve, hands you the install prompt it ships at
 `assets/install-agents-prompt.md`: the agent copies your host's set into the agent directory, binds
 the models by tier (an OpenCode profile map, `model:` in a Claude Code agent file, or
@@ -79,7 +98,7 @@ part a generator cannot decide — the ids must be ones the host really offers.
 ### From a checkout
 
 Clone the repository and copy the skill directories you want into an opencode skills directory.
-Copy a skill directory whole: `SKILL.md`, `assets/`, and `scripts/` where the skill ships it — the
+Copy a skill directory whole: `SKILL.md`, `references/`, `assets/`, and `scripts/` where present — the
 helpers there are the source of the runtime copies the executor stages into the project's
 `.pdca/scripts/` (see the workspace note above). `tests/` and the diagram generators are
 development-only and not needed at runtime.
@@ -98,13 +117,16 @@ mkdir -p .opencode/skills
 cp -r skills/pdca* .opencode/skills/
 ```
 
-Skills are discovered by the `name` field in their frontmatter. Copying all five does not change
-which ones the model may pick: only `pdca` is advertised, the overlays and the forms keep
+In OpenCode V2 the directory determines the exact skill ID; the frontmatter `name` is a display
+label. Copying all five does not change which ones the model may pick: only `pdca` is advertised,
+the overlays and the forms keep
 `metadata.opencode/autoinvoke: false`.
+
+</details>
 
 ## Usage
 
-Only `pdca` is advertised to the model for automatic selection; it is the single entry of the
+Ask for `pdca` explicitly; it is the single entry of the
 family. `pdca-coder`, `pdca-dotnet`, `pdca-collection` and `pdca-incremental` set
 `metadata.opencode/autoinvoke: false`: they stay registered but load only when the user names them
 explicitly (`skill pdca-dotnet`, `@pdca-dotnet`) or when the base PLAN selects that overlay or form.
@@ -125,10 +147,11 @@ Invoke a skill by name, e.g. in an opencode session:
 
 ## Tests
 
-Each skill ships a `tests/` suite (plain `unittest`, standard library only). Run one skill:
+The source checkout keeps each skill's test suite in `tests/<skill>/`, outside the
+installable `skills/` tree. To run the base suite, install PyYAML and run:
 
 ```sh
-python3 -m unittest discover -s skills/pdca/tests -p 'test_*.py' -v
+python3 -m unittest discover -s tests/pdca -p 'test_*.py' -v
 ```
 
 Some checks compare the skill against host-side artifacts that live in a separate config
@@ -137,17 +160,24 @@ checks skip unless you point at that checkout:
 
 ```sh
 OPENCODE_CONFIG_REPO=/path/to/opencode-config \
-  python3 -m unittest discover -s skills/pdca-dotnet/tests -p 'test_*.py'
+  python3 -m unittest discover -s tests/pdca-dotnet -p 'test_*.py'
 ```
 
-`pdca-collection` additionally ships a dependency-free bash check of its git model (branch
+The collection test suite also includes a Bash check of its Git model (branch
 chain, `--no-ff` merge of completed groups, conflict detection, single-group isolation, and an
 incomplete group preserved but never merged) on throwaway temp repositories. `unittest discover`
-runs it through `tests/test_git_model.py`; it can also be run directly:
+runs it through `tests/pdca-collection/test_git_model.py`; you can also run it directly:
 
 ```sh
-bash skills/pdca-collection/tests/git-model-sim.sh
+bash tests/pdca-collection/git-model-sim.sh
 ```
+
+Maintainer scripts live in `tools/pdca/`. Run diagram generators from the
+directory where you want the SVG and HTML output to appear.
+
+To inspect OpenCode token usage and costs, run
+`python3 tools/pdca/pdca_cost.py --days 3` from the source checkout. This
+optional utility is not part of the skill installation.
 
 ## Plugins
 

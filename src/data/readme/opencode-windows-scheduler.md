@@ -49,7 +49,7 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 29 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 30 agent tools, built-in agent skill |
 
 ### Language
 
@@ -125,7 +125,7 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 29 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 30 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
@@ -137,7 +137,7 @@ The agent gets the full feature set — 29 tools covering scheduling, pipelines,
 | `pause_task` | `name` | Pauses a job (matrix parent pauses every clone) |
 | `resume_task` | `name` | Resumes a paused job |
 | `get_history` | `taskName?`, `status?`, `limit?` | Recent runs with duration, tokens, cost, model, quality gate and hooks |
-| `get_task_logs` | `name`, `lines?` | Tail of the run log |
+| `get_task_logs` | `name` or `taskName`, `lines?` | Tail of the run log |
 | `dry_run` | `name?` | Simulates a pipeline (or every task): order, DAG, matrix fan-out, estimates |
 | `manage_workspaces` | `action`, `id?`, `name?`, `path?`, `color?` | Multi-repo workspaces: list, add, update, delete |
 | `matrix_control` | `action`, `name?` | Matrix results, cancel pending clones, clean up orphans, preview clones |
@@ -158,6 +158,7 @@ The agent gets the full feature set — 29 tools covering scheduling, pipelines,
 | `pipeline_validate` | `path?`, `source?` | Validates `opencode.pipeline.yaml` without changing tasks |
 | `pipeline_apply` | `path?`, `source?`, `dryRun?` | Idempotently creates or updates pipeline tasks; `dryRun` only reports the diff |
 | `pipeline_export` | `pipeline` | Exports a pipeline's tasks back to YAML |
+| `report_bug` | `description`, `taskName?`, `includeLogs?`, `includeAnalytics?`, `channel?` | Reports an agent-steward issue with diagnostics and optional reproduction context |
 
 `schedule_task` also accepts the full matrix configuration (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
 
@@ -279,13 +280,14 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 109 test suites, 600+ checks
+npm test             # 115 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
-`npm run test:chaos` runs `test-chaos-dag.mjs` separately — it is the 110th `test-*.mjs`
-file on disk but is intentionally not part of `npm test`. The **109** in `npm test`
-counts exactly the suites listed in that script.
+`npm run test:chaos` runs `test-chaos-dag.mjs` separately; `test-prod-install.mjs`
+is likewise invoked through its own script. The **115** in `npm test` counts
+exactly the suites listed in that script; every `test-*.mjs` file on disk is
+reachable through at least one npm script.
 
 `npm run test:en` sets `OPENCODE_SCHEDULER_LOCALE=en` for every suite; the variable is a
 service hook, not a user setting.

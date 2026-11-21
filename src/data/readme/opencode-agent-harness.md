@@ -525,6 +525,8 @@ npx opencode-agent-harness update --target /path/to/project
   modified harness files. Your unrelated uncommitted work is never staged. The push
   uses `--no-verify` — a `chore(harness)` maintenance commit must not be stranded by a
   project pre-push gate that legitimately refuses a direct main push.
+  - Tracked harness-owned files that already match the release but remain uncommitted are
+    adopted into that commit, preventing invisible drift without manual commits; another session's staged bytes are never swept.
   - `--no-commit` to skip commit+push, `--no-push` to commit but not push,
     `--accept-harness` to overwrite a locally-modified harness-owned file.
   - `init` does **not** commit or push by default: pass `--commit` to commit the

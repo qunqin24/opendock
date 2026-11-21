@@ -18,6 +18,10 @@ Uzman Skill'ler gelişmiş referanslar olarak korunuyor. OpenCode entegrasyonu i
 
 **Geliştirme aşamasında:** SDK ve örnekler herkese açık. Ancak Vira hizmetine ve Studio iş akışlarına genel erişim henüz açık değil. Ürün erişimi olmadan chatbot örneğinin **Vira OFF** tarafını, kendi model sağlayıcı anahtarınızla çalıştırabilirsiniz. **Vira ON** için Vira hesabı, yetkili bağlantı ve yayımlanmış uygun davranış gerekiyor.
 
+## Yasal belgeler
+
+[Kullanım Koşulları](docs/legal/terms.tr.md) · [Gizlilik Politikası](docs/legal/privacy.tr.md) · [Çerez Politikası](docs/legal/cookies.tr.md) · [Kabul Edilebilir Kullanım](docs/legal/acceptable-use.tr.md) · [KVKK Aydınlatma](docs/legal/kvkk-notice.tr.md) · [Tüm yasal belgeler (EN/TR, Türkiye/AB/ABD ekleri)](docs/legal/README.md)
+
 ## Neden Vira?
 
 Bir asistanın verdiği yanlış cevabı düzeltmek kolay. Aynı düzeltmenin farklı modellerde, agent'larda ve sürümlerde **hangi kapsamda geçerli olduğunu**, **test edilip edilmediğini** ve **gerçekte uygulanıp uygulanmadığını** yönetmek zor.

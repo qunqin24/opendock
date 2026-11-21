@@ -12,7 +12,8 @@ and choose what gets published. No MCP server or CI pipeline setup is required.
 
 On Martian's open [Code Review Bench](#benchmark-results), `/pr-deep` found
 more of the listed issues in 50 real pull requests than any of the 21 tools on
-the benchmark's dashboard.
+the benchmark's dashboard. On ReviewBench's test set, which scores each finding
+on its own merits, 97.4% of its findings were judged valid.
 
 AZPR is an independent community project. It is not built by or affiliated with
 the OpenCode team.
@@ -197,8 +198,14 @@ tools on its public dashboard.**
 - **Built for interactive triage (F2 54.1, would rank 6th):** `/pr-deep`
   reports every defect it confirms instead of holding findings back, and you
   choose which ones to publish.
+- **Findings that hold up when checked (95.6% judged valid):** this
+  benchmark's precision is the share of comments that are on its list of about
+  three issues per PR, so it counts an accurate comment outside that list as
+  wrong. [ReviewBench](#checked-on-a-second-benchmark) scores each finding on
+  its own merits instead: it judged 95.6% of this release's findings valid, and
+  97.4% of 0.3.7's.
 
-| Tool | Issues found (recall) | High and Critical found | Precision | F2 |
+| Tool | Issues found (recall) | High and Critical found | Comments on the benchmark's list (precision) | F2 |
 | :--- | ---: | ---: | ---: | ---: |
 | **AZPR 0.3.5 (`/pr-deep`, Claude Opus 5.5)** | **67.7%** 🏆 | **74.2%** 🏆 | **30.0%** | **54.1** |
 | copilot-v2 | 66.5% | 71.2% | 38.5% | 58.0 |
@@ -232,6 +239,12 @@ The benchmark's precision also counts accurate comments it does not list:
    AZPR findings that matched no expected issue against the source code:
    **36 were accurate**, and **18 were genuine defects** introduced or exposed
    by the PR that the benchmark's list does not include.
+3. **A judge that checks each finding found them valid.** ReviewBench does not
+   compare findings with a list alone: its judge checks every finding that
+   matches no listed issue against the code. On its 25-PR test set it judged
+   **95.6%** of this release's findings valid, and **97.4%** of 0.3.7's
+   ([the runs](#checked-on-a-second-benchmark)). We ran its scoring pipeline
+   ourselves, so this is not a leaderboard result.
 
 ### Model and effort recommendations
 

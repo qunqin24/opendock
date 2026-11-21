@@ -11,11 +11,11 @@ namespace.
 - **Footer badge** in the session prompt footer and on the home screen, showing the active
   context and its default namespace.
 - **Colour-coded**: red for `prod` / `production` / `prd`, yellow for `stg` / `stage` /
-  `staging` / `preprod` / `uat`, muted otherwise.
+  `staging` / `preprod` / `uat`, muted otherwise — and configurable per context in `cli.json`.
 - **Live**: follows your kubeconfig, so `kubectl config use-context …` (or `kubectx`) and
   `kubectl config set-context --current --namespace …` show up without restarting OpenCode.
-- **`/kube`**: a palette and slash command that shows the full context, namespace, and the
-  kubeconfig file the context was read from.
+- **`/kube`**: a palette and slash command that shows the full context, namespace, applied
+  colour rule, and the kubeconfig file the context was read from.
 - **Read-only**: it never writes to your kubeconfig, and it does not need `kubectl` on
   `PATH`. It reads the same files kubectl does: `$KUBECONFIG` (in order) or
   `~/.kube/config`. The first file with a non-empty `current-context` wins, and the namespace
@@ -45,6 +45,49 @@ Because it is a CLI-side plugin, it also works when the TUI talks to a remote Op
 server. The badge describes the machine running the TUI; see [Limitations](#limitations) for
 what that does and does not tell you.
 
+## Configuration
+
+Colours can be overridden per context in `~/.config/opencode/cli.json`. The string shorthand
+that `plugin add` writes cannot carry options, so replace that entry with the object form:
+
+```jsonc title="~/.config/opencode/cli.json"
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "opencode-kube-context",
+      "options": {
+        "colors": {
+          "*prod*": "red",
+          "*dev*": "green",
+          "*": "muted"
+        }
+      }
+    }
+  ]
+}
+```
+
+Patterns are case-insensitive and match both the raw context name and the name shown in the
+badge, so `prod-eu` also matches an EKS ARN such as
+`arn:aws:eks:…:cluster/prod-eu`. `*` matches any run of characters and is the only wildcard.
+
+Rules are applied in this order:
+
+1. Exact names (keys without `*`), in the order written.
+2. The built-in prod/staging detection.
+3. Wildcard rules, in the order written.
+
+An exact rule can therefore recolour a production context, but a wildcard such as `*prod*`
+cannot hide the built-in red. Put a catch-all `"*"` last if you want one.
+
+Values are `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `gray`, or `muted`,
+resolved from the active theme, or a hex colour such as `#f55` or `#ff5555`. Named colours
+follow the theme and light/dark mode; hex values do not. Invalid values are skipped and listed
+by `/kube`.
+
+This setting is per user and per machine. CLI configuration has no project-local form.
+
 ## Usage
 
 The badge appears on its own when a context is set. With no `current-context` in your
@@ -53,7 +96,7 @@ when the context does not set one.
 
 | Command | What it does |
 | --- | --- |
-| `/kube` | Shows the current context, namespace, and the kubeconfig file the context was read from |
+| `/kube` | Shows the current context, namespace, applied colour and rule, and the kubeconfig file the context was read from |
 | `Kubernetes: kubectl context` | Same command, in the command palette |
 
 Long names are shortened for the footer. EKS ARNs (`arn:aws:eks:…:cluster/name`) show the
@@ -73,6 +116,8 @@ cluster name; contexts over 36 characters and namespaces over 24 are middle-trun
   a single `kubectl` call, or credentials resolved by an auth plugin.
 - The kubeconfig reader expects the block YAML that kubectl and the cloud CLIs write. A context
   written in an unusual shape may show `default` for its namespace.
+- Colour rules match the context name only. The namespace is displayed in the same colour, and
+  cannot be matched or coloured separately.
 - Context switching is left to `kubectl` on purpose: the plugin only observes.
 
 ## Development

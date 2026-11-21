@@ -15,7 +15,7 @@ Tavily is a trademark of Tavily Inc.; this unofficial plugin is not endorsed by 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-tavily#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-tavily#v0.0.6
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/tavily-status` in a session.
@@ -25,12 +25,12 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.5" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.6" }] }
 ```
 
 ### Update
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.4`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-tavily#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.5`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-tavily#v<version>`.
 
 ## Sign in
 
@@ -75,7 +75,7 @@ Ask for what you need. The model uses the skills to choose a tool, or you can na
 Tavily status
 - Connection: sign-in required
 - Account: none
-- Access: every tool runs without asking: the five reads and any tool Tavily adds later. Set the access option to "ask-changes" or "read-only" to restrict a tool Tavily adds later.
+- Access: every tool runs without asking: the five tools, which spend credits, and any tool Tavily adds later. Set the access option to "ask-changes" or "read-only" to ask or deny them.
 - Sign-in: OAuth (/connect → Tavily account)
 - Web search: Tavily, unless opencode.json sets "websearch"
 - Tools: none listed yet
@@ -107,11 +107,15 @@ See [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/
    | Value | What runs | What asks or is denied |
    | --- | --- | --- |
    | `"all"` (the default) | the five tools, and any tool Tavily adds later | nothing |
-   | `"ask-changes"` | the five tools | a tool Tavily adds later: it asks |
-   | `"read-only"` | the five tools | a tool Tavily adds later: it is **denied** |
+   | `"ask-changes"` | nothing: each of the five spends credits | the five tools, and a tool Tavily adds later: each asks |
+   | `"read-only"` | nothing | the five tools, and a tool Tavily adds later: they are **denied** |
+
+   OpenCode's own `websearch` tool is outside this: while the `websearch` option is on it searches through Tavily and
+   spends the same credits, under OpenCode's `websearch` permission, at every value. Set `"websearch": false` or deny
+   `websearch` to stop it.
 
    ```jsonc
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.5", "options": { "access": "ask-changes" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.6", "options": { "access": "ask-changes" } }] }
    ```
 
    The default block, generated from `defaultRules()` for `access: "all"`:
@@ -139,7 +143,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/
    ] } } }
    ```
 
-3. **Per-tool rules**, in `permissions` or in an agent's own: `{ "action": "tavily_tavily_research", "resource": "*", "effect": "ask" }` makes research ask, and `deny` refuses it. `{ "action": "tavily_*", "resource": "*", "effect": "deny" }` denies every Tavily tool. A later rule wins, and a saved "Always allow" still applies after your rules.
+3. **Per-tool rules**, in `permissions` or in an agent's own: `{ "action": "tavily_tavily_research", "resource": "*", "effect": "ask" }` makes research ask, and `deny` refuses it. `{ "action": "tavily_*", "resource": "*", "effect": "deny" }` denies every Tavily tool. A later rule wins, and a saved "Always allow" still applies after your rules. To keep one tool running without asking at `"ask-changes"`, add `{ "action": "tavily_tavily_search", "resource": "*", "effect": "allow" }` after the block: it lets search run without asking at `"ask-changes"`; repeat for `tavily_tavily_extract` and `tavily_tavily_map`.
 
 **Why the names read `tavily_tavily_search`.** Tavily's own server names its tools `tavily_<tool>`, and OpenCode prefixes an MCP tool with its server's name, which is `tavily`. The permission action is that full name, so a rule is `tavily_tavily_search`. It is the exact name to use in a rule; renaming it would break saved rules, so it stays.
 
@@ -155,7 +159,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.5", "options": { "websearch": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.6", "options": { "websearch": true } }]
 }
 ```
 
@@ -206,7 +210,7 @@ Sign out first, while the plugin is installed: once it is removed, `opencode mcp
 3. Remove the plugin, then reload:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.5
+   opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.6
    opencode reload
    ```
 

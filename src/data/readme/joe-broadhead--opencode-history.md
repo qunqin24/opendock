@@ -13,17 +13,17 @@ Unofficial; not affiliated with OpenCode.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-history#v0.0.7
+opencode plugin add github:joe-broadhead/opencode-history#v0.0.8
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/history-status`. On first start the plugin indexes every session in OpenCode's database in the background, newest first. The tools work while it runs, over the sessions indexed so far. `/history-status`, or `/history` in the terminal UI, shows the progress.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.6`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-history#v0.0.7`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-history#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.7" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.8" }] }
 ```
 
 The index is kept; when a new version changes its layout, the plugin rebuilds it in the background.
@@ -52,7 +52,7 @@ await tools.history.sql({ sql: "select date(created) as day, round(sum(cost), 2)
 - **Sessions and files.** `history_sessions` lists sessions without a query, by last update, creation, cost or size. `history_files` lists the sessions that read or changed a file or folder, with counts per operation and the `seq`s of its touches.
 - **Recall.** `history_recall` searches, takes the best sessions and returns quoted evidence with session IDs and `seq`s, for the agent to answer from.
 - **SQL.** `history_sql` runs one read-only `SELECT` or `WITH` statement over the index, for counts and reports. Its stable interface is four views, `v_sessions`, `v_docs`, `v_files` and `v_links`, and two full-text tables, `docs_words` (`MATCH`) and `docs_sub` (`text LIKE '%substring%'`). The other tables can change between versions.
-- **Events list.** `history_events_list` lists what changed in this machine's sessions since a cursor, as normalised events, for Memory, other consumers of the source contract and scripts. It is History's side of the source contract, `@we-the-rebel-alliance/source-contract`: `package.json` declares one source, `history.sessions` (`source: "sessions"`), whose owner the tools RPC method `probe` names; the default source `history` lists as before. Agents answering questions use the tools above.
+- **Events list.** `history_events_list` lists what changed in this machine's sessions since a cursor, as normalised events, for Memory, other consumers of the source contract and scripts. It is History's side of the source contract, `@we-the-rebel-alliance/source-contract`: `package.json` declares `history.sessions` (`source: "sessions"`) and the list snapshot `history.sessions.list`, whose owner the tools RPC method `probe` names. The list reads **every project's** session titles on this computer, not only the current project's: it is the same `sessions` read with `scope: "all"`, at most 50 ids and titles, and a title that still holds a secret is left out. `history.sessions` is not renamed; the default source `history` lists as before. Agents answering questions use the tools above.
 - **Pin.** `history_pin` keeps a past session's brief, or a range of its messages, in the current session's instructions, so it stays in view through compactions. It is not in Code Mode, because it changes the current session.
 
 Search, sessions, files and recall look in the current project by default. They leave out the current session, subagent sessions and archived sessions unless you ask for them. The filters are `scope` (`project`, `directory`, `all` or `session`), `since` and `until` (an ISO date, or an age such as `36h`, `7d`, `3w`, `2m` or `1y`), `kinds`, `tool`, `agent`, `path`, `sessionID`, `includeSubagents`, `includeCurrent` and `includeArchived`.
@@ -103,7 +103,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs
    | `"read-only"` | the reads | nothing: `history_pin` and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.7", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.8", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -209,7 +209,7 @@ Options go on the plugin entry in `opencode.json`:
 ```jsonc
 {
   "plugins": [{
-    "package": "github:joe-broadhead/opencode-history#v0.0.7",
+    "package": "github:joe-broadhead/opencode-history#v0.0.8",
     "options": {
       "defaultScope": "project",
       "mask": ["internal-token-[0-9a-f]{32}"]
@@ -228,7 +228,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.7", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.8", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
   "permissions": [
     { "action": "history_sql", "resource": "*", "effect": "deny" }
   ]

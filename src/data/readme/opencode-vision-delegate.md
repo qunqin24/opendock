@@ -16,6 +16,8 @@ opencode 2.x ships a new ("v2") plugin API with a stable domain surface — tool
 
 - `server` (v1 hooks API) — full features: `vision_analyze` tool, per-model vision routing, image materialization, permission handling. **This is what opencode 1.18 loads.**
 - `setup` (v2 plugin API) — **the same full feature set through the v2 domains**: the `vision_analyze` tool via `ctx.tool.transform`, permission auto-allow via `ctx.permission.hook("evaluate")`, image materialization + native-vision gating via `ctx.session.hook("context")`, and the tool knobs resolved from the user's `vision-agent` agent record. Runtime-verified on opencode 2.3.2. The v2 surface is structurally typed with guards — a host missing a domain degrades that one registration instead of failing the load.
+  - **Knob capture timing (fix `fix-v2-knob-capture-timing`)**: on 2.x hosts the user config's agent entries merge into the agent domain only AFTER plugin transforms run, so knobs are resolved lazily at tool-execute time — first from the agent domain's merged `vision-agent` record, then from the host's global config file (`OPENCODE_CONFIG_DIR`-aware, JSONC-tolerant, strictly read-only), and only then reported as unset. The v1 config-hook snapshot is unchanged (correct on 1.x hosts).
+  - **Known limitation (agent capability map)**: the agent-name → vision-capable map is refreshed post-merge at session-context time wherever the agent domain exposes `list`/`get` outside `transform`; on hosts that expose no such post-merge observation point the map stays transform-time (possibly incomplete) and the request-model check — which is the primary routing signal on v2 — governs routing on its own.
 
 The two entries write disjoint registration systems, so there is no double-registration conflict if both loaders ever see the package.
 
@@ -72,6 +74,14 @@ opencode plugin opencode-vision-delegate --global
 ```
 
 Then restart opencode and verify with `opencode agent list`.
+
+Additionally (verified on the 2.x installer): `opencode plugin add` APPENDS —
+a bare `opencode plugin opencode-vision-delegate --global` over an existing
+entry fails with `Duplicate plugin ID: vision`. Remove the old `plugin`-array
+entry first (uninstall step 1 below), then install. `remove` only removes
+the config entry of its own registered source, and the store path follows
+the specifier spelling — switching between npm and github sources leaves
+both store dirs behind, delete the stale one.
 
 opencode 1.18 has **no built-in plugin uninstall command**. To uninstall manually (verified working):
 

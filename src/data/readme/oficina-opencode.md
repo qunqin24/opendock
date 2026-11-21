@@ -39,7 +39,7 @@ Después abrí OpenCode en tu proyecto y escribí: **`/oficina <lo que necesitá
 <!-- BEGIN GENERATED: facts -->
 | | |
 |---|---|
-| **Paquete** | `oficina-opencode` v3.3.1 |
+| **Paquete** | `oficina-opencode` v3.3.2 |
 | **Tools** | 18 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |

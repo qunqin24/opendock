@@ -19,7 +19,7 @@ Granola is a trademark of Granola, Inc.; this unofficial plugin is not endorsed 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-granola#v0.0.7
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -30,7 +30,7 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.7" }] }
 ```
 
 ### Update
@@ -68,11 +68,11 @@ before it writes. Its inputs are `meeting_ids`, `content` (`notes`, `transcript`
 the export folder, and `overwrite`. When your plan has no transcripts, the file holds the notes and says that
 transcripts are not available on your Granola plan.
 
-It also declares one source, `granola.meetings`, under the source contract (`package.json`'s `sources`), for Memory's
+It also declares sources under the source contract (`package.json`'s `sources`). `granola.meetings` is for Memory's
 collector and other scripts, not for answering questions: `events_list` (`granola_events_list`) lists the meetings you
 took part in since a cursor, as normalised events with their summaries, oldest first, for the account it names (the
 source's accounts are named: the signed-in email), and the tools RPC method `probe` names who is signed in, which is
-how a consumer learns that email. Both only read, and never ask. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
+how a consumer learns that email. `granola.meetings.list` is the same `search_meetings` read, verified through `get_meetings`, as the contract's `list` output, so an app can render it without knowing Granola. `granola.meetings` is not renamed. Both only read, and never ask. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
 
 To see the connection, the workspace, the tools and the next step:
 
@@ -117,7 +117,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.6", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.7", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -161,9 +161,11 @@ The plugin inserts this block directly after each agent's base "allow everything
   { "action": "granola_probe", "resource": "*", "effect": "allow" },
   { "action": "granola_create_folder", "resource": "*", "effect": "allow" },
   { "action": "granola_update_folder", "resource": "*", "effect": "allow" },
+  { "action": "granola_update_meeting_title", "resource": "*", "effect": "allow" },
   { "action": "granola_add_note_to_folder", "resource": "*", "effect": "allow" },
   { "action": "granola_remove_note_from_folder", "resource": "*", "effect": "allow" },
   { "action": "granola_update_private_notes", "resource": "*", "effect": "allow" },
+  { "action": "granola_update_summary", "resource": "*", "effect": "allow" },
   { "action": "granola_generate_summary", "resource": "*", "effect": "allow" },
   { "action": "granola_give_feedback", "resource": "*", "effect": "allow" },
   { "action": "granola_create_meeting_note_from_transcript", "resource": "*", "effect": "allow" },
@@ -201,7 +203,7 @@ plugin in the system config, which outranks each member's own config: `/etc/open
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.6",
+      "package": "github:joe-broadhead/opencode-granola#v0.0.7",
       "options": { "exportDirectory": "<an absolute path>/Granola" }
     }
   ]
@@ -284,7 +286,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.6`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.7`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 

@@ -6,7 +6,7 @@
 
 让 [Magpie](https://usemagpie.ai/) 通过你的 Google 账号使用 **Google AI Studio** 与 **Gemini 网页版**。插件在本机自动运行 [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) 与 [gemini-web2api-go](https://github.com/zexadev/gemini-web2api-go)，提供对话、原生工具调用、Nano Banana 图片生成与 Deep Research 等能力。
 
-> **新模型支持说明**：**Google AI Studio (`ai-studio`)** 默认自动跟随官方最新稳定版后端，现已直接支持 **`gemini-4-hydrogen`**（含 `xhigh` 思考档位）与 **`gemini-4-carbon`**（需账号具备对应权益，如 Google AI Ultra）。**Gemini Web (`gemini-web`)** 由后端 [`dorokuma/gemini-web2api-go` `v6.2.2`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 原生支持 `gemini-4-carbon` / `gemini-4-hydrogen` / **`gemini-4-neon`** 专用模型 ID（含 `-thinking` 思考变体），`strict_model` 开启时也能正确互认槽位升降级；`gemini-4-neon` 系列为服务端内部思考模型，回复中不输出 `reasoning_content`。**对话模式与任务模式分离**：日常对话用 `gemini-4-neon` / `gemini-4-hydrogen` / `gemini-4-carbon`（`gemini-4-carbon` 及 `-thinking` / `-thinking-medium` 变体为纯对话模式），任务/工具密集型场景可选独立任务模式模型 **`gemini-4-neon-task`**、**`gemini-4-carbon-task`** 与 **`gemini-4-hydrogen-task`**（对应 Gemini Web 网页端「任务」开关）。
+> **新模型支持说明**：**Google AI Studio (`ai-studio`)** 默认自动跟随官方最新稳定版后端，现已直接支持 **`gemini-4-hydrogen`**（含 `xhigh` 思考档位）与 **`gemini-4-carbon`**（需账号具备对应权益，如 Google AI Ultra）。**Gemini Web (`gemini-web`)** 由后端 [`dorokuma/gemini-web2api-go` `v6.3.0`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.3.0) 原生支持 `gemini-4-carbon` / `gemini-4-hydrogen` / **`gemini-4-neon`** 专用模型 ID（含 `-thinking` 思考变体），`strict_model` 开启时也能正确互认槽位升降级；`gemini-4-neon` 系列为服务端内部思考模型，回复中不输出 `reasoning_content`。**对话模式与任务模式分离**：日常对话用 `gemini-4-neon` / `gemini-4-hydrogen` / `gemini-4-carbon`（`gemini-4-carbon` 及 `-thinking` / `-thinking-medium` 变体为纯对话模式），任务/工具密集型场景可选独立任务模式模型 **`gemini-4-neon-task`**、**`gemini-4-carbon-task`** 与 **`gemini-4-hydrogen-task`**（对应 Gemini Web 网页端「任务」开关）。
 
 ## Fork 声明与致谢
 
@@ -19,7 +19,7 @@
 **与原版的主要差异**（完整历史见 [CHANGELOG](CHANGELOG.md)）：
 
 1. npm 包名迁移为作用域包 **`@dorokuma/magpie-gemini-web`**；原版无作用域包 `magpie-gemini-web` 仍由原作者维护，两者在 npm 上是相互独立的包。
-2. Gemini Web 后端固定使用 `dorokuma/gemini-web2api-go` 的**官方 Release 预编译二进制**（当前 `v6.2.2`，SHA-256 由脚本单向同步、禁止手改），移除本地补丁重编流水线。
+2. Gemini Web 后端固定使用 `dorokuma/gemini-web2api-go` 的**官方 Release 预编译二进制**（当前 `v6.3.0`，SHA-256 由脚本单向同步、禁止手改），移除本地补丁重编流水线。
 3. Gemini Web 新增 `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-4-neon` 模型 ID（含独立的任务模式模型 `gemini-4-neon-task` / `gemini-4-carbon-task` / `gemini-4-hydrogen-task`）与互认槽位校验；修复幻影会话、AI Studio 代理优先级、更新锁原子发布与自愈等问题。
 
 
@@ -37,7 +37,7 @@
 | **图片生成** | Nano Banana 系列模型，供 Magpie 的图片生成使用（需要 Magpie v0.1.2075+，见下文） | 不支持 |
 | **登录方式** | 自动安装官方后端，导入账号后确认连接 | 本机向导页引导：无痕窗口登录并复制 `cookie` |
 | **额度卡片** | 显示冷却中的模型与恢复时间 | 同步网页版 **5 小时** 与 **每周** 用量及重置时间 |
-| **本地后端** | AIStudio2API（自动安装并跟随官方稳定版） | gemini-web2api-go (`v6.2.2` 固定 pin 二进制) |
+| **本地后端** | AIStudio2API（自动安装并跟随官方稳定版） | gemini-web2api-go (`v6.3.0` 固定 pin 二进制) |
 
 ---
 
@@ -244,13 +244,13 @@ magpie plugin options @dorokuma/magpie-gemini-web '{"studio":{"proxy":"http://12
 - 模型列表过滤 `-build` / `assistant_route` 模型：这类模型附带 Build 写代码助手的系统提示词，不作为普通 Agent 模型提供。升级后可执行 `magpie provider models ai-studio` 刷新列表。
 
 **Gemini Web 优化后端升级与回退：**
-- [#53](https://github.com/dorokuma/magpie-gemini-web/issues/53) 的多账号索引漏传已修复，需重新导入受影响的 Cookie 或在后端账号管理中修正索引。后端 [`dorokuma/gemini-web2api-go` `v6.2.2`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 已原生收录 `gemini-4-carbon`、`gemini-4-hydrogen` 与 `gemini-4-neon` 模型 ID（含 `-thinking` 思考变体，Neon 系列为服务端内部思考、不输出 `reasoning_content`），同时移除了 Gemini Web 对外 `gemini-4-argon*`（原 Argon 槽位在上游目录中原位改名为 4 Carbon，谷歌已下架 Argon，请改用 `gemini-4-carbon*` 或 `gemini-4-neon*`）；`strict_model` 槽位校验按显示名家族互认升级/降级，付费账号请求 `gemini-3.8-flash` 被路由至 `4 Hydrogen` 时也能正确识别，不会误报 `429 model_downgraded`。
-- 插件默认固定使用后端仓发布的 [v6.2.2](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.2.2) 预编译二进制（一仓一制品，6 平台 SHA-256 pin 在 `lib/backend-release.json`，不再由插件仓打补丁重编）。对话请求按上游沉默计时：Google 让请求排队时每 60 秒发一次心跳，后端会一直等到出字；连续 `request_timeout_sec`（默认 180 秒）没有任何数据才放弃这一次并重试，还在出字的长回复也不会被截断。
-- **旧版升级**：插件加载时若识别到托管的旧版后端进程，会自动回收并升级到当前 pin 的 `v6.2.2`，这可能中断正在进行的生成请求；建议升级前先等待在途请求结束，或手动停止旧进程（PID 见数据目录 `backend.pid`）。非插件托管或无法识别的实例不保证自动更新。升级后保留原有配置与账号。
+- [#53](https://github.com/dorokuma/magpie-gemini-web/issues/53) 的多账号索引漏传已修复，需重新导入受影响的 Cookie 或在后端账号管理中修正索引。后端 [`dorokuma/gemini-web2api-go` `v6.3.0`](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.3.0) 已原生收录 `gemini-4-carbon`、`gemini-4-hydrogen` 与 `gemini-4-neon` 模型 ID（含 `-thinking` 思考变体，Neon 系列为服务端内部思考、不输出 `reasoning_content`），同时移除了 Gemini Web 对外 `gemini-4-argon*`（原 Argon 槽位在上游目录中原位改名为 4 Carbon，谷歌已下架 Argon，请改用 `gemini-4-carbon*` 或 `gemini-4-neon*`）；`strict_model` 槽位校验按显示名家族互认升级/降级，付费账号请求 `gemini-3.8-flash` 被路由至 `4 Hydrogen` 时也能正确识别，不会误报 `429 model_downgraded`。
+- 插件默认固定使用后端仓发布的 [v6.3.0](https://github.com/dorokuma/gemini-web2api-go/releases/tag/v6.3.0) 预编译二进制（一仓一制品，6 平台 SHA-256 pin 在 `lib/backend-release.json`，不再由插件仓打补丁重编）。对话请求按上游沉默计时：Google 让请求排队时每 60 秒发一次心跳，后端会一直等到出字；连续 `request_timeout_sec`（默认 180 秒）没有任何数据才放弃这一次并重试，还在出字的长回复也不会被截断。
+- **旧版升级**：插件加载时若识别到托管的旧版后端进程，会自动回收并升级到当前 pin 的 `v6.3.0`，这可能中断正在进行的生成请求；建议升级前先等待在途请求结束，或手动停止旧进程（PID 见数据目录 `backend.pid`）。非插件托管或无法识别的实例不保证自动更新。升级后保留原有配置与账号。
 - **回退官方上游版 / 恢复 pin 版**（停止后端后在插件目录执行）：
   ```bash
   npm run backend:install:upstream  # 回退并固定使用上游 zexadev v4.28.0
-  npm run backend:install           # 恢复默认 pin 的 v6.2.2
+  npm run backend:install           # 恢复默认 pin 的 v6.3.0
   ```
 - pin 同步、校验与冒烟流程见 [docs/backend-release.md](docs/backend-release.md)。
 

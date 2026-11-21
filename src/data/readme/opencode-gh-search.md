@@ -38,7 +38,7 @@ opencode plugin add opencode-gh-search
 This adds it to your global `~/.config/opencode/opencode.json`, which Desktop needs to load plugin UIs. Unpinned, OpenCode keeps it up to date. To stay on a stable version, pin it; exact versions are never auto-updated:
 
 ```sh
-opencode plugin add opencode-gh-search@0.1.0
+opencode plugin add opencode-gh-search@0.1.3
 ```
 
 Check for and apply updates with `opencode plugin check` and `opencode plugin update opencode-gh-search`. Remove it with `opencode plugin remove opencode-gh-search`.

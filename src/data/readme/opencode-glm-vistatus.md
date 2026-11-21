@@ -157,14 +157,14 @@ MCP                     0/1,000
 
 ```bash
 npm install          # 安装开发依赖（运行时依赖由 OpenCode 宿主提供，发布包零依赖）
+npm run sync-version # 生成 src/_version.ts
 npm run build        # tsc 产物 + esbuild 打包 → dist/tui.js
 npm run typecheck    # tsc --noEmit
 ```
 
 构建产物：
 
-- `dist/tui.js` — 双格式 TUI 插件包（`{ id, tui, setup }`，即 `./tui` 导出目标）：
-  V1 宿主读 `tui` 字段，V2 宿主读 `setup` 字段
+- `dist/tui.js` — 双格式 TUI 插件包（`{ id, tui, setup }`)；即 `./tui` 导出目标：V1 宿主读 `tui` 字段，V2 宿主读 `setup` 字段
 
 ## 技术架构
 
