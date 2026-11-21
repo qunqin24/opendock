@@ -112,24 +112,36 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
   }, [text]);
 
   // Parse: JSON errors first, then the plugin list.
-  const parsed = useMemo((): { error: string | null; entries: Entry[]; hasPluginKey: boolean } => {
-    if (!text.trim()) return { error: null, entries: [], hasPluginKey: false };
+  // V1 lists plugins under "plugin", V2 under "plugins"; `key` keeps the one this config uses.
+  const parsed = useMemo((): { error: string | null; entries: Entry[]; hasPluginKey: boolean; key: string } => {
+    const none = { entries: [], hasPluginKey: false, key: 'plugin' };
+    if (!text.trim()) return { error: null, ...none };
     let json: unknown;
     try {
       json = JSON.parse(stripJsonc(text));
     } catch (e) {
-      return { error: (e as Error).message, entries: [], hasPluginKey: false };
+      return { error: (e as Error).message, ...none };
     }
-    if (!json || typeof json !== 'object' || Array.isArray(json)) return { error: t('config.notObject'), entries: [], hasPluginKey: false };
-    const list = (json as Record<string, unknown>).plugin;
-    if (list === undefined) return { error: null, entries: [], hasPluginKey: false };
-    if (!Array.isArray(list)) return { error: t('config.pluginNotArray'), entries: [], hasPluginKey: true };
-    // Entries are strings, or [spec, options] tuples.
+    if (!json || typeof json !== 'object' || Array.isArray(json)) return { error: t('config.notObject'), ...none };
+    const obj = json as Record<string, unknown>;
+    const key = obj.plugin === undefined && obj.plugins !== undefined ? 'plugins' : 'plugin';
+    const list = obj[key];
+    if (list === undefined) return { error: null, ...none };
+    if (!Array.isArray(list)) return { error: t('config.pluginNotArray', { key }), entries: [], hasPluginKey: true, key };
+    // Entries are strings, [spec, options] tuples (V1) or { package, options } objects (V2).
     const entries = list
-      .map((x) => (typeof x === 'string' ? x : Array.isArray(x) && typeof x[0] === 'string' ? x[0] : null))
+      .map((x) =>
+        typeof x === 'string'
+          ? x
+          : Array.isArray(x) && typeof x[0] === 'string'
+            ? x[0]
+            : x && typeof x === 'object' && typeof (x as { package?: unknown }).package === 'string'
+              ? (x as { package: string }).package
+              : null,
+      )
       .filter((x): x is string => x !== null)
       .map(parseSpec);
-    return { error: null, entries, hasPluginKey: true };
+    return { error: null, entries, hasPluginKey: true, key };
   }, [text, t]);
 
   // Look up packages we don't list straight from npm (the registry allows CORS).
@@ -228,8 +240,8 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
         changed = true;
       } else out.push(e.raw);
     }
-    return changed ? JSON.stringify({ plugin: out }, null, 2) : null;
-  }, [parsed.entries, facts, npm]);
+    return changed ? JSON.stringify({ [parsed.key]: out }, null, 2) : null;
+  }, [parsed.entries, parsed.key, facts, npm]);
 
   const copyFixed = async () => {
     if (!fixed) return;

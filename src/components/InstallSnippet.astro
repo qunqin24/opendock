@@ -1,5 +1,5 @@
 ---
-import type { Plugin } from '../lib/plugins';
+import { hasDesktopUi, isTuiOnly, type Plugin } from '../lib/plugins';
 import { localeFromPath, useTranslations } from '../lib/i18n';
 
 interface Props {
@@ -9,23 +9,55 @@ const { plugin: p } = Astro.props;
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
 
+/*
+ * Where a plugin goes depends on the OpenCode major and on which hosts load it
+ * (`surfaces`, see scripts/lib/compat.mjs):
+ *
+ *   V1  server → opencode.json   "plugin"     TUI only → tui.json  "plugin"
+ *   V2  server → opencode.json   "plugins"    TUI only → cli.json  "plugins"
+ *
+ * V2 also has `opencode plugin add`, and OpenCode Desktop only loads plugins
+ * from the global opencode.json. Plugins that support V2, or don't say, get
+ * the V2 form with a note for V1; V1-only plugins keep the V1 form.
+ */
 const spec = p.version ? `${p.name}@${p.version}` : p.name;
-const config = `{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["${spec}"]
-}`;
+const v1Only = p.opencode === 'v1';
+const tuiOnly = isTuiOnly(p);
+const desktop = hasDesktopUi(p);
 
-const tabs = [
-  { id: 'project', label: t('install.project'), hint: t('install.projectHint'), file: 'opencode.json', code: config },
-  {
-    id: 'global',
-    label: t('install.global'),
-    hint: t('install.globalHint'),
-    file: '~/.config/opencode/opencode.json',
-    code: config,
-  },
-  { id: 'npm', label: t('install.manual'), hint: t('install.manualHint'), file: 'shell', code: `pnpm add -D ${p.name}` },
-];
+const json = (schema: string | null, key: string) =>
+  schema ? `{\n  "$schema": "${schema}",\n  "${key}": ["${spec}"]\n}` : `{\n  "${key}": ["${spec}"]\n}`;
+const source = { id: 'npm', label: t('install.manual'), hint: t('install.manualHint'), file: 'shell', code: `pnpm add -D ${p.name}` };
+
+type Tab = { id: string; label: string; hint: string; file: string; code: string };
+let tabs: Tab[];
+let note: string | null = null;
+
+if (v1Only) {
+  const code = json(`https://opencode.ai/${tuiOnly ? 'tui' : 'config'}.json`, 'plugin');
+  const project = tuiOnly ? '.opencode/tui.json' : 'opencode.json';
+  const global = `~/.config/opencode/${tuiOnly ? 'tui' : 'opencode'}.json`;
+  tabs = [
+    { id: 'project', label: t('install.project'), hint: t('install.projectHint', { file: project }), file: project, code },
+    { id: 'global', label: t('install.global'), hint: t('install.globalHint', { file: global }), file: global, code },
+    source,
+  ];
+} else if (tuiOnly) {
+  tabs = [
+    { id: 'cli', label: t('install.command'), hint: t('install.commandHint'), file: 'shell', code: `opencode plugin add ${p.name}` },
+    { id: 'global', label: t('install.global'), hint: t('install.tuiOnlyHint'), file: '~/.config/opencode/cli.json', code: json(null, 'plugins') },
+    source,
+  ];
+  if (p.opencode !== 'v2') note = t('install.v1NoteTui');
+} else {
+  const code = json('https://opencode.ai/config.json', 'plugins');
+  tabs = [
+    { id: 'cli', label: t('install.command'), hint: t('install.commandHint'), file: 'shell', code: `opencode plugin add ${p.name}` },
+    { id: 'project', label: t('install.project'), hint: t('install.projectHint', { file: 'opencode.json' }), file: 'opencode.json', code },
+    { id: 'global', label: t('install.global'), hint: t('install.globalHint', { file: '~/.config/opencode/opencode.json' }), file: '~/.config/opencode/opencode.json', code },
+  ];
+  if (p.opencode !== 'v2') note = t('install.v1Note');
+}
 ---
 
 <div data-install>
@@ -72,6 +104,8 @@ const tabs = [
       </div>
     ))
   }
+  {note && <p class="mt-2 text-xs leading-5 text-muted-foreground">{note}</p>}
+  {desktop && <p class="mt-2 text-xs leading-5 text-muted-foreground">{t('install.desktopNote')}</p>}
 </div>
 
 <script>
