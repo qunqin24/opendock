@@ -18,9 +18,18 @@ interface Entry {
   name: string | null;
   /** Version or range after the name, if any. */
   version: string | null;
+  /** A V2 control entry (`*`, `-id`, `acme.*`, a built-in `opencode.*` ID), not a package. */
+  control?: boolean;
   /** The list item as parsed, so a fix keeps its options: a string, [spec, options] (V1) or { package, options } (V2). */
   item?: unknown;
 }
+
+/**
+ * V2 `plugins` also holds plugin IDs and wildcards that turn plugins off and on
+ * again, in order (opencode.ai/docs/plugins#control): `*`, `-acme`,
+ * `-opencode.provider.*`, `opencode.provider.openai`.
+ */
+const isControl = (spec: string) => /^-|\*/.test(spec.trim()) || /^opencode\.[a-z0-9.-]+$/i.test(spec.trim());
 
 /** The same list item with its spec replaced, options untouched. */
 function withSpec(item: unknown, spec: string): unknown {
@@ -147,7 +156,9 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
             : x && typeof x === 'object' && typeof (x as { package?: unknown }).package === 'string'
               ? (x as { package: string }).package
               : null;
-      return spec === null ? [] : [{ ...parseSpec(spec), item: x }];
+      if (spec === null) return [];
+      if (key === 'plugins' && isControl(spec)) return [{ raw: spec, name: null, version: null, control: true, item: x }];
+      return [{ ...parseSpec(spec), item: x }];
     });
     return { error: null, entries, hasPluginKey: true, key };
   }, [text, t]);
@@ -176,15 +187,17 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
   const results = useMemo(() => {
     if (!facts) return [];
     const seen = new Map<string, number>();
+    const hasControl = parsed.entries.some((e) => e.control);
     for (const e of parsed.entries) if (e.name) seen.set(e.name, (seen.get(e.name) ?? 0) + 1);
 
     return parsed.entries.map((e) => {
       const findings: Finding[] = [];
       if (!e.name) {
-        findings.push({ tone: 'info', text: t('config.local') });
+        findings.push({ tone: 'info', text: t(e.control ? 'config.control' : 'config.local') });
         return { entry: e, fact: null, findings };
       }
-      if ((seen.get(e.name) ?? 0) > 1) findings.push({ tone: 'error', text: t('config.duplicate') });
+      // With control entries a repeat can be deliberate: `-acme` then `acme` re-enables it.
+      if (!hasControl && (seen.get(e.name) ?? 0) > 1) findings.push({ tone: 'error', text: t('config.duplicate') });
 
       const fact = facts.get(e.name) ?? null;
       const info = npm.get(e.name);
@@ -236,7 +249,8 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
         out.push(e.item ?? e.raw);
         continue;
       }
-      if (kept.has(e.name)) {
+      // Order matters once control entries are involved, so keep every repeat.
+      if (kept.has(e.name) && !parsed.entries.some((x) => x.control)) {
         changed = true;
         continue;
       }
