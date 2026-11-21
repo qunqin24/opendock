@@ -18,6 +18,15 @@ interface Entry {
   name: string | null;
   /** Version or range after the name, if any. */
   version: string | null;
+  /** The list item as parsed, so a fix keeps its options: a string, [spec, options] (V1) or { package, options } (V2). */
+  item?: unknown;
+}
+
+/** The same list item with its spec replaced, options untouched. */
+function withSpec(item: unknown, spec: string): unknown {
+  if (Array.isArray(item)) return [spec, ...item.slice(1)];
+  if (item && typeof item === 'object') return { ...(item as object), package: spec };
+  return spec;
 }
 
 /** What npm says about a package we don't list (abbreviated metadata). */
@@ -129,18 +138,17 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
     if (list === undefined) return { error: null, ...none };
     if (!Array.isArray(list)) return { error: t('config.pluginNotArray', { key }), entries: [], hasPluginKey: true, key };
     // Entries are strings, [spec, options] tuples (V1) or { package, options } objects (V2).
-    const entries = list
-      .map((x) =>
+    const entries = list.flatMap((x): Entry[] => {
+      const spec =
         typeof x === 'string'
           ? x
           : Array.isArray(x) && typeof x[0] === 'string'
             ? x[0]
             : x && typeof x === 'object' && typeof (x as { package?: unknown }).package === 'string'
               ? (x as { package: string }).package
-              : null,
-      )
-      .filter((x): x is string => x !== null)
-      .map(parseSpec);
+              : null;
+      return spec === null ? [] : [{ ...parseSpec(spec), item: x }];
+    });
     return { error: null, entries, hasPluginKey: true, key };
   }, [text, t]);
 
@@ -221,11 +229,11 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
   const fixed = useMemo(() => {
     if (!facts || !parsed.entries.length) return null;
     const kept = new Set<string>();
-    const out: string[] = [];
+    const out: unknown[] = [];
     let changed = false;
     for (const e of parsed.entries) {
       if (!e.name) {
-        out.push(e.raw);
+        out.push(e.item ?? e.raw);
         continue;
       }
       if (kept.has(e.name)) {
@@ -236,9 +244,9 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
       const info = npm.get(e.name);
       const latest = facts.get(e.name)?.v ?? (info && typeof info === 'object' ? info.latest : null);
       if (e.version && isExact(e.version) && latest && e.version !== latest) {
-        out.push(`${e.name}@${latest}`);
+        out.push(withSpec(e.item ?? e.raw, `${e.name}@${latest}`));
         changed = true;
-      } else out.push(e.raw);
+      } else out.push(e.item ?? e.raw);
     }
     return changed ? JSON.stringify({ [parsed.key]: out }, null, 2) : null;
   }, [parsed.entries, parsed.key, facts, npm]);
