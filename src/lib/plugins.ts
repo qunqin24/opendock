@@ -70,6 +70,8 @@ export interface Plugin {
   opencode?: OpencodeTarget;
   /** True when `opencode` is 'v1' only because the release predates V2. */
   opencodeInferred?: boolean;
+  /** The published package declares an OpenCode Desktop GUI bundle. */
+  opencodeDesktop?: true;
   /** Slug of the package this one republishes under another scope (set at load, see disambiguate.ts). */
   republishOf?: string;
 }
@@ -254,6 +256,7 @@ export interface SearchDoc {
   featured: boolean;
   opencode: OpencodeTarget;
   opencodeInferred: boolean;
+  opencodeDesktop?: true;
   /** A republished copy of another listed package (see disambiguate.ts). */
   republished: boolean;
 }
@@ -278,6 +281,7 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   featured: p.featured,
   opencode: p.opencode ?? null,
   opencodeInferred: p.opencodeInferred ?? false,
+  ...(p.opencodeDesktop ? { opencodeDesktop: true } : {}),
   republished: Boolean(p.republishOf),
 }));
 

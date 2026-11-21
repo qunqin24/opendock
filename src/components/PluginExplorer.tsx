@@ -28,10 +28,14 @@ const UPDATED_DAYS: Record<UpdatedId, number> = { any: Infinity, week: 7, month:
 const MIN_STARS = ['any', '10', '100', '1000'] as const;
 type MinStarsId = (typeof MIN_STARS)[number];
 // "v2" and "v1" mean "known to run on it", so a V1 + V2 plugin is in both.
-const COMPAT = ['any', 'v2', 'v1', 'unknown'] as const;
+const COMPAT = ['any', 'v2', 'v1', 'desktop', 'unknown'] as const;
 type CompatId = (typeof COMPAT)[number];
-const compatMatch = (d: SearchDoc, c: CompatId) =>
-  c === 'any' || (c === 'unknown' ? !d.opencode : d.opencode === c || d.opencode === 'both');
+const compatMatch = (d: SearchDoc, c: CompatId) => {
+  if (c === 'any') return true;
+  if (c === 'desktop') return d.opencodeDesktop === true;
+  if (c === 'unknown') return !d.opencode;
+  return d.opencode === c || d.opencode === 'both';
+};
 
 const time = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
 

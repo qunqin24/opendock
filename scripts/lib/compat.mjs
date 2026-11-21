@@ -5,6 +5,7 @@
  * (`@opencode/plugin` first published 2026-09-02, 2.0.0 shipped 2026-09-12).
  * The strongest signal is which SDK the published manifest depends on; a few
  * packages also declare `engines.opencode`, a `./v2` export or a keyword.
+ * OpenCode Desktop GUI plugins declare a `./gui-experimental` bundle (V2).
  * Packages with no signal at all whose latest release predates V2 can only
  * have been written for V1, so they are marked V1 with `inferred: true`.
  */
@@ -13,6 +14,32 @@ export const V2_FIRST_PUBLISHED = '2026-09-02';
 
 const V1_SDK = ['@opencode-ai/plugin', '@opencode-ai/sdk'];
 const V2_SDK = ['@opencode/plugin', '@opencode/client', '@opencode/schema'];
+const NODE_CONDITIONS = new Set(['default', 'import', 'node', 'node-addons']);
+const BUN_CONDITIONS = new Set(['default', 'import', 'node', 'bun']);
+
+/** Follow common npm export conditions without downloading the package. */
+function importTarget(target, conditions) {
+  if (target === null) return null;
+  if (typeof target === 'string') return target.startsWith('./') ? target : undefined;
+  if (Array.isArray(target)) {
+    for (const item of target) {
+      const resolved = importTarget(item, conditions);
+      if (resolved) return resolved;
+    }
+  } else if (target && typeof target === 'object') {
+    for (const [key, value] of Object.entries(target)) {
+      if (!conditions.has(key)) continue;
+      const resolved = importTarget(value, conditions);
+      if (resolved !== undefined) return resolved;
+    }
+  }
+}
+
+function hasGuiBundle(entry) {
+  return [NODE_CONDITIONS, BUN_CONDITIONS].some((conditions) =>
+    /^\.\/.+\.c?js$/.test(importTarget(entry, conditions) ?? ''),
+  );
+}
 
 /**
  * Majors (1 and/or 2) an `engines.opencode` range admits. Deliberately small:
@@ -50,10 +77,10 @@ export function rangeMajors(range) {
 /**
  * @param {object | null} manifest the latest version's package.json, as npm serves it
  * @param {string | null} publishedAt when that version was published (ISO)
- * @returns {{ target: 'v1' | 'v2' | 'both' | null, inferred: boolean }}
+ * @returns {{ target: 'v1' | 'v2' | 'both' | null, inferred: boolean, desktop: boolean }}
  */
 export function detectCompat(manifest, publishedAt) {
-  if (!manifest) return { target: null, inferred: false };
+  if (!manifest) return { target: null, inferred: false, desktop: false };
   const deps = {
     ...manifest.peerDependencies,
     ...manifest.devDependencies,
@@ -68,16 +95,18 @@ export function detectCompat(manifest, publishedAt) {
     v2 ||= engines.v2;
   }
   const exportsField = manifest.exports;
+  const desktop = hasGuiBundle(exportsField?.['./gui-experimental']);
+  v2 ||= desktop;
   if (exportsField && typeof exportsField === 'object' && './v2' in exportsField) v2 = true;
   const keywords = (manifest.keywords ?? []).map((k) => String(k).toLowerCase());
   if (keywords.some((k) => /^opencode-?v2$/.test(k))) v2 = true;
   if (keywords.some((k) => /^opencode-?v1$/.test(k))) v1 = true;
 
-  if (v1 && v2) return { target: 'both', inferred: false };
-  if (v1) return { target: 'v1', inferred: false };
-  if (v2) return { target: 'v2', inferred: false };
-  if (publishedAt && publishedAt < V2_FIRST_PUBLISHED) return { target: 'v1', inferred: true };
-  return { target: null, inferred: false };
+  if (v1 && v2) return { target: 'both', inferred: false, desktop };
+  if (v1) return { target: 'v1', inferred: false, desktop };
+  if (v2) return { target: 'v2', inferred: false, desktop };
+  if (publishedAt && publishedAt < V2_FIRST_PUBLISHED) return { target: 'v1', inferred: true, desktop };
+  return { target: null, inferred: false, desktop };
 }
 
 /** Most recent versions with publish dates, newest first: `[{ v, t }]`. */

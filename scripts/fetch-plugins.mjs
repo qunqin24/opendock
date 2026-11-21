@@ -370,7 +370,7 @@ async function main() {
   // Downloads move slowly and packuments rarely change within a day; repo
   // metadata gets a shorter TTL because stars are the point of the site.
   // Versioned names: entries cached before a field was added would hide it for a day.
-  const pkgCache = await cache('packuments-v2.json', 20);
+  const pkgCache = await cache('packuments-v3.json', 20);
   const repoCache = await cache('repos-v2.json', 20);
   const dlCache = await cache('downloads.json', 20);
 
@@ -411,7 +411,7 @@ async function main() {
       homepage: doc.homepage ?? p.links?.homepage ?? null,
       createdAt: doc.createdAt ?? p.date ?? null,
       modifiedAt: doc.modifiedAt ?? p.date ?? null,
-      compat: doc.compat ?? { target: null, inferred: false },
+      compat: doc.compat ?? { target: null, inferred: false, desktop: false },
       versions: doc.versions ?? [],
       gh: parseGitHub(repoUrl),
     };
@@ -481,6 +481,7 @@ async function main() {
       featured: featured.has(r.name),
       opencode: r.compat.target,
       opencodeInferred: r.compat.inferred,
+      ...(r.compat.desktop ? { opencodeDesktop: true } : {}),
       // Transient, written to details/<slug>.json and removed from the snapshot.
       details: buildDetails(r, repo, (repoShare.get(r.gh ? `${r.gh.owner}/${r.gh.repo}`.toLowerCase() : '') ?? 0) > 1),
     };

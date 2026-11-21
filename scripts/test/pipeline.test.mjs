@@ -25,7 +25,11 @@ test('pipeline writes a complete snapshot even when download API is unavailable'
         ['existing', 'new-package'].map(name => ({ package: { name, description: 'A useful plugin' } }))
       });
       if (url.startsWith('https://registry.npmjs.org/')) return Response.json({
-        'dist-tags': { latest: '1.0.0' }, versions: { '1.0.0': { description: 'A useful plugin', license: 'MIT' } }
+        'dist-tags': { latest: '1.0.0' }, versions: { '1.0.0': {
+          description: 'A useful plugin',
+          license: 'MIT',
+          exports: url.endsWith('/new-package') ? { './gui-experimental': './dist/gui-experimental.cjs' } : {},
+        } }
       });
       if (url.startsWith('https://api.npmjs.org/')) return new Response('', { status: 404 });
       throw new Error('Unexpected network call: ' + url);
@@ -37,6 +41,9 @@ test('pipeline writes a complete snapshot even when download API is unavailable'
   assert.equal(snapshot.plugins.find(p => p.name === 'existing').downloadsMonth, 1234);
   assert.equal(snapshot.plugins.find(p => p.name === 'existing').downloadsWeek, 123);
   assert.equal(snapshot.plugins.find(p => p.name === 'new-package').downloadsMonth, 0);
+  assert.equal(snapshot.plugins.find(p => p.name === 'new-package').opencode, 'v2');
+  assert.equal(snapshot.plugins.find(p => p.name === 'new-package').opencodeDesktop, true);
+  assert.equal(Object.hasOwn(snapshot.plugins.find(p => p.name === 'existing'), 'opencodeDesktop'), false);
   assert.ok(Date.now() - Date.parse(snapshot.generatedAt) < 5000);
   assert.match(stdout, /1 last-known, 1 unavailable/);
   assert.match(stdout, /wrote 2 plugins/);
