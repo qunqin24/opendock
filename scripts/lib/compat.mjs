@@ -5,7 +5,8 @@
  * (`@opencode/plugin` first published 2026-09-02, 2.0.0 shipped 2026-09-12).
  * The strongest signal is which SDK the published manifest depends on; a few
  * packages also declare `engines.opencode`, a `./v2` export or a keyword.
- * OpenCode Desktop GUI plugins declare a `./gui-experimental` bundle (V2).
+ * A `./gui-experimental` export also declares V2 Desktop GUI support. The
+ * crawler separately inspects archives without an exports map.
  * Packages with no signal at all whose latest release predates V2 can only
  * have been written for V1, so they are marked V1 with `inferred: true`.
  */

@@ -70,7 +70,7 @@ export interface Plugin {
   opencode?: OpencodeTarget;
   /** True when `opencode` is 'v1' only because the release predates V2. */
   opencodeInferred?: boolean;
-  /** The published package declares an OpenCode Desktop GUI bundle. */
+  /** The published package exports a Desktop GUI bundle or ships it at the conventional root path. */
   opencodeDesktop?: true;
   /** Slug of the package this one republishes under another scope (set at load, see disambiguate.ts). */
   republishOf?: string;
