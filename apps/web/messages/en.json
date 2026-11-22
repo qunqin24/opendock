@@ -1,0 +1,265 @@
+{
+  "meta": {
+    "title": "OpenDock — OpenCode plugins",
+    "description": "Find, compare and install OpenCode plugins. Every package on npm, ranked by real use."
+  },
+  "nav": {
+    "skip": "Skip to content",
+    "home": "OpenDock home",
+    "github": "GitHub",
+    "language": "中文",
+    "languageLabel": "切换到中文"
+  },
+  "footer": {
+    "tagline": "An independent directory of OpenCode plugins. Not affiliated with OpenCode.",
+    "status": "{count} plugins · data refreshed daily",
+    "directory": "Directory",
+    "allPlugins": "All plugins",
+    "categories": "Categories",
+    "trending": "Trending",
+    "authors": "For authors",
+    "ranking": "How ranking works",
+    "listing": "Get listed",
+    "report": "Report wrong data",
+    "project": "Project",
+    "dock": "OpenDock for OpenCode"
+  },
+  "search": {
+    "label": "Search plugins",
+    "placeholder": "Search {count} plugins…",
+    "clear": "Clear search",
+    "results": "Search results",
+    "none": "No plugins match “{query}”.",
+    "viewAll": "View all results"
+  },
+  "common": {
+    "noDescription": "No description.",
+    "perMonth": "/mo",
+    "downloadsTitle": "{count} npm downloads last month",
+    "starsTitle": "{count} GitHub stars",
+    "downloadsSr": "downloads a month",
+    "starsSr": "stars",
+    "downloadsPerMonth": "{count} downloads / month",
+    "by": "by {owner}",
+    "lastPushTitle": "Last push to the repository",
+    "compatTitle": "OpenCode versions it supports",
+    "opencode": "OpenCode {versions}"
+  },
+  "health": {
+    "ok": "Maintained",
+    "warn": "Check before use",
+    "danger": "Unmaintained",
+    "reason": {
+      "healthy": "Recent activity, with source, README and license",
+      "archived": "Repository is archived",
+      "deprecated": "Marked deprecated on npm",
+      "stale-year": "No update in over a year",
+      "stale": "No update in six months",
+      "no-repo": "No source repository linked on npm",
+      "no-readme": "No README",
+      "no-license": "No license declared"
+    }
+  },
+  "home": {
+    "title": "Plugins for OpenCode.",
+    "lead": "Browse {count} community plugins, ranked by how much people really use them.",
+    "plugins": "Plugins",
+    "mostUsed": "Most used",
+    "trending": "Trending",
+    "updated": "Recently updated",
+    "categories": "Categories",
+    "dockStatus": "In development",
+    "dockTitle": "Install and manage plugins from inside OpenCode",
+    "dockBody": "The OpenDock plugin brings this directory into OpenCode as a panel: search, install, update and remove plugins without editing config files.",
+    "dockPlanned": "Planned command, not published yet"
+  },
+  "list": {
+    "metaTitle": "Plugins",
+    "title": "Plugins",
+    "searchTitle": "Search results",
+    "results": "{count, plural, one {# result} other {# results}}",
+    "closest": "No plugin matches every word, showing the {count} closest",
+    "categories": "Categories",
+    "showMore": "Show more",
+    "opencode": "OpenCode",
+    "worksOnV2": "Works on V2",
+    "worksOnV1": "Works on V1",
+    "status": "Status",
+    "maintainedOnly": "Maintained only",
+    "maintained": "Maintained",
+    "layout": "Layout",
+    "listView": "List",
+    "cardsView": "Cards",
+    "sortBy": "Sort by",
+    "sort": {
+      "score": "Best",
+      "downloads": "Most used",
+      "trending": "Trending",
+      "updated": "Recently updated"
+    },
+    "filters": "Filters",
+    "activeFilters": "Active filters",
+    "remove": "Remove {label}",
+    "clearAll": "Clear all",
+    "empty": "No plugins match these filters.",
+    "emptyHint": "Try a single word such as memory, git or auth, or remove a filter.",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {pages}",
+    "pages": "Pages"
+  },
+  "plugin": {
+    "downloadsAMonth": "{count} downloads a month",
+    "noDescription": "No description provided.",
+    "deprecated": "This package is deprecated on npm.",
+    "archived": "This repository is archived and no longer maintained.",
+    "health": "Health",
+    "score": "Score",
+    "scoreValue": "{score} / 100",
+    "seeScorecard": "See the scorecard",
+    "category": "Category",
+    "details": "Details",
+    "author": "Author",
+    "currentVersion": "Current version",
+    "lastUpdated": "Last updated",
+    "created": "Created",
+    "downloads": "Downloads",
+    "downloadsValue": "{count} / month",
+    "stars": "Stars",
+    "starsShared": "{count} (shared repository)",
+    "worksWith": "Works with",
+    "notStated": "Not stated",
+    "license": "License",
+    "none": "None",
+    "sections": "Sections",
+    "tab": {
+      "overview": "Overview",
+      "scorecard": "Scorecard",
+      "updates": "Updates"
+    },
+    "info": "Plugin information",
+    "noReadme": "This package has no README. Check the repository for how to use it.",
+    "readmeLanguage": "README in {language}",
+    "showMore": "Show more",
+    "scorecardIntro": "Computed automatically from public npm and GitHub data, refreshed daily. Something wrong?",
+    "letUsKnow": "Let us know",
+    "activelyMaintained": "This plugin is actively maintained.",
+    "hygiene": "Hygiene",
+    "hygieneOk": "README, license, source repository and description all present.",
+    "hygieneMissing": "Missing: {items}.",
+    "missing": {
+      "description": "description",
+      "readme": "README",
+      "license": "license",
+      "repo": "source repository"
+    },
+    "maintenance": "Maintenance",
+    "lastPush": "Last push {when}.",
+    "latestRelease": "Latest release {version}, {when}.",
+    "repoArchived": "Repository archived.",
+    "npmDeprecated": "Deprecated on npm.",
+    "responsiveness": "Responsiveness",
+    "openIssues": "{count, plural, one {# open issue} other {# open issues}} on GitHub.",
+    "noRepo": "No linked repository to check.",
+    "adoption": "Adoption",
+    "adoptionText": "{downloads} downloads last month. {stars} stars, +{delta} in 30 days.",
+    "adoptionShared": "Stars belong to a shared repository, so only part of them count.",
+    "scoreIntro": "Each signal is scaled from 0 to 1, then weighted.",
+    "howRanking": "How ranking works",
+    "archivedScore": "Archived repositories keep about a third of their score.",
+    "signal": {
+      "downloads": "Downloads",
+      "stars": "Stars",
+      "activity": "Recent work",
+      "momentum": "Momentum"
+    },
+    "noReleases": "No release history recorded yet.",
+    "allVersions": "All versions on npm",
+    "related": "Related plugins",
+    "breadcrumb": "Breadcrumb",
+    "plugins": "Plugins",
+    "links": {
+      "npm": "npm",
+      "repo": "Repository",
+      "homepage": "Homepage",
+      "report": "Report wrong data"
+    }
+  },
+  "actions": {
+    "copy": "Copy install command",
+    "copied": "Copied",
+    "copiedHint": "Copied. {hint}",
+    "blocked": "Copying is blocked here. Use the Install box to select the command.",
+    "more": "More links"
+  },
+  "install": {
+    "title": "Install",
+    "method": "Install method",
+    "terminal": "Terminal",
+    "thisProject": "This project",
+    "allProjects": "All projects",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copiedSr": "Copied to clipboard.",
+    "manual": "Copying is blocked here. The text is selected: press ⌘C or Ctrl+C.",
+    "hint": {
+      "cli": "Run this in your terminal, not inside OpenCode. It installs the plugin for all your projects.",
+      "cliJson": "Or add it by hand to ~/.config/opencode/cli.json. This plugin only runs in the terminal interface.",
+      "project": "To use it in one project only, add this to opencode.json in the project’s root folder.",
+      "v1Project": "Add this to {file} in your project’s root folder.",
+      "v1Global": "Add this to {file} to use it in every project."
+    },
+    "note": {
+      "v1": "Built for OpenCode V1. It does not load in OpenCode V2.",
+      "unknown": "The package does not say which OpenCode version it supports."
+    }
+  },
+  "about": {
+    "metaTitle": "How ranking works",
+    "metaDescription": "How OpenDock scores OpenCode plugins, what the health marks mean, and how to get a plugin listed or corrected.",
+    "title": "About OpenDock",
+    "lead": "OpenDock lists every OpenCode plugin published on npm and ranks them by how much they are really used. It is independent and not affiliated with OpenCode. Data is refreshed daily from public npm and GitHub data, and nobody can pay for a position.",
+    "ranking": "How ranking works",
+    "rankingIntro": "Every plugin gets a score from 0 to 100 from four signals:",
+    "signals": {
+      "downloads": "npm downloads in the last month. The clearest sign that people actually install it.",
+      "stars": "GitHub stars, capped by downloads, so a plugin inside a famous repository does not borrow that repository’s fame.",
+      "activity": "Days since the last push. Full marks within a week, fading to zero after a year.",
+      "momentum": "Stars gained in the last 30 days, relative to size, so new plugins can climb."
+    },
+    "archived": "An archived repository keeps about a third of its score.",
+    "health": "Health marks",
+    "healthBody": {
+      "ok": "Recent activity, with a source repository, README and license.",
+      "warn": "No update in six months, or no linked repository, README or license.",
+      "danger": "Archived, deprecated on npm, or no update in over a year."
+    },
+    "authors": "For plugin authors",
+    "listTitle": "Get listed",
+    "listBody": "Add the <keyword></keyword> keyword to your package.json and publish to npm. Your plugin appears after the next daily refresh. No form, no pull request. A description, repository link, README and license improve your health mark and how well search finds you.",
+    "fixTitle": "Fix wrong data",
+    "fixBody": "Categories are assigned automatically and can be wrong. Corrections to the category, description or repository go through a reviewed override file.",
+    "fixCta": "Request a correction",
+    "removeTitle": "Get removed",
+    "removeBody": "Drop the <keyword></keyword> keyword, or open an issue asking to be blocklisted. The next refresh removes it.",
+    "removeCta": "Request removal"
+  },
+  "author": {
+    "metaDescription": "{count, plural, one {# OpenCode plugin} other {# OpenCode plugins}} by {login}.",
+    "org": "GitHub organisation",
+    "plugins": "{count, plural, one {plugin} other {plugins}}",
+    "downloadsAMonth": "downloads a month",
+    "stars": "stars",
+    "elsewhere": "Elsewhere",
+    "pluginsTab": "Plugins"
+  },
+  "backToTop": {
+    "label": "Back to top",
+    "aria": "Back to top, {percent}% read"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The page does not exist, or the plugin was removed from npm. Search for it above, or browse every plugin.",
+    "cta": "Browse all plugins"
+  }
+}

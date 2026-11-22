@@ -1,0 +1,265 @@
+{
+  "meta": {
+    "title": "OpenDock — OpenCode 插件市场",
+    "description": "查找、比较并安装 OpenCode 插件。收录 npm 上的全部插件，按真实使用情况排名。"
+  },
+  "nav": {
+    "skip": "跳到正文",
+    "home": "OpenDock 首页",
+    "github": "GitHub",
+    "language": "EN",
+    "languageLabel": "Switch to English"
+  },
+  "footer": {
+    "tagline": "独立的 OpenCode 插件目录，与 OpenCode 官方无关。",
+    "status": "{count} 个插件 · 每日更新数据",
+    "directory": "目录",
+    "allPlugins": "全部插件",
+    "categories": "分类",
+    "trending": "趋势",
+    "authors": "给作者",
+    "ranking": "排名规则",
+    "listing": "如何被收录",
+    "report": "报告数据错误",
+    "project": "项目",
+    "dock": "OpenDock 插件"
+  },
+  "search": {
+    "label": "搜索插件",
+    "placeholder": "在 {count} 个插件中搜索…",
+    "clear": "清空搜索",
+    "results": "搜索结果",
+    "none": "没有找到与“{query}”相关的插件。",
+    "viewAll": "查看全部结果"
+  },
+  "common": {
+    "noDescription": "暂无描述。",
+    "perMonth": "/月",
+    "downloadsTitle": "上个月 npm 下载 {count} 次",
+    "starsTitle": "GitHub 星标 {count}",
+    "downloadsSr": "月下载",
+    "starsSr": "星标",
+    "downloadsPerMonth": "月下载 {count}",
+    "by": "作者 {owner}",
+    "lastPushTitle": "仓库最近一次推送",
+    "compatTitle": "支持的 OpenCode 版本",
+    "opencode": "OpenCode {versions}"
+  },
+  "health": {
+    "ok": "维护中",
+    "warn": "使用前请检查",
+    "danger": "已无人维护",
+    "reason": {
+      "healthy": "近期有更新，源码、README 和许可证齐全",
+      "archived": "仓库已归档",
+      "deprecated": "已在 npm 上标记为弃用",
+      "stale-year": "超过一年没有更新",
+      "stale": "半年没有更新",
+      "no-repo": "npm 上没有关联源码仓库",
+      "no-readme": "没有 README",
+      "no-license": "没有声明许可证"
+    }
+  },
+  "home": {
+    "title": "OpenCode 插件市场",
+    "lead": "浏览 {count} 个社区插件，按真实使用情况排名。",
+    "plugins": "插件",
+    "mostUsed": "最常用",
+    "trending": "本周上升",
+    "updated": "最近更新",
+    "categories": "分类",
+    "dockStatus": "开发中",
+    "dockTitle": "在 OpenCode 里直接安装和管理插件",
+    "dockBody": "OpenDock 插件把这个目录做成 OpenCode 里的一个面板：搜索、安装、更新、卸载插件，不用再手动改配置文件。",
+    "dockPlanned": "计划中的命令，尚未发布"
+  },
+  "list": {
+    "metaTitle": "插件",
+    "title": "插件",
+    "searchTitle": "搜索结果",
+    "results": "{count, number} 个结果",
+    "closest": "没有插件匹配所有关键词，显示最接近的 {count} 个",
+    "categories": "分类",
+    "showMore": "显示更多",
+    "opencode": "OpenCode",
+    "worksOnV2": "支持 V2",
+    "worksOnV1": "支持 V1",
+    "status": "状态",
+    "maintainedOnly": "只看维护中",
+    "maintained": "维护中",
+    "layout": "布局",
+    "listView": "列表",
+    "cardsView": "卡片",
+    "sortBy": "排序方式",
+    "sort": {
+      "score": "综合",
+      "downloads": "最常用",
+      "trending": "本周上升",
+      "updated": "最近更新"
+    },
+    "filters": "筛选",
+    "activeFilters": "已选筛选",
+    "remove": "移除 {label}",
+    "clearAll": "全部清除",
+    "empty": "没有符合这些条件的插件。",
+    "emptyHint": "试试 memory、git、auth 这样的单个关键词，或者去掉一个筛选条件。",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {page} 页，共 {pages} 页",
+    "pages": "分页"
+  },
+  "plugin": {
+    "downloadsAMonth": "月下载 {count}",
+    "noDescription": "作者没有提供描述。",
+    "deprecated": "这个包已在 npm 上标记为弃用。",
+    "archived": "这个仓库已归档，不再维护。",
+    "health": "健康度",
+    "score": "评分",
+    "scoreValue": "{score} / 100",
+    "seeScorecard": "查看评分卡",
+    "category": "分类",
+    "details": "详情",
+    "author": "作者",
+    "currentVersion": "当前版本",
+    "lastUpdated": "最近更新",
+    "created": "创建于",
+    "downloads": "下载量",
+    "downloadsValue": "{count} / 月",
+    "stars": "星标",
+    "starsShared": "{count}（共享仓库）",
+    "worksWith": "支持版本",
+    "notStated": "未说明",
+    "license": "许可证",
+    "none": "无",
+    "sections": "内容",
+    "tab": {
+      "overview": "概览",
+      "scorecard": "评分卡",
+      "updates": "版本"
+    },
+    "info": "插件信息",
+    "noReadme": "这个包没有 README，用法请查看源码仓库。",
+    "readmeLanguage": "README（{language}）",
+    "showMore": "展开全部",
+    "scorecardIntro": "根据 npm 和 GitHub 的公开数据自动计算，每日更新。发现有误？",
+    "letUsKnow": "告诉我们",
+    "activelyMaintained": "这个插件在持续维护。",
+    "hygiene": "资料完整度",
+    "hygieneOk": "README、许可证、源码仓库和描述都已提供。",
+    "hygieneMissing": "缺少：{items}。",
+    "missing": {
+      "description": "描述",
+      "readme": "README",
+      "license": "许可证",
+      "repo": "源码仓库"
+    },
+    "maintenance": "维护情况",
+    "lastPush": "最近推送于{when}。",
+    "latestRelease": "最新版本 {version}，发布于{when}。",
+    "repoArchived": "仓库已归档。",
+    "npmDeprecated": "已在 npm 上弃用。",
+    "responsiveness": "响应情况",
+    "openIssues": "GitHub 上有 {count, number} 个未关闭的 issue。",
+    "noRepo": "没有关联仓库，无法检查。",
+    "adoption": "使用情况",
+    "adoptionText": "上个月下载 {downloads} 次。星标 {stars}，近 30 天 +{delta}。",
+    "adoptionShared": "星标属于共享仓库，只计入一部分。",
+    "scoreIntro": "每项指标先换算到 0 到 1，再按权重相加。",
+    "howRanking": "排名规则",
+    "archivedScore": "已归档的仓库只保留约三分之一的分数。",
+    "signal": {
+      "downloads": "下载量",
+      "stars": "星标",
+      "activity": "近期更新",
+      "momentum": "增长势头"
+    },
+    "noReleases": "还没有记录到发布历史。",
+    "allVersions": "在 npm 上查看全部版本",
+    "related": "相关插件",
+    "breadcrumb": "面包屑导航",
+    "plugins": "插件",
+    "links": {
+      "npm": "npm",
+      "repo": "源码仓库",
+      "homepage": "主页",
+      "report": "报告数据错误"
+    }
+  },
+  "actions": {
+    "copy": "复制安装命令",
+    "copied": "已复制",
+    "copiedHint": "已复制。{hint}",
+    "blocked": "当前环境不允许复制，请在右侧安装卡片里选中命令。",
+    "more": "更多链接"
+  },
+  "install": {
+    "title": "安装",
+    "method": "安装方式",
+    "terminal": "终端",
+    "thisProject": "当前项目",
+    "allProjects": "所有项目",
+    "copy": "复制",
+    "copied": "已复制",
+    "copiedSr": "已复制到剪贴板。",
+    "manual": "当前环境不允许复制，已帮你选中文字：按 ⌘C 或 Ctrl+C 复制。",
+    "hint": {
+      "cli": "在终端里运行这条命令，不是在 OpenCode 里。它会为你所有项目安装这个插件。",
+      "cliJson": "也可以手动加到 ~/.config/opencode/cli.json。这个插件只在终端界面中运行。",
+      "project": "只想在某个项目里用，就把这段加到该项目根目录的 opencode.json。",
+      "v1Project": "把这段加到项目根目录的 {file}。",
+      "v1Global": "加到 {file}，所有项目都能用。"
+    },
+    "note": {
+      "v1": "这是为 OpenCode V1 做的插件，在 OpenCode V2 中无法加载。",
+      "unknown": "这个包没有说明支持哪个 OpenCode 版本。"
+    }
+  },
+  "about": {
+    "metaTitle": "排名规则",
+    "metaDescription": "OpenDock 如何给 OpenCode 插件打分、健康标记的含义，以及如何收录或纠正插件信息。",
+    "title": "关于 OpenDock",
+    "lead": "OpenDock 收录所有发布在 npm 上的 OpenCode 插件，并按真实使用情况排名。它是独立项目，与 OpenCode 官方无关。数据每天从 npm 和 GitHub 的公开数据更新，排名不能花钱购买。",
+    "ranking": "排名规则",
+    "rankingIntro": "每个插件根据四项指标得到 0 到 100 的分数：",
+    "signals": {
+      "downloads": "最近一个月的 npm 下载量，最能说明真的有人在装。",
+      "stars": "GitHub 星标，但不超过下载量能支撑的上限，避免放在知名大仓库里的插件沾仓库的光。",
+      "activity": "距离最近一次推送的天数：一周内满分，一年后降到零。",
+      "momentum": "近 30 天新增的星标，按体量换算，让新插件也有机会上升。"
+    },
+    "archived": "已归档的仓库只保留约三分之一的分数。",
+    "health": "健康标记",
+    "healthBody": {
+      "ok": "近期有更新，并提供了源码仓库、README 和许可证。",
+      "warn": "半年没有更新，或缺少源码仓库、README、许可证之一。",
+      "danger": "仓库已归档、在 npm 上已弃用，或超过一年没有更新。"
+    },
+    "authors": "给插件作者",
+    "listTitle": "如何被收录",
+    "listBody": "在 package.json 里加上 <keyword></keyword> 关键词并发布到 npm，下一次每日更新后就会出现。不用填表，也不用提 PR。提供描述、仓库链接、README 和许可证，能改善健康标记，也更容易被搜到。",
+    "fixTitle": "纠正错误数据",
+    "fixBody": "分类是自动判断的，难免出错。分类、描述或仓库的修正会通过一份经过审核的覆盖文件生效。",
+    "fixCta": "提交修正申请",
+    "removeTitle": "申请移除",
+    "removeBody": "去掉 <keyword></keyword> 关键词，或者提 issue 申请加入屏蔽名单，下一次更新就会移除。",
+    "removeCta": "申请移除"
+  },
+  "author": {
+    "metaDescription": "{login} 的 {count} 个 OpenCode 插件。",
+    "org": "GitHub 组织",
+    "plugins": "个插件",
+    "downloadsAMonth": "月下载",
+    "stars": "星标",
+    "elsewhere": "其他主页",
+    "pluginsTab": "插件"
+  },
+  "backToTop": {
+    "label": "回到顶部",
+    "aria": "回到顶部，已阅读 {percent}%"
+  },
+  "notFound": {
+    "title": "页面不存在",
+    "body": "这个页面不存在，或者插件已从 npm 下架。可以在上方搜索，或浏览全部插件。",
+    "cta": "浏览全部插件"
+  }
+}
