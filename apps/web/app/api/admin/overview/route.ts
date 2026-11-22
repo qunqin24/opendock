@@ -49,7 +49,7 @@ export async function GET() {
     },
     health,
     compat,
-    categories: getCategories().map((c) => ({ id: c.id, label: c.labelEn, count: c.count })),
+    categories: getCategories().map((c) => ({ id: c.id, label: c.labelEn, labelZh: c.label, count: c.count })),
     topDownloads: plugins
       .toSorted((a, b) => b.downloadsMonth - a.downloadsMonth)
       .slice(0, 8)

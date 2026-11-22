@@ -12,6 +12,7 @@ import { LANG_TAG, routing, type Locale } from '@/i18n/routing';
 import { getMeta } from '@/lib/data';
 import { formatNumber } from '@/lib/format';
 import { alternates } from '@/lib/seo';
+import '../globals.css';
 import './site.css';
 import { syncOverrides } from '@/lib/overrides';
 

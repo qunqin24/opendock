@@ -87,14 +87,17 @@ export default async function PluginPage({ params, searchParams }: Props) {
   const category = getCategory(p.category);
   const catLabel = category ? categoryLabel(category, locale) : null;
   const versions = getVersions(p.slug);
-  const install = installOptions(p, (key, values) => ti(key, values));
+  const install = installOptions(p, (key, values) => ti(key as Parameters<typeof ti>[0], values));
   const primary = install.options[0];
   const concerns = p.health.filter((h) => h.id !== 'healthy');
   const score = Math.round(p.score);
   const title = p.title || p.name;
   const description = pluginDescription(p, locale);
   const owner = authorHref(p.owner);
-  const reason = (id: string) => (th.has(`reason.${id}`) ? th(`reason.${id}`) : id);
+  const reason = (id: string) => {
+    const key = `reason.${id}` as Parameters<typeof th>[0];
+    return th.has(key) ? th(key) : id;
+  };
   const rel = (iso: string | null) => formatRelative(iso, locale);
 
   const links = [

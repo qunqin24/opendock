@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         description: p.description,
         category: p.category,
         categoryLabel: getCategory(p.category)?.labelEn ?? p.category,
+        categoryLabelZh: getCategory(p.category)?.label ?? null,
         downloadsMonth: p.downloadsMonth,
         stars: p.starsCredited,
         score: p.score,

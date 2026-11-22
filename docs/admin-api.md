@@ -1,11 +1,19 @@
 # Admin API
 
-Served by `apps/web` (Next.js route handlers). The admin SPA (`apps/admin`) is
-served under `/admin` on the same origin, so the session cookie just works.
-In development the admin Vite server proxies `/api` to `http://localhost:3000`.
+Served by `apps/web` (Next.js route handlers). The admin UI is part of the same
+Next app (`apps/web/app/admin`, UI code in `apps/web/components/admin`), served
+under `/admin` on the same origin, so the session cookie just works. There is no
+separate admin server or static build: in development `pnpm --filter @opendock/web dev`
+serves both the site and `/admin` on port 3000, and in production the single
+`web` container does (nginx only proxies to it). `/admin/*` is English-only and
+excluded from the next-intl proxy.
+
+Page access is enforced on the server: every admin page calls `requireAdminPage()`
+(`apps/web/lib/admin/guard.ts`), which redirects to `/admin/sign-in` without a
+session and to `/admin/settings/account` while `mustChangePassword` is set.
 
 All responses are JSON. Errors: `{ "error": "<message>" }` with a 4xx/5xx status.
-`401` means not signed in (the SPA redirects to `/admin/sign-in`); `403` means
+`401` means not signed in (the admin UI redirects to `/admin/sign-in`); `403` means
 signed in but not allowed. `503` means the database is not configured.
 
 ## Auth
@@ -24,7 +32,7 @@ Session cookie `od_session` (httpOnly, SameSite=Lax, Secure in production),
 
 The first account is created automatically on first start when no user exists:
 username `admin`, a random password printed once to the server log, and
-`mustChangePassword: true`. The SPA should then push the user to the password
+`mustChangePassword: true`. The admin UI then pushes the user to the password
 change form (Settings → Account) until they change it.
 
 ## Overview
@@ -78,6 +86,13 @@ public site).
 → `200 { override }`. A field set to `null` means "no override, use the data".
 
 `DELETE /api/admin/overrides?name=<package name>` → `204` (removes every override for that plugin).
+
+`POST /api/admin/overrides/bulk` body `{ names: string[], action, category? }` → `200 { updated }`.
+Applies one action to 1–500 plugins in a single transaction. `action` is one of
+`feature`, `unfeature`, `block`, `unblock`, `category` (needs `category`), or
+`reset` (removes every override for those plugins). A value equal to the
+snapshot's own is stored as `null`, and override rows left empty are deleted.
+One `override.bulk` audit entry lists the affected names.
 
 Changes show on the public site within 15 seconds (each server process caches overrides briefly).
 

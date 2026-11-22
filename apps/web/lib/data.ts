@@ -103,6 +103,8 @@ let view: {
   plugins: Plugin[];
   bySlug: Map<string, Plugin>;
   allByName: Map<string, Plugin>;
+  /** Snapshot values before overrides, for comparing against. */
+  baseByName: Map<string, Plugin>;
   categories: Category[];
 } | null = null;
 
@@ -132,6 +134,7 @@ function build() {
     plugins,
     bySlug: new Map(plugins.map((p) => [p.slug, p])),
     allByName: new Map(all.map((p) => [p.name, p])),
+    baseByName: new Map(snapshot.plugins.map((p) => [p.name, p])),
     categories: snapshot.categories.map((c) => ({ ...c, count: counts.get(c.id) ?? 0 })),
   };
   return view;
@@ -167,6 +170,11 @@ export function getAllPlugins(): Plugin[] {
 
 export function getAnyPlugin(name: string): Plugin | undefined {
   return build().allByName.get(name);
+}
+
+/** The snapshot's own values for a plugin, ignoring overrides. */
+export function getBasePlugin(name: string): Plugin | undefined {
+  return build().baseByName.get(name);
 }
 
 export function getOverride(name: string): Override | undefined {

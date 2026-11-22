@@ -1,0 +1,363 @@
+{
+  "meta": {
+    "title": "OpenDock 管理后台",
+    "description": "OpenDock 管理后台。",
+    "signIn": "登录",
+    "overview": "概览",
+    "plugins": "插件",
+    "installs": "安装统计",
+    "account": "账户",
+    "appearance": "外观"
+  },
+  "common": {
+    "appName": "OpenDock 管理后台",
+    "cancel": "取消",
+    "continue": "继续",
+    "close": "关闭",
+    "retry": "重试",
+    "loading": "加载中…",
+    "never": "从未",
+    "unknown": "未知",
+    "justNow": "刚刚",
+    "role": {
+      "admin": "管理员"
+    },
+    "theme": {
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    }
+  },
+  "language": {
+    "label": "语言",
+    "description": "管理后台界面使用的语言。",
+    "en": "English",
+    "zh": "中文",
+    "switchTo": "切换语言"
+  },
+  "errors": {
+    "network": "无法连接到服务器。",
+    "http": "请求失败（{status}）。",
+    "generic": "出了点问题。",
+    "unknown": "未知错误。",
+    "signInFailed": "登录失败。",
+    "sessionExpired": "登录已过期，请重新登录。",
+    "loadTitle": "无法加载数据",
+    "loadHint": "后端可能已离线，或数据库尚未配置。",
+    "server": {
+      "databaseNotConfigured": "数据库尚未配置。",
+      "signInRequired": "请先登录。",
+      "adminsOnly": "仅限管理员访问。",
+      "tooManyAttempts": "尝试次数过多，请 15 分钟后再试。",
+      "credentialsRequired": "请输入用户名和密码。",
+      "wrongCredentials": "用户名或密码错误。",
+      "passwordsRequired": "请输入当前密码和新密码。",
+      "passwordTooShort": "新密码至少需要 10 个字符。",
+      "passwordSame": "新密码不能与当前密码相同。",
+      "currentPasswordWrong": "当前密码不正确。",
+      "jsonBodyExpected": "请求体应为 JSON。",
+      "noSuchPlugin": "没有这个插件。",
+      "unknownCategory": "未知的分类。",
+      "missingPluginName": "缺少插件名称。",
+      "bulkSelectionSize": "请选择 1 到 500 个插件。",
+      "unknownAction": "未知的操作。"
+    }
+  },
+  "nav": {
+    "group": "管理",
+    "overview": "概览",
+    "plugins": "插件",
+    "installs": "安装统计",
+    "settings": "设置",
+    "tagline": "插件目录",
+    "skip": "跳到主要内容",
+    "toggleSidebar": "切换侧边栏",
+    "sidebarTitle": "侧边栏",
+    "sidebarDescription": "显示移动端侧边栏。"
+  },
+  "header": {
+    "search": "搜索",
+    "toggleTheme": "切换主题",
+    "openThemeSettings": "打开主题设置"
+  },
+  "command": {
+    "title": "命令面板",
+    "description": "搜索页面或执行命令。",
+    "placeholder": "输入命令或搜索…",
+    "empty": "没有找到结果。",
+    "theme": "主题"
+  },
+  "profile": {
+    "account": "账户",
+    "signOut": "退出登录",
+    "openMenu": "打开账户菜单"
+  },
+  "signOut": {
+    "title": "退出登录",
+    "description": "确定要退出登录吗？之后需要重新登录才能访问管理后台。",
+    "confirm": "退出登录"
+  },
+  "auth": {
+    "title": "登录",
+    "description": "输入用户名和密码以管理 OpenDock。",
+    "username": "用户名",
+    "password": "密码",
+    "usernameRequired": "请输入用户名。",
+    "passwordRequired": "请输入密码。",
+    "submit": "登录",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
+  },
+  "dashboard": {
+    "title": "概览",
+    "refreshed": "数据更新于{when}",
+    "stats": {
+      "plugins": "插件",
+      "downloads": "月下载量",
+      "stars": "Star 数",
+      "maintainers": "维护者",
+      "overrides": "人工干预",
+      "installs30d": "安装量（30 天）"
+    },
+    "overridesHint": "{featured} 个精选，{blocked} 个已屏蔽，{recategorized} 个已改分类",
+    "installsHint": "近 7 天共 {count}",
+    "health": {
+      "title": "健康度",
+      "description": "所有插件的维护状况"
+    },
+    "compat": {
+      "title": "OpenCode 兼容性",
+      "description": "插件面向的 OpenCode 版本代际"
+    },
+    "byCategory": "各分类插件数",
+    "topDownloads": {
+      "title": "下载量排行",
+      "description": "npm 月下载量"
+    },
+    "trending": {
+      "title": "热门趋势",
+      "description": "近 7 天 Star 增长"
+    },
+    "noData": "暂无数据。"
+  },
+  "health": {
+    "ok": "健康",
+    "warn": "需关注",
+    "danger": "有风险"
+  },
+  "compat": {
+    "v1": "v1",
+    "v2": "v2",
+    "both": "两者兼容",
+    "unknown": "未知"
+  },
+  "plugins": {
+    "title": "插件",
+    "description": "维护插件目录：调整分类、设为精选或屏蔽插件。",
+    "matching": "共 {count} 个匹配。",
+    "searchPlaceholder": "搜索插件…",
+    "category": "分类",
+    "health": "健康度",
+    "overriddenOnly": "仅看已干预",
+    "sortBy": "排序方式",
+    "sortLabel": "排序：{option}",
+    "sort": {
+      "score": "评分",
+      "downloads": "下载量",
+      "stars": "Star 数",
+      "updated": "最近更新"
+    },
+    "columns": {
+      "title": "插件",
+      "category": "分类",
+      "downloads": "月下载量",
+      "stars": "Star 数",
+      "score": "评分",
+      "healthLevel": "健康度",
+      "flags": "标记"
+    },
+    "flags": {
+      "featured": "精选",
+      "blocked": "已屏蔽",
+      "overridden": "已干预"
+    },
+    "edit": "编辑",
+    "empty": "没有符合筛选条件的插件。",
+    "loadFailed": "无法加载插件。",
+    "selectPage": "选择本页全部",
+    "selectRow": "选择 {name}"
+  },
+  "bulk": {
+    "toolbar": "批量操作",
+    "selected": "已选 {count} 个",
+    "featured": "精选",
+    "blocked": "屏蔽",
+    "category": "分类",
+    "reset": "清除干预",
+    "clear": "取消选择",
+    "working": "正在处理…",
+    "actions": {
+      "feature": "设为精选",
+      "unfeature": "取消精选",
+      "block": "屏蔽",
+      "unblock": "取消屏蔽"
+    },
+    "done": {
+      "feature": "已将 {count} 个插件设为精选。",
+      "unfeature": "已取消 {count} 个插件的精选。",
+      "block": "已屏蔽 {count} 个插件。",
+      "unblock": "已取消屏蔽 {count} 个插件。",
+      "category": "已移动 {count} 个插件。",
+      "reset": "已清除 {count} 个插件的人工干预。"
+    },
+    "confirmBlock": {
+      "title": "屏蔽 {count} 个插件？",
+      "desc": "它们会在 15 秒内从公开网站消失，之后可以随时取消屏蔽。"
+    },
+    "confirmReset": {
+      "title": "清除 {count} 个插件的人工干预？",
+      "desc": "这些插件的分类、精选、屏蔽和备注都会恢复为数据中的原始值。"
+    }
+  },
+  "table": {
+    "asc": "升序",
+    "desc": "降序",
+    "hide": "隐藏",
+    "view": "视图",
+    "toggleColumns": "显示或隐藏列",
+    "reset": "重置",
+    "filterPlaceholder": "筛选…",
+    "selected": "已选 {count} 项",
+    "noResults": "没有找到结果。",
+    "clearFilters": "清除筛选"
+  },
+  "pagination": {
+    "pageOf": "第 {page} 页，共 {total} 页",
+    "rowsPerPage": "每页行数",
+    "first": "跳到第一页",
+    "previous": "上一页",
+    "next": "下一页",
+    "last": "跳到最后一页",
+    "goTo": "跳到第 {page} 页"
+  },
+  "override": {
+    "category": "分类",
+    "useData": "沿用数据",
+    "forceOn": "强制开启",
+    "forceOff": "强制关闭",
+    "featured": "精选",
+    "blocked": "屏蔽（在公开站点隐藏）",
+    "note": "备注",
+    "notePlaceholder": "为什么要做这项干预",
+    "lastUpdated": "最后更新于 {when}，操作人 {by}。",
+    "remove": "移除干预",
+    "save": "保存",
+    "saved": "干预已保存。",
+    "removed": "干预已移除。"
+  },
+  "installs": {
+    "title": "安装统计",
+    "description": "来自 OpenDock OpenCode 插件的匿名、需用户主动开启的统计数据。",
+    "range": "{days} 天",
+    "empty": "暂无安装数据。OpenDock 插件发布并有用户选择开启统计后，这里会显示计数。",
+    "events": "{count} 次事件",
+    "chartDescription": "近 {days} 天每日的安装、更新和卸载次数",
+    "series": {
+      "install": "安装",
+      "update": "更新",
+      "uninstall": "卸载"
+    },
+    "topPlugins": "热门插件",
+    "plugin": "插件",
+    "installsColumn": "安装",
+    "uninstallsColumn": "卸载",
+    "versions": "OpenCode 版本",
+    "noVersions": "没有上报版本数据。"
+  },
+  "settings": {
+    "title": "设置",
+    "description": "管理你的管理员账户和后台界面外观。",
+    "nav": {
+      "account": "账户",
+      "appearance": "外观"
+    },
+    "navPlaceholder": "设置",
+    "account": {
+      "title": "账户",
+      "description": "你的管理员登录信息与密码。",
+      "mustChangeTitle": "请先修改密码",
+      "mustChangeDescription": "此账户仍在使用初始密码。请先设置新密码，再使用管理后台的其他功能。",
+      "username": "用户名",
+      "role": "角色",
+      "lastSignIn": "上次登录",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码",
+      "currentRequired": "请输入当前密码。",
+      "newTooShort": "新密码至少需要 10 个字符。",
+      "confirmRequired": "请再次输入新密码。",
+      "mismatch": "两次输入的密码不一致。",
+      "submit": "更新密码",
+      "updated": "密码已更新。"
+    },
+    "appearance": {
+      "title": "外观",
+      "description": "自定义后台的外观，可在日间与夜间主题之间自动切换。",
+      "font": "字体",
+      "fontDescription": "选择后台使用的字体。",
+      "fonts": {
+        "inter": "Inter",
+        "manrope": "Manrope",
+        "system": "系统字体"
+      },
+      "theme": "主题",
+      "themeDescription": "选择后台的主题。",
+      "submit": "更新偏好设置",
+      "updated": "偏好设置已更新。"
+    }
+  },
+  "config": {
+    "title": "主题设置",
+    "description": "调整外观和布局，以符合你的使用习惯。",
+    "reset": "重置",
+    "resetAll": "将所有设置恢复为默认值",
+    "select": "选择{option}",
+    "preview": "{option}选项预览",
+    "theme": {
+      "title": "主题",
+      "reset": "将主题偏好恢复为默认",
+      "label": "选择主题偏好",
+      "description": "在跟随系统、浅色模式和深色模式之间选择"
+    },
+    "sidebar": {
+      "title": "侧边栏",
+      "reset": "将侧边栏样式恢复为默认",
+      "label": "选择侧边栏样式",
+      "description": "在内嵌、悬浮和标准侧边栏布局之间选择",
+      "inset": "内嵌",
+      "floating": "悬浮",
+      "sidebar": "标准"
+    },
+    "layout": {
+      "title": "布局",
+      "reset": "将布局选项恢复为默认",
+      "label": "选择布局样式",
+      "description": "在默认展开、紧凑图标和全屏布局之间选择",
+      "default": "默认",
+      "icon": "紧凑",
+      "offcanvas": "全屏布局"
+    }
+  },
+  "notFound": {
+    "title": "哎呀，页面不存在！",
+    "description": "你要找的页面不存在，或已被移除。",
+    "back": "返回上一页",
+    "home": "回到首页"
+  },
+  "generalError": {
+    "title": "哎呀，出错了 :')",
+    "description": "给你带来不便，我们深表歉意。请稍后再试。",
+    "retry": "重试",
+    "home": "回到首页"
+  }
+}

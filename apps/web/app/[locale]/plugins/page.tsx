@@ -168,7 +168,7 @@ export default async function PluginsPage({ params, searchParams }: Props) {
             </div>
             <SortSelect
               value={sort ?? 'score'}
-              options={SORT_IDS.map((id) => ({ id, label: t(`sort.${id}`) }))}
+              options={SORT_IDS.map((id) => ({ id, label: t(`sort.${id}` as Parameters<typeof t>[0]) }))}
               hrefs={Object.fromEntries(SORT_IDS.map((id) => [id, toggle({ sort: id === 'score' ? undefined : id })]))}
             />
           </div>

@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* The admin has its own stylesheet (app/admin/admin.css); keep its classes out of the site's. */
+@source not '../components/admin';
+@source not '../lib/admin';
+@source not './admin';
+
 /* Site-wide basics. Colours and type live in app/(site)/site.css. */
 @layer base {
   html {

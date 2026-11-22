@@ -1,0 +1,363 @@
+{
+  "meta": {
+    "title": "OpenDock Admin",
+    "description": "OpenDock admin console.",
+    "signIn": "Sign in",
+    "overview": "Overview",
+    "plugins": "Plugins",
+    "installs": "Installs",
+    "account": "Account",
+    "appearance": "Appearance"
+  },
+  "common": {
+    "appName": "OpenDock Admin",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "close": "Close",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "never": "Never",
+    "unknown": "Unknown",
+    "justNow": "just now",
+    "role": {
+      "admin": "admin"
+    },
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    }
+  },
+  "language": {
+    "label": "Language",
+    "description": "Language of the admin interface.",
+    "en": "English",
+    "zh": "中文",
+    "switchTo": "Switch language"
+  },
+  "errors": {
+    "network": "Cannot reach the server.",
+    "http": "Request failed ({status}).",
+    "generic": "Something went wrong.",
+    "unknown": "Unknown error.",
+    "signInFailed": "Sign in failed.",
+    "sessionExpired": "Session expired. Please sign in again.",
+    "loadTitle": "Could not load data",
+    "loadHint": "The backend may be offline or the database not configured.",
+    "server": {
+      "databaseNotConfigured": "The database is not configured.",
+      "signInRequired": "Sign in required.",
+      "adminsOnly": "Admins only.",
+      "tooManyAttempts": "Too many attempts. Try again in 15 minutes.",
+      "credentialsRequired": "Username and password are required.",
+      "wrongCredentials": "Wrong username or password.",
+      "passwordsRequired": "Current and new password are required.",
+      "passwordTooShort": "The new password needs at least 10 characters.",
+      "passwordSame": "The new password must differ from the current one.",
+      "currentPasswordWrong": "The current password is wrong.",
+      "jsonBodyExpected": "Expected a JSON body.",
+      "noSuchPlugin": "No such plugin.",
+      "unknownCategory": "Unknown category.",
+      "missingPluginName": "Missing plugin name.",
+      "bulkSelectionSize": "Select between 1 and 500 plugins.",
+      "unknownAction": "Unknown action."
+    }
+  },
+  "nav": {
+    "group": "Admin",
+    "overview": "Overview",
+    "plugins": "Plugins",
+    "installs": "Installs",
+    "settings": "Settings",
+    "tagline": "Plugin directory",
+    "skip": "Skip to Main",
+    "toggleSidebar": "Toggle Sidebar",
+    "sidebarTitle": "Sidebar",
+    "sidebarDescription": "Displays the mobile sidebar."
+  },
+  "header": {
+    "search": "Search",
+    "toggleTheme": "Toggle theme",
+    "openThemeSettings": "Open theme settings"
+  },
+  "command": {
+    "title": "Command menu",
+    "description": "Search for a page or run a command.",
+    "placeholder": "Type a command or search...",
+    "empty": "No results found.",
+    "theme": "Theme"
+  },
+  "profile": {
+    "account": "Account",
+    "signOut": "Sign out",
+    "openMenu": "Open account menu"
+  },
+  "signOut": {
+    "title": "Sign out",
+    "description": "Are you sure you want to sign out? You will need to sign in again to access the admin.",
+    "confirm": "Sign out"
+  },
+  "auth": {
+    "title": "Sign in",
+    "description": "Enter your username and password to manage OpenDock.",
+    "username": "Username",
+    "password": "Password",
+    "usernameRequired": "Please enter your username.",
+    "passwordRequired": "Please enter your password.",
+    "submit": "Sign in",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "dashboard": {
+    "title": "Overview",
+    "refreshed": "Data refreshed {when}",
+    "stats": {
+      "plugins": "Plugins",
+      "downloads": "Downloads / month",
+      "stars": "Stars",
+      "maintainers": "Maintainers",
+      "overrides": "Overrides",
+      "installs30d": "Installs (30d)"
+    },
+    "overridesHint": "{featured} featured, {blocked} blocked, {recategorized} recategorized",
+    "installsHint": "{count} in the last 7 days",
+    "health": {
+      "title": "Health",
+      "description": "Maintenance signals across all plugins"
+    },
+    "compat": {
+      "title": "OpenCode compatibility",
+      "description": "Which OpenCode generation plugins target"
+    },
+    "byCategory": "Plugins by category",
+    "topDownloads": {
+      "title": "Top downloads",
+      "description": "Monthly npm downloads"
+    },
+    "trending": {
+      "title": "Trending",
+      "description": "Star growth over the last 7 days"
+    },
+    "noData": "No data yet."
+  },
+  "health": {
+    "ok": "Healthy",
+    "warn": "Warning",
+    "danger": "At risk"
+  },
+  "compat": {
+    "v1": "v1",
+    "v2": "v2",
+    "both": "Both",
+    "unknown": "Unknown"
+  },
+  "plugins": {
+    "title": "Plugins",
+    "description": "Curate the directory: recategorize, feature or block plugins.",
+    "matching": "{count} matching.",
+    "searchPlaceholder": "Search plugins...",
+    "category": "Category",
+    "health": "Health",
+    "overriddenOnly": "Overridden only",
+    "sortBy": "Sort by",
+    "sortLabel": "Sort: {option}",
+    "sort": {
+      "score": "Score",
+      "downloads": "Downloads",
+      "stars": "Stars",
+      "updated": "Recently updated"
+    },
+    "columns": {
+      "title": "Plugin",
+      "category": "Category",
+      "downloads": "Downloads/mo",
+      "stars": "Stars",
+      "score": "Score",
+      "healthLevel": "Health",
+      "flags": "Flags"
+    },
+    "flags": {
+      "featured": "Featured",
+      "blocked": "Blocked",
+      "overridden": "Overridden"
+    },
+    "edit": "Edit",
+    "empty": "No plugins match these filters.",
+    "loadFailed": "Unable to load plugins.",
+    "selectPage": "Select all on this page",
+    "selectRow": "Select {name}"
+  },
+  "bulk": {
+    "toolbar": "Bulk actions",
+    "selected": "{count} selected",
+    "featured": "Featured",
+    "blocked": "Block",
+    "category": "Category",
+    "reset": "Clear overrides",
+    "clear": "Clear selection",
+    "working": "Applying…",
+    "actions": {
+      "feature": "Mark as featured",
+      "unfeature": "Remove from featured",
+      "block": "Block",
+      "unblock": "Unblock"
+    },
+    "done": {
+      "feature": "{count} plugins marked as featured.",
+      "unfeature": "{count} plugins removed from featured.",
+      "block": "{count} plugins blocked.",
+      "unblock": "{count} plugins unblocked.",
+      "category": "Moved {count} plugins.",
+      "reset": "Cleared overrides on {count} plugins."
+    },
+    "confirmBlock": {
+      "title": "Block {count} plugins?",
+      "desc": "They disappear from the public site within 15 seconds. You can unblock them later."
+    },
+    "confirmReset": {
+      "title": "Clear overrides on {count} plugins?",
+      "desc": "Category, featured, blocked and notes go back to the data for these plugins."
+    }
+  },
+  "table": {
+    "asc": "Asc",
+    "desc": "Desc",
+    "hide": "Hide",
+    "view": "View",
+    "toggleColumns": "Toggle columns",
+    "reset": "Reset",
+    "filterPlaceholder": "Filter...",
+    "selected": "{count} selected",
+    "noResults": "No results found.",
+    "clearFilters": "Clear filters"
+  },
+  "pagination": {
+    "pageOf": "Page {page} of {total}",
+    "rowsPerPage": "Rows per page",
+    "first": "Go to first page",
+    "previous": "Go to previous page",
+    "next": "Go to next page",
+    "last": "Go to last page",
+    "goTo": "Go to page {page}"
+  },
+  "override": {
+    "category": "Category",
+    "useData": "Use data",
+    "forceOn": "Force on",
+    "forceOff": "Force off",
+    "featured": "Featured",
+    "blocked": "Blocked (hidden on the public site)",
+    "note": "Note",
+    "notePlaceholder": "Why this override exists",
+    "lastUpdated": "Last updated {when} by {by}.",
+    "remove": "Remove override",
+    "save": "Save",
+    "saved": "Override saved.",
+    "removed": "Override removed."
+  },
+  "installs": {
+    "title": "Installs",
+    "description": "Anonymous, opt-in telemetry from the OpenDock OpenCode plugin.",
+    "range": "{days} days",
+    "empty": "No installs yet. Counts appear once the OpenDock plugin ships and users opt in.",
+    "events": "{count} events",
+    "chartDescription": "Installs, updates and uninstalls per day, last {days} days",
+    "series": {
+      "install": "Install",
+      "update": "Update",
+      "uninstall": "Uninstall"
+    },
+    "topPlugins": "Top plugins",
+    "plugin": "Plugin",
+    "installsColumn": "Installs",
+    "uninstallsColumn": "Uninstalls",
+    "versions": "OpenCode versions",
+    "noVersions": "No version data reported."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your admin account and the look of this app.",
+    "nav": {
+      "account": "Account",
+      "appearance": "Appearance"
+    },
+    "navPlaceholder": "Settings",
+    "account": {
+      "title": "Account",
+      "description": "Your admin sign-in and password.",
+      "mustChangeTitle": "Change your password to continue",
+      "mustChangeDescription": "This account is still using its initial password. Set a new one before using the rest of the admin.",
+      "username": "Username",
+      "role": "Role",
+      "lastSignIn": "Last sign-in",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "currentRequired": "Please enter your current password.",
+      "newTooShort": "New password must be at least 10 characters.",
+      "confirmRequired": "Please confirm the new password.",
+      "mismatch": "Passwords do not match.",
+      "submit": "Update password",
+      "updated": "Password updated."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize the appearance of the app. Automatically switch between day and night themes.",
+      "font": "Font",
+      "fontDescription": "Set the font you want to use in the dashboard.",
+      "fonts": {
+        "inter": "Inter",
+        "manrope": "Manrope",
+        "system": "System"
+      },
+      "theme": "Theme",
+      "themeDescription": "Select the theme for the dashboard.",
+      "submit": "Update preferences",
+      "updated": "Preferences updated."
+    }
+  },
+  "config": {
+    "title": "Theme Settings",
+    "description": "Adjust the appearance and layout to suit your preferences.",
+    "reset": "Reset",
+    "resetAll": "Reset all settings to default values",
+    "select": "Select {option}",
+    "preview": "{option} option preview",
+    "theme": {
+      "title": "Theme",
+      "reset": "Reset theme preference to default",
+      "label": "Select theme preference",
+      "description": "Choose between system preference, light mode, or dark mode"
+    },
+    "sidebar": {
+      "title": "Sidebar",
+      "reset": "Reset sidebar style to default",
+      "label": "Select sidebar style",
+      "description": "Choose between inset, floating, or standard sidebar layout",
+      "inset": "Inset",
+      "floating": "Floating",
+      "sidebar": "Sidebar"
+    },
+    "layout": {
+      "title": "Layout",
+      "reset": "Reset layout options to default",
+      "label": "Select layout style",
+      "description": "Choose between default expanded, compact icon-only, or full layout mode",
+      "default": "Default",
+      "icon": "Compact",
+      "offcanvas": "Full layout"
+    }
+  },
+  "notFound": {
+    "title": "Oops! Page Not Found!",
+    "description": "It seems like the page you're looking for does not exist or might have been removed.",
+    "back": "Go Back",
+    "home": "Back to Home"
+  },
+  "generalError": {
+    "title": "Oops! Something went wrong :')",
+    "description": "We apologize for the inconvenience. Please try again later.",
+    "retry": "Try again",
+    "home": "Back to Home"
+  }
+}
