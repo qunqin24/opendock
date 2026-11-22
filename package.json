@@ -13,6 +13,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "data": "node scripts/fetch-plugins.mjs",
+    "data:authors": "node scripts/fetch-authors.mjs",
     "data:dev": "node scripts/fetch-plugins.mjs --limit 120",
     "translate": "node scripts/translate-plugins.mjs",
     "indexnow": "node scripts/indexnow.mjs",
