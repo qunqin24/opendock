@@ -55,7 +55,9 @@ The hook reads the V2 result shape — a string `content` or an array of
 text parts — and rewrites it in place, which keeps the rest of the result
 (metadata, non-text parts) exactly as the tool returned it. Outputs under
 40 characters skip processing entirely. Two deliberate limits remain:
-results truncate at `maxLines` and `maxLineLen` with an overflow marker,
+results over `maxLines` keep their first 40% and last 60% with an
+omission marker in between (the verdict of a command is at the end), long
+lines are shortened at `maxLineLen`,
 and the raw output is not kept anywhere, so rerun the command when you
 need it all. Path shortening of the `compact_path` kind is avoided on
 purpose — a path the model cannot open costs more than the characters it
@@ -73,8 +75,10 @@ saves.
 ```
 
 Options beyond the three above are `minFrames` (default 3), `enabled`, and
-`tools` (default `["shell", "bash", "grep", "glob", "read"]`). Restart
-opencode after changing them.
+`tools` (default `["shell", "bash"]`). Add `grep` or `glob` if you accept
+truncated results there; `read` is best left out, because the agent edits
+based on what it reads and a shortened or deduplicated file view is not the
+real file. Restart opencode after changing them.
 
 ## Develop
 

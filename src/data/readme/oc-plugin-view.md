@@ -12,6 +12,7 @@ Open [`packages/`](packages), or take a row from the table below. Each package i
 | --- | --- | --- | --- | --- |
 | janua | MCP | `0.5.2` | Persistent interactive terminals: spawn a program, write to it, read live output, resize it, kill it. | `npx @nathwn12/janua` |
 | oc-bifrost | plugin | `1.7.1` | Runs V1-era OpenCode plugins on OpenCode V2. | Add `@nathwn12/oc-bifrost` to `plugins`. |
+| oc-dispatch | plugin | — | Routes each request to the cheapest adequate live-catalog model, dormant by default. | Source only, no npm release (source version 0.1.0): `github:nathwn12/oc-collections#main::path:packages/oc-dispatch`. |
 | oc-flight-deck | plugin | `0.24.0` | Live cost, token, cache and context telemetry in the sidebar. | Add `oc-flight-deck` to `plugins`. |
 | oc-harness-setup | CLI | `1.0.2` | Installs a Windows OpenCode starter, behind a doctor gate. | `npx --yes oc-harness-setup setup` |
 | oc-plugin-view | plugin | `0.2.0` | Lists every loaded server plugin in the sidebar. | `opencode plugin add oc-plugin-view` |
@@ -19,7 +20,7 @@ Open [`packages/`](packages), or take a row from the table below. Each package i
 | rea-shim | MCP | `0.2.3` | Launches the upstream `rea` reverse-engineering MCP and can bootstrap its JDK and Ghidra. | `npx -y rea-shim@latest --doctor` |
 | oc-collections | repo | — | This index and the npm-workspaces monorepo behind it. | — |
 
-An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once. The `gladius` and `puppet` MCP servers keep their source here but publish from the repositories that build their engines; `oc-fallback`, `oc-graphify` and `oc-terminal` are private, so they load from this repo instead of the registry. None of the five carries a version row.
+An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once. The `gladius` and `puppet` MCP servers keep their source here but publish from the repositories that build their engines; `oc-fallback`, `oc-graphify`, `oc-terminal` and `oc-dispatch` are private, so they load from this repo instead of the registry, by GitHub specifier such as `github:nathwn12/oc-collections#main::path:packages/oc-dispatch`. None of the six carries a version row.
 
 ## Requirements
 

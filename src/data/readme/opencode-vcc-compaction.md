@@ -1,14 +1,16 @@
 # opencode-vcc-compaction — deterministic LLM-free compaction for OpenCode V2
 
+[![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-111827)](https://opencode.ai/docs/plugins/) [![npm version](https://img.shields.io/npm/v/opencode-vcc-compaction?color=8cdb9f)](https://www.npmjs.com/package/opencode-vcc-compaction) [![Node.js 18+](https://img.shields.io/badge/Node.js-%3E%3D18-417e3f?logo=nodedotjs&logoColor=white)](https://nodejs.org/) [![MIT license](https://img.shields.io/badge/License-MIT-22C55E)](./LICENSE) [![CI](https://github.com/jwitmann/opencode-vcc-compaction/actions/workflows/ci.yml/badge.svg)](https://github.com/jwitmann/opencode-vcc-compaction/actions)
+
 **Your long session gets summarized by a model. The summary is invented
 text — and the model then reasons from it as if it were fact.**
 
 This plugin removes the model from that step. Port of [`dsh-compaction-vcc`](https://github.com/tingfeng-droid/dsh-compaction-vcc)
 (MIT, itself a fork of `TsFreddie/dsh-compaction-instant`), written
 directly against `@opencode/plugin/effect` (canonical runtime), so no
-convert-to-Effect task ever arises. Version: `opencode-vcc-compaction@0.3.3`.
+convert-to-Effect task ever arises.
 
-On every `compaction` hook the plugin compiles history with a deterministic region compiler and sets `event.result = { summary, metadata: { keepID } }`. The host takes its `fromHook` short-circuit: the summary persists verbatim, the tail rebuilds from `keepID`, and **no model call is made** on the compaction path — proven live on host v2.3.2 (see [`docs/research/vcc-plugin-live-verdict.md`](https://github.com/jwitmann/opencode-vcc-compaction/blob/main/docs/research/vcc-plugin-live-verdict.md)).
+On each `compaction` hook the plugin compiles history with a deterministic region compiler and, when a keepID can be picked, sets `event.result = { summary, metadata: { keepID, vccRev, vccConfigHash } }`. The host takes its `fromHook` short-circuit: the summary persists verbatim, the tail rebuilds from `keepID`, and **no model call is made** on the compaction path — proven live on host v2.3.2 (see [`docs/research/vcc-plugin-live-verdict.md`](https://github.com/jwitmann/opencode-vcc-compaction/blob/main/docs/research/vcc-plugin-live-verdict.md)).
 
 Why verbatim: a model asked to summarize fills what it cannot quite recall with plausible wording — invented, fluent, and then treated as factual premise. This engine only moves original text, never rewriting a character: every elision carries a `(seq N)` pointer back to its source event. The model sees original tokens or explicitly marked pointers. Nothing else.
 
@@ -16,7 +18,7 @@ Why verbatim: a model asked to summarize fills what it cannot quite recall with 
 - **Verbatim** — prior checkpoints carried over word for word, never re-summarized.
 - **Deterministic** — same messages + config → byte-identical summary.
 - **Measured** — full sweep in [Performance](#performance).
-- **Fail-safe** — when no keepID can be picked, the hook abstains and the host falls back to model compaction. Never a broken summary.
+- **Fail-safe** — when no keepID can be picked, or the compiled outcome fails validation (blank summary, missing keepID — nothing a retry could fix, the compiler is deterministic), the hook abstains and the host falls back to model compaction. Never a broken summary.
 
 ## How it works
 
@@ -25,12 +27,14 @@ compile nodes, runs the deterministic reference compiler (`engine/`),
 and sets:
 
 ```js
-event.result = { summary, metadata: { keepID } }
+event.result = { summary, metadata: { keepID, vccRev, vccConfigHash } }
 ```
 
 `keepID` is the id of the first message the host must keep: the last
 `keepMessages` request messages stay verbatim, everything older compiles
-into the summary. When no message id exists at/after the keep cut, the
+into the summary. `vccRev` (engine revision) and `vccConfigHash` (stable
+hash of the resolved config) stamp which compiler and knobs produced the
+checkpoint. When no message id exists at/after the keep cut, the
 adapter abstains — `result` stays unset and the host falls back to model
 compaction. Never a broken summary.
 
@@ -112,24 +116,25 @@ information.
 - **Deterministic** — the same messages + config always compile to the
   byte-identical summary (proven by double-run selftests).
 - **Measured** — 4,998 mixed messages compile to a ~28k-character summary
-  in ~0.5 s on the dev machine, byte-identical across runs (see
+  in ~0.4 s on the dev machine, byte-identical across runs (see
   Performance).
-- **Fail-safe** — no keepID, no result: the host falls back to model
-  compaction rather than persisting a broken summary.
+- **Fail-safe** — no keepID (or a failed outcome validation), no result:
+  the host falls back to model compaction rather than persisting a broken summary.
 
 ## Performance
 
 Single-threaded `node`, no model, no network. Measured on the dev machine
 (Xeon W-2195, node v24.22.3) with synthetic mixed histories (user text +
 assistant text + tool-call + tool-result, default config), best of 3 runs.
-Input sizes are request-payload characters with ÷4 token estimates:
+Input sizes are request-payload characters with ÷4 token estimates
+(reproduce: `node scripts/bench.mjs`):
 
 | History | Input | Summary | Time |
 | --- | --- | --- | --- |
-| 999 messages | ~0.58M chars (~150k tokens) | 28,130 chars | 80 ms |
-| 4,998 messages | ~2.9M chars (~730k tokens) | 28,047 chars | 496 ms |
-| 9,999 messages | ~5.9M chars (~1.5M tokens) | 28,047 chars | 934 ms |
-| 24,999 messages | ~14.7M chars (~3.7M tokens) | 27,876 chars | 4.7 s |
+| 999 messages | ~585k chars (~146k tokens) | 27,901 chars | 71 ms |
+| 4,998 messages | ~2.9M chars (~0.7M tokens) | 28,105 chars | 395 ms |
+| 9,999 messages | ~5.9M chars (~1.5M tokens) | 28,151 chars | 856 ms |
+| 24,999 messages | ~14.6M chars (~3.7M tokens) | 27,983 chars | 3.1 s |
 
 Two things to read off this table:
 
@@ -139,6 +144,16 @@ Two things to read off this table:
   tokens) binds: bigger histories elide more rows, they don't emit more
   text. Raise the cap if you want larger checkpoints, at the cost of more
   context per compaction.
+
+Cost shape (profiled 2026-11-22, 10k-message compaction): ~96% of the
+time is the region compile (~70% of that is tokenization — counting is
+the work, not waste), and the elision passes keep a running token total
+rather than recounting per eviction. Mapping, framing, config hashing,
+outcome validation, and snapshot retain together round to ~0%. The
+hook additions cost one storage read plus microseconds per compaction
+event and nothing per turn. Over-budget checks test the O(1)
+length-density guard before tokenizing (semantics-preserving; see the
+engine header), so small tool results skip counting entirely.
 
 Caveats: synthetic repetitive text, one machine, one node version —
 indicative, not a benchmark. Real sessions vary with text shape
@@ -159,9 +174,11 @@ Or declare it in `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-vcc-compaction"]
+  "plugins": ["opencode-vcc-compaction"]
 }
 ```
+
+String and object forms can mix in one `plugins` array.
 
 With options (all optional; defaults in Configuration below):
 
@@ -210,10 +227,14 @@ numbers fall back to defaults.
 | `userTextTokens` | 16384 | per-block user text budget |
 | `toolCallTokens` | 128 | tool one-liner budget |
 | `toolResultExcerptTokens` | 256 | tool-result excerpt budget |
+| `toolErrorExcerptTokens` | 256 | failure-result excerpt budget (larger: failures are not one recall away) |
+| `toolResultPointerTokens` | off | success results over this token count collapse to a recall pointer; errors never collapse (remove the key to disable after setting it — JSON has no Infinity) |
 | `includeReasoning` | false | keep reasoning blocks (else elided) |
 | `hideTools` | [] | tool names dropped entirely |
 | `noisePatterns` | [] | extra strip regex sources (strings) |
 | `keepMessages` | 6 | trailing messages kept verbatim |
+| `snapshotMaxMessages` | 50 | snapshot store keeps newest N messages across compactions |
+| `snapshotFullPayloadMessages` | 20 | newest N keep full tool-result payloads; older age out to markers |
 
 `noisePatterns` entries must be valid regex sources — an invalid one
 throws loudly at setup, never a silent no-strip.
@@ -230,11 +251,12 @@ How the budgets behave:
   matters more than the middle.
 - Under cap pressure the oldest **tool/result rows go first**
   (`[N tool/result entries elided: seqs a-b]`), then the oldest remaining
-  entries — tool calls can never squeeze the dialogue out. The newest
-  content always survives, and a `[cap enforced at N entry tokens]`
-  footer says the cap bit.
+  entries (`[N earlier entries elided: ...]`) — tool calls can never squeeze
+  the dialogue out. The newest content always survives, and a
+  `[cap enforced at N entry tokens]` footer says the cap bit.
 - Dropped prior checkpoints never vanish silently: each leaves a
-  `[checkpoint N]` line (N = compaction ordinal, 1 = oldest).
+  `[checkpoint @ seq N]` line (the seq-fallback form — this path supplies
+  no checkpoint ordinals).
 - `keepMessages` counts request messages, not entries: the host rebuilds
   the verbatim tail from `keepID`, the summary covers everything older.
 
@@ -250,12 +272,14 @@ pointers against the per-session snapshot.
 
 Server slash commands (plus the `./tui` companion below):
 `/vcc-recall`, `/vcc-search`,
-`/vcc-status`. Command invocations cannot read history directly, so the
+`/vcc-status`, `/vcc-compaction`. Command invocations cannot read history directly, so the
 `context` hook (with `compaction` as backup) persists a cleaned snapshot
 of the session's messages to `ctx.storage` (`vcc-snapshot/<sessionID>`,
 growth-guarded by version/count/lastID); the commands read that
-snapshot. A snapshot written on every context event is fresh enough for
-recall/search; `/vcc-status` reports its age.
+snapshot. Single writes over ~1MB log a warn tripwire (per-session
+max/trip stats live under `vcc-stats/`). A snapshot written on every
+context event is fresh enough for recall/search; `/vcc-status` reports
+its age.
 
 - `/vcc-recall <seq selection> | result <ref> | checkpoint <ref>` —
   restore exact original content, e.g. `/vcc-recall 3-7`,
@@ -264,8 +288,14 @@ recall/search; `/vcc-status` reports its age.
 - `/vcc-search <keyword-or-regex>` — e.g. `/vcc-search login`.
   Replies with `(seq N)` hits plus a recall call-to-action.
 - `/vcc-status` — engine revision, resolved config
-  (`maxTokens`/`keepMessages`/reasoning/hide/noise counts), and snapshot
+  (`maxTokens`/`keepMessages`/reasoning/hide/noise counts), per-session
+  compaction switch state, and snapshot
   freshness (version, message count, lastID, age).
+- `/vcc-compaction [on|off]` — per-session switch for deterministic
+  compaction (stored under `vcc-switch/<sessionID>`, defaults on).
+  Bare invocation reports state; `off` makes the hook abstain (host
+  native fallback) while snapshots keep running, so recall/search
+  still work when re-enabled.
 
 Results travel as an RPC event the TUI companion renders: each command
 emits `rpc.opencode-vcc-compaction.replied` and returns void with no
@@ -287,9 +317,9 @@ giving up to the log.
 `tui.tsx` listens for the reply event and renders it immediately: short
 replies as toasts, long ones as large centered dialogs. No keymap
 commands — none are needed, since the event carries its session. Add
-the package to `cli.json` `plugins` (TUI-only surface, also works
-against a remote server). The server commands stay as the transcript
-record; the companion is the quiet visible channel.
+the package to `cli.json` `plugins` (same package, `./tui` entrypoint;
+TUI-only surface, also works against a remote server). The reply itself never lands in the transcript;
+the companion is the quiet visible channel.
 
 ## Message mapping
 
@@ -301,8 +331,9 @@ compact `JSON.stringify`, text → as-is, error → `[error] ...`, content →
 `TextContent` joined / `[file name]` / `[type]`); media → image iff
 `mediaType` starts with `image/`, else document; `compaction` part with
 text → synthesized checkpoint node (prior summaries carry over verbatim);
-`compaction` with null text, `effort` parts, and system-role messages →
-skipped.
+`compaction` with null text and system-role messages →
+skipped; `effort` parts are dropped but the message shell is kept with
+empty content, so seqs still align.
 
 ## Tokenizer
 
@@ -317,8 +348,9 @@ and control bytes are stripped deterministically before counting.
 
 - `index.ts` — thin Effect wiring only (`Plugin.define` + `Effect.fn` +
   `session.hook` + `command.transform`). No logic beyond config →
-  `compileCompaction` → assign, snapshot remember, and the three
-  `/vcc-*` command registrations.
+  `compileCompaction` → assign, growth-guarded snapshot remember, RPC
+  reply emit with prompt fallback, and the four `/vcc-*` command
+  registrations.
 - `adapter.mjs` — pure mapping + compile (unit-tested, no host). See its
   header for the vocabulary mapping (tool args, tool-result projection,
   checkpoint synthesis, skip cases, tool-link seam).
@@ -326,6 +358,11 @@ and control bytes are stripped deterministically before counting.
   growth-guarded write check, recall/search arg parsing, selection
   resolution, reply formatters, status text). Unit-tested; the only
   module `index.ts` imports command-side.
+- `events.mjs` — reply-event contract (`rpc.opencode-vcc-compaction.replied`
+  type string + payload build/validate); the single source of truth both
+  `index.ts` and `tui.tsx` import.
+- `tui.tsx` — the `./tui` companion (toasts short replies, dialogs long
+  ones; passive listener, no keymap).
 - `engine/` — the VCC reference engine, ported verbatim from upstream
   (`tokenize`, `compile`, `recall`, `session-compat`, `search`). Ships
   inside the npm tarball as published.
@@ -333,7 +370,8 @@ and control bytes are stripped deterministically before counting.
   engine stage vectors (`npm run test` runs both).
 - `examples/` — scratch project registering the repo root with a cheap
   `compaction.buffer` trigger for live runs (never run from a real project).
-- `scripts/` — release + changelog flow (tag-triggered publish).
+- `scripts/` — release + changelog flow (tag-triggered publish) plus the
+  perf bench (`bench.mjs`, behind the Performance table).
 - `docs/research/` — verdicts grounding the release claims.
 - `archive/` — frozen history, not maintained: the closed probe harness,
   the deciding spec, the reuse inventory, and the port plans. Do not extend.
@@ -351,8 +389,8 @@ from the scratch project, never a real one.
 
 ## Status and limits
 
-- v0.3.2 ships the hook + three server slash commands
-  (`/vcc-recall`, `/vcc-search`, `/vcc-status`) plus the `./tui`
+- Ships the hook + four server slash commands
+  (`/vcc-recall`, `/vcc-search`, `/vcc-status`, `/vcc-compaction`) plus the `./tui`
   companion that renders their replies quietly. `(seq N)`
   pointers are 1-based ordinals over the compiled messages (skipped
   messages consume no seq); recall/search resolve them against the

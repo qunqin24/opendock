@@ -1,7 +1,7 @@
 # opencode-hooks-plugin
 
 Runs Claude Code `SessionStart`, `PreToolUse` and `PostToolUse` hooks in [opencode](https://opencode.ai), which
-has no hook system of its own.
+does not read Claude Code's hooks files.
 
 One package serves **both opencode generations**: the dual entrypoint runs on opencode V2 and on opencode V1
 (1.18.29 or newer), with the same bridged behaviour in each.
@@ -12,10 +12,10 @@ executes those same commands and forwards their output the way Claude Code would
 
 ## Why this is needed
 
-opencode has no hooks. That is not an oversight in the docs — it is verifiable:
+opencode has hooks for its own plugins, but it does not read Claude Code's. That is verifiable:
 
 - The config schema at <https://opencode.ai/config.json> contains **zero** occurrences of the string `hook`.
-  There is no top-level `hooks` key and no `experimental.hook`.
+  There is no top-level `hooks` key and no `experimental.hook`, so a hooks file cannot be declared in config.
 - There is no `SessionStart` event. The [plugin event list](https://opencode.ai/docs/plugins/#events) exposes
   `session.created`, `session.idle`, `tool.execute.before`, and friends — nothing that fires at startup with
   Claude Code's semantics.
@@ -38,6 +38,7 @@ package maps one onto the other.
 | `$CLAUDE_PROJECT_DIR`              | the project directory                           | the project directory                            |
 | stdout `{ "systemMessage": "…" }`  | `experimental.chat.system.transform`            | session `context`/`compaction`/`generate`/`title` hooks |
 | stdout `{ "continue": false }`     | remaining commands are skipped                  | remaining commands are skipped                   |
+| `PreToolUse` deny / exit 2 (opt-in) | `tool.execute.before` throws                   | `tool.hook("execute.before")` rejects (2.0.29+)  |
 
 Claude Code's stdout control contract is honoured: hook scripts routinely interleave the JSON directive with
 ordinary log lines, so stdout is scanned line by line rather than parsed as one document.
@@ -147,13 +148,20 @@ Both layouts share the same shape, so either works:
 | ---------------------- | ------------------------ | --------------------------------------- | --------------------------------------------------------------------------- |
 | `root`                 | `string`                 | `$OPENCODE_HOOKS_ROOT`, else project dir | What `${CLAUDE_PLUGIN_ROOT}` expands to, and where the hooks file is probed. |
 | `hooksFile`            | `string`                 | `$OPENCODE_HOOKS_FILE`, else probed      | Explicit path to a hooks file.                                              |
-| `matchers`             | `string[]`               | `["startup", "resume", ""]`              | Matcher values to honour. An entry with no matcher always runs, and `startup\|resume` runs when either is honoured. |
+| `matchers`             | `string[]`               | `["startup", "resume", ""]`              | `SessionStart` matcher values to honour. A group with no matcher counts as `""`, so it runs with the defaults but not with a list that leaves `""` out. `startup\|resume` runs when either is honoured. |
 | `skip`                 | `string[]`               | `[]`                                     | Substrings; a command containing any of them is not run.                    |
 | `timeoutMs`            | `number`                 | `20000`                                  | How long the **first model call** waits for the commands as a whole.        |
 | `commandTimeoutMs`     | `number`                 | `120000`                                 | How long **one command** is waited for before moving on to the next.        |
 | `injectSystemMessages` | `boolean`                | `true`                                   | Whether `systemMessage` directives reach the system prompt.                  |
 | `reportFailures`       | `boolean`                | `true`                                   | Whether a failed command adds a one-line notice to the system prompt.        |
 | `env`                  | `Record<string, string>` | `{}`                                     | Extra environment variables exported to every command.                      |
+| `preToolDecisions`     | `boolean`                | `false`                                  | Whether `PreToolUse` commands can block or rewrite a call. See [PreToolUse decisions](#pretooluse-decisions-opt-in). |
+| `failClosed`           | `boolean`                | `false`                                  | With `preToolDecisions`, whether a `PreToolUse` command that times out, fails to start or exits other than 0 or 2 blocks the call. |
+| `killOnTimeout`        | `boolean`                | `false`                                  | Whether a command that outlives `commandTimeoutMs` is killed, with every process it started. |
+| `trust`                | `"all"` \| `"approved"`  | `"all"`                                  | `"approved"` runs a project's own hooks only once approved. See [Approving project hooks](#approving-project-hooks-opt-in). |
+| `approvalsFile`        | `string`                 | `~/.config/opencode-hooks/approved.json` | Where approvals are kept (`$XDG_CONFIG_HOME` is honoured).                  |
+
+Every option added after 0.6.0 is off by default: without them the plugin behaves exactly as it did.
 
 ## PreToolUse
 
@@ -161,9 +169,39 @@ Before each opencode tool call, the `PreToolUse` commands whose `matcher` select
 in order. The tool mapping, matcher rules and payload are the same as for `PostToolUse` below, with
 `hook_event_name: "PreToolUse"`.
 
-Each command is awaited, so a hook that inspects the working tree sees it as the tool found it. Unlike in Claude
-Code, a `PreToolUse` hook cannot block or change the call: its exit code and stdout are ignored, and a failure is
-logged only.
+Each command is awaited, so a hook that inspects the working tree sees it as the tool found it. By default, unlike
+in Claude Code, a `PreToolUse` hook cannot block or change the call: its exit code and stdout are ignored, and a
+failure is logged only. Set `preToolDecisions` to change that.
+
+### PreToolUse decisions (opt-in)
+
+With `"preToolDecisions": true`, `PreToolUse` commands decide about the call the way Claude Code reads them:
+
+| The command                                                       | The call                                                        |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| exits 2                                                           | is blocked; stderr is the reason the model reads                |
+| exits 0 with `permissionDecision: "deny"`                         | is blocked, with `permissionDecisionReason`                     |
+| exits 0 with the deprecated `decision: "block"`, or `continue: false` | is blocked, with `reason` / `stopReason`                    |
+| exits 0 with `updatedInput`                                       | runs with the changed fields written back to opencode's arguments |
+| exits 0 with `additionalContext`                                  | runs, and the text is appended to its result for the model      |
+| exits 0 with `permissionDecision: "ask"`                          | runs: a plugin cannot prompt, so opencode's own permission rules decide; a warning is logged |
+| exits 0 with `allow`, or nothing                                  | runs                                                            |
+| exits with any other code, times out or fails to start            | runs, unless `failClosed` is on, then it is blocked             |
+
+stdout is parsed as one JSON document first, as Claude Code does, and line by line when that fails, so a directive
+printed among log lines still counts. The most restrictive decision wins; the first block stops the remaining
+commands. Every command is sent the call as the model made it, not as an earlier hook rewrote it.
+
+A blocked call fails with `Blocked by PreToolUse hook <script>: <reason>`. opencode V1 does this through
+`tool.execute.before` throwing, as its own `.env` protection example does. opencode V2 fails a call from a plugin hook
+from **2.0.29** on; on an older V2 the denial is logged and the call goes ahead, and a warning says so at startup.
+
+`updatedInput` is mapped back field by field (`file_path` → `filePath`/`path`, `old_string` → `oldString`,
+`run_in_background` → `background`, …), and only the fields whose value changed are written. A patch reaches hooks as
+one `Edit` per file, so an `updatedInput` for it cannot be written back: it is ignored with a warning. A shell call's
+`workdir` stays as it was: the `cd '<dir>' && ` the hook was shown is stripped back off the new command.
+
+`allow` does not skip opencode's permission prompts.
 
 ## PostToolUse
 
@@ -207,8 +245,10 @@ add their full runtime to every launch. They are started and left to run; the fi
 **Commands run sequentially,** in the order declared in the hooks file. Each one is waited for up to
 `commandTimeoutMs`; past that the next command starts anyway, so one command that never returns cannot
 starve the rest. The two timeouts are easy to confuse: `commandTimeoutMs` bounds each command, `timeoutMs`
-bounds how long the first model call waits for all of them. Bun's shell exposes no way to kill a running
-command, so an overrunning one is left to finish on its own.
+bounds how long the first model call waits for all of them. By default an overrunning command is left to finish
+on its own: Bun's shell exposes no way to kill it, and killing an install or a sync half-way can leave it worse off.
+Set `killOnTimeout` to kill it instead: the command then runs in a process group of its own, through
+`node:child_process` on both generations, and the whole group gets `SIGTERM`, then `SIGKILL` two seconds later.
 
 **Commands get the event payload on stdin,** as in Claude Code, and stdin then ends, so a hook that reads it
 sees EOF instead of hanging. `SessionStart` gets `hook_event_name`, `source: "startup"` and `cwd`; there is no
@@ -228,19 +268,48 @@ opencode --print-logs --log-level DEBUG
 opencode V1 entries are tagged `service=opencode-hooks`; opencode V2 logs to the console with an
 `[opencode-hooks]` prefix.
 
+**Hooks it will not run are named once,** at `info` level when the plugin loads: events it does not bridge
+(`Stop: 2`) and entries that are not a `command` (`PreToolUse type prompt: 1`).
+
 **`CLAUDE_PLUGIN_ROOT` is exported** to every command, since hook scripts often read it directly.
 **`CLAUDE_CODE_ENTRYPOINT` is deliberately not set** — scripts use it to gate Claude-Code-only behaviour, and
 this is not Claude Code. If one of your hooks is a no-op without it, that hook was written to only run under
 Claude Code; put it in `skip`.
+
+## Approving project hooks (opt-in)
+
+By default every bridged command runs. A repository that ships a `.claude/settings.json` therefore runs its commands,
+with your environment, as soon as opencode starts in it. With `"trust": "approved"`, a command from a hooks file
+**inside the project directory** runs only once it has been approved; a hooks file outside it (a `root` or
+`hooksFile` your own config points at, such as an installed Claude Code plugin) is trusted as before.
+
+Approvals are kept outside every repository, in `~/.config/opencode-hooks/approved.json` (mode `0600`), so a
+repository cannot approve itself. Review and approve a project's commands from its directory:
+
+```sh
+npx @raultov/opencode-hooks-plugin status    # lists each command and whether it is approved
+npx @raultov/opencode-hooks-plugin approve   # asks, then approves the ones that are not
+```
+
+Both take `--root`, `--hooks-file` and `--approvals-file`, resolved as the plugin resolves them; `approve --yes`
+skips the question. When the plugin skips unapproved commands it logs a warning with the exact `approve` command line.
+
+An approval covers the hooks file, the event, the matcher and the command line. Editing the command or widening its
+matcher needs a new approval. **The content of a script the command calls is not covered:** approve a command that
+runs `./.claude/hooks/x.sh` only if you trust whoever can change that script.
+
+An unknown `trust` value is read as `"approved"`, so a typo cannot quietly run everything.
 
 ## Limitations
 
 - **Only `SessionStart`, `PreToolUse` and `PostToolUse` are bridged.** The other Claude Code events have
   opencode counterparts you can wire up directly in a plugin of your own: `Stop` → the `session.idle` event,
   `SessionEnd` → `session.deleted`.
-- **A `PreToolUse` hook cannot block or change a call,** and no tool hook's stdout reaches the model. Claude
-  Code honours exit code 2, `permissionDecision` and `additionalContext`; this bridge only runs the command.
-- **`SessionStart` runs once per opencode process,** when the plugin loads, not once per session.
+- **By default a `PreToolUse` hook cannot block or change a call,** and no tool hook's stdout reaches the model.
+  `preToolDecisions` makes `PreToolUse` honour exit code 2, `permissionDecision`, `updatedInput` and
+  `additionalContext`; `ask` cannot prompt, and `PostToolUse` output is still not read.
+- **`SessionStart` runs once per opencode process,** when the plugin loads, not once per session. Its payload's
+  `source` is always `startup`: no session exists yet at that point, so the plugin cannot tell a resumed one apart.
 - **`systemMessage` injection differs per generation.** opencode V2 uses the stable session request
   hooks, offering the block to every request kind that carries a system prompt (`context`, `compaction`,
   `generate`, `title`). opencode V1 uses an experimental hook (`experimental.chat.system.transform`)
@@ -254,7 +323,7 @@ Claude Code; put it in `skip`.
 
 ```sh
 bun install
-bun test        # unit + plugin-level tests, no real commands executed
+bun test        # unit + plugin-level tests; only the process tests run real (local) sh commands
 bun run typecheck
 bun run lint
 bun run build

@@ -357,6 +357,13 @@ so agents see complete descriptions.
   follow the session into the worktree, and `archive` clears the pointer. `backlog archive
   <id>` removes the shipped feature's worktree + merged branch, so a session cleans up
   after itself on close.
+- **Native OpenCode worktrees share the same container**: the managed `opencode.json`
+  sets `worktree.directory` to `../.worktrees/<repo>`, so a checkout created from the
+  TUI or `opencode run --worktree` lands beside the harness's own instead of under
+  OpenCode's data directory (which the managed edit policy denies). Feature isolation
+  still goes through `backlog worktree`: a native checkout is detached and carries no
+  branch, board row, bootstrap, or cleanup. See ADR 0002
+  (`docs/adr/0002-worktree-strategy.md`).
 - **One project board, never a worktree copy**: board reads and writes are project-scoped.
   A `backlog_*`/`backlog` command run inside a linked feature worktree resolves to the
   shared board service, or — in legacy file mode — to the MAIN checkout's board, so a row
@@ -403,6 +410,15 @@ so agents see complete descriptions.
 
 ### Permission model & limits
 
+- **Managed policies are the hard-deny layer.** The generated top-level
+  `policies` in [`templates/opencode.json`](templates/opencode.json) deny
+  credential-sensitive paths, self-modification of the OpenCode config/store,
+  and MCP availability by default. Unlike `permissions`, policies cannot be
+  widened by project permissions, agent rules, or saved approvals. Opt in to a
+  configured MCP server by appending, for example,
+  `{ "action": "mcp.use", "resource": "pg", "effect": "allow" }`. See
+  [`bin/agent-harness.js`](bin/agent-harness.js) for merge behavior and the
+  managed matrix.
 - **Ordering is last-match-wins, so a project rule can shadow a harness deny.**
   V2 applies `permissions` in order (global → project → agent) and the *last*
   matching rule wins. `init`/`update` append a project's own rules **after** the
@@ -411,12 +427,14 @@ so agents see complete descriptions.
   (denies after the work-root allow), but a hand-added project rule is stronger
   than the baseline — audit project `permissions` whenever a deny must be
   absolute, and treat the project layer as a deliberate escape hatch.
-- **`permissions` gate tool *selection*, not the host.** They are advisory to
+- **Policies and permissions gate tool selection/configured MCP availability,
+  not the host.** They are advisory to
   the model; a `shell` call runs with the host user's full authority regardless
   of the rules (V2's own docs say so). The harness compensates with mechanical
   guards — the capacity envelope, the main-checkout / branch-switch guard,
-  per-feature worktrees, session leases — not a kernel sandbox. Keep secrets off
-  the box, and prefer a container or a dedicated user for untrusted work.
+  per-feature worktrees, session leases — not a kernel sandbox. Shell command
+  strings cannot be bounded by path patterns. Keep secrets off the box, and
+  prefer a container or a dedicated user for untrusted work.
 
 ## QA gates
 

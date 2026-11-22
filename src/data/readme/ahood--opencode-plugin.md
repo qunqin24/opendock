@@ -432,7 +432,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood skill share <owner>/<skill> --group <group>` | Share a skill you own with a group, without changing its public/private visibility. |
 | `ahood skill unshare <owner>/<skill> --group <group>` | Stop sharing a skill you own with a group. |
 | `ahood skill init [name]` | Scaffold a new skill folder with a minimal, valid SKILL.md. |
-| `ahood skill publish <owner>/<skill>@<version> [--path <dir>] [--kind skill\|agent\|mcp\|doc\|project\|loop\|prompt] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of a skill, agent, mcp server manifest, doc, project guide, loop, or prompt from a folder containing SKILL.md, AGENT.md, server.json, DOC.md, PROJECT.md, LOOP.md, or PROMPT.md, creating the skill first if it doesn't already exist. |
+| `ahood skill publish <owner>/<skill>@<version> [--path <dir>] [--kind skill\|agent\|mcp\|doc\|project\|loop\|prompt] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of a skill, agent, mcp server manifest, doc, project guide, loop, or prompt from a folder containing SKILL.md, AGENT.md, server.json, DOC.md, PROJECT.md, LOOP.md, or PROMPT.md, creating the skill first if it doesn't already exist. |
 
 ### Agent
 
@@ -455,7 +455,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood agent share <owner>/<agent> --group <group>` | Share an agent you own with a group, without changing its visibility. |
 | `ahood agent unshare <owner>/<agent> --group <group>` | Stop sharing an agent you own with a group. |
 | `ahood agent init [name]` | Scaffold a new agent folder with a minimal, valid AGENT.md. |
-| `ahood agent publish <owner>/<agent>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of an agent from a folder containing AGENT.md, creating it first if it doesn't exist yet. |
+| `ahood agent publish <owner>/<agent>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of an agent from a folder containing AGENT.md, creating it first if it doesn't exist yet. |
 
 ### MCP (server manifests)
 
@@ -478,7 +478,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood mcp share <owner>/<server> --group <group>` | Share an MCP server manifest you own with a group, without changing its visibility. |
 | `ahood mcp unshare <owner>/<server> --group <group>` | Stop sharing an MCP server manifest you own with a group. |
 | `ahood mcp init [name]` | Scaffold a new MCP server manifest folder with a minimal, valid server.json. |
-| `ahood mcp publish <owner>/<server>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of an MCP server manifest from a folder containing server.json, creating it first if it doesn't exist yet. |
+| `ahood mcp publish <owner>/<server>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of an MCP server manifest from a folder containing server.json, creating it first if it doesn't exist yet. |
 
 ### Doc
 
@@ -501,7 +501,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood doc share <owner>/<doc> --group <group>` | Share a doc you own with a group, without changing its visibility. |
 | `ahood doc unshare <owner>/<doc> --group <group>` | Stop sharing a doc you own with a group. |
 | `ahood doc init [name]` | Scaffold a new doc folder with a minimal, valid DOC.md. |
-| `ahood doc publish <owner>/<doc>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of a doc from a folder containing DOC.md, creating it first if it doesn't exist yet. |
+| `ahood doc publish <owner>/<doc>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of a doc from a folder containing DOC.md, creating it first if it doesn't exist yet. |
 
 ### Project
 
@@ -525,7 +525,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood project share <owner>/<slug> --group <group>` | Share a project guide you own with a group, without changing its visibility. |
 | `ahood project unshare <owner>/<slug> --group <group>` | Stop sharing a project guide you own with a group. |
 | `ahood project init [name] [--project <git-remote> \| --no-project]` | Scaffold a new project guide folder with a minimal, valid PROJECT.md. |
-| `ahood project publish <owner>/<slug>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of a project guide from a folder containing PROJECT.md, creating it first if it doesn't exist yet. |
+| `ahood project publish <owner>/<slug>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of a project guide from a folder containing PROJECT.md, creating it first if it doesn't exist yet. |
 
 ### Loop
 
@@ -548,7 +548,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood loop share <owner>/<loop> --group <group>` | Share a loop you own with a group, without changing its visibility. |
 | `ahood loop unshare <owner>/<loop> --group <group>` | Stop sharing a loop you own with a group. |
 | `ahood loop init [name]` | Scaffold a new loop folder with a minimal, valid LOOP.md. |
-| `ahood loop publish <owner>/<loop>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of a loop from a folder containing LOOP.md, creating it first if it doesn't exist yet. |
+| `ahood loop publish <owner>/<loop>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of a loop from a folder containing LOOP.md, creating it first if it doesn't exist yet. |
 
 ### Prompt
 
@@ -568,7 +568,7 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood prompt share <owner>/<prompt> --group <group>` | Share a prompt you own with a group, without changing its visibility. |
 | `ahood prompt unshare <owner>/<prompt> --group <group>` | Stop sharing a prompt you own with a group. |
 | `ahood prompt init [name]` | Scaffold a new prompt folder with a minimal, valid PROMPT.md. |
-| `ahood prompt publish <owner>/<prompt>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--json]` | Publish a new version of a prompt from a folder containing PROMPT.md, creating it first if it doesn't exist yet. |
+| `ahood prompt publish <owner>/<prompt>@<version> [--path <dir>] [--name <text>] [--tagline <text>] [--tags <comma,separated>] [--license <id>] [--homepage <url>] [--repository <url>] [--changelog <text>] [--visibility public\|private] [--json]` | Publish a new version of a prompt from a folder containing PROMPT.md, creating it first if it doesn't exist yet. |
 
 ### Group
 

@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>跨 49 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
+<p align="center"><b>跨 52 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 42 個代理本來就把每次會話寫在磁碟上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 45 個代理本來就把每次會話寫在磁碟上。<br>
 deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途換代理接著做、用 <code>deja restore</code> 找回被覆寫的程式碼——無需 LLM，單個 Go 二進位檔。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -133,7 +133,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 五十個編碼代理把每一次對話都寫進本機檔案，
+**在 Codex 裡解決，Claude 記得。** 五十二個編碼代理把每一次對話都寫進本機檔案，
 deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
@@ -273,7 +273,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 與 RustRover 外掛（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh-TW.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` 與 CodeCompanion 外掛（[`extensions/nvim/`](../../extensions/nvim/docs/zh-TW.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) 彈窗（`prefix + D`）與狀態列 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast 擴充功能 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | 一鍵匯入 MCP 與 Skill 倉庫（`ccswitch://`） | [匯入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨代理切換指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 兩條路各自都夠用，兩條都走也不會出問題：每個套件都會先讀 `deja install` 寫下的設定。

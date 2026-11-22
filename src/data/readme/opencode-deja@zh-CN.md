@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>跨 49 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
+<p align="center"><b>跨 52 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 42 个智能体本来就把每次会话写在磁盘上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 45 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -270,7 +270,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 与 RustRover 插件（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` 与 CodeCompanion 插件（[`extensions/nvim/`](../../extensions/nvim/docs/zh.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) 弹窗（`prefix + D`）与状态栏 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast 扩展 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | 一键导入 MCP 与 Skill 仓库（`ccswitch://`） | [导入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨智能体切换指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。

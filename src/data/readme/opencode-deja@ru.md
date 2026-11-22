@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 49 кодинг-агентов.</b></p>
+<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 52 кодинг-агентов.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 42 агента уже сохраняют каждую сессию на диск.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 45 агентов уже сохраняют каждую сессию на диск.<br>
 deja индексирует всю историю локально, чтобы агенты сохраняли контекст после <code>/compact</code>, передавали задачу на полпути через <code>deja handoff</code> и восстанавливали перезаписанный код через <code>deja restore</code> — без LLM, один Go-бинарник.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -136,7 +136,7 @@ shell-скрипт; используйте `scoop install deja-vu` (есть в 
 
 ## Что это даёт
 
-**Решено в Codex — помнит Claude.** Сорок девять кодинг-агентов пишут каждый разговор в локальные файлы,
+**Решено в Codex — помнит Claude.** Пятьдесят два кодинг-агента пишут каждый разговор в локальные файлы,
 deja превращает эти файлы в слой памяти, который читают все они.
 
 | | |
@@ -290,7 +290,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/ru.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | плагин для `lazy.nvim` и CodeCompanion ([`extensions/nvim/`](../../extensions/nvim/docs/ru.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | всплывающее окно [TPM](https://github.com/tmux-plugins/tpm) (`prefix + D`) и `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | расширение Raycast `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | импорт MCP и репозитория Skills в 1 клик (`ccswitch://`) | [Добавить MCP в CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Переход между агентами](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Любого пути достаточно, оба вместе тоже не мешают: каждый пакет сначала читает то, что записал

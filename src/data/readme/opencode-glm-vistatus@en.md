@@ -178,6 +178,14 @@ Build artifacts:
 | Error strategy   | `Promise.allSettled` graceful degradation (shows partial data)     |
 | Refresh strategy | first fetch on mount + timed polling (default 5 min, customizable) |
 
+## For plugin authors
+
+This panel is **multi-provider by design**: alongside its native GLM view, any other provider plugin — AtomCode, CodeArts, or your own — can render its quota **live in the same sidebar** by registering a single `<providerID>.quota` RPC. Zero coupling, zero config, zero changes on this side.
+
+This plugin is itself a quota source, too: add the package to the **server plugin list** (`plugins` in `opencode.json`) and it serves the GLM quota over the same protocol (`zai-coding-plan.quota` and every other GLM provider alias) for any reader to consume. The `cli.json` TUI entry is unaffected.
+
+See **[docs/quota-rpc.md](./docs/quota-rpc.md)** for the contract, reader behavior, and a one-file recipe for exposing your own provider's quota.
+
 ## Troubleshooting
 
 | Symptom                     | Likely cause                                                                |

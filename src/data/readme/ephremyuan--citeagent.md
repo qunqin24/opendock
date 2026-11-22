@@ -166,6 +166,13 @@ returned job ID. Job handles are retained in the server process. The older
 `ingest_url` tool keeps its deterministic HTML defaults and also returns a
 job ID if ingestion is still running.
 
+For citation-only ingestion, call `ingest_source` with tool arguments like
+`{"input_ref": "/path/to/sources/paper.pdf", "output_mode": "csl_only"}`.
+Both ingestion tools accept `full` (default), `csl_evidence`, and `csl_only`.
+Read the citation from the completed job’s `csl` field. Citation-only mode
+still saves the run summary, and URL or media records may retain source snapshots.
+Re-ingesting an existing full record in this mode can remove its full-output artifacts.
+
 Use `citation_verify` with the exact record ID to check CSL fields or a supplied
 quotation, with an optional locator to narrow the check. It reports agreement with stored extraction and,
 when available, checks the original bytes against the recorded digest. The

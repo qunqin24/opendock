@@ -373,7 +373,8 @@ Releases are published to npm by GitHub Actions after a GitHub Release is publis
 2. Create and publish a GitHub Release with the matching `v`-prefixed tag (for example, package version `0.2.0` uses
    tag `v0.2.0`).
 3. The release workflow verifies the tag and package version, runs the full CI suite, then publishes to npm with
-   provenance. Prereleases are not published.
+   provenance. Prereleases are not published. The archival `v0.1.0` release is tested but not republished because that
+   version already exists on npm.
 
 The repository's npm package must be configured for **trusted publishing** on npmjs.com to use GitHub Actions as the
 publisher, with repository `987poiuytrewq/opencode-github-pr`, workflow `release.yml`, and environment `npm`. The

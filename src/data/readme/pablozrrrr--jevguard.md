@@ -657,10 +657,15 @@ jevguard check --range origin/main..HEAD --annotations   # GitHub Actions
 Each non-merge commit's own patch is the unit and its subject is the task; merge
 commits are skipped. Exit codes: `0` for pass or warnings, `1` when a rule with
 severity `error` failed, `2` when the check could not run. `UNAVAILABLE` never fails:
-it exits `0` with a warning, or `1` with `--strict`. The report, the JSON and the
-GitHub annotations carry rule IDs, outcomes, probabilities, severities, typed reason
-codes and commit revisions — never the diff, the commit subject or a credential — and
-the command writes nothing.
+it exits `0` with a warning, or `1` with `--strict`. Every mode carries rule IDs,
+outcomes, commit revisions and the typed reason codes of commits not judged
+completely; the JSON adds each rule's severity, probability and scoped paths, plus
+the slice metadata of a sliced rule (slice index, path, kind and hunk ordinal) that
+the review log projection already allows, while the text report gives each rule's
+ID and outcome only. A GitHub annotation carries the rule ID, the shortened commit
+revision, the probability and the severity — nothing else — and the typed reason
+codes in the warning for commits not judged completely. None of them ever carries
+the diff, the commit subject or a credential, and the command writes nothing.
 The Jev key goes in a repository secret. See [check mode](./docs/check-mode.md) for the
 workflow example and the `SCOPE-001` caveat.
 
@@ -761,7 +766,12 @@ fixes the decisions — Claude Code only, opt-in in the user's own `claude-code.
 interactive sessions only, `error` rules from the user's allowlist (the pilot uses
 `SECRETS-001` and `DESTRUCTIVE-001`), one block per unit, an 8 s budget, never a
 built-in, coexisting with remediation delivery, and `jevguard ack` as the user's
-per-unit override.
+per-unit override. The first pieces are in: the `enforce` section is validated
+strictly (the allowlist and the budget, with built-ins and duplicates kept out of it as
+[configuration](./docs/configuration.md) documents) and the decision that turns a review
+into a block is pure and tested, failing open on anything it cannot answer positively.
+The `Stop` hook that would apply it is not wired yet, so a review is still observe-only
+and an enabled section has no effect.
 
 The `V0.4` `jev-init` skill is implemented: when no policy exists it bootstraps
 `.jev/rules.md` and `.jev/config.yaml` from the user's explicit constraints and

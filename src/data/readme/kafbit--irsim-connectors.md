@@ -1,6 +1,8 @@
+<p align="center"><img src="docs/logo/irsim-logo.svg" alt="irsim" width="96" height="96"></p>
+
 # irsim
 
-irsim is a local design canvas. It draws the boards of a repository (`design/*.dc.html`) in sandboxed frames, lets you comment on a board, and delivers those comments to a coding agent session through a plugin.
+irsim is a local design canvas. It draws the boards of a repository (`design/*.html`) in sandboxed frames, lets you comment on a board, and delivers those comments to a coding agent session through a plugin.
 
 The board file format is in [docs/01-runtime.md](docs/01-runtime.md).
 
@@ -41,7 +43,7 @@ claude plugin marketplace add kafbit/irsim && claude plugin install irsim@kafbit
 
 ## Other agents
 
-Codex, OpenCode, Pi and Command Code get the same canvas: the `design_canvas` tool, the comments delivered to the session, and the `irsim-workflow` skill. The connectors call `irsim bridge`; the installer points `irsim` at this checkout, so the command exists even when the installed release predates it. `--uninstall` restores the previous `irsim` link.
+Codex, OpenCode, Pi and Command Code get the same canvas: the `design_canvas` tool, the comments delivered to the session, and the `irsim-workflow` and `irsim-design` skills. The connectors call `irsim bridge`; the installer points `irsim` at this checkout, so the command exists even when the installed release predates it. `--uninstall` restores the previous `irsim` link.
 
 ```bash
 scripts/install-agents.sh            # point irsim here, link OpenCode, Pi and Command Code
@@ -77,7 +79,7 @@ irsim export [--design-dir <path>] [--out <dir>] [--title <text>]
 
 `irsim export` builds a standalone static preview (`dist/preview` by default) with an `index.html`, a frame per board under `b/`, the runtime and the viewer assets, all with relative URLs. Serve that folder (`npx serve dist/preview`, not `file://`, because the frames are modules) to review every board without an irsim server. `.github/workflows/preview.yml` builds it on each pull request and uploads it as an artifact. The layout and limits are in [docs/03-preview-site.md](docs/03-preview-site.md).
 
-In the canvas, a board with working controls or links between boards gets a Play button. Play runs it on the canvas or full screen (a web page board fills the window), and `<a href="Other.dc.html">` in a played board moves to that board. Details are in [docs/01-runtime.md](docs/01-runtime.md#play).
+In the canvas, a board with working controls or links between boards gets a Play button. Play runs it on the canvas or full screen (a web page board fills the window), and `<a href="Other.html">` in a played board moves to that board. Details are in [docs/01-runtime.md](docs/01-runtime.md#play).
 
 The plugin's `design_canvas` tool has a `check` action. It renders a board (or every board of a page) in headless Chromium and returns errors, an empty-render warning and a screenshot in `.irsim/checks/`. It needs an installed Chrome, Chromium, Brave or Edge, or the executable in `IRSIM_BROWSER`. The same check is at `POST /api/boards/<Board>/check` and `POST /api/pages/<page>/check`.
 
@@ -110,7 +112,7 @@ The same check runs from two more places:
 
 Below 25% zoom the canvas shows a thumbnail of each board instead of a live frame. The server renders a missing thumbnail the first time it is shown, with an installed Chrome, Chromium, Brave or Edge run headless, or the executable in `IRSIM_BROWSER`. `irsim thumbs [--page <id>] [--board <name>] [--force]` renders them ahead of time on the running server. Thumbnails are cached in `~/.cache/irsim/thumbs`, named by the content of the board and its imports, so every checkout and worktree with the same boards reuses them. While a changed board renders, its previous thumbnail shows with an Outdated label. A thumbnail no checkout has shown for 14 days is pruned by `irsim thumbs`.
 
-The plugin ships the `irsim-workflow` skill. It makes a change to what a screen shows start in the board: change the board, report its route, stop, then build the app after the user's confirmation.
+The plugin ships the `irsim-workflow` and `irsim-design` skills. `irsim-design` holds the file formats of a board and `design/canvas.json`. `irsim-workflow` makes a change to what a screen shows start in the board: change the board, report its route, stop, then build the app after the user's confirmation.
 
 ## Sections and variants
 
@@ -136,14 +138,14 @@ A variant is a copy of a board that Claude edits in a chosen direction. Select a
 - UI/UX pass: fix affordances, states, feedback, spacing and accessibility.
 - Research: look up current patterns for this kind of screen first, then apply the best fit.
 
-irsim copies the board once per preset into `design/<Board>Variant<Preset>.dc.html`, puts the copies in a section named `<Board> variants`, and sends the chosen Claude session one turn that names each file and its direction. A copy shows Not changed yet until Claude writes it.
+irsim copies the board once per preset into `design/<Board>Variant<Preset>.html`, puts the copies in a section named `<Board> variants`, and sends the chosen Claude session one turn that names each file and its direction. A copy shows Not changed yet until Claude writes it.
 Open Compare on the section or in the inspector, at `/p/<page>/compare/<Board>`. It shows the original and each variant side by side at the same width, with a width selector and a theme toggle.
-Choose on a column writes that content to `<Board>.dc.html`, keeps the original title, deletes every variant file and removes the section. Keep original and Discard variants delete the variants only.
+Choose on a column writes that content to `<Board>.html`, keeps the original title, deletes every variant file and removes the section. Keep original and Discard variants delete the variants only.
 Choose is refused, and nothing changes, when a board outside the variants imports one of them. Change that board first. Choosing does not notify Claude, and you approve the result as any other change.
 
 ## Review boards in pull requests
 
-A board is accepted by looking at it in irsim, with the Approve button or a reply to the agent. A code review then has one job for the boards: check that the boards and the app in the pull request show the same thing. It does not review the markup of `.dc.html` files.
+A board is accepted by looking at it in irsim, with the Approve button or a reply to the agent. A code review then has one job for the boards: check that the boards and the app in the pull request show the same thing. It does not review the markup of board files.
 
 We recommend this setup in every project that keeps its screens as boards. It is the setup irsim uses for its own canvas app. Replace `design/` with your `designDir` and `app/src/` with your UI source.
 
@@ -154,9 +156,11 @@ Board files stay tracked. Git keeps their history and still stops a merge or reb
 `.gitattributes`:
 
 ```gitattributes
-design/*.dc.html linguist-generated=true gitlab-generated
+design/*.html linguist-generated=true gitlab-generated
 design/canvas.json linguist-generated=true gitlab-generated
 ```
+
+`design/*.html` also covers the legacy `.dc.html` board files. A `design/*.dc.html` pattern covers only the legacy name, and `irsim doctor` warns when the boards use the `.html` name.
 
 GitHub collapses these files in "Files changed" behind "Load diff" and leaves them out of the language stats. GitLab 16.11 and later collapses them in merge requests once the file is on the default branch. A reviewer can still open them.
 
@@ -169,7 +173,7 @@ Keep a table in `AGENTS.md` that maps each UI source file to its boards, then ad
 
 The user accepts a board by looking at it in irsim. A review does not review board files.
 
-- Do not comment on the markup, styles, copy, structure or layout numbers of `design/*.dc.html` and `design/canvas.json`.
+- Do not comment on the markup, styles, copy, structure or layout numbers of `design/*.html` and `design/canvas.json`.
 - Do check, with the table above, that:
   - a change to what a person sees has its board changed in the same pull request,
   - the board shows the same states, labels, controls and layout as the code,
@@ -183,7 +187,7 @@ Claude Code and other agents read `AGENTS.md` (or `CLAUDE.md` that imports it). 
 
 ```markdown
 Follow the "Reviewing a pull request" section of `AGENTS.md`.
-Do not review the contents of `design/*.dc.html` or `design/canvas.json`. Review only whether the boards and the app code in the pull request show the same thing.
+Do not review the contents of `design/*.html` or `design/canvas.json`. Review only whether the boards and the app code in the pull request show the same thing.
 ```
 
 For CodeRabbit, `.coderabbit.yaml`:

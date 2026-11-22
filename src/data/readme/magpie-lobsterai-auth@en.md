@@ -17,6 +17,7 @@ Provider id: `lobsterai`. After sign-in, models appear as `lobsterai/<model>`.
 ## Features
 
 - Browser sign-in through LobsterAI's own login page and a one-shot loopback callback.
+- Manual callback URL paste sign-in (`method: "code"`) for Docker, remote servers, or isolated browsers where `127.0.0.1` cannot reach Magpie directly.
 - Manual access/refresh token sign-in as a fallback.
 - Live account model catalog from `GET /api/models/available`.
 - LobsterAI `lobsterai_options` thinking levels, including the Kimi K3 contract.

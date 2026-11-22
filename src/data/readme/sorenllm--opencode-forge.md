@@ -739,6 +739,39 @@ nested workspaces. This is a disclosed difference from the recipe's
 nearest-exclusive pool scoping; dispatch gating still follows the
 recipe, so visibility never grants cross-pool dispatch.
 
+**Worker shell rescue (v2 hosts)**: opencode 2.x evaluates a plugin
+tool's permission assert at the *plugin host's* location, while native
+worker files register at the *project* location — so a worker calling
+`forge_shell` used to hit the host's missing-agent fallback, a literal
+deny-all that short-circuits before any configured rule, saved
+approval, or ask (bare `Permission denied: forge_shell`, nothing in the
+logs; source-verified on 2.3.2 — see
+`reports/research-plugin-tool-permission.md`). The plugin therefore
+maintains a rescue through the host's **own documented session-rule
+surface**: forge-family sessions carry one appended session rule
+`{action: "forge_shell", resource: "*", effect: "allow"}` — seeded on
+the forge primary (worker children inherit session rules at creation)
+and belt-injected on a worker session at its first `forge_shell`. The
+rule restores the documented default-open posture in exactly that
+geometry and is scoped to the `forge_shell` action alone (it can never
+affect a builtin tool or another plugin). It is host state, not a
+file — the plugin's filesystem ledger does not grow. An **explicit
+`deny` always wins** and disables the rescue entirely, in either config
+shape:
+
+```jsonc
+// v2 (opencode.jsonc)
+{ "permissions": [ { "action": "forge_shell", "resource": "*", "effect": "deny" } ] }
+// legacy v1 shape
+{ "permission": { "forge_shell": "deny" } }
+```
+
+If the session-rule surface is unavailable, a belt lets worker calls
+through the bare fallback deny with a one-per-session
+`[forge:session-rescue]` disclosure (diagnostics + the tool call's
+title); primary sessions never take that belt — their agent resolves,
+so a bare deny there is a real deny.
+
 **Recipe field reference** (per agent entry):
 
 | field | meaning | notes |

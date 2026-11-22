@@ -21,11 +21,22 @@ Then add the package name to the `plugins` list in your project's `opencode.json
 
 Preserve other entries if you already have an OpenCode config.
 
+Once the plugin loads, it automatically registers the **Code App** primary agent (`codeapp`) and the **codeapp** workflow skill directly from the bundled `codeapp-js/AI/codeapp.agent.md`. No Setup command or manual global file copy is needed. Registration does not write into unrelated projects, change your default agent/model, or replace an existing `codeapp` agent or skill. Removing the plugin removes its runtime registrations; your own files are untouched.
+
 Open OpenCode in the Code App project, then run `/cap-setup --app-name "My App" --description "My Code App"` to copy the bundled `codeapp-js` template and install `.opencode/agents/codeapp.md`, adapted from the bundled `codeapp-js` agent instructions. Existing agent and app files are left intact except app configuration metadata and the configured HTML title. Setup sets `"default_agent": "codeapp"` in the project's existing OpenCode config (preferring `.opencode/opencode.json(c)` when present), or creates `opencode.jsonc`. Comments and unrelated settings, including the model and plugins, are preserved. This sets the default for new sessions; it does not switch the agent of an existing session.
 
 Add `--skills` to `/cap-setup` to copy the bundled `codeapp-js/AI/skills` into `.opencode/skills`; this is optional, and existing skills are left untouched. You can then ask the agent to load a matching skill or call the `skill` tool yourself. Use `/cap-skills` or **Browse skills** to read bundled instructions without installing them. The bundled `start` skill may mention older CAP commands; use `/cap-setup` rather than `cap newApp` in OpenCode.
 
 The installed **codeapp** agent asks for approval before running mutating `cap_*` tools. To get the same behavior with other agents, add `{ "action": "cap_mutation", "resource": "*", "effect": "ask" }` under `permissions` in `opencode.jsonc`. Explicit slash commands are user-initiated actions.
+
+## Select the agent or use its workflow as a skill
+
+- **Agent picker:** choose **Code App**. Existing custom profiles may retain their own display name.
+- **No picker / existing session:** run `/cap-agent` to select `codeapp` without changing the model or making a model request. `/cap-agent Build an inventory app` selects it and sends that task.
+- **Terminal / automation:** `opencode run --agent codeapp "Build an inventory app"`.
+- **Keep your current agent:** prompt `Load the codeapp skill and help me build an inventory app`, or mention `@codeapp` as a **skill** where the client supports skill mentions. A bare agent mention is not an agent switch.
+
+The `codeapp` skill includes the same bundled workflow instructions, plus guidance to use the current workspace and request approval for Power Platform mutations. It does **not** change the active agent, model, or enforced permissions. Use `/cap-agent` when you want the dedicated agent's approval rules. Domain skills (Dataverse, connectors, flows, and so on) remain available through `/cap-skills` and optional `--skills` installation.
 
 ## Desktop side panel
 
@@ -52,10 +63,11 @@ OpenCode reloads updated GUI bundles after `npm update codeapp-js-opencode`. Sla
 
 ## Commands
 
-Slash commands perform operations directly. Matching namespaced agent tools (`cap_deploy`, `cap_add_dataverse`, etc.) accept structured inputs when you ask OpenCode to perform a task.
+Slash commands perform operations directly. Matching namespaced agent tools (`cap_deploy`, `cap_add_dataverse`, etc.) accept structured inputs when you ask OpenCode to perform a task. `/cap-agent` is session selection, not a Power Platform tool.
 
 | Command | Example / purpose |
 | --- | --- |
+| `/cap-agent` | Select the Code App agent for this session; optionally follow with a task |
 | `/cap-sign-in` | Sign in to Power Apps without requiring an existing app configuration |
 | `/cap-change-account` | Clear cached authentication and sign in with the account picker; optional `--cloud <region>` |
 | `/cap-sign-out` | Clear the shared cached Power Platform login |
@@ -80,7 +92,7 @@ Use `--environment <id-or-url>` where supported, and quote values containing spa
 
 Aligned with `codeappjsext` **2.1.9**, using exact dependencies `codeapp-js-cli` **1.4.0** and `codeapp-js` **2.4.0**. A dependency override keeps the CLI, setup template, agent and skills on the same SDK version. The parity tests cover authentication, table metadata, setup metadata/title, import/flow/deploy routing, local debugger toggling, skill browsing and environment selection before setup.
 
-OpenCode supplies the panel, agent, permissions and previews instead of VS Code editor/status-bar controls and Copilot registrations. Skills are optionally installed into `.opencode/skills`, not registered with Copilot. Generated artifacts are deliberately preserved, and resource discovery never invokes terminal pickers. Deploy and flow requests explicitly use non-interactive mode. Environment selections made before setup are remembered by the desktop panel; slash commands and tools must pass `--environment`/`environment` until app configuration exists. This plugin does not modify terminal or system `PATH`.
+OpenCode supplies the panel, agent, permissions and previews instead of VS Code editor/status-bar controls and Copilot registrations. The Code App agent and workflow skill register automatically; domain skills are optionally installed into `.opencode/skills`, not registered with Copilot. Generated artifacts are deliberately preserved, and resource discovery never invokes terminal pickers. Deploy and flow requests explicitly use non-interactive mode. Environment selections made before setup are remembered by the desktop panel; slash commands and tools must pass `--environment`/`environment` until app configuration exists. This plugin does not modify terminal or system `PATH`.
 
 ## Development
 

@@ -169,6 +169,15 @@ wait for a description until you configure one and run `crib project index`.
 `crib status` counts what is waiting. Details:
 [docs/generate.toml.example](docs/generate.toml.example).
 
+To pick the profile per machine without editing either file, set
+`CRIB_GENERATE_PROFILE` (a profile in `models.toml`; it also clears any
+`[generate] provider`) or `CRIB_GENERATE_PROVIDER` (one named provider). They
+override `config.toml` when set and not blank. Set them where the crib daemon is
+launched (your MCP client's or combiner's server environment, or the shell
+profile it inherits), then restart the daemon: config is read once at
+startup. `crib generate test` and `crib status` show the values in use and
+say which came from the environment.
+
 **4 — Use it.** The CLI verbs mirror the MCP tools, so anything Claude does you can
 do too:
 
@@ -237,6 +246,14 @@ which bytes, and which verbs may write them, is [docs/storage.md](docs/storage.m
 
 By default a verb attaches to the **warm daemon** (the same process the MCP server
 runs), so it's fast; `--no-daemon` runs in-process, `--json` gives machine output.
+
+On a colour terminal, query and list output is styled by what each part is:
+ranks dim, names and titles bold, kinds magenta, statuses by value, warnings
+yellow, and file paths cyan and clickable where the terminal supports links.
+Piped output is plain text, unchanged. `--color auto|always|never` overrides the
+detection, `NO_COLOR` turns it off, and any role can be restyled in the
+`[styles]` section of `$CRIB_THEME_FILE` (e.g. `crib.path = blue underline`;
+the roles are listed in [`crib/style.py`](crib/style.py)).
 
 ## Going further
 

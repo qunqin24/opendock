@@ -4,9 +4,29 @@
 [![CI](https://github.com/system1970/opencode-antigravity-acp/actions/workflows/ci.yml/badge.svg)](https://github.com/system1970/opencode-antigravity-acp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-Use your **Antigravity subscription models** inside **OpenCode Desktop & CLI** through Google's official local `agy acp` stdio protocol — with full OpenCode Code Mode (`mcp_oc_execute`), MCP tools, skills, `AGENTS.md`, native approval controls, and bidirectional cross-model conversation handoff.
+Use your **Antigravity subscription models** inside **OpenCode Desktop & CLI** through Google's official local `agy acp` stdio protocol — v0.2.0 T3-Code-style swap-freely: seamless cross-model switching via plain-text-only handoff, Pure ACP by default, with an explicit opt-in single Code Mode MCP server.
 
-![Antigravity ACP running Gemini 4 Hydrogen in OpenCode Desktop with Code Mode MCP](./assets/screenshot.jpg)
+![Antigravity ACP running Gemini 4 Hydrogen in OpenCode Desktop](./assets/screenshot.jpg)
+
+---
+
+## Terms of Service & Compliance — Read First
+
+This plugin drives **only** the official local `agy acp --stdio --process-per-session` Agent Client Protocol server installed by Google. It never extracts OAuth tokens, never spoofs IDE/API headers, and never replays private HTTP endpoints.
+
+- Antigravity Terms: https://antigravity.google/terms
+- Why third-party clients are restricted: https://antigravity.google/docs/faq#why-cant-i-use-third-party-software-such-as-claude-code-openclaw-or-opencode-with-my-antigravity-login
+- ACP authentication docs: https://antigravity.google/docs/ide/extensions/acp#authentication
+- Community ToS clarification: https://discuss.ai.google.dev/t/tos-clarification-is-opencode-antigravity-acp-official-agy-acp-in-opencode-permitted-under-the-antigravity-terms-of-service/202970/2
+
+### Auth boundary: `oauth-personal` vs `GEMINI_API_KEY` vs `agent-platform`
+
+- **Consumer default (`oauth-personal`):** thin personal Google sign-in via your local `agy` CLI. After `initialize`, the plugin calls official `authenticate` with `{ methodId: "oauth-personal" }`. Use this for normal personal Antigravity usage.
+- **`GEMINI_API_KEY` (`gemini-api-key`):** if `GEMINI_API_KEY` is set (or `ANTIGRAVITY_ACP_AUTH_METHOD=gemini-api-key`), the plugin authenticates with `{ methodId: "gemini-api-key" }` using the Developer API key path documented for ACP. Benign already-authenticated responses are ignored so cached/env auth keeps working.
+- **`agent-platform`:** set `ANTIGRAVITY_ACP_AUTH_METHOD=agent-platform` (with `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` + Application Default Credentials) for Gemini Enterprise Agent Platform usage.
+- You can force a method explicitly with `ANTIGRAVITY_ACP_AUTH_METHOD=oauth-personal|oauth-business|gemini-api-key|agent-platform`.
+
+You are responsible for complying with the Antigravity Terms of Service, quota limits, and any Google policy changes. Every request runs against your real Antigravity account and shares your quota.
 
 ---
 
@@ -16,26 +36,24 @@ Plugins like OAuth token extractors or local reverse proxies pull credentials ou
 
 This plugin follows the same official-harness architecture used by tools like **T3 Code** and **Zed ACP**:
 
-| Aspect | OAuth / Proxy Plugins | `opencode-antigravity-acp` (Official ACP) |
+| Aspect | OAuth / Proxy Plugins | `opencode-antigravity-acp` (Strict Thin ACP) |
 | :--- | :--- | :--- |
-| **Auth & headers** | Extracts OAuth tokens; spoofs IDE/API headers | None — spawns your local signed-in `agy acp` binary directly |
+| **Auth & headers** | Extracts OAuth tokens; spoofs IDE/API headers | None — spawns your local signed-in `agy acp` binary directly + official `authenticate` |
 | **Protocol** | Unofficial private HTTP API emulation | Official stdio JSON-RPC Agent Client Protocol (`agy acp --stdio --process-per-session`) |
-| **Workspace tools** | Often loses OpenCode Code Mode / MCPs | Bridges OpenCode Code Mode, MCP servers & skills over localhost Bearer-auth HTTP MCP |
-| **Internal OpenCode signatures** | Raw OpenCode prompt parts leak upstream | Allowlist sanitizer strips OpenCode-only tools (`tools.opencode.*`, `session_move`) |
+| **Prompt injection** | Raw outer-harness system prompts / tool schemas leak upstream | Zero — `input.system = []`, `input.tools = {}`, no `<workspace_tools_bridge>` / `<workspace_context>` |
+| **History replay** | Replays foreign model turns verbatim (incl. tool calls) | Never replays tool/reasoning state — cross-model switches send a plain-text-only handoff (`[Historical user/assistant]`, 16k cap) + latest prompt |
 | **429 / Quota error handling** | Often retries repeatedly in tight loops | Fail-fast circuit breaker halts on attempt #1 and trips a 60s persisted cooldown |
 
 ---
 
 ## Features
 
+- **Seamless cross-model switching (v0.2.0, T3-Code-style `create_with_handoff`):** switch freely between Antigravity ACP and normal OpenCode models in the same session — no lock-outs, no lost context. Normal ACP-to-ACP flow sends ONLY the raw latest human prompt + image attachments via `buildThinAcpPromptBlocks`. Switching back after normal-model turns starts a fresh `agy acp` session (`session/new`) and restores the earlier conversation via a plain-text-only handoff (`buildTextOnlyHandoffPromptBlocks`: ONLY `[Historical user]` / `[Historical assistant]` text, 16k cap, dropping all reasoning, tool calls, tool results, schemas, todos, approvals) followed by the latest prompt. No tool/reasoning replay, ever. Toggling ACP modes reconnects automatically with the same seamless restore.
+- **Pure ACP by default + optional single Code Mode MCP:** `mcpServers: []` (zero bridged MCPs, 100% native `agy acp`) unless you opt in via the ACP popover (`Pure ACP` vs `+ Code Mode`). Opt-in attaches only the single `oc` Code Mode MCP server with zero prompt injection.
+- **Explicit ACP `authenticate()` + oauth env scrub:** after `initialize`, the bridge calls official `authenticate` (`oauth-personal` by default, `gemini-api-key` when `GEMINI_API_KEY` is set, or `ANTIGRAVITY_ACP_AUTH_METHOD` override), ignoring benign already-authenticated errors. When spawning `agy acp` for `oauth-personal`, ambient `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `GOOGLE_APPLICATION_CREDENTIALS` are scrubbed so stray keys never collide with the personal login (kept for `gemini-api-key` / `agent-platform`).
 - **Dynamic Live Model & Reasoning Effort Discovery:** Queries `agy acp` (`session/new` `configOptions` + `models.availableModels`), caches the catalog in OpenCode plugin storage (6h TTL, deduplicated across open workspaces), and exposes all models with their individual reasoning efforts (`low`, `medium`, `high`, `xhigh` where supported) without family-collapsing in OpenCode Desktop.
-- **OpenCode Tool Bridge (Loopback MCP Relay):** Exposes OpenCode tools (Code Mode `mcp_oc_execute`, `mcp_oc_skill`, connected MCP servers) to Antigravity over `127.0.0.1` with a per-instance random 24-byte Bearer token and tool-description sanitization.
-- **Bidirectional Cross-Model Context Handoff:**
-  - Switching **OpenCode model -> Antigravity ACP** passes prior prompts, responses, and tool outputs inside `<conversation_context_from_other_models>`.
-  - Switching **Antigravity -> OpenCode model -> back to Antigravity** incrementally catches Antigravity up on only the unseen intermediate turns.
-  - Switching **Antigravity -> OpenCode model** converts Antigravity's native `acp_*` hosted tool calls/results into compatible text summaries.
-- **Zero Impact on Normal OpenCode Usage:** `McpRelayServer` and `agy acp` processes start lazily only when an `antigravity-acp/*` model is invoked. Normal OpenCode providers keep full Code Mode and prompt/response paths untouched.
-- **Native OpenCode Desktop Controls & Slash Commands:** Compact `ACP` composer popover for switching Approval Modes (`Auto`, `Accept edits`, `Ask`, `Plan`), Tool Bridge modes (`Native + MCP` vs `All OpenCode`), resetting the live thread (`/agy-reset`), or refreshing models (`/agy-reload`).
+- **Zero Impact on Normal OpenCode Usage:** `McpRelayServer` (only used for opt-in Code Mode) and `agy acp` processes start lazily only when an `antigravity-acp/*` model is invoked. Normal OpenCode providers keep full Code Mode and prompt/response paths untouched.
+- **Native OpenCode Desktop Controls & Slash Commands:** Compact `ACP` composer popover for switching Approval Modes (`Auto`, `Accept edits`, `Ask`, `Plan`), ACP modes (`Pure ACP` vs `+ Code Mode`), or refreshing models (`/agy-reload`). `/agy-reset` stays available as a background slash command. Selecting an Antigravity model pre-warms `agy acp` in the background, so the status pill moves `Standby` → `Starting...` → `Connected` before you even send the first message.
 
 ---
 
@@ -44,9 +62,10 @@ This plugin follows the same official-harness architecture used by tools like **
 ### Built-in Guardrails
 
 1. **Zero token extraction / zero spoofing:** Never reads Antigravity auth databases or modifies official `agy` headers or binaries.
-2. **Strict context allowlist:** Only user workspace instructions (`core/instructions` / `AGENTS.md`), `core/skill-guidance`, `core/mcp-guidance`, and external `core/codemode` namespaces are forwarded. OpenCode's internal `opencode` namespace (`session_move`, `tools.opencode.*`) is stripped before leaving OpenCode and verified by pre-flight assertion.
-3. **Fail-fast attempt-1 circuit breaker:** Detects upstream API/quota errors (`RESOURCE_EXHAUSTED`, `code 429`, `code 403`, `PERMISSION_DENIED`, `API error (attempt N)`), cancels/kills `agy acp` immediately, trips a persisted 60-second cooldown, and suppresses automatic replay after server restarts.
-4. **Clean plugin disable / reload:** Disposing mid-turn terminates the AI SDK stream cleanly without emitting retryable error chunks so OpenCode doesn't enter retry loops.
+2. **Zero outer-harness injection:** Outer `system` instructions and tool schemas are cleared (`input.system = []`, `input.tools = {}`) for ACP models. No `appendSystemPrompt` is ever passed to `session/new` / `session/resume`. Only the raw latest human prompt + attachments (or a plain-text-only handoff + latest prompt on model switch) leave OpenCode.
+3. **No tool/reasoning replay:** Cross-model switches carry over ONLY plain-text `[Historical user]` / `[Historical assistant]` turns (16k cap). Reasoning, tool calls/results, schemas, todos, and approvals are dropped — Antigravity always owns a clean native session after a switch.
+4. **Fail-fast attempt-1 circuit breaker:** Detects upstream API/quota errors (`RESOURCE_EXHAUSTED`, `code 429`, `code 403`, `PERMISSION_DENIED`, `API error (attempt N)`), cancels/kills `agy acp` immediately, trips a persisted 60-second cooldown, and suppresses automatic replay after server restarts.
+5. **Clean plugin disable / reload:** Disposing mid-turn terminates the AI SDK stream cleanly without emitting retryable error chunks so OpenCode doesn't enter retry loops.
 
 ### Honest Risks to Know
 
@@ -98,10 +117,10 @@ When an **Antigravity (ACP)** model is active, an **`ACP`** pill appears above t
   - `Ask` — Prompts before file edits and shell commands.
   - `Plan` — Creates a plan before executing changes.
 - **Tool bridge:**
-  - `Native + MCP` *(default)* — `agy acp` uses native file/shell tools while OpenCode bridges Code Mode, MCP servers, and skills.
-  - `All OpenCode` — Routes OpenCode's `read`/`edit`/`bash` tools through OpenCode as well *(resets the ACP thread when switched)*.
+  - `Pure ACP` *(default)* — `mcpServers: []`, zero bridged MCPs, 100% native `agy acp`.
+  - `+ Code Mode` — Attaches only the single `oc` Code Mode MCP server *(reconnects automatically with conversation preserved, zero prompt injection)*.
 - **Actions & Slash commands:**
-  - `/agy-reset` — Disposes and resets the active Antigravity ACP thread for the current session.
+  - `/agy-reset` — Disposes and resets the active Antigravity ACP session for the current session (background command).
   - `/agy-reload` — Forces live model & reasoning-effort discovery from `agy acp` and reloads providers.
 
 ---

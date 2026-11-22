@@ -28,8 +28,8 @@
       </a>
     </td>
     <td align="center">
-      <a href="https://badge.socket.dev/npm/package/@tryvira/sdk/0.1.74">
-        <img src="https://badge.socket.dev/npm/package/@tryvira/sdk/0.1.74" alt="Socket security badge for @tryvira/sdk 0.1.74" height="72" />
+      <a href="https://badge.socket.dev/npm/package/@tryvira/sdk/0.1.75">
+        <img src="https://badge.socket.dev/npm/package/@tryvira/sdk/0.1.75" alt="Socket security badge for @tryvira/sdk 0.1.75" height="72" />
       </a>
     </td>
     <td align="center">

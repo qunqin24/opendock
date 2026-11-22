@@ -24,7 +24,7 @@ month █░░░░░░░░░░░░░   0.4%   29d 21h
 
 | 功能 | 说明 |
 |---|---|
-| **三个窗口** | 5 小时滚动、每周、每月，百分比 + 进度条 + 重置倒计时 |
+| **三个窗口** | 5 小时滚动、每周、每月：进度条（宽度跟着面板走）+ 百分比（恒定一位小数）+ 重置倒计时 |
 | **状态徽章** | 正常 / 接近上限（75%）/ 即将限流（90%）/ 已限流 |
 | **模型消耗** | 按模型列出当前 5 小时窗口内的配额消耗，金额降序 |
 | **窗口自动重置** | 窗口起点跟着接口返回的 `resetsAt` 走，重置后旧记录自动排除 |
@@ -95,11 +95,19 @@ opencode plugin add opencode-go-gauge
 
 ## 配色
 
-跟随主题，饱和度压到 0.28 以下（莫兰迪化）。三个语义色（success / warning / error）保持固定，因为红就是红、绿就是绿，不该随主题漂移。
+跟随主题，饱和度压到 0.28 以下（莫兰迪化）。三个语义色（success / warning / error）保持固定，因为红就是红、绿就是绿，不该随主题漂移。填充色只由压力等级决定，同一等级同一颜色——曾经按用量再压一档明度，结果是三条同属「正常」却出现两种绿。
+
+## 进度条的量化
+
+轨道宽度由布局量出来（`Renderable.width` 加 `onSizeChange`），不是写死格数：面板越宽，一格代表的百分比越小。
+
+填充按**半格**取整——整格用背景色，不足一格的那半用 `▐`（U+2590，`East_Asian_Width=N`，中文终端下稳定占 1 列）。这么定有两个理由：非零用量至少看得见半个格，不至于像坏了的空条；而半格比「非零至少一整格」准得多——14 格的条里后者会把 5.3% 画成 7.1%，还跟同一行写的数字互相打脸。
+
+条上不画 75% / 90% 的阈值刻度：那两道贯穿三行的竖杠既没有文字标注，含义又已经由填充颜色表达了。
 
 ## 已知限制
 
-- **需要 OpenCode 2.2.x**（依赖 `client.experimental.usage.limits` 和 `session.hook("http.response")`）
+- **需要 OpenCode 2.2.x 以上**：依赖 `client.experimental.usage.limits` 与 `session.hook("http.response")`，已在 v2.3.2 实测可用
 - **只有服务端 hook 记账**：TUI 单独运行（`--standalone`）时可能收不到
 - **窗口边界有短暂延迟**：`resetsAt` 过期但接口还没返回新值时，会短暂显示上一窗口的数字
 - **`kind=title` 的标题生成也计入**：它确实消耗配额，所以和 Console 口径一致，但会让数字比「你主动调用模型」略高
@@ -110,7 +118,7 @@ opencode plugin add opencode-go-gauge
 npm install
 npm run build     # babel src -> dist
 npm run typecheck # tsc --noEmit，babel 不做类型检查
-npm test          # node:test，61 个用例
+npm test          # node:test，99 个用例
 npm run verify    # typecheck + build + test，发版前跑这个
 ```
 

@@ -73,7 +73,7 @@ It is **on by default** and needs no model name to run. With `captureModel` unse
 
 What has been established, and by which kind of evidence, is itemised in [docs/internals/auto-capture-evidence.md](docs/internals/auto-capture-evidence.md). Read that file before quoting any figure in it — two of the entries are defects found in the measuring bench itself, and the corrected numbers are the ones recorded there. `bench/capture-trigger-results.md` is a **bench** simulation of trigger *timing* with a scripted extractor; it answers "which moment is worth mining", not "does this earn its keep".
 
-**Am I armed?** `memory_evidence` answers on the `plugin_load` line: `capture=on` (the default), `capture=off` (`autoCapture: false`), `invalid_model`, `no_capabilities`, or `switch_mismatch`. `capture=on` plus no `auto_capture_*` line after a session means the pass did not complete, not that your configuration is wrong; #404 found that mechanism and its fix is merged. On desktop this needs `opencode service restart` after an edit — relaunching the app keeps the old service and its already-parsed options alive.
+**Am I armed?** `memory_evidence` answers on the `plugin_load` line: `capture=on` (the default), `capture=off` (`autoCapture: false`), `invalid_model`, `no_capabilities`, or `switch_mismatch`. Once armed, an empty turn leaves one of these lines: `capture_cost` a verdict, `auto_capture_skipped` nothing durable, `auto_capture_start` alone a pass cut before its verdict, `auto_capture_dispose` no turn-end event seen. On desktop this needs `opencode service restart` after an edit — relaunching the app keeps the old service and its already-parsed options alive.
 
 ## How memory is written
 

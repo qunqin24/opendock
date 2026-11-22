@@ -178,6 +178,14 @@ npm run typecheck    # tsc --noEmit
 | 错误策略    | `Promise.allSettled` 优雅降级（部分失败也展示）  |
 | 刷新策略    | 挂载首次获取 + 定时轮询（默认 5 分钟，可自定义） |
 
+## 插件作者对接
+
+本面板是**多 provider 设计**：除 GLM 原生视图外，任何其他 provider 插件（AtomCode、CodeArts，或你自己的 provider）只需注册一个 `<providerID>.quota` RPC，即可把自己的额度**实时送进同一块侧边栏**——零耦合、零配置、无需改动本插件。
+
+本插件自身也是一个 quota 来源：将包加入 **server 插件列表**（`opencode.json` 的 `plugins`），它会把 GLM 额度以同一协议暴露出去（`zai-coding-plan.quota` 等全部 GLM 供应商别名），供任何 reader 消费；`cli.json` 的 TUI 入口不受影响。
+
+协议契约、行为细节与单文件接入示例见 **[docs/quota-rpc.md](./docs/quota-rpc.md)**。
+
 ## 故障排查
 
 | 现象                  | 可能原因                                                           |

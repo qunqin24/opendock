@@ -62,7 +62,7 @@ Waiting time is shortened, so the length is not the review duration.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.4.5
+   opencode plugin add opencode-azure-devops-pr-review@0.4.6
    ```
 
 2. In OpenCode's terminal UI, type `/pr-setup`. Dialogs ask for your Azure
@@ -448,14 +448,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.5
+opencode plugin add opencode-azure-devops-pr-review@0.4.6
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.5'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.6'
 ```
 
 Add only one of them. OpenCode 2.3.0 loads the plugin into a running OpenCode
@@ -470,7 +470,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.4.5",
+    "package": "opencode-azure-devops-pr-review@0.4.6",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -495,7 +495,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.4.5 &&
+opencode plugin add opencode-azure-devops-pr-review@0.4.6 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -527,7 +527,8 @@ the first one (`Unknown setting settings.terminalPanel`) instead of starting. `o
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.4.5 release notes](docs/releases/v0.4.5.md) for what changed, the
+See the [0.4.6 release notes](docs/releases/v0.4.6.md) for what changed, the
+[0.4.5 release notes](docs/releases/v0.4.5.md) for stopping a run from the panel, the
 [0.4.4 release notes](docs/releases/v0.4.4.md) for the steps at the panel's foot, the
 [0.4.3 release notes](docs/releases/v0.4.3.md) for setup in the terminal UI, the
 [0.4.0 release notes](docs/releases/v0.4.0.md) for commands without review IDs and the
@@ -541,8 +542,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.4.5 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.5.tar.gz)
-and extract it, or check out tag `v0.4.5`. The installer needs POSIX `sh` and
+Download the [v0.4.6 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.4.6.tar.gz)
+and extract it, or check out tag `v0.4.6`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -1079,7 +1080,8 @@ notices as before. The same terminal part brings the
 
 `/pr-comment` plans one general summary plus inline comments for confirmed high
 and medium findings (low findings stay in the summary index). Planning runs in
-pages of at most four findings, two pages at a time, and the pages are joined
+pages of at most four findings (more only where one defect at several places
+keeps its findings together), two pages at a time, and the pages are joined
 in page order, so the result does not depend on which page finishes first; each
 page may get a correction turn, and an item that still cannot be posted
 faithfully is skipped with a reason instead of failing the command. Inline
@@ -1091,6 +1093,27 @@ quick review, not independently verified` (and, in the summary, incomplete
 coverage), and their inline comments need a location on a changed HEAD file.
 When two shards of a quick review report one defect, the planner may combine
 them into one comment under fixed rules (see [commenting](docs/COMMENTING.md)).
+
+One mistake is often made at several places of a pull request: the same wrong
+call in each handler, the same stale text in each copy. Each place is a
+finding of its own, and the planner may give such findings one inline comment
+instead of a thread per place. The comment stands at the place that shows the
+mistake most clearly, and AZPR lists every other place under it:
+
+```text
+**📍 Also at** (the same defect; fix these places with it):
+- `/src/orders/refund.ts:41-44` (F-3)
+- `/src/orders/cancel.ts:18` (F-5)
+```
+
+The findings must have the same severity and need the same correction; places
+that need different corrections keep their own comments. Every place keeps
+its row in the summary index, and you can still exclude or regrade each one
+after a preview. A shared comment has a marker of its own, so it counts as
+already posted only when this very comment, with every place, is on the pull
+request; and a shared comment and a comment for one place are not planned
+onto the same quoted lines (see
+[one defect at several places](docs/COMMENTING.md#one-defect-at-several-places)).
 
 ### Adjusting findings after a preview
 
@@ -1294,8 +1317,8 @@ dependency and is not built on your machine.
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.4.5` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.5'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.4.6` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.4.6'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -1308,7 +1331,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.4.5](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.5)
+release scope, [v0.4.6](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.4.6)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

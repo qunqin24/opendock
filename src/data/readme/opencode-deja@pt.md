@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Memória local compartilhada, transferência entre agentes e recuperação de código para 49 agentes de código.</b></p>
+<p align="center"><b>Memória local compartilhada, transferência entre agentes e recuperação de código para 52 agentes de código.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes e mais 42 agentes já salvam cada sessão em disco.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes e mais 45 agentes já salvam cada sessão em disco.<br>
 O deja indexa tudo localmente para que seus agentes mantenham o contexto após o <code>/compact</code>, passem a tarefa adiante com <code>deja handoff</code> e recuperem código sobrescrito com <code>deja restore</code> — sem LLM, um único binário em Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | Português | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ indexado e qual comando rodar em seguida.
 
 ## O que você ganha
 
-**Resolvido no Codex, lembrado pelo Claude.** Quarenta e nove agentes de código escrevem cada conversa em
+**Resolvido no Codex, lembrado pelo Claude.** Cinquenta e dois agentes de código escrevem cada conversa em
 arquivos locais, e o deja transforma esses arquivos numa camada de memória que todos eles conseguem ler.
 
 | | |
@@ -290,7 +290,7 @@ cada um tem um pacote no próprio ecossistema, para quem instala extensões por 
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/pt.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | plugin `lazy.nvim` e CodeCompanion ([`extensions/nvim/`](../../extensions/nvim/docs/pt.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | popup [TPM](https://github.com/tmux-plugins/tpm) (`prefix + D`) e `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | extensão Raycast `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | importação em 1 clique de MCP e repositório de Skills (`ccswitch://`) | [Adicionar MCP ao CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Guia de troca de agente](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Qualquer um dos dois caminhos basta e os dois juntos não quebram nada: cada pacote lê primeiro o que o
