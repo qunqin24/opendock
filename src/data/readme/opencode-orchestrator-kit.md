@@ -38,17 +38,20 @@ On **OpenCode 2** the kit is the `opencode-orchestrator-kit` plugin, published o
 
 > "Add refresh-token rotation to the auth service."
 
-| Step | Agent                 | What happens                                                                                 |
-| ---- | --------------------- | -------------------------------------------------------------------------------------------- |
-| 1    | `explorer`            | Reads the current auth flow (read-only).                                                     |
-| 2    | `planner`             | Turns findings into a phased plan in `plan/draft/`.                                          |
-| 3    | `plan-writer`         | Owns the plan board: `plan/draft/` -> `plan/in-progress/` -> `plan/qa/` -> `plan/complete/`. |
-| 4    | `developer-fixer`     | Implements one phase at a time, with fresh context each time.                                |
-| 5    | `test-engineer`       | Writes and runs tests for the new logic.                                                     |
-| 6    | `security`            | Reviews the auth-sensitive change before it reaches `plan/complete/`.                        |
-| 7    | `comprehension-coach` | Developer-support comprehension check, scaled to the change (NONE / LIGHT / DEEP).           |
+| Step | Agent                 | What happens                                                                                                                                                                                                     |
+| ---- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | `orchestrator`        | Intake: an ambiguous request is restated for explicit confirmation before any delegation; a clear one proceeds as-is (see [workflow intake configuration](docs/CONFIGURATION.md#workflow-intake-configuration)). |
+| 1    | `explorer`            | Reads the current auth flow (read-only).                                                                                                                                                                         |
+| 2    | `planner`             | Turns findings into a phased plan in `plan/draft/`.                                                                                                                                                              |
+| 3    | `plan-writer`         | Owns the plan board: `plan/draft/` -> `plan/in-progress/` -> `plan/qa/` -> `plan/complete/`.                                                                                                                     |
+| 4    | `developer-fixer`     | Implements one phase at a time, with fresh context each time.                                                                                                                                                    |
+| 5    | `test-engineer`       | Writes and runs tests for the new logic.                                                                                                                                                                         |
+| 6    | `security`            | Reviews the auth-sensitive change before it reaches `plan/complete/`.                                                                                                                                            |
+| 7    | `comprehension-coach` | Developer-support comprehension check, scaled to the change (NONE / LIGHT / DEEP).                                                                                                                               |
 
 Every delegation uses a 9-section task spec (Goal, Success Criteria, Scope, Safety, Inputs, Outputs, Test Plan, Verification, Edge Cases), never a free-form prompt. The orchestrator itself never edits `auth.ts`.
+
+Before routing, the orchestrator checks whether the request is ambiguous — goal, scope, affected files, or constraints neither stated nor inferable from the request, session memory, project profile, or repo. If it is, the request is restated as an explicit spec and confirmed with you before anything is dispatched; a clear request routes exactly as before, with no extra round-trip and no skill load: the `workflow-intake` skill is loaded only for an ambiguous request or a `workflow.mode` decision. The restated spec's complexity is triaged categorically onto NONE / LIGHT / DEEP — `NONE` is the existing small-task shortcut (at most one file or no plan needed), `LIGHT` the bounded band between NONE and DEEP (direct delegations, no plan card), `DEEP` security-sensitive, cross-module or multi-phase work (plan card) — never a numeric score, and `workflow.mode` in `.opencode/workflow.config.json` decides how binding that triage is: `auto` (default) keeps today's routing, `full` always runs the standard flow, `lite` permits the slim quick path by explicit decision. Configuration: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md#workflow-intake-configuration); protocol and criteria: [`skills/workflow-intake/SKILL.md`](skills/workflow-intake/SKILL.md).
 
 ## Design decisions
 
@@ -112,7 +115,7 @@ A local checkout of this repository uses the same object form with an absolute d
 opencode plugin add 'github:NicoGenti/opencode-orchestrator-kit#main::path:plugin'
 ```
 
-What the plugin registers at runtime (nothing is copied into `.opencode/`): 16 agents (+ `pc-doctor` and `writer` with `"withExtras": true`), 5 commands (`/start-session`, `/quick`, `/recall`, `/research-mode`, `/close-session`), 10 skills, and the native `plan_board` tool — the TypeScript port of `scripts/plan-board.py`, where standing authorization covers `check` and `move` of conforming plan files and every other board operation needs per-request approval. Setup options are `preset` (one of the five bundled presets, in the same format as `templates/models.config.json`; all-`placeholder/*` presets fail fast with a `TierConfigError`) and `withExtras` (default `false`).
+What the plugin registers at runtime (nothing is copied into `.opencode/`): 16 agents (+ `pc-doctor` and `writer` with `"withExtras": true`), 5 commands (`/start-session`, `/quick`, `/recall`, `/research-mode`, `/close-session`), 11 skills, and the native `plan_board` tool — the TypeScript port of `scripts/plan-board.py`, where standing authorization covers `check` and `move` of conforming plan files and every other board operation needs per-request approval. Setup options are `preset` (one of the five bundled presets, in the same format as `templates/models.config.json`; all-`placeholder/*` presets fail fast with a `TierConfigError`) and `withExtras` (default `false`).
 
 Your own configuration always wins: the plugin upserts an agent's `transform` only when the editor returns nothing for it, so user config in `~/.config/opencode/` or the project config is never overwritten.
 
@@ -191,6 +194,7 @@ Caveats, in the spirit of [`docs/BENCHMARK-TOKEN-USAGE.md`](docs/BENCHMARK-TOKEN
 - **Opt into extras** with `./install.sh --with-extras` to install `pc-doctor` and `writer` into `agents/`. Re-run with `--upgrade` (or `--force`) to refresh kit files that are already installed.
 - **Add a skill** by following [Companion kits](#companion-kits) below. A file at `skills/<name>/SKILL.md` is not loaded while an agent's `permission.skill` map starts with `"*": deny`.
 - **Optional structural search:** if `ast-grep` (`sg`) is installed, the `explorer` can use it for structural queries; see `skills/structural-search/SKILL.md`.
+- **MCP servers and Code Mode:** OpenCode 2 reaches MCP tools inside `execute` (Code Mode) by default, so a tool missing from the native list is not a missing server. The per-server `codemode`/`disabled` options, the opt-out shape and the kit's CRG pointer are in [`docs/CODE-MODE.md`](docs/CODE-MODE.md).
 - **Measure token impact:** follow the A/B protocol in [`docs/BENCHMARK-TOKEN-USAGE.md`](docs/BENCHMARK-TOKEN-USAGE.md) to compare exploration with and without the repo map.
 - **Design-first governance:** keep architecture decisions in `.context/DESIGN-RULES.md`; [`docs/DESIGN-RULES.md`](docs/DESIGN-RULES.md) describes the template, the lifecycle, and the checks run by `planner` and `code-reviewer`.
 - **Engineering baseline** (secrets hygiene, git hygiene, definition of done) lives in `CONTRIBUTING.md`.
@@ -303,12 +307,28 @@ Companion repositories are optional. This kit runs on its own. A third-party kit
 
 ### Extension contract
 
-- **Skills path.** Put each skill at `.opencode/skills/<name>/SKILL.md` with frontmatter `name` equal to `<name>` ([Skills](https://opencode.ai/v2/docs/skills)). This plugin does not register those skills. The `skill` tool loads whatever OpenCode discovers on that path.
+- **Skills path.** Put each skill at `.opencode/skills/<name>/SKILL.md` with frontmatter `name` equal to `<name>` ([Skills](https://opencode.ai/v2/docs/skills)). This plugin does not register those skills. The `skill` tool loads whatever OpenCode discovers on that path. Vet a skill before enabling it — see [Verify your skills](#verify-your-skills).
 - **`web-*` is reserved** for web-stack skill packs (theme, brand, scaffold, deploy, and similar). Agents that allow the glob: `orchestrator`, `oracle`, `developer-fixer`, `code-reviewer`, and `deploy-helper`. A skill named `web-…` is enabled for those agents, so project skills and unrelated packs use another prefix. One example of the shape is `web-theme` or `web-deploy`.
 - **`project-*` is reserved** for the consuming project's own skills. `orchestrator`, `developer-fixer`, and `code-reviewer` already allow it. Other agents need an allowlist edit before they can load a `project-*` skill.
 - **Shell asks.** `developer-fixer` asks before `npx`, `dotnet`, `ng`, `docker build`, and `bash` or `sh` scripts under a skill `scripts/` directory. A companion can ship those commands under that ask, with the shell catch-all still deny.
 - **Commands.** A companion registers its own commands in OpenCode (a site scaffolder is one example). This plugin registers `/start-session`, `/quick`, `/recall`, `/research-mode`, and `/close-session`.
 - **Design-rules template.** `templates/design-rules.md` is a starting point, including an optional UI section. Copy it and customize or delete sections. This repository does not fetch or pin an upstream copy.
+
+### Verify your skills
+
+A `web-*` pack or a `project-*` skill is prompt content that runs with your agent's permissions, so vet it before it is enabled. NVIDIA's [SkillSpector](https://github.com/NVIDIA/SkillSpector) runs 71 patterns across 17 categories over a skill directory and scores it 0–100. This kit pins v2.13.6 and gates itself on a committed baseline, so a scan reports only findings newer than the review.
+
+```bash
+# the pin this kit gates on
+uv tool install --python 3.13 git+https://github.com/NVIDIA/skillspector.git@v2.13.6
+# one directory per run, static analysis only
+skillspector scan .opencode/skills/<name>/ --no-llm
+# after baselining that directory: fail on new findings only
+skillspector scan .opencode/skills/<name>/ --no-llm \
+  --baseline .skillspector-baseline.yaml --fail-on-findings
+```
+
+If the scan cannot run at all, treat the skill as unvetted and do not enable it until it can. Verdict bands, baseline triage, and the scanner's residual limits are in [`docs/SKILL-VETTING.md`](docs/SKILL-VETTING.md).
 
 ### Adding a skill
 

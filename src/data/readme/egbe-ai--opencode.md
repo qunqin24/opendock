@@ -1,4 +1,4 @@
-# Egbe plugins for Claude, Gemini CLI, OpenClaw and Hermes
+# Egbe plugins for Claude, Codex, Gemini CLI, OpenCode, OpenClaw and Hermes
 
 This repository is the [Claude plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces)
 for **Egbe**, an AI co-founder's business stack. Its one plugin, [`egbe`](plugins/egbe),
@@ -102,13 +102,18 @@ from a repository; in Codex, run
 marketplace. Then ask your agent to set up Egbe and sign in when it asks.
 
 In OpenCode (1.18.29 or later, or 2.x), add the native Egbe plugin,
-[`@egbe-ai/opencode`](plugins/egbe-opencode), to `opencode.json`:
-`"plugins": ["@egbe-ai/opencode"]` in OpenCode 2 (or
-`opencode plugin add @egbe-ai/opencode`), `"plugin": ["@egbe-ai/opencode"]` in 1.x.
-It adds Egbe's skills and the `egbe` MCP server. Sign in once with
-`opencode mcp auth egbe` in a terminal (or `/mcps` in OpenCode 2), restart
-OpenCode and ask it to set up Egbe. Until the package is on npm, clone this
-repository and list the folder's absolute path instead of the package name.
+[`@egbe-ai/opencode`](https://www.npmjs.com/package/@egbe-ai/opencode) (source in
+[`plugins/egbe-opencode`](plugins/egbe-opencode)):
+
+```sh
+opencode plugin @egbe-ai/opencode -g
+```
+
+In OpenCode 2, run `opencode plugin add @egbe-ai/opencode` instead; you can
+also list it in `opencode.json` yourself (`"plugin": ["@egbe-ai/opencode"]` in
+1.x, `"plugins": [...]` in 2). It adds Egbe's skills and the `egbe` MCP server.
+Sign in once with `opencode mcp auth egbe` in a terminal (or `/mcps` in
+OpenCode 2), restart OpenCode and ask it to set up Egbe.
 Session logging is on by default here too: in project folders set up for
 Egbe, the plugin sends each run's turn (your messages, model calls with usage,
 tool calls with their results, and replies) to

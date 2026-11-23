@@ -14,6 +14,12 @@ non-navigation keys so they cannot approve, cancel, or edit the form. Press
 Ctrl+Q again to return to the form. Permission prompts and unrelated forms
 continue to own their keys and block NAV.
 
+The native Ask Question form also supports Ctrl+Q to navigate the transcript.
+While NAV is active, typing, selection, Enter, and paste cannot change or
+submit an answer. Ctrl+Q or `i` returns to the question and follows the latest
+output; Escape or Ctrl+C returns without following or cancelling the question.
+The form resumes its normal input handling after leaving NAV.
+
 ## Compatibility
 
 Tested with **OpenCode 2.1.4**. This uses OpenCode V2's TUI plugin API, not the
@@ -88,16 +94,18 @@ discovery. Use **one installation method**, not both. Restart OpenCode.
 | **i** | Type normally | Return to INPUT, follow latest output, preserve draft |
 | **Escape / Ctrl+C** | OpenCode default | Leave NAV without moving the viewport, then perform OpenCode's normal interrupt/clear action |
 
-Only Ctrl+Q is intercepted in INPUT, and only when the actual normal prompt
-is focused. Ctrl+U/D keep their default prompt-editing/exit behavior until NAV.
+Only Ctrl+Q is intercepted in INPUT, when the actual normal prompt is focused
+or an eligible question or plan-review form owns input. Ctrl+U/D keep their
+default prompt-editing/exit behavior until NAV.
 In NAV, other keys, Enter, and pasted text are ignored to protect the draft
 and avoid accidental submissions. This is transcript navigation, not Vim
 editing, selection, or visual mode.
 
 Dialogs and other non-base modes keep their own keyboard handling. NAV is
 not entered from shell mode, autocomplete, unrelated textareas, or permission
-rejection editors. Pending permissions/forms prevent NAV entry; incoming
-requests exit NAV. Root-session checks include descendant/subagent requests,
+rejection editors. Pending permissions and unrelated forms prevent NAV entry;
+incoming blocking requests exit NAV. Only the first displayed native question
+form can enter NAV. Root-session checks include descendant/subagent requests,
 and location-scoped global forms are checked as well. Session changes reset
 NAV. The home screen and mouse behavior are unchanged.
 
@@ -178,6 +186,10 @@ the npm loading path. Validate:
    interactive. Ctrl+Q does not capture their rejection-reason editor.
 8. Dialogs, forms, shell mode, session switches, and plugin disable/re-enable
    retain correct input ownership, with no duplicate listeners.
+9. With a native Ask Question form open, test Ctrl+Q, transcript scrolling,
+   and protected typing/paste/Enter in NAV. Return to the form and verify its
+   selection and partial custom answer are unchanged. With `form-ctrl-nav`
+   enabled, Ctrl+N/P should still navigate answers in form input.
 
 A load/keyboard smoke test against the public 0.1.2 package passed. The packed
 0.1.3 archive also passed a live OpenCode npm-loader smoke test using a

@@ -152,7 +152,7 @@ A write that cites code references builds one tree index — a single recursive 
 
 The plugin keeps a use ledger — a due-date card for every row: who looked at it, when, and how it reached them. It is append-only, never ingested as a memory, and reported in `memory_status` and the `/memory` panel.
 
-- **Use has three distinct sources** — the row rode the injected block, `memory_recall` returned it, or a grep/read pull appended it — because "the model asked" and "the harness offered" are different facts. No prompt content is stored: the ledger keeps a scan-truncated string from the *memory* side, never your message.
+- **Use has three sources.** Injection offers a row to the model. `memory_recall` returns a requested row. A tool pull earns credit when the plugin sees the row’s complete line in the matching tool result during `session.context`. The ledger records matching terms from memory and omits prompt text.
 - **Reinforcement is a tie-break only** (`useBoost ≤ 1.0`): a recently used row wins a tie and can never outrank a real score gap.
 - **`never retrieved` is stated, not acted on.** Pruning is your decision.
 - **Aggregate STORE counts are machine-wide by decision (#213 B)** — they describe the store on this machine, not your slice of it. Privacy applies to the content surfaces instead: `memory_evidence` and the recent-blocked-writes list follow each reader's repository visibility (#306).

@@ -176,11 +176,13 @@ A command rule is also tried against the text inside `bash -c`, `sh -c`, `powers
 
 | Command | Exit codes |
 | --- | --- |
-| `check [--policy f] [--json]` | 0 ok, 2 invalid |
+| `check [--policy f] [--json] [--explain --action a [--command c] [--path p]]` | 0 ok, 2 invalid; with `--explain`: 1 usage, 10 ask, 20 deny |
 | `evaluate --action a [--command c] [--path p]` | 0 pass, 10 ask, 20 deny |
 | `audit --log f [--html out] [--open] [--json]` | 0 ok, 4 missing log, 5 broken chain |
 | `init [--preset p] [--out f] [--force]` | 0 ok, 1 exists |
 | `redact [file]` | 0 |
+
+`cordon check --explain --action shell --command "bash -c \"rm -rf /tmp\""` prints the candidates, the first matching rule, later rules that also match, and how a native allow, ask, or deny would change. It uses the same decision as `evaluate` and the plugin.
 
 ## Audit log
 
@@ -197,7 +199,7 @@ Secrets are redacted before writing. Every command gets a stable hash so records
 | Check | Result |
 | --- | --- |
 | Live regression | Passed on OpenCode 2.2.5: `.env` and `rm -rf` both force-denied under `--auto` — [`docs/REGRESSION.md`](docs/REGRESSION.md) |
-| Unit + adapter tests | 61 passing |
+| Unit + adapter tests | 63 passing |
 | Packaging | `npx opencode-cordon --version` works |
 | CI | Node 20/22/24 × Ubuntu/Windows |
 
@@ -215,7 +217,7 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 - [x] Live regression on OpenCode 2.2.5
 - [ ] Live "what is being blocked right now" TUI panel
-- [ ] `cordon check --explain`
+- [x] `cordon check --explain`
 - [x] Hash-chained audit entries, checked by `cordon audit` (exit 5 when the chain breaks)
 - [ ] GitHub Action that fails a PR when dangerous rules are removed
 - [ ] Community policy templates

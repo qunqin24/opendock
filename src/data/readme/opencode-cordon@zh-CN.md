@@ -194,11 +194,13 @@ Glob：`*`（路径模式下不跨 `/`）、`**`（跨目录，`**/` 可匹配�
 
 | 命令 | 作用 | 退出码 |
 | --- | --- | --- |
-| `check [--policy f] [--json]` | 校验策略、打印生效规则 | 0 通过，2 无效 |
+| `check [--policy f] [--json] [--explain --action a [--command c] [--path p]]` | 校验策略；`--explain` 解释一次调用命中了哪条规则、后面哪些规则没轮到、原生 allow/ask/deny 会变成什么 | 0 通过，2 无效；带 `--explain` 时还有 1 用法错误、10 ask、20 deny |
 | `evaluate --action a [--command c] [--path p] [--tool t] [--agent id]` | 判定单条调用 | 0 pass，10 ask，20 deny |
 | `audit --log f [--html out] [--open] [--json]` | 汇总日志、检查哈希链、生成 HTML | 0 成功，4 日志缺失，5 链断裂 |
 | `init [--preset p] [--out f] [--force]` | 生成起始策略 | 0 成功，1 已存在/用法错误 |
 | `redact [file]` | 从文件或 stdin 脱敏 | 0 |
+
+`cordon check --explain --action shell --command "bash -c \"rm -rf /tmp\""` 会打印候选命令、第一条命中的规则、同样命中但没轮到的后续规则，以及原生 allow、ask、deny 会变成什么。判定和 `evaluate`、插件是同一条。
 
 ## 审计日志与报告
 
@@ -217,7 +219,7 @@ JSONL 每行一个事件（`decision` / `tool` / `shell`）：
 | 项 | 结果 |
 | --- | --- |
 | 真机回归 | **OpenCode 2.2.5 通过**（2026-11-03）：`--auto` 下 `.env` 读取被 `ask → deny`、`rm -rf ./scratch` 被 `allow → deny`，两次都落盘，目标文件保留 —— [`REGRESSION.md`](REGRESSION.md) |
-| 单元 + 适配层测试 | **61 个全部通过**（`node --test test/guard.test.mjs test/plugin.test.mjs`），其中一套用真实 `@opencode/plugin` 钩子 + 假 context 驱动插件 |
+| 单元 + 适配层测试 | **63 个全部通过**（`node --test test/guard.test.mjs test/plugin.test.mjs`），其中一套用真实 `@opencode/plugin` 钩子 + 假 context 驱动插件 |
 | 打包 | 已发布 [`opencode-cordon`](https://www.npmjs.com/package/opencode-cordon)，`npx opencode-cordon --version` 可用 |
 | CI | Node 20/22/24 × Ubuntu/Windows |
 
@@ -236,7 +238,7 @@ JSONL 每行一个事件（`decision` / `tool` / `shell`）：
 
 - [x] OpenCode 2.2.5 真机回归 + 钩子 payload 样例
 - [ ] `session.panel` TUI 面板：实时显示“现在正在拦什么”
-- [ ] `cordon check --explain`：解释为什么命中、改哪条会怎样
+- [x] `cordon check --explain`：解释为什么命中、改哪条会怎样
 - [x] 审计哈希链，由 `cordon audit` 检查（链断裂时退出码 5）
 - [ ] GitHub Action：PR 删掉危险规则时失败
 - [ ] 社区策略模板

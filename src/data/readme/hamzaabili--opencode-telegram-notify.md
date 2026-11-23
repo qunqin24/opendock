@@ -82,9 +82,9 @@ a chat-with-your-agent relay, it never injects text into your sessions.
   registered via `setMyCommands`, so the ☰ menu works out of the box.
   `/setup` prints a copy-paste-ready `opencode.jsonc` block.
 - 🏠 **Multi-instance safe** — several OpenCode instances on one host: each
-  notifies only for its own project root; a single-poller file lock guarantees
-  only one process consumes `getUpdates`; process-level event-id dedupe means
-  reloads don't double-send.
+  notifies only for its own project root; one file lock per bot token
+  guarantees a single `getUpdates` consumer; process-level event-id dedupe
+  means reloads don't double-send.
 - 🌐 **en / it / zh** notification language (BCP-47 tags accepted).
 - 🔒 **Private by default** — `hideCommands: true` replaces shell/tool args with
   a count; every log line and error message is token-redacted.
@@ -185,7 +185,7 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | --- | --- | --- | --- |
 | `telegram.botToken` | string | — | Bot token; `"${VAR}"` expands from process env |
 | `telegram.chatId` | string | — | Destination chat (user id or negative group id) |
-| `telegram.allowedUserIds` | string[] | `[]` | Extra guard: only these Telegram user ids may tap buttons or run commands (empty = everyone reaching this bot token) |
+| `telegram.allowedUserIds` | string[] | `[]` | Extra guard: only these Telegram user ids may tap buttons or run commands. Empty = anyone who can reach the bot — on a group chat, set this: otherwise any member can answer permissions or run `/stop` |
 | `language` | string | `"en"` | Notification language: `en`, `it`, `zh`. Tags such as `zh-CN`, `zh-Hans` or `it-IT` match by base language; unknown tags fall back to `en`; `cn` is accepted as a `zh` alias |
 | `events.permission` | boolean | `true` | Permission request notifications + buttons |
 | `events.question` | boolean | `true` | Question (`form.created`) notifications |
@@ -200,6 +200,7 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `maxMessageChars` | number | 3800 | Max body length (Telegram hard limit is 4096) |
 | `hideCommands` | boolean | `false` | Replace shell/tool arguments with `[n]` in bodies |
 | `logFile` | string | off | Append-only debug log path (token-redacted, one line per event) |
+| `lockDir` | string | cache dir | Absolute path override for the poller lock/state directory (`~` is not expanded); the default is namespaced per bot token (see Multi-instance behavior). A shared path is shared by every bot pointed at it |
 
 `language` is process-wide (one chat per plugin instance). `zh` currently
 contains Simplified Chinese; `zh-TW`/`zh-Hant` resolve to it until a
@@ -262,7 +263,7 @@ ignored — this is a notifier, not a chat relay.
 | `/start` | Re-enables a silenced chat; echoes your chat id in a copy-block |
 | `/status` | Running state, project root, which event groups are on, active ignore rules |
 | `/setup` | Copy-paste-ready `opencode.jsonc` snippet (with placeholders, never your token) |
-| `/stop` | Silence notifications in this chat until `/start` |
+| `/stop` | Silence notifications in this chat until `/start` (persisted across restarts and shared by every instance of the same bot) |
 | `/help` | Short command list |
 
 ## How it fits OpenCode
@@ -294,13 +295,27 @@ ignored — this is a notifier, not a chat relay.
 
 One host can run several OpenCode instances (different roots, same bot token):
 
-- the first instance that wins the cache-dir file lock (`~/.cache/
-  opencode-telegram-notify/poller.lock`, with liveness heartbeat) consumes
-  Telegram updates and serves the chat;
+- the first instance that wins the file lock consumes Telegram updates and
+  serves the chat. Lock and state live under
+  `~/.cache/opencode-telegram-notify/<sha256(token) prefix>/poller.lock` and
+  `poller.offset.json`, so **bots with different tokens never share a lock or
+  an update offset**; instances of the *same* token share both on purpose;
 - every instance is notified only about its own root, so taps are routed by
   whichever instance is polling;
 - losing activation (crash, machine restart), staleness after ~30 s lets the
-  next instance take over.
+  next instance take over. The last processed `update_id` and the `/stop`
+  silence survive the handover, and standby instances mirror the silence flag
+  so `/stop` reaches every project served by that bot. Standbys re-read the
+  state on their acquire retry (15 s by default), so a project can still send
+  one notification for up to that long after `/stop`;
+- after upgrading from 0.7.0 or earlier the per-token state starts empty and
+  the old shared `poller.offset.json` is ignored (safe to delete). Telegram
+  only replays updates it still holds (a 24 h window), so a recent notification
+  can repeat once; no new update is ever skipped. Downgrading to 0.7.0 is safe
+  too: it ignores the per-token directory and reads the old shared file again,
+  so at worst recent updates replay;
+- `/stop` is stored per bot token, so it applies to the one chat bound to that
+  token. Use one bot per chat.
 
 ## Troubleshooting
 

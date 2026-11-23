@@ -1,6 +1,10 @@
 ﻿# OpenCode QQ Bot
 
-通过 QQ 机器人与 [OpenCode](https://opencode.ai) AI 编程助手对话——双向监控桌面会话、远程发起任务、权限审批与选择弹窗直达 QQ、图片语音双向、长任务不丢答案。
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+Talk to [OpenCode](https://opencode.ai) — the open-source AI coding agent — through QQ. Monitor desktop sessions from your phone, launch tasks remotely, approve permission requests and answer form prompts right in QQ, with two-way images and voice, and long tasks that never lose their answers.
+
+Built for production, not just message bridging: a self-healing watchdog, an auditable kill log, dead-turn auto-continuation, official-quota-aligned rate governance, and multi-bot single-process isolation.
 
 [![npm version](https://img.shields.io/npm/v/@linjz/opencode-qqbot)](https://www.npmjs.com/package/@linjz/opencode-qqbot)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
@@ -8,75 +12,78 @@
 [![Bun](https://img.shields.io/badge/Bun->=1.0-fbf0df)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6)](https://www.typescriptlang.org/)
 
-> 面向中文用户。OpenCode V2（桌面后台服务）+ QQ 官方开放平台机器人（C2C 单聊 / 群聊 @）。
+> Target users: Chinese-speaking QQ users. OpenCode V2 (desktop background service) + an official QQ open-platform bot (C2C private chat / group @mention).
 
-## 功能一览
+## Features
 
-| 能力 | 说明 |
+| Capability | What it does |
 |---|---|
-| 双向对话 | QQ 消息直达 opencode 会话，AI 回复推回 QQ（markdown 渲染、长文自动结构化分条：表格不拆散、代码块围栏自动修补） |
-| 桌面会话镜像 | 📋 摘要卡：桌面会话的最近一轮问答实时推送到 QQ（默认全文） |
-| 进度观察 | `/watch` 订阅工具调用里程碑（🔧 命令摘要/退出码），节流合并推送 |
-| **权限审批** | opencode 发起权限请求 → QQ 收 🔐 四键卡片（允许一次/总是允许/拒绝/忽略），点按钮静默生效（点击后该按钮回显 ✓/✗，其余按钮保持原样），也可文字回复"允许/总是/拒绝" |
-| **选择弹窗桥接** | opencode 的 Form（选择/多选/布尔/文本）→ QQ 📝 卡片，点按钮或回字母（A/B/C）作答；桌面端回合发起的审批/表单**同样**推送（常驻监听，12s 轮询，bot 空闲也收得到） |
-| 远程指令 | `/new /stop /status /sessions /history /model /agent /rename /watch /mirror /progress /queue /ledger /send` |
-| 富媒体 | 收图（原生附件给 AI 看图）；**收语音**（QQ 内置 ASR 免费转文字进 prompt）；**发图/发文件**（AI 回复含 `QQ_SEND_FILE: <路径>` 标记或 `/send <路径>` 指令，20MB 上限） |
-| 引用上下文 | 长按引用某条消息提问，AI 能感知被引用的内容（我方回复也会入索引缓存） |
-| 长任务不丢 | 前台 30min 超时 → 后台等待（SSE + 轮询，最长 24h）；停滞 30min 主动提醒（带「已停滞/状态不明/已终结未回传」状态位 + 最近工具动作 + 无进展时长） |
-| 投递幂等 | 双层去重：同 msgId 跨进程原子占位 + 同内容在途指纹（窗口=并发在途；已完成消息的重发按重发处理）；同文长回复 24h 出站去重；「已收到」受理回执默认关（`QQ_ACK_RECEIPT=1` 调试召回） |
-| 重启恢复 | 网关 session/seq 落盘，重启优先 RESUME（服务端只补断线窗口，不重放 backlog）；在途台账启动对账——已答补投、在跑重挂、排队挂失只通知永不误派 |
-| 渲染保真 | 出站有序列表 `1.` 自动转 `1、`（QQ 渲染器对 `N.` 型会跨段续编，实测 `N、`/`一、` 完全保真），代码块内不动、幂等 |
-| 自恢复 | 开机竞态退避、端口漂移自动发现与热换基、巡检告警（QQ 主动消息）、看门狗进程守护、单实例锁心跳 + 60s 周期自检（锁被他人接管/锁文件消失 → 自杀退出，杜绝多实例暗跑） |
-| 安全 | fail-closed 名单准入（名单外一律拒绝）、下载域白名单、日志密钥打码、推送内容脱敏、危险命令审批由 opencode 权限表驱动（QQ 端四键直达） |
+| Two-way chat | QQ messages reach the OpenCode session; AI replies are pushed back to QQ (markdown rendering, long answers auto-split with table atoms intact and code-fence repair) |
+| Desktop session mirror | 📋 Digest card: the latest Q&A round of a desktop session is mirrored to QQ in real time (full text by default) |
+| Progress watching | `/watch` subscribes to tool-call milestones (🔧 command summary / exit code), throttled and merged |
+| **Permission approval** | OpenCode permission requests arrive as 🔐 four-button cards (allow once / always allow / reject / ignore). Taps take effect silently (the tapped button shows ✓/✗ via native visited state). The card also shows exactly which rule "always allow" will save. Text replies ("允许/总是/拒绝") work too |
+| **Form prompt bridge** | OpenCode Forms (single-choice / multi-choice / boolean / text) render as 📝 QQ cards — answer by tapping buttons or replying with a letter (A/B/C). Requests and forms from desktop-side turns are pushed as well (always-on watcher, 12s poll) |
+| Remote commands | `/new /cancel /status /sessions /history /models /agents /rename /progress /queue /ledger /send /undo /amend /goal /compact /redo /btw` |
+| Rich media | Receive images (native attachments go to the AI for vision); **receive voice** (QQ's built-in ASR transcribes to text into the prompt for free); **send images/files** (AI replies containing `QQ_SEND_FILE: <path>` or the `/send <path>` command; 20MB limit) |
+| Quote context | Long-press quote a message and ask — the AI sees the quoted content (our own replies are indexed too) |
+| Long tasks never lost | 30-min foreground timeout falls back to a background wait (SSE + polling, up to 24h); a 30-min stall triggers a proactive notice with status (stalled / unknown / finished-but-lost), the latest tool action, and how long there's been no progress |
+| Duplicate-proof delivery | Two-layer dedup: cross-process atomic msgId claim + same-content in-flight fingerprint; long identical replies deduped outbound for 24h; "received" ack bubble off by default (`QQ_ACK_RECEIPT=1` to enable) |
+| Restart recovery | Gateway session/seq persisted — restart prefers RESUME (server only backfills the disconnect window, no backlog replay); the in-flight ledger reconciles on startup: answered→re-delivered, running→re-attached, queued→notified (never mis-dispatched) |
+| Rendering fidelity | Ordered lists auto-convert `1.` → `1、` (QQ's renderer renumbers `N.` across paragraphs; `N、` is faithful), code blocks untouched, idempotent |
+| Self-healing | Startup race backoff, port-drift auto-discovery with hot base-swap, patrol alerts (QQ proactive messages), a production watchdog (OTP-style restart intensity, dual-signal liveness, 10s post-spawn re-spawn), single-instance lock with heartbeat + 60s self-check |
+| Auditability | Every watchdog kill decision lands in a dedicated JSONL audit log (`~/.openqq/kills.log`): the rationale (health snapshot), the action (pid + TERM/KILL escalation), and the consequence (new pid + restart counter) |
+| Security | fail-closed allowlist admission (non-listed users always rejected), download-domain allowlist, secret masking in logs, push content redaction, dangerous-command approval driven by OpenCode's permission rules (four-button cards) |
 
-## 快速开始
+Why QQ instead of the official mobile app: the official OpenCode Mobile (TestFlight / Google Play) is a remote for the desktop app — install required, out-of-region store accounts needed in China, and pairing through tunnels. This bot closes the loop natively in QQ: no app, no QR pairing, approval cards delivered straight to your chat.
 
-### 前置条件
+## Quick start
 
-1. **QQ 机器人凭据**：到 [QQ 开放平台](https://q.qq.com) 创建机器人，拿到 **AppID** 与 **AppSecret**（沙箱调试先在管理端配沙箱账号；正式环境需配服务器公网 IP 白名单）。
-2. **OpenCode V2** 在本机运行（bot 连接其后台服务 API）。
-3. **运行时**：bun 或 node 任一（推荐 bun；node ≥ 20 亦可，自动改用内置运行包）。
+### Prerequisites
 
-### 选形态（二选一）
+1. **QQ bot credentials**: create a bot on the [QQ Open Platform](https://q.qq.com) and get the **AppID** and **AppSecret** (for sandbox debugging, configure sandbox accounts in the admin console first; production requires a server public-IP allowlist).
+2. **OpenCode V2** running on the same machine (the bot connects to its background service API).
+3. **Runtime**: bun or node, either one (bun recommended; node ≥ 20 also works via the bundled runtime build).
 
-| | 插件形态（推荐） | 独立部署形态 |
+### Pick a flavor (either one)
+
+| | Plugin flavor (recommended) | Standalone flavor |
 |---|---|---|
-| 适合 | 本机已有 opencode，想装完即用 | 服务器/自定义常驻方式 |
-| 安装 | `opencode plugin add @linjz/opencode-qqbot`（或 plugins 数组加 `"@linjz/opencode-qqbot"`） | `npm i -g @linjz/opencode-qqbot`（或 `github:linjz3376/opencode-qqbot`） |
-| 常驻 | 插件自动拉起 bot，serve 重启自动恢复 | 自管：`openqq` 前台 / systemd / 任务计划 |
-| 配置入口 | `npx @linjz/opencode-qqbot setup`（扫码）或手写 `~/.openqq/.env` | 同上（装完全局命令也可用 `openqq-setup`） |
+| Best for | OpenCode already installed locally, zero-config | Servers / your own daemon setup |
+| Install | `opencode plugin add @linjz/opencode-qqbot` (or add `"@linjz/opencode-qqbot"` to the plugins array) | `npm i -g @linjz/opencode-qqbot` (or `github:linjz3376/opencode-qqbot`) |
+| Keep-alive | The plugin auto-launches the bot and recovers when the OpenCode service restarts | Self-managed: `openqq` in foreground / systemd / Task Scheduler |
+| Config entry | `npx @linjz/opencode-qqbot setup` (QR scan) or hand-write `~/.openqq/.env` | Same (the global `openqq-setup` command also works) |
 
-开发者从源码直装插件形态：`bun run deploy:plugin`（全量包解到全局插件目录，与应用者拿到的发布物一致）。
+Developers installing from source: `bun run deploy:plugin` (full package unpacked into the global plugin directory — byte-identical to what npm users get).
 
-### 配置（`~/.openqq/.env`，单点密钥）
+### Configuration (`~/.openqq/.env`, single point of secrets)
 
-手机 QQ 扫码绑定（自动写凭据；connector 按需临时安装）：
+Bind by scanning a QR code with your phone (writes credentials automatically; the connector installs on demand):
 
 ```bash
 npx @linjz/opencode-qqbot setup
-# 独立部署形态装过 -g 的话也可直接：openqq-setup
+# standalone flavor with -g: openqq-setup
 ```
 
-或手工创建：
+Or create it manually:
 
 ```ini
-QQ_APP_ID=你的AppID
-QQ_APP_SECRET=你的AppSecret
-ALLOWED_USERS=你的QQ openid   # fail-closed：必填，非名单用户一律拒绝
-OPENCODE_BASE_URL=http://127.0.0.1:<端口>/api   # opencode 桌面服务地址（2.1.x 端口动态；失联时 bot 启动会自动发现）
-OPENCODE_PASSWORD=opencode 服务密码（桌面端服务配置的 Basic auth 密码）
+QQ_APP_ID=your AppID
+QQ_APP_SECRET=your AppSecret
+ALLOWED_USERS=your QQ openid   # fail-closed: required; users not on the list are always rejected
+OPENCODE_BASE_URL=http://127.0.0.1:<port>/api   # OpenCode desktop service address (2.1.x ports are dynamic; the bot auto-discovers on connect failure)
+OPENCODE_PASSWORD=opencode service password (Basic auth password from the desktop service config)
 QQ_SANDBOX=false
 ```
 
-### 启动
+### Start
 
-- **插件形态**：无需手动启动——装好插件 + 配好凭据后，插件巡检自动拉起 bot；opencode 服务重启也会自动恢复。
-- **独立部署形态**：`openqq` 前台运行；常驻按 OS 自选（Windows 用 `deploy/` 任务计划脚本；Linux `systemd --user`；macOS launchd 或 `nohup`）。
+- **Plugin flavor**: nothing to start manually — once the plugin is installed and credentials are set, the plugin's patrol launches the bot; it also recovers when the OpenCode service restarts.
+- **Standalone flavor**: run `openqq` in the foreground; for daemon mode pick your OS (Windows: Task Scheduler via `openqq service install`; Linux: `systemd --user`; macOS: launchd or `nohup`).
 
 <details>
-<summary>Linux：systemd --user 单元（复制即用）</summary>
+<summary>Linux: systemd --user unit (copy-paste ready)</summary>
 
-`~/.config/systemd/user/openqq.service`：
+`~/.config/systemd/user/openqq.service`:
 
 ```ini
 [Unit]
@@ -88,7 +95,6 @@ Type=simple
 ExecStart=openqq
 Restart=on-failure
 RestartSec=30
-# 凭据与数据目录（.env 写入后权限自动 0600）
 Environment=HOME=%h
 
 [Install]
@@ -98,14 +104,14 @@ WantedBy=default.target
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now openqq
-# 登录外也常驻：loginctl enable-linger $USER
+# keep running without login: loginctl enable-linger $USER
 ```
 </details>
 
 <details>
-<summary>macOS：launchd plist（复制即用）</summary>
+<summary>macOS: launchd plist (copy-paste ready)</summary>
 
-`~/Library/LaunchAgents/net.opencode-qqbot.plist`：
+`~/Library/LaunchAgents/net.opencode-qqbot.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -126,141 +132,174 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 ```
 </details>
 
-> **单实例**：bot 启动时持文件锁（`~/.openqq/openqq-<appId>.lock`，10s 心跳、30s 僵尸判定）——双开时后到实例待命，宿主退出后自动接管，避免同 bot 多实例被 QQ 网关互踢。`QQ_INSTANCE_LOCK=false` 可关闭。
+> **Single instance**: the bot holds a file lock on startup (`~/.openqq/openqq-<appId>.lock`, 10s heartbeat, 30s zombie takeover) — a second instance waits in standby and takes over when the host exits, preventing QQ gateway mutual-kick between twins. `QQ_INSTANCE_LOCK=false` disables it.
 
-> **跨平台**：bot 本体零 OS 分支（纯 TS，与 QQ 官方 SDK 同形态）；运行时 bun 优先、node ≥20 自动兜底（跑内置运行包）。Linux/macOS 常驻用 `systemd --user` 或 `nohup` 即可；端口自动发现在三个系统都可用（Linux 走 `ss -tln`，macOS 走 `netstat -an -p tcp`，Windows 走 `netstat -ano -p tcp`）。
+> **Cross-platform**: the bot body has zero OS branches (pure TS, same shape as the official QQ SDK); bun preferred, node ≥ 20 falls back automatically. Port auto-discovery works on all three OSes (Linux `ss -tln`, macOS `netstat -an -p tcp`, Windows `netstat -ano -p tcp`).
 
-## 指令一览
+## Commands
 
-| 指令 | 说明 |
+| Command | What it does |
 |---|---|
-| `/new` | 开新会话 |
-| `/stop`（别名 `/cancel`） | 中止当前生成并清空忙碌队列 |
-| `/status` | 服务器/会话/模型/Agent 状态 |
-| `/sessions` | 列出会话并可选择切换 |
-| `/history [N]` | 最近 N 轮历史（默认 3，上限 10；换行/代码块/表格完整保留） |
-| `/model` | 查看或切换模型（session 级） |
-| `/agent` | 查看或切换 Agent |
-| `/rename <名>` | 重命名当前会话（仅本地会话标题，不改服务端标题） |
-| `/watch` / `/watch off` | 观察模式：工具调用里程碑实时推送 |
-| `/progress` | 手动进度查询：工具调用/失败统计、当前在途状态（本地事件源，零模型调用） |
-| `/queue` | 忙碌队列：查看 / `clear` 清空 / `drop <编号>` 定点删除（忙碌时消息自动 FIFO 排队） |
-| `/ledger` | 台账视图：快照 / `check` 对账会话历史 / `settle <尾号> confirm` 人工结清（孤儿与在途可追溯） |
-| `/mirror` | 摘要镜像开关 |
-| `/send <路径>` | 把白名单目录内的文件/图片发到 QQ |
+| `/new` | Start a new session |
+| `/cancel` | Abort the current generation and clear the busy queue |
+| `/status` | Cockpit: server / auth / session / model / agent / watch / mirror / queue / log; `watch` / `mirror` + `on`/`off` are the only switch entries |
+| `/sessions` | List sessions and switch by number |
+| `/history [N]` | Last N rounds (default 3, max 10; newlines / code blocks / tables preserved) |
+| `/models` | View or switch the model (session-level) |
+| `/agents` | View or switch the agent |
+| `/rename <name>` | Rename the current session (local title only) |
+| `/progress` | Manual progress query: tool/failure stats and in-flight status (local event source, zero model calls) |
+| `/queue` | Busy queue: view / `clear` / `drop <n>` / `<text>` explicit enqueue (busy messages steer into the running turn by default; `QQ_BUSY_DEFAULT=queue` restores auto-queuing) |
+| `/ledger` | Ledger view: snapshot / `check` reconcile / `settle <suffix> confirm` manual settle (orphans and in-flight traceable) |
+| `/send <path>` | Send a file/image from an allowlisted directory to QQ |
+| `/undo` | Official semantics: revert the last turn and restore files (receipt carries the reverted prompt; re-send after edits) |
+| `/amend <text>` | Steer a busy turn with supplementary instructions (official steer semantics); or `/queue <text>` to explicitly enqueue |
+| `/goal <objective>` | Official goal mode (engine built-in, v2.2.1+): the session drives itself until done or blocked; `/goal` for status, `pause`/`resume`/`clear` to control |
+| `/compact` `/redo` `/btw` | Official engine commands: compact session / restore an undo / side question (not written into session context) |
 
-## 环境变量（可选调优）
+## Environment variables (optional tuning)
 
-| 变量 | 默认 | 说明 |
+| Variable | Default | Meaning |
 |---|---|---|
-| `QQ_ACTIVE_DAILY_LIMIT` | 100 | 主动消息日配额（QQ 官方限制 1000/天/关系，留余量） |
-| `QQ_PASSIVE_RIDE_WINDOW_MS` | 300000 | 主动降级前"骑"被动窗口的时间窗 |
-| `QQ_STREAM_STAGGER_MS` | 300 | 多片回复片间错峰（0=一次性全发） |
-| `QQ_SESSION_IDLE_HOURS` | 6 | 闲置会话回收阈值 |
-| `QQ_INTERACTION_WATCH_SECONDS` | 12 | 常驻交互监听轮询间隔（0=关闭） |
-| `QQ_REDISPATCH_MAX_AGE_MS` | 7200000 | 启动对账时丢失消息的自动重派窗口（0=关闭自动重派只通知；受台账 24h 清账线封顶） |
-| `QQ_ACK_RECEIPT` | 关 | 受理即回执气泡「已收到，正在处理」（调试期设 `true`/`on`/`1` 开启） |
-| `QQ_GATEWAY_STATE_MAX_HOURS` | 6 | 网关会话持久化恢复窗口（超龄 / RESUME 被拒自动回退 IDENTIFY） |
-| `QQ_EVENT_PROBE` | 关 | 插件侧事件探针（`true` 时全量事件类型落 `~/.openqq/opencode-events.jsonl`，诊断用） |
-| `OPENCODE_TURN_TIMEOUT_MINUTES` | 30 | 前台回合时限（超时转后台等待） |
-| `QQ_DIGEST_ANSWER_MAX_CHARS` | 0（全文） | 摘要卡答案截断上限 |
-| `QQ_HISTORY_USER_CLIP` / `QQ_HISTORY_TEXT_CLIP` | 500 / 1200 | /history 用户/AI 行截断 |
-| `QQ_SEND_EXTRA_ROOTS` | — | `/send` 额外允许目录（逗号分隔） |
-| `QQ_ORPHAN_MS` | 90000 | 孤儿判定阈值（受理后无下文超此时长记孤儿；合法 5s~60min，非法回退默认） |
-| `QQ_WATCHDOG_INTERVAL_MS` | 300000 | 插件引导器巡检间隔（5min；计划任务侧由 service install 注册，默认 10min） |
-| `QQ_PERM_DEFER_MS` | 500 | 审批弹卡延迟判定窗（0~10s）：窗口内 ask 已被其他端处置则不推 QQ 卡，与桌面静默放行对齐 |
-| `QQ_QUEUE_RECEIPTS` | 关 | 队列完成回执「队列 #N 完成」（批量排空防刷，默认关） |
-| `QQ_LOG_FILE` | `~/.openqq/openqq.log`（统一日志，bot 与看门狗同文件） | 进程内文件日志路径；滚动 20MB×4 代、总预算 100MB（`QQ_LOG_MAX_MB`/`QQ_LOG_KEEP`/`QQ_LOG_TOTAL_MB` 可调） |
-| `QQBOT_DEFAULT_CWD` | bot 进程工作目录 | 新会话默认项目目录（目录继承链兜底值） |
-| `QQ_SANDBOX` | false | QQ 沙箱环境（REST 域切至 sandbox） |
-| `QQ_INSTANCE_LOCK` | 开 | 单实例文件锁（`false` 关闭，仅排查多实例问题时临时用） |
+| `QQ_ACTIVE_DAILY_LIMIT` | 100 | Proactive message daily quota (official QQ limit is 1000/day/relation; headroom kept) |
+| `QQ_PASSIVE_RIDE_WINDOW_MS` | 300000 | How long to "ride" a passive reply window before falling back to proactive |
+| `QQ_STREAM_STAGGER_MS` | 300 | Stagger between split-reply chunks (0 = send all at once) |
+| `QQ_SESSION_IDLE_HOURS` | 6 | Idle session eviction threshold |
+| `QQ_INTERACTION_WATCH_SECONDS` | 12 | Always-on interaction watcher poll interval (0 = off) |
+| `QQ_BUSY_DEFAULT` | `steer` | Busy-time delivery, aligned with the official TUI (Enter steers): new messages merge into the running turn. Set `queue` for client-side FIFO queuing (legacy behavior) |
+| `QQ_REDISPATCH_MAX_AGE_MS` | 7200000 | Startup-reconcile auto-redispatch window for lost messages (0 = notify only; capped by the 24h ledger trim) |
+| `QQ_ACK_RECEIPT` | off | "Received, working on it" ack bubble (set `true`/`on`/`1` for debugging) |
+| `QQ_GATEWAY_STATE_MAX_HOURS` | 6 | Gateway session persistence window (older / RESUME-rejected falls back to IDENTIFY) |
+| `QQ_EVENT_PROBE` | off | Plugin-side event probe (`true` dumps all event types to `~/.openqq/opencode-events.jsonl`, for diagnosis) |
+| `OPENCODE_TURN_TIMEOUT_MINUTES` | 30 | Foreground turn timeout (falls back to background wait) |
+| `QQ_DIGEST_ANSWER_MAX_CHARS` | 0 (full text) | Digest card answer truncation limit |
+| `QQ_HISTORY_USER_CLIP` / `QQ_HISTORY_TEXT_CLIP` | 500 / 1200 | /history user/AI line truncation |
+| `QQ_SEND_EXTRA_ROOTS` | — | Extra allowed directories for `/send` (comma-separated) |
+| `QQ_ORPHAN_MS` | 90000 | Orphan threshold (accepted but silent beyond this; valid 5s–60min, invalid falls back) |
+| `QQ_WATCHDOG_INTERVAL_MS` | 300000 | Plugin bootstrap patrol interval (5min; the service-side autostart default is 10min) |
+| `QQ_PERM_DEFER_MS` | 500 | Approval card deferral window (0–10s): if the request is resolved elsewhere within the window, no QQ card — aligns with desktop silent handling |
+| `QQ_QUEUE_RECEIPTS` | off | Queue-completion receipt "queue #N done" (off by default to prevent batch spam) |
+| `QQ_LOG_FILE` | `~/.openqq/openqq.log` (unified log, bot + watchdog in one file) | In-process file log path; 20MB × 4 generations, 100MB total budget (`QQ_LOG_MAX_MB`/`QQ_LOG_KEEP`/`QQ_LOG_TOTAL_MB` tunable) |
+| `QQBOT_DEFAULT_CWD` | bot process cwd | Default project directory for new sessions |
+| `QQ_SANDBOX` | false | QQ sandbox environment (REST domain switches to sandbox) |
+| `QQ_INSTANCE_LOCK` | on | Single-instance file lock (`false` to disable; only for multi-instance debugging) |
+| `QQ_BOTS` | — | Multi-role JSON table (multiple QQ bots in one process, data bucketed per role; absent = single-role legacy) |
+| `QQ_LANE_SCOPE` | `per-session-peer` | Session isolation granularity: `per-session-peer` (official per-peer refined per-session) or `per-peer` |
 
-## 架构
+**Internal knobs (troubleshooting/tests only — safe to ignore day to day)**
 
-四层（每文件带 `@input/@output/@pos` 头注释）：
+| Variable | Default | Meaning |
+|---|---|---|
+| `QQ_ACTIVE_MINUTE_LIMIT` | 20 | Proactive message per-minute rolling window (official 20/min aligned) |
+| `QQ_API_CALL_TIMEOUT_MS` | 30000 | Per-call engine API timeout (P11 req-layer defense) |
+| `QQ_SSE_SILENCE_MS` | 120000 | SSE silence kill threshold (P8: zero-byte proactive reconnect) |
+| `QQ_BG_RESUME_MAX` | 3 | Dead-turn auto-continuation cap (0 = off; valid 0–5) |
+| `QQ_BG_STREAM_DEAD_MS` | 15min | Background stream-liveness dead threshold (valid 1–60min) |
+| `QQ_BG_TOOL_GRACE_MS` | 60min | Bounded tool-execution grace window before dead judgment |
+| `QQ_REAPER_MIN_AGE_MS` | 40min | Zombie reaper age gate |
+| `QQ_REAPER_SILENCE_MS` | 30min | Zombie reaper silence gate |
+| `QQ_REAPER_SCAN_SECONDS` | 60 | Zombie/orphan patrol interval (same tick) |
+| `QQ_ORPHAN_SCAN_SECONDS` | 60 | Orphan ledger patrol interval |
+| `QQ_DISPATCH_STALL_MS` | 120000 | Dispatch-stall sentinel threshold (valid 30s–60min) |
+| `QQ_NOTIFY_MAX_ATTEMPTS` | 8 | `openqq notify` delivery attempt cap |
+| `QQ_NOTIFY_TTL_HOURS` | 24 | notify outbox queue retention |
+| `QQ_DATA_DIR` | `~/.openqq` | Runtime data root (ledgers/logs/locks; whole directory is portable) |
+| `QQ_INFLIGHT_FILE` | `<data dir>/inflight.json` | In-flight ledger file path |
+| `QQ_OUTBOX_FILE` | `<data dir>/outbox.json` | notify outbox file path |
+| `QQ_FORM_JOURNAL_FILE` | `<data dir>/forms.json` | Form-bridge persistence file |
+| `QQ_DELIVERY_DEDUPE_FILE` | `<data dir>/delivery-dedupe.json` | Outbound dedupe state file |
+
+> All variables go into `~/.openqq/.env` (one `KEY=value` per line). Secrets discipline: the file is read by the bot only; no tool or session may echo its contents.
+
+### Behavior config (`~/.openqq/config.json`, optional)
+
+Mirrors the official OpenCode layering ("json = behavior, env = secrets"): behavior knobs can move to `config.json` (flat JSON, **same key names as the env vars**), leaving `.env` for secrets only. Precedence, high to low:
 
 ```
-src/qq/        QQ 传输层（WS 网关 / REST API / 发送器 / 媒体）
-src/opencode/  opencode V2 客户端（REST + SSE 事件流 / 会话 / 历史渲染）
-src/core/      业务域（审批/卡片/表单桥/投递/镜像/巡检/端口发现/限额/上下文缓存/发文件，及投递幂等 inbound-dedupe、网关持久化 gateway-state、在途台账 inflight-journal、单实例锁 instance-lock）
-src/bridge.ts  编排门面 + 命令系统 commands.ts + 入口 index.ts
+inherited env  >  ~/.openqq/.env  >  ~/.openqq/config.json  >  built-in defaults
 ```
 
-## 测试
+```json
+{
+  "QQ_BUSY_DEFAULT": "queue",
+  "QQ_STREAM_STAGGER_MS": 500
+}
+```
+
+`QQ_CONFIG_FILE` overrides the config path (tests/multi-instance). Keep secrets (QQ_APP_SECRET, OPENCODE_PASSWORD, …) out of config.json — behavior keys only.
+
+## Architecture
+
+Four layers (every file carries an `@input/@output/@pos` header):
+
+```
+src/qq/        QQ transport (WS gateway / REST API / sender / media)
+src/opencode/  OpenCode V2 client (REST + SSE event stream / sessions / history rendering)
+src/core/      Business domains (approval/cards/form-bridge/delivery/mirror/link-watch/port-discovery/reply-limiter/context-buffer/send-media, plus inbound-dedupe, gateway-state, inflight-journal, instance-lock, zombie-reaper, watchdog, notices)
+src/bridge.ts  Orchestration facade + commands.ts + entry index.ts
+```
+
+## Tests
 
 ```bash
-npm run verify        # tsc + 28 个单元套件（受理幂等/网关持久化/回合归属/渲染适配/台账恢复等）
-npm run test:e2e      # 五套 e2e（需 opencode 服务在跑）
+npm run verify        # tsc + 56 unit suites (admission idempotency, gateway persistence, turn attribution, rendering adaptation, ledger recovery, watchdog decisions, kill-audit, notices, ...)
+npm run test:e2e      # five e2e suites (requires a running OpenCode service)
 ```
 
-## 运维入口（全 TS，跨平台，随包分发）
+## Operations (all TypeScript, cross-platform, shipped with the package)
 
 ```bash
-openqq restart                            # 等空闲 → 停 → 拉（旧 safe-restart.ps1 的替代）
-openqq restart --force                    # 跳过空闲等待（维护窗口）
-openqq watchdog --once                    # 单次巡检（自启项 / systemd timer / launchd 调用）
-openqq watchdog --loop --interval-min 10  # 常驻循环
-openqq service install|uninstall|status   # 自启注册：win32=schtasks / linux=systemd user / darwin=launchd
+openqq restart                            # wait for idle → stop → start (replaces the old safe-restart.ps1)
+openqq restart --force                    # skip idle wait (maintenance window)
+openqq watchdog --once                    # single patrol (autostart / systemd timer / launchd)
+openqq watchdog --loop --interval-min 10  # resident loop
+openqq service install|uninstall|status   # autostart registration: win32=schtasks / linux=systemd user / darwin=launchd
 ```
 
-判活 = 锁文件 pid + `process.kill(pid, 0)` + 心跳新鲜度（>5 分钟触发重启，启动期有 60s 宽限）。
-`~/.openqq/` **只放运行时数据**（`.env`、台账、统一日志 `openqq.log`、`heartbeat`），不放任何脚本。
+Liveness = lock-file pid + `process.kill(pid, 0)` + heartbeat freshness (>5min stale triggers restart, 60s grace during startup).
+`~/.openqq/` holds **runtime data only** (`.env`, ledgers, unified log `openqq.log`, `heartbeat`); the kill-decision audit line lives in `kills.log`.
 
-## 排障
+## Troubleshooting
 
-| 症状 | 先看 |
+| Symptom | Check first |
 |---|---|
-| QQ 无响应 | 统一日志 `~/.openqq/openqq.log`（bot 输出与看门狗审计同文件，滚动 20MB×4 代、总预算 100MB） |
-| 进程疑似僵死 | `openqq watchdog --once` —— 一次判定并自愈（先杀残留再拉起） |
-| ECONNREFUSED | 桌面服务端口漂移——重启 bot 会自动发现新端口（`~/.openqq/last-discovered.json` 留痕） |
-| 桌面弹窗卡住任务 | 后台等待会发带任务的停滞通告（含最近动作与无进展时长）；`/stop` 可终止 |
-| 日志见「已有实例待命」 | 单实例锁生效中——另一实例持锁（60s 自检会在锁异动时收敛双活，正常无需处理） |
+| QQ not responding | Unified log `~/.openqq/openqq.log` (bot output and watchdog audits in one file, 20MB × 4 generations, 100MB budget) |
+| Process疑似 frozen | `openqq watchdog --once` — judges and self-heals in one pass (kill residue, then relaunch) |
+| ECONNREFUSED | Desktop service port drift — restarting the bot auto-discovers the new port (`~/.openqq/last-discovered.json` trail) |
+| Desktop popup blocking a task | The background wait sends stall notices with recent actions; `/stop` aborts |
+| Log shows "instance standing by" | Single-instance lock active — another instance holds the lock (the 60s self-check converges twins on lock changes; normally nothing to do) |
 
-## 平台注意事项
+## Platform notes
 
-以下发现来自真实部署（Windows 11 / OpenCode v2.2.2），插件无法修复但会反复绊倒用户，集中存档：
+Hard-won findings from real deployments (Windows 11 / OpenCode v2.2.2) — the plugin can't fix these, but they keep tripping users:
 
-**QQ 平台侧**
+**QQ platform**
 
-1. token 接口 `POST https://bots.qq.com/app/getAppAccessToken` 的参数是 **`clientSecret`**（旧文档写作 `appSecret`）；报错 `100016 invalid appid or secret` 极具误导性——先核对字段名，别急着重置密钥。
-2. token 与正式/沙箱无关，统一走正式域名 `bots.qq.com`；**沙箱域名 `sandbox.api.sgroup.qq.com` 没有 token 端点**（请求会返回 `11001 不支持的调用`）。
-3. 沙箱 bot 有独立网关：`GET https://sandbox.api.sgroup.qq.com/gateway` → `wss://sandbox.api.sgroup.qq.com/websocket`；沙箱 bot 连正式网关会被 4914 拒绝。
+1. The token endpoint `POST https://bots.qq.com/app/getAppAccessToken` takes **`clientSecret`** (older docs say `appSecret`); the `100016 invalid appid or secret` error is misleading — check the field name before resetting your secret.
+2. Tokens are environment-independent and always use the production domain `bots.qq.com`; **the sandbox domain `sandbox.api.sgroup.qq.com has no token endpoint** (it returns `11001 unsupported call`).
+3. Sandbox bots have a separate gateway: `GET https://sandbox.api.sgroup.qq.com/gateway` → `wss://sandbox.api.sgroup.qq.com/websocket`; a sandbox bot connecting to the production gateway is rejected with 4914.
 
-**OpenCode 侧**
+**OpenCode side**
 
-4. `opencode plugin add` 偶发无输出挂起（>3min），重试通常成功。
-5. `opencode reload` **只增不删**：plugins 数组移除的条目在服务端内存不卸载（旧插件的定时器仍存活），彻底生效需重启服务。
-6. 全局插件目录扫描器只认根级入口（package.json exports 指向 `./dist` 子路径会被跳过），**仅影响本地目录形态**；npm 包形态无此限制。
-7. `opencode plugin update` 必须带 scope 全名（`@linjz/opencode-qqbot`），裸写包短名报 `Plugin is not configured`。
-8. npm 插件缓存在 `~/.cache/opencode/npm/<pkg>@<tag>/<时间戳>/`，update 会新建时间戳目录——对「在缓存文件上打本地补丁」的用户，补丁会静默失效；请避免在缓存副本上打补丁。
+4. `opencode plugin add` occasionally hangs silently (>3min); retrying usually works.
+5. `opencode reload` **only adds, never removes**: entries removed from the plugins array stay loaded in server memory (old plugin timers keep running); a full service restart is required.
+6. The global plugin-directory scanner only recognizes root-level entrypoints (a package.json `exports` pointing at a `./dist` subpath gets skipped) — **directory-flavor installs only**; the npm package flavor has no such limit.
+7. `opencode plugin update` needs the fully scoped name (`@linjz/opencode-qqbot`); the bare short name errors with `Plugin is not configured`.
+8. npm plugin cache lives in `~/.cache/opencode/npm/<pkg>@<tag>/<timestamp>/` — `update` creates a new timestamp directory, so local patches on cached copies silently stop applying. Never patch cache copies.
 
-## 与 OpenCode 桌面版能力对齐矩阵
+## Alignment matrix with the OpenCode desktop
 
-QQ 桥的本质是「opencode 交互事件 → QQ 交互原语」的适配器。桌面版 TUI 能处理的每类阻塞式交互，QQ 侧应有对应物（桥接或明确降级）：
+The QQ bridge is an adapter from "OpenCode interaction events" to "QQ interaction primitives". Every blocking interaction the desktop TUI can handle should have a counterpart on the QQ side (bridged or explicitly degraded):
 
-| 桌面端交互类型 | QQ 侧现状 | 差距 |
+| Desktop interaction | QQ side today | Gap |
 |---|---|---|
-| 权限审批（PermissionRequest） | ✅ 四键卡片（允许一次/总是/拒绝/忽略）+ 文字回复 + 桌面端挂起的审批同样推送（常驻监听 12s） | 无 |
-| 单字段 Form（单选/多选/布尔/文本） | ✅ 字母按钮卡片 + 文本解析 + 30min TTL + form-journal 持久化 | 无 |
-| **多字段 Form（Questions）** | ⚠️ 回退「请在桌面端完成」（明确降级） | 逐字段向导为候选增强（见提案，未实施） |
-| 未来 opencode 新增交互类型 | ⚠️ 无对齐机制，只能事后逐个补 | 按矩阵验收：要么随版本桥接、要么登记为「明确降级」，不允许出现未定义状态 |
+| Permission requests | ✅ Four-button cards (once/always/reject/ignore) + text replies + desktop-pending requests pushed too (always-on watcher, 12s) | None |
+| Single-field Form (choice/multi/bool/text) | ✅ Letter-button cards + text parsing + 30min TTL + form-journal persistence | None |
+| **Multi-field Form (Questions)** | ⚠️ Falls back to "please complete on desktop" (explicit degradation) | Per-field wizard is a candidate enhancement (not implemented) |
+| Future OpenCode interaction types | ⚠️ No alignment mechanism; patched one by one after the fact | Matrix acceptance: bridge with the version or register as "explicit degradation" — undefined states are not allowed |
 
-原则：未支持的类型永远给出明确文案 + 桌面端指引，不允许静默丢弃；多字段向导等增强按最小侵入接入。
-
-
-## English Summary
-
-**OpenCode QQ Bot** bridges [OpenCode](https://opencode.ai) (an open-source AI coding agent) into QQ (China's largest IM). Talk to your coding agent from your phone: send tasks, approve dangerous tool calls via interactive cards, dictate prompts with built-in voice-to-text, receive long-running results, and even send/receive files.
-
-- **Approval cards & form prompts**: OpenCode permission requests and multi-step forms render as interactive QQ cards (tap to allow/deny, or reply by text)
-- **Long tasks never lost**: 30-min foreground timeout falls back to a 24h background wait with status-aware stall notices; results are pushed back on completion
-- **Duplicate-proof delivery**: cross-process msgId claim + same-content fingerprint admission; gateway session/seq persisted across restarts (RESUME, no backlog replay)
-- **Notify channel**: cron / CI / any process can push results to QQ via `openqq notify` (file-locked outbox, TTL, idempotent by --id)
-- **QQ rendering fix**: ordered lists auto-flatten to the `、` style — what you see on desktop matches what lands on QQ
-
-Install: `opencode plugin add @linjz/opencode-qqbot` — Chinese README below, docs/review playbook in the repo.
+Principle: unsupported types always get explicit copy + desktop guidance, never silent drops; enhancements like the per-field wizard land with minimal intrusion.
 
 ## License
 
 MIT
-

@@ -149,6 +149,15 @@ context by itself; the transmissions above are the requests themselves.
   owns the keyboard — the note's textarea is blurred and not focusable.
 - A brand-new chat has no session yet; opening the note commits one through the
   API (no prompt, no model call) so the note has somewhere stable to live.
+  Leaving a note that is still empty (not a single character) deletes that chat
+  again and returns to the new-chat screen; leaving any note with text — even
+  only whitespace — opens the chat the note belongs to, the same chat `Insert`
+  targets, without pasting, so the text stays reachable. That chat
+  is remembered as chat-less: if you close its tab before ever sending a
+  message, the note asks whether to delete the chat and its note (No keeps both
+  and leaves the tab closed). Chatting in it, or inserting the note, forgets the
+  question silently. The list is stored beside the notes and survives a restart,
+  so it can never delete a chat you have since used.
 - Deleting a chat empties its note record. The record itself stays on disk as an
   empty store file: the TUI storage API can read, write and overwrite a key but
   has no `remove`, so one (empty) file per session is retained. Notes written

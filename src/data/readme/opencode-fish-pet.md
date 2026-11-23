@@ -43,7 +43,7 @@ opencode plugin add opencode-fish-pet
 - **109 段动画**：五分类随机池（小动作 / 玩耍 / 吃什么 / 时节 / 文字），点击 5 种回应，拖拽/抛掷/双击弹弓，多开互撞
 - **工作状态机**：聚合所有运行中会话（thinking/working/result/waiting），最近 90s 工具调用折叠成一句话随气泡显示（如「干活中 · 跑命令×3」）
 - **完成庆祝**：前台会话收官全量庆祝，后台完成冒气泡不抢动画；子代理完成静默
-- **碎碎念**：每 5 分钟随口一句（10 分钟无观众则沉默；右键可总开关），带时间背景——它知道今天星期几、快到什么节日、外面天气如何；睡觉时说梦话
+- **碎碎念**：默认关（右键可开关）；开启后每 5 分钟随口一句（10 分钟无观众则沉默），带时间背景——它知道今天星期几、快到什么节日、外面天气如何；睡觉时说梦话
 - **待办**：`@2026-11-20 15:00` / `@18:30` / `@2h` 截尾定截止，越近提醒越密
 - **多开**：鱼 0 演聚合状态，其余各绑一个运行中会话
 - **面板聊天**：Fish 标签页直接对话，发送即有"正在琢磨"反馈、逐字流式回复；可给鱼起名字（面板标题随之变化）
@@ -110,7 +110,7 @@ Notes:
 - **109 animations**: five weighted random pools (small moves / play / eating / seasonal / text), 5 click reactions, drag/throw/slingshot, multi-fish collisions
 - **Work state machine**: aggregates all running sessions (thinking/working/result/waiting); the last 90s of tool calls fold into one line on the bubble (e.g. "Working · commands ×3")
 - **Completion**: full celebration when the foreground session finishes, unobtrusive bubbles for background completions; subagent completions stay silent
-- **Muttering**: one line every 5 minutes (silent without an audience for 10 min; right-click to toggle), with time context — it knows the day, upcoming holidays and the weather outside; sleep-talks while asleep
+- **Muttering**: off by default (right-click to toggle); when on, one line every 5 minutes (silent without an audience for 10 min), with time context — it knows the day, upcoming holidays and the weather outside; sleep-talks while asleep
 - **To-dos**: due times via an `@2026-11-20 15:00` / `@18:30` / `@2h` suffix; reminders escalate as the deadline approaches
 - **Multiple fish**: fish #0 plays the aggregate state, the rest each bind to a running session
 - **Panel chat**: talk to the fish in the Fish tab with instant "thinking" feedback and word-by-word streaming; name it and the tab title follows

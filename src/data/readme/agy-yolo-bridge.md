@@ -389,7 +389,7 @@ The bridge registers strictly typed tools conforming to `@opencode/schema/tool`,
 
 ### `agy_exec` (Universal Instruction Execution)
 
-Executes any custom command or markdown file via Antigravity ACP.
+Executes any custom command or markdown file via Antigravity ACP. Execution duration is governed strictly by the workspace configuration schema (`maxExecutionTimeoutMs: 0`, unlimited duration).
 
 - **Input Schema:**
   - `command` (`string`, optional): Name of a registered command (e.g. `"audit"`).
@@ -397,7 +397,6 @@ Executes any custom command or markdown file via Antigravity ACP.
   - `instructionPath` (`string`, optional): Relative or absolute path to instruction markdown file.
   - `inlineInstruction` / `prompt` (`string`, optional): Raw prompt or instruction text.
   - `args` (`string`, optional): Contextual user arguments.
-  - `timeoutMs` (`number`, optional): Execution timeout in milliseconds. Set to `0` for unlimited duration (default: `0`).
 - **Output Schema:** `output: Schema.String`
 - **Return Shape:** `{ content: string, output: string }`
 
@@ -409,8 +408,7 @@ Executes any custom command or markdown file via Antigravity ACP.
   "arguments": {
     "agent": "build",
     "instructionPath": ".agent/handoff/02_TECHNICAL_PLAN.md",
-    "args": "--verify-all",
-    "timeoutMs": 0
+    "args": "--verify-all"
   }
 }
 ```
@@ -422,18 +420,18 @@ Specialized helper tool to execute an approved implementation plan in YOLO mode.
 - **Input Schema:**
   - `planPath` (`string`, optional): Explicit path to plan file.
   - `inlinePlanText` (`string`, optional): Inline markdown plan text.
-  - `timeoutMs` (`number`, optional): Execution timeout in milliseconds. Set to `0` for unlimited duration (default: `0`).
 - **Output Schema:** `output: Schema.String`
 
 ---
 
 ## Live Process Visibility & Observability
 
-During long-running multi-tool builds and audits, `agy-yolo-bridge` provides zero-friction, modular live visibility without making assumptions about workspace layout:
+During long-running multi-tool builds and audits, `agy-yolo-bridge` provides zero-friction, modular live visibility without making assumptions about workspace layout or polluting the git repository:
 
 - **Universal Stderr Streaming**: Every tool call and status transition emitted by the model is immediately written to `process.stderr`:
 
   ```text
+  [agy-bridge] Live activity stream: /tmp/agy-bridge/latest.log
   [agy-bridge] [#1] edit: src/services/extractor.ts
   [agy-bridge] [#1] status: completed (tool-1)
   [agy-bridge] [#2] run_command: pnpm run typecheck
@@ -441,6 +439,7 @@ During long-running multi-tool builds and audits, `agy-yolo-bridge` provides zer
   ```
 
   This surfaces live progress directly to the OpenCode terminal in real-time.
+- **Ephemeral OS Temp Live Stream**: Live execution events are concurrently streamed to `${os.tmpdir()}/agy-bridge/latest.log` (and bounded per-session logs in `sessions/`). Developers or external monitors can run `tail -f /tmp/agy-bridge/latest.log` to watch real-time execution progress without touching or modifying the project repository.
 - **Enriched `toolCtx.progress`**: Both `tool_start` and `tool_update` events feed OpenCode's dynamic tool progress hooks.
 
 ---

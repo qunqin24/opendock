@@ -45,7 +45,7 @@ Features:
 | Package                                                                       | Ecosystem   | Install                                                      | Purpose                                                                             |
 | ----------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | [`github.com/dkmnx/recollect`](https://pkg.go.dev/github.com/dkmnx/recollect) | Go module   | `go get github.com/dkmnx/recollect@latest`                   | Engine library for facts, search, transactions, jobs, and prompt rendering.         |
-| [`recollect`](https://github.com/dkmnx/recollect/releases)                    | Go binary   | `go install github.com/dkmnx/recollect/cmd/recollect@latest` | JSON-RPC stdio engine with `version`, `doctor`, and `setup opencode`.               |
+| [`recollect`](https://github.com/dkmnx/recollect/releases)                    | Go binary   | `go install github.com/dkmnx/recollect/cmd/recollect@latest` | JSON-RPC stdio engine, MCP server, and setup commands.                              |
 | [`opencode-recollect`](https://www.npmjs.com/package/opencode-recollect)      | npm package | `opencode plugin add opencode-recollect@latest`              | OpenCode plugin with the `memory` tool, `/recollect-*` commands, and event capture. |
 
 ## Requirements
@@ -121,11 +121,13 @@ The binary serves JSON-RPC on stdin and stdout. It also has setup commands:
 ```sh
 recollect version
 recollect doctor
+recollect mcp
 recollect setup opencode
 ```
 
 `setup opencode` prints the plugin entry for the OpenCode host. Add `--write`
-to merge it into the global `opencode.json`.
+to merge it into the global `opencode.json`. `recollect mcp` serves the Model
+Context Protocol over stdio.
 
 ## Usage
 
@@ -198,10 +200,26 @@ Search is lexical by default. Set `RECOLLECT_SEARCH_INDEX` to choose the
 derived index:
 
 - `sqlite` uses the private SQLite FTS5 index under `.engine/search`.
-- `hybrid` adds semantic candidates from the built-in deterministic embedder.
+- `hybrid` adds semantic candidates from the OpenAI-compatible endpoint in
+  `config.json`. Set `embedding.baseURL`, `embedding.model`,
+  `embedding.dimensions`, and `embedding.apiKeyEnv`. `hybrid` refuses to start
+  without an endpoint.
+
+The config file lives at `<userDir>/config.json`. Run `recollect doctor` to
+print the effective values with secret values hidden.
 
 Markdown stays authoritative. The index rebuilds from the files and never
 replaces them.
+
+## MCP
+
+`recollect mcp` serves the Model Context Protocol over stdio. It exposes memory
+search, read, save, correct, delete, and context tools, plus resources. See
+[docs/mcp.md](docs/mcp.md) for client setup, configuration, and limits.
+
+The server uses the same engine, config file, and privacy filters as the stdio
+protocol. The engine protocol itself is documented in
+[docs/protocol.md](docs/protocol.md).
 
 ## OpenCode
 

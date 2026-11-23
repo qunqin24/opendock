@@ -77,6 +77,36 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
 - **Compactación integrada**: los errores `context_too_long` de free-pi se
   reescriben para que OpenCode los reconozca como desbordamiento de contexto y
   ejecute `/compact` automáticamente en vez de terminar el turno.
+- **Techo por modelo aprendido del gateway**: cuando free-pi rechaza una
+  petición real por longitud, ese tamaño se guarda en `live-limits.json` como
+  techo de ese modelo y el catálogo anuncia una ventana un 15 % menor, también
+  sin reiniciar (`provider.reload`). Así la siguiente compactación empieza antes
+  de que el gateway rechace también el propio resumen, que es lo que dejaba el
+  turno detenido con solo el checkpoint en pantalla. Los rechazos causados por
+  una imagen o un archivo adjunto no cuentan: su base64 no dice nada de la
+  ventana de texto.
+- **Resumen de compactación sin recortes**: el presupuesto de salida de la
+  petición de compactación ya no se limita a 32k, porque un resumen cortado por
+  el límite hace fallar la compactación completa. Si aun así el resumen no cabe
+  en el techo aprendido, se descartan los turnos de usuario más antiguos (sin
+  romper parejas de herramienta) en lugar de abortar el turno.
+- **Ventana reciente en el resumen**: OpenCode sólo conserva el último
+  intercambio junto al resumen, así que el trabajo hecho justo antes de
+  compactar desaparecía. El plugin lee la sesión nativa, cita los últimos turnos
+  (hasta 24k caracteres) en la petición de compactación y exige que el resumen
+  termine con `## Recent window`, entregándolos también como último mensaje
+  porque los modelos gratuitos ignoran las reglas del sistema. Esos turnos
+  viajan una sola vez en la primera petición posterior, por si el resumen los
+  comprimió de más; caducan a la hora y no se guardan en disco.
+- **Poda de resultados antiguos**: las sesiones largas llegan a prompts de
+  100k–170k tokens y a ese tamaño los modelos gratuitos pierden el centro de la
+  conversación y dejan de seguir las reglas, aunque el gateway acepte la
+  petición. Antes de enviar, el plugin colapsa los resultados de herramientas
+  antiguos (conserva 600 caracteres de cabecera y 240 del final, con un aviso de
+  que se podaron), sin tocar el texto de usuario, las decisiones del asistente
+  ni los mensajes más recientes. El presupuesto es el 40 % de la ventana
+  anunciada (mínimo 24k), así que el prompt vuelve a la zona donde el modelo
+  atiende.
 - **Sin bucles de compactación**: si el servidor rechaza como «demasiado
   largo» una petición que cabe de sobra en la ventana (menos de 60k tokens),
   el plugin la reintenta con un `x-session-id` nuevo en vez de compactar. Si
@@ -87,14 +117,16 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   El plugin lo responde con la primera línea del primer mensaje, sin gastar
   créditos, sin pedir un anuncio y sin dejar la sesión atascada en
   «New session».
-- **Capacidades según el modelo**: los modelos que models.dev identifica como
-  multimodales anuncian entrada de imágenes y el gateway las reenvía al modelo
-  upstream. Los modelos de solo texto siguen usando `look_at_image`, porque
-  incrustar cada imagen leída (cientos de KB) en la conversación desborda la
-  ventana y gasta cuota en tokens de imagen; OpenCode sustituye las imágenes por
-  un aviso y el plugin aplica el mismo aviso al terminar la herramienta para que
-  el base64 no quede guardado en la sesión. La salida es siempre texto: la ruta
-  de chat no devuelve imágenes.
+- **Capacidades según el modelo**: los modelos gratuitos aceptan imágenes de
+  entrada de forma nativa; se comprobó con `curl_cffi` contra el gateway y los
+  cuatro transcriben una captura adjunta. Los alias de pago anuncian lo que
+  models.dev sabe de su modelo upstream. La salida es siempre texto: la ruta de
+  chat no devuelve imágenes. Para una imagen en disco o para un modelo de solo
+  texto sigue estando `look_at_image`, que además no deja el base64 en la
+  conversación. OpenCode recodifica los adjuntos grandes a 2000 px y cuenta su
+  base64 como tokens, así que una imagen de más de ~500 KB puede disparar una
+  compactación automática antes del turno; en ese caso conviene `look_at_image`,
+  que reescala y envía solo lo necesario.
 - **Subagentes identificados**: las sesiones hijas envían
   `x-freepi-subagent: 1`, igual que los proveedores que el CLI crea para sus
   subagentes.
@@ -163,22 +195,40 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   hook de respuesta y entrega el resultado a OpenCode, así que el turno sigue sin
   mostrar «one request at a time»; el reintento normal también rota el id como
   respaldo.
-- **Catálogo y metadatos resistentes**: el catálogo de free-pi y el registro de
-  models.dev se guardan en disco; si la red falla al arrancar se usan las copias
-  locales en vez de quedarse sin modelos o sin límites de contexto. Los avisos
-  que el servidor manda en el catálogo y en `/me` (`notice`) se registran una
-  vez en el log del plugin.
+- **Catálogo y metadatos en vivo**: el catálogo de free-pi y el registro de
+  models.dev se consultan en cada arranque y solo se guardan en memoria para el
+  proceso actual. El único archivo persistente es `live-limits.json`, con la
+  ventana y los tokens que el servidor confirmó. Si la red falla, se usa lo que
+  ya esté en memoria en vez de inventar límites. Los avisos que el servidor
+  manda en el catálogo y en `/me` (`notice`) se registran una vez en el log del
+  plugin.
+- **Catálogo que se recupera solo**: si `/client-version` no responde, el
+  proveedor quedaría registrado sin modelos y el selector de esa ubicación
+  mostraría «Model unavailable» para todos los modelos free-pi. Por eso la
+  petición se reintenta una vez de inmediato y, si aun así falla, el plugin
+  vuelve a pedir el catálogo en segundo plano (2 s, 5 s, 10 s, 20 s, 30 s y 60 s)
+  y, en cuanto lo obtiene, registra los modelos y recarga proveedor y modelo en
+  caliente. No hace falta reiniciar OpenCode ni elegir otra carpeta.
+- **Aislamiento por proveedor**: todo lo que añade el plugin —herramientas,
+  cabeceras, anuncios, reglas de prompt, compactación, reintentos, topes de
+  tokens y ajustes— se aplica solo a `free-pi` y `free-pi-defense`. Los demás
+  proveedores no reciben las herramientas en su lista (el plugin las quita de la
+  petición), no ven las cabeceras free-pi y conservan sus propias imágenes y su
+  propio uso. Si una sesión cambia de free-pi a otro modelo, pierde las
+  herramientas en la siguiente petición y las llamadas directas se rechazan.
 - Compatible con rutas, credenciales y navegador de cada sistema operativo.
 
 ## Lectura de imágenes
 
-Los modelos siguen siendo solo texto, igual que en el CLI. Para mirar una
-captura de pantalla o cualquier imagen del proyecto, el modelo llama a la
-herramienta `look_at_image` con una ruta y una pregunta concreta. El plugin:
+Los modelos gratuitos de free-pi aceptan imágenes adjuntas de forma nativa: al
+adjuntar una captura en la conversación, el gateway la reenvía al modelo upstream
+y el modelo la ve. En los modelos de solo texto, o cuando la imagen está en disco
+y no conviene cargarla entera, el modelo llama a `look_at_image` con una ruta y
+una pregunta concreta. El plugin:
 
+- Acepta PNG, JPEG y WebP.
 - Solo lee archivos dentro de la carpeta del proyecto (incluidos enlaces
   simbólicos resueltos).
-- Acepta PNG, JPEG y WebP.
 - Lee las dimensiones de la cabecera y envía el archivo intacto mientras no
   supere los 5 MB, conservando la resolución y la calidad originales. Solo las
   imágenes mayores se recodifican con Photon, manteniendo el mayor tamaño y la
@@ -192,15 +242,18 @@ herramienta `look_at_image` con una ruta y una pregunta concreta. El plugin:
 
 Cada llamada consume parte del allowance diario del usuario, como en el CLI.
 La herramienta solo se ejecuta en sesiones de free-pi; en otros proveedores
-responde que no está disponible. Si el modelo intenta leer una imagen con
-`read`, el plugin sustituye el base64 por un aviso que le indica usar
-`look_at_image` con la misma ruta.
+responde que no está disponible. Si el modelo activo acepta imágenes, un `read`
+de una imagen conserva el archivo y el modelo la ve; si es de solo texto, el
+plugin sustituye el base64 por un aviso que le indica usar `look_at_image` con la
+misma ruta.
 
 ## Herramientas free-pi
 
-El plugin registra las mismas herramientas de servidor que el CLI. Todas
-comprueban que la sesión sea de free-pi antes de gastar cuota; en cualquier otro
-proveedor responden que no están disponibles.
+El plugin registra las mismas herramientas de servidor que el CLI. OpenCode no
+permite registrar una herramienta solo para un proveedor, así que el plugin las
+quita de la lista de herramientas de cada petición servida por otro proveedor y,
+además, todas comprueban que la sesión sea de free-pi antes de gastar cuota. Los
+demás modelos no las ven ni pueden ejecutarlas.
 
 | Herramienta      | Qué hace                                                                 |
 | ---------------- | ------------------------------------------------------------------------ |
@@ -209,6 +262,7 @@ proveedor responden que no están disponibles.
 | `web_search`     | Busca en la web y devuelve título, URL, fecha y texto de cada resultado. |
 | `docs_lookup`    | Consulta documentación actual de una librería o framework.               |
 | `free_pi_usage`  | Muestra cuota restante, créditos, tokens y tier de la cuenta.            |
+| `free_pi_subagent_read` | Lee la transcripción de una sesión hija: prompts, herramientas y respuesta. |
 
 `generate_image` acepta `prompt`, `aspect_ratio` (`1:1`, `16:9`, `9:16`, `4:3`,
 `3:2`) y un `name` opcional para el archivo. Rechaza tipos que no sean PNG,
@@ -227,6 +281,15 @@ no reutiliza respuestas ni oculta llamadas repetidas.
 con su hora de recarga en ET, los créditos premium o de referidos y los tokens
 de hoy y de por vida. Si el servidor asigna el carril lento, incluye el aviso
 del CLI.
+
+`free_pi_subagent_read` recibe el `sessionID` que devuelve la herramienta
+`subagent` y devuelve la conversación de esa sesión hija: el prompt recibido,
+cada llamada a herramienta con su entrada y su resultado, y el texto final del
+subagente. Antes de leer comprueba con `session.get` que `parentID` sea la sesión
+que llama, así que no puede abrir sesiones ajenas. Sin `sessionID` lista las
+sesiones hijas de la sesión actual con su agente y su resultado. El transcript se
+mantiene dentro de un presupuesto de caracteres (`maxChars`, 60k por defecto) y,
+si no cabe, conserva los turnos más recientes y lo indica.
 
 La compra de créditos y la guía de free-pi ya no se exponen como herramientas:
 se resuelven en el dashboard y la documentación de free-pi, sin gastar cuota ni
@@ -259,14 +322,37 @@ plano, comparten el allowance diario y envían su informe al agente principal.
 Así se conservan las sesiones hijas, los permisos, la profundidad de subagentes
 y el resto del comportamiento nativo.
 
+La herramienta `subagent` es la de OpenCode y está disponible para **cualquier
+modelo**, no solo para los agentes `free-pi/*`: también puede lanzarlos un
+modelo de otro proveedor configurado en OpenCode. El plugin garantiza además que
+todos los modelos gratuitos anuncien soporte de tools, de modo que el runner
+nunca oculte `subagent` por una capacidad incorrecta de models.dev. Cuando el
+hijo termina, OpenCode inyecta su informe en la sesión padre; para ver lo que
+realmente ejecutó, el padre llama a `free_pi_subagent_read` con el `sessionID`
+del hijo.
+
 El plugin solo reescribe estos archivos si conservan su marca de gestión; si el
 usuario edita o reemplaza uno, se respeta tal cual.
 
 ## Skill y contexto
 
-El plugin registra una skill `free-pi` mediante la API nativa de skills, con la
-lista de herramientas, los subagentes y las reglas de allowance. OpenCode la
-anuncia cuando es relevante y el agente la carga con su herramienta `skill`.
+El plugin instala una skill nativa en:
+
+```text
+~/.config/opencode/skills/free-pi/SKILL.md
+```
+
+OpenCode la descubre con su propio cargador (ID `free-pi`), la anuncia cuando es
+relevante y el agente la carga con su herramienta `skill`. Contiene la lista de
+herramientas, los subagentes y las reglas de allowance. Si el directorio de
+configuración no se puede escribir, el plugin la registra mediante la API de
+skills como respaldo.
+
+Cada petición principal de free-pi recibe además una guía breve que pide
+delegar el trabajo grande en `free-pi/scout`, `free-pi/planner`,
+`free-pi/worker` o `free-pi/reviewer` con `subagent`, cargar skills con `skill`
+y seguir `AGENTS.md` en lugar de inventar convenciones. Esa guía solo se añade a
+las peticiones de `free-pi` y `free-pi-defense`.
 
 La memoria, las sesiones y el contexto son los de OpenCode: `AGENTS.md` y los
 archivos de `instructions` se cargan de forma nativa, las sesiones persisten y
@@ -311,6 +397,15 @@ insiste, devuelve un `400` con un mensaje de error de proveedor. Ese texto no
 coincide con el patrón de desbordamiento de OpenCode, así que el runner deja de
 compactar en lugar de entrar en un ciclo de resúmenes que no reducen nada.
 
+Cuando el rechazo sí corresponde a una conversación larga, el tamaño medido se
+guarda como `rejectedPromptTokens` del modelo en `live-limits.json`. El
+`provider.transform` reconstruye el catálogo con ese techo (85 % del tamaño
+rechazado, sin bajar de la ventana ya aceptada) y `provider.reload` lo aplica en
+caliente, de modo que la siguiente compactación se dispara antes de que el
+gateway rechace el resumen. Si el resumen aún no cupiera, el hook de
+compactación descarta los turnos de usuario más antiguos en lugar de dejar que
+OpenCode aborte el turno.
+
 free-pi cobra en créditos contra una cuota diaria, no en USD por token. Por
 eso los modelos se registran con costo `0`, igual que el CLI del proveedor; el
 consumo real se consulta en `/me` y `/me/stats` y se refleja en los mensajes de
@@ -329,6 +424,13 @@ puede completarse el hook de reintento rota el id para los siguientes pasos. Un
 turno que se aborta o falla a mitad de stream marca su `x-session-id` como sucio:
 la siguiente petición arranca directamente con un id nuevo y libera el anterior,
 de modo que la sesión continúa sin interrupciones y sin pasar por un reintento.
+
+Los fallos de transporte (`ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, DNS
+temporal, `socket hang up`) no son límites de cuenta: el plugin los reintenta con
+espera exponencial hasta cinco veces más (2 s, 4 s, 8 s, 16 s y 30 s) y marca el
+`x-session-id` como sucio para que el siguiente intento use una conexión y un
+slot nuevos. Así un corte breve de red, del router o del servicio local de
+OpenCode no termina el turno en el segundo intento.
 
 ## Rutas por plataforma
 
@@ -353,6 +455,7 @@ Si `XDG_CONFIG_HOME` o `OPENCODE_CONFIG_DIR` están definidos, se respetan.
 | `OPENCODE_CONFIG_DIR`     | Directorio de configuración de OpenCode.             |
 | `FREE_PI_DATA_DIR`        | Directorio de datos del plugin.                      |
 | `FREE_PI_LOG_FILE`        | Ruta alternativa del archivo de log del plugin.      |
+| `FREE_PI_TRACE=1`         | Registra en el log la forma real de cada petición: herramientas enviadas, tamaños y último mensaje. |
 
 No hay variables obligatorias.
 
@@ -450,6 +553,7 @@ test/smoke.mjs          prueba de humo del build
 test/registry.mjs       models.dev en vivo y tolerancia a fallos
 test/models.mjs         capacidades, variantes y límites
 test/live.mjs           ventana medida y observaciones del gateway
+test/diet.mjs           poda de resultados de herramientas antiguos
 test/hooks.mjs          hooks de sesión, anuncios, cuota y compactación
 ```
 

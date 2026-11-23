@@ -153,7 +153,8 @@ npx claude-smart install --host claude-code,codex --backend managed \
 Existing `--host codex` and `--host opencode` commands still work. Without a terminal,
 saved backend/provider settings are reused; a fresh install requires `--backend`.
 Use `--yes` to skip interactive questions when all required settings are supplied
-or saved. For multiple local agents, specify `--provider` unless one is already saved.
+or saved. For local mode, specify `--provider` unless a learning selection is already saved
+and confirmed; the coding integration never selects the learning provider.
 Use `--read-only` to retrieve memories without publishing interactions, or `--learn`
 to resume learning. The interactive guide offers both modes for either backend.
 
@@ -416,7 +417,7 @@ Advanced users can tune claude-smart via environment variables — see [DEVELOPE
 | Path | What |
 | --- | --- |
 | `~/.reflexio/data/reflexio_claude-smart.db` | SQLite data for fresh local installations, including learned preferences, skills, interactions, and search indexes. Existing installations keep the database path saved in `~/.reflexio/configs/config_claude-smart.json`, which may point to `reflexio.db` or a custom file. |
-| `~/.claude-smart/.env` | claude-smart config read by the hooks, backend, installer, and `npx claude-smart setup` — connection and learning policy (`REFLEXIO_URL` / `REFLEXIO_API_KEY`, `CLAUDE_SMART_LEARNING_PROVIDER` / `CLAUDE_SMART_LEARNING_MODEL`), plus execution overrides. Existing `CLAUDE_SMART_HOST` rows remain legacy fallback; installers no longer default or rewrite them. |
+| `~/.claude-smart/.env` | claude-smart config read by the hooks, backend, installer, and `npx claude-smart setup` — connection and learning policy (`REFLEXIO_URL` / `REFLEXIO_API_KEY`, `REFLEXIO_NATIVE_CLI_MODEL`), plus execution overrides. `CLAUDE_SMART_HOST` identifies the coding integration; it does not select learning execution. Confirmed setup converts obsolete selectors and preserves the original file for recovery. |
 | `~/.claude-smart/claude-code/claude-smart/` | Claude Code's stable local copy of the active npm package, registered as the `reflexioai` marketplace. Claude Code runs the plugin in place from its `plugin/` dir. |
 | `.claude/settings.local.json` or `~/.claude/settings.json` | Claude Code hook environment, such as `CLAUDE_SMART_CITATIONS`; use project-local settings for one repo or user settings for all projects. |
 | `~/.codex/config.toml` | Codex plugin state, hook feature flags, and per-hook trust entries after `claude-smart install --host codex`. |
@@ -492,18 +493,12 @@ publications). This fallback is a low-urgency policy, not proof a session ended.
 Normal full-window and stride extraction still runs promptly. A negative judge
 result produces no learning and is recorded as examined.
 
-Optimizer policy is also owned by the Reflexio server. SessionStart no longer
-turns optimization on or rewrites its budgets, adoption permissions or assistant
-backend. Existing server settings are preserved; fresh servers keep their own
-(disabled) optimizer default until explicitly configured. The old
-`CLAUDE_SMART_ENABLE_OPTIMIZER` hook flag is no longer read. Removing or setting
-that flag does not disable an optimizer already enabled on the server; change
-`playbook_optimizer_config` on the server to do that.
-
-The separately installed `claude-smart-optimizer-assistant` helper remains
-available for explicitly configured local optimization. See the
-[backend binding notes](./DEVELOPER.md#optimizer-backend-binding) before assigning
-an executable path, especially when the server is remote.
+The GEPA playbook optimizer and its `claude-smart-optimizer-assistant` helper
+are retired. Current playbook improvements use Reflexio's rule-evidence tuner.
+The server upgrade retires saved GEPA settings automatically and retains the
+original configuration for rollback. Plugin updates do not rewrite server policy.
+Upgrade an independently managed server to its GEPA retirement release before
+updating a separate helper installation.
 
 Extraction cadence is owned by the Reflexio server: configure `window_size` and
 `stride_size` there. Starting a client session preserves those settings. The

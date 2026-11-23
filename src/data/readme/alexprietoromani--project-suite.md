@@ -5,10 +5,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.8.0-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.9.2-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/npm-@alexprietoromani%2Fproject--suite-CB3837?style=flat-square" alt="npm package">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity%20%7C%20Codex-111111?style=flat-square" alt="Works with Claude Code, opencode, Antigravity and Codex">
   <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
-  <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
+  <img src="https://img.shields.io/badge/commands-8-111111?style=flat-square" alt="8 commands">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
@@ -65,6 +66,20 @@ flowchart LR
 
 Documents live in `docs/` inside your repo (auditable), in the language you choose (`es | en`). Working files (`docs/task/`, `docs/plan/`, `docs/logs/`, `CLAUDE.md`, `AGENTS.md`) stay **local by default** — they are not versioned unless you ask for it at setup. That is why a worktree receives them by copy and hands them back with `tablero.py --sync`, not by merge.
 
+## Interactive Offline HTML Viewers (drawDB + Archify)
+
+Specifications are not static dead text. Every technical specification generated with `especificar` automatically compiles into two interactive, 100% offline companion HTML viewers (zero external dependencies, self-contained single files verifiable with `--check` via SHA-256 integrity hash):
+
+- **`docs/db/diseno_db.html` (`scripts/render_db_html.py` — drawDB style):** An interactive Entity-Relationship (ER) canvas with pan and zoom, real-time table and column inspector, type definitions (SQLite, PostgreSQL, MySQL), primary key conceptual meanings, write policies, and a complete CRUD-by-component matrix.
+- **`docs/architecture/architecture.html` (`scripts/render_arch_html.py` — Archify style):** A multi-view blueprint explorer supporting C4 Context, C4 Container, master flow maps, sequence diagrams, per-flow invariants, and an interactive ADR (Architectural Decision Records) search engine.
+
+Both viewers are compiled deterministically with Python standard library (`render_db_html.py` and `render_arch_html.py`). Any change to the source Markdown document invalidates the embedded hash, allowing CI and gates (`verificar-dod`, `auditar-coherencia`) to detect documentation drift immediately:
+
+```bash
+python scripts/render_db_html.py --check docs/db/diseno_db.md
+python scripts/render_arch_html.py --check docs/architecture/architecture.md
+```
+
 ## Several plans in one repo (tracks)
 
 A repo can hold **several plans with different purposes** —one pipeline per booklet, one service per domain—, each with its own Fase 0. Each plan is a **track**.
@@ -109,6 +124,20 @@ Tracks **are** the directories under `docs/plan/` that contain a `plan_maestro.m
 ### The plan corrects itself
 
 When each Sub fase closes, `construir` contrasts what was learned against the pending Sub fases of the same Fase and rewrites them if needed, inserting corrective Tareas **inside the current Fase** —never as a new Fase at the end— and tagging each touched block with `> ⟳ Ajustado en SF{x.y} — <reason>`. It always warns; it only asks permission if the adjustment would change the Fase's global deliverable.
+
+## Deterministic CLI Suite & Governance
+
+`project-suite` does not rely solely on LLMs for mechanical invariants. It ships a suite of deterministic, zero-dependency CLI tools (Python standard library only) under `scripts/` to govern the repository, enforce quality gates, and operate directly from the terminal or CI/CD pipelines:
+
+| Script | Responsibility | Key Flags / Commands |
+|---|---|---|
+| `scripts/suite.py` | Unified project governance CLI. Single entry point for status checks and maintenance. | `status`, `verify`, `sync`, `audit`, `hooks`, `dod` |
+| `scripts/scaffold_project.py` | Deterministic spec-driven project scaffolder. Generates templates, rules, and configuration. | `--visibility`, `--agent`, `--orchestration`, `--stack`, `--rules` |
+| `scripts/nueva_fase.py` | Deterministic new Fase generator. Scaffolds `fases/FNN-slug.md`, updates `plan_maestro.md`, and rebuilds the board index with zero drift. | `--title`, `--objetivo`, `--subfases` |
+| `scripts/verificar_dod.py` | Deterministic Definition of Done gate. Evaluates tests, coverage, DB drift, and emits auditable JSONL receipts. | `--fase`, `--subfase`, `--tarea`, `--json` (writes to `docs/logs/recibos/`) |
+| `scripts/auditar_coherencia.py` | Static drift auditor between `architecture.md`/`diseno_db.md` and real application/SQL code. | `--strict`, `--fix` |
+| `scripts/log_index.py` | Indexer for transferable engineering `Cues` and classification of `DOM` (domain) vs `INV` (invariants) in `docs/logs/log.md` (Harness² foundation). | `--resumen`, `--formato json` |
+| `scripts/install_hooks.py` | Native Git Hooks manager (`pre-commit` and `pre-push`) with built-in secret and forbidden artifact scanning. | `--verify`, `--uninstall` |
 
 ## 3-Level Hierarchical Orchestration
 
@@ -164,7 +193,7 @@ Findings are triaged by the Orchestrator into `fix-now` (immediate resolution be
 |---|---|
 | `/init [idea]` | Bootstraps a project: design interview → `docs/` → rules → `.gitignore` → authorship. |
 | `/nueva-fase [change]` | Spec-driven gate: decides whether a change deserves a new Fase and drafts it **before** coding. |
-| `/modo [estricto/relajado/off]` | Changes or queries the ambient reminder intensity. |
+| `/modo [estricto\|relajado\|off]`<br>`/modo orquestacion [single-agent\|orca\|bridge\|private\|public]` | Changes ambient reminder intensity or updates orchestration topology and repo visibility live. |
 | `/track [slug \| nuevo <slug>]` | Lists, switches or creates the repo's plans (tracks). |
 | `/fase <FNN \| SFx.y>` | Opens a worktree and branch for a Fase or Subfase, with bounded scope and isolated documents. |
 | `/review [commit]` | Reviews the current diff against the plan: detects unplanned code or spec contradictions. |
@@ -231,6 +260,8 @@ Open opencode inside the repo (it reads `.opencode/` + `opencode.json`), or copy
 
 > `.opencode/` and `opencode.json` are **generated**, do not edit them by hand. After touching `skills/`, `commands/` or `.mcp.json`: `python scripts/sync_opencode.py`. Verify with `python scripts/validate_plugin.py`.
 
+> **Note on `Duplicate plugin ID: project-suite`:** If you have installed `@alexprietoromani/project-suite` globally in OpenCode and run `opencode` *inside the `project-suite` repository itself*, OpenCode will report a warning that both the global package and the local `.opencode/plugins/` directory share the ID `project-suite`. This is completely benign and only occurs when developing on the plugin itself. In user projects, only the global plugin loads.
+
 ### Antigravity CLI
 
 Antigravity CLI (`agy`) is the successor to Gemini CLI — a new Go-based terminal agent, not a rename:
@@ -243,11 +274,26 @@ The plugin root ships a `plugin.json` manifest; `agy plugin validate` processes 
 
 ### OpenAI Codex
 
-project-suite provides native support for OpenAI Codex:
+project-suite provides native, first-class support for OpenAI Codex:
 
-- Manifests `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` expose all 22 skills, governance commands, and `.mcp.json`.
-- Uses `AGENTS.md` for project instructions and rules.
-- Fully compatible with the 3-level hierarchical orchestration model (`sol -> terra -> luna`).
+- **Manifests:** `.codex-plugin/plugin.json` exposes the 22 skills (`skills/`), the 8 commands (`commands/`), and `.mcp.json`. The catalog `.agents/plugins/marketplace.json` allows discovery and local installation.
+- **Rules & Instructions:** Consumes `AGENTS.md` natively for system-level instructions and governance rules.
+- **Orchestration:** Fully supports the 3-level hierarchical model using Codex presets (`sol` Orchestrator -> `terra` Specialist -> `luna` Executor).
+
+Example `.codex-plugin/plugin.json`:
+
+```json
+{
+  "name": "project-suite",
+  "version": "1.9.2",
+  "description": "Spec-driven project scaffolder and governor",
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "mcpServers": "./.mcp.json"
+}
+```
+
+Codex discovers all commands (`/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`) and skills directly in your workspace.
 
 ### Gemini CLI (legacy — enterprise and API keys)
 

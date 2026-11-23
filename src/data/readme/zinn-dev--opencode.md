@@ -67,7 +67,7 @@ bun run dev -- task list
 
 ## OpenCode inspector
 
-The [`@zinn-dev/opencode`](integrations/opencode/inspector/README.md) package adds task inspection to the OpenCode TUI and an experimental board summary to OpenCode Desktop. It requires OpenCode 2.3.2 and Zinn CLI 0.41.0 or newer on `PATH`. Add `@zinn-dev/opencode@^0.5.0` to the `plugins` array in `~/.config/opencode/opencode.json`, and add the same package to `~/.config/opencode/cli.json` with your inspector options.
+The [`@zinn-dev/opencode`](integrations/opencode/inspector/README.md) package adds task inspection to the OpenCode TUI and an experimental board summary to OpenCode Desktop. It requires OpenCode 2.3.2 and Zinn CLI 0.45.0 or newer on `PATH`. Add `@zinn-dev/opencode@^0.6.0` to the `plugins` array in `~/.config/opencode/opencode.json`, and add the same package to `~/.config/opencode/cli.json` with your inspector options.
 
 See the [OpenCode inspector guide](https://zinn.sh/integrations/opencode/inspector) for the two-file recipe, options, updates, and removal.
 

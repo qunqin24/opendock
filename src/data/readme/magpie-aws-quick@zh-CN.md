@@ -45,6 +45,11 @@ Python 后端（`quickwork-agent`，打包在 `resources/agent.zip` 里），以
 5. **会话复用（默认开启）**：三级续接判定——见下文
    [会话复用](#会话复用thread-reuse)。
 
+设备 ID：官方桌面端连接时总会把 profile 里的 `device_id` 作为 `outpostId` 发出去，所以直连会话也发一个按账号固定的 ID，不再发空值。
+凭据管理器登录直接用桌面端 profile 里的 `device_id`（只读）；OAuth 账号在登录时生成一个 UUID，存在账号记录里，刷新令牌和重新登录都保持不变。
+大图上传投递时也用同一个 ID。不同账号不共用 ID，同一账号的 ID 不会更换。设 `stableDeviceId: false` 可退回空值。
+本地 outpost 模式使用 Quick 自带 agent 报告的 ID；agent 会继承环境变量 `QUICKWORK_BASE` / `QUICKWORK_ROOT`。
+
 ### 会话复用（thread reuse）
 
 Quick 在服务端按 `thread_id` 保存会话历史，而 OpenAI 客户端每次请求都重发
@@ -155,22 +160,44 @@ magpie login aws-quick              # 按提示选择登录方式
 账号自己的 token，和桌面端用量组件的数字一致；重置时间按桌面端的算法取
 下个月 1 号。
 
+### 选项
+
+少数插件选项可以调请求行为（`magpie plugin options aws-quick '{…}'`）：
+
+- `headerWaitMs`（默认 `10000`）：流式请求在 Quick 给出首个输出**或**超过
+  该时长后返回响应头——Quick 跑自带工具时可能长时间静默，而网关对响应头
+  的等待是有上限的。`0` 表示和以前一样等到首个输出。
+- `idleTimeoutMs`（默认 `300000`）：一轮 Quick turn 超过该时长没有任何进展
+  （keepalive 不算）就中止，报 503 `timeout`；同时给 Quick 发它自己的
+  `stop_generation` 帧，避免服务端继续空跑。客户端中止同样处理。`0` 关闭。
+- `showQuickTools`（默认 `true`）：把 Quick 自带工具的 `tool_start` 以
+  `[Quick: <名称>]` 推理行的形式透出，长时间 agentic 轮次不再看起来像卡死；
+  `false` 隐藏。
+- `stableDeviceId`（默认 `true`）：直连会话把按账号固定的设备 ID 作为
+  `outpostId` 发送（见上文"设备 ID"）；`false` 改发空值。
+
 ## 已知限制
 
 - **工具调用是文本约定模拟**：Quick 的 agent 在服务端自带工具链（浏览器、本地文件、MCP 等），
   `tool_start`/`tool_result` 等事件由它自己执行、客户端只观测，`message_complete.tool_calls`
   恒为空。客户端传入的 OpenAI `tools` 通过提示词注入为 `<tool_call>{json}</tool_call>`
   文本约定，由插件解析成标准 `tool_calls` 返回；`tool` 角色的结果渲染为
-  `[tool_result …]` 续接同一 thread。可靠性取决于模型遵守约定——已实测
+  `[tool_result …]` 续接同一 thread。完整的工具说明每个 thread 只发一次，
+  复用 thread 的后续轮次只带一段简短提醒：消息里的内容都会留在 Quick 的
+  thread 历史里、计入上下文。可靠性取决于模型遵守约定——已实测
   `tool_choice:'required'` 下 smart/advanced 均能稳定产出；模型偶尔会先用
-  自带工具（如联网搜索）直接作答，此时表现为普通文本回复。
+  自带工具（如联网搜索）直接作答，此时表现为普通文本回复。若模型改用
+  Quick 自己的原生工具通道调用了客户端声明的工具，插件会识别该调用并按
+  普通 `tool_calls` 返回，并在 Quick 把它重写成文本之前中止本轮。
   Quick 自带工具的执行结果不会映射为 OpenAI `tool_calls`（那是它内部过程）。
-- **图片只支持小图**：内联图片（`data:` URL、Anthropic base64 块、工具结果
-  里的图片）会作为 `user_message.attachments` 发出去，但 Quick 把图片的
-  base64 和文字算在同一个 64KB 帧里，大约 40KB 以内的图才能发；更大的图会
-  被丢弃，并在消息里注明。Quick 自己的上传接口只会把文件投递到已连接的
-  设备，直连会话没有设备，所以用不了。非图片文件（`file`/`input_file`）
-  仍是占位。
+- **图片：小图内联，大图走云端上传**：能放进消息帧的内联图片（`data:` URL、
+  Anthropic base64 块、工具结果里的图片）仍作为 `user_message.attachments`
+  的 base64 发出；更大的图（每张 ≤3MiB、每轮最多 4 张、合计 ≤5MiB、仅限
+  内联数据）会通过 Quick 自己的附件上传流程传到账号的云端会话工作区——
+  和 Quick 应用里附加文件是同一个位置。远程 URL 和非图片文件
+  （`file`/`input_file`）仍不支持；上传失败时会在消息里注明图片缺失。
+  云端上传需要直连会话（OAuth / 凭据管理器登录）；本地 outpost 回退路径
+  仍只支持内联。
 - **采样参数**：`temperature` 等不在协议内，传了也会被服务端忽略（`capabilities.temperature:false`）。
 - **会话与账号绑定**：thread 复用的 scope 里包含账号身份哈希；换号后旧 thread 自动失效重建。
 - **多窗口/并发**：同一 QuickSocket 上不同 thread 可并行 turn；同一 thread 的并发请求会被拒绝（`busy`）。
@@ -181,8 +208,8 @@ magpie login aws-quick              # 按提示选择登录方式
   截断时回复里会带 `> [quick] …已截断` 提示。
 - **OAuth 登录仅限 consumer/social 通道**：重放的是桌面端 `quick.aws.com/sn`
   的 `social` provider 流程。走企业 IdP 的租户如果 issuer 不是 Amazon 社交 IdP
-  可能无法完成——这种情况请改用本地凭据方式。OAuth 路径以空 `outpostId` 运行
-  （服务端接受），将来若有依赖真实设备 id 的服务端能力不适用于此路径。
+  可能无法完成——这种情况请改用本地凭据方式。OAuth 路径会发送固定的生成设备 ID，
+  但不运行本地 agent，需要已连接设备的服务端能力（本机文件、应用）不适用于此路径。
 
 ## 安全与凭据
 

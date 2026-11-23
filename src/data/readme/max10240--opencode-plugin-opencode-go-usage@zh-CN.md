@@ -51,7 +51,7 @@ prompt、在很长的对话里找不到某个决定、密钥不小心进了上�
 | 插件 | 它能给你什么 | 什么时候需要 |
 | --- | --- | --- |
 | [Unicorn](./packages/opencode-plugin-unicorn/README.zh-CN.md) | 把下面所有插件打成一个包，并可独立开关 | 想一次装好整套工具，不想逐个管理插件 |
-| [God agent](./packages/opencode-plugin-god/README.zh-CN.md) | 注册 `god` agent，按 model ID 从本地文件或 HTTP 选择 system prompt | 想要一个按模型切换提示词、又不想影响其他 agent 的独立 agent |
+| [God agent](./packages/opencode-plugin-god/README.zh-CN.md) | 注册 `god` agent，按 model ID 选择 system prompt，内置常用模型提示词，也可用本地文件或 HTTP 覆盖 | 想要一个按模型切换提示词、又不想影响其他 agent 的独立 agent |
 | [自动后台](./packages/opencode-plugin-non-blocking/README.zh-CN.md) | 长时间运行的 Bash 和 subagent 自动转入后台 | 构建、测试、安装或研究型 subagent 卡住了当前 session |
 | [Prompt 检索](./packages/opencode-plugin-prompt-search/README.zh-CN.md) | 搜索所有历史 session 的 prompt，并插入而不发送 | 记得写过某段 prompt，但想不起在哪个 session |
 | [当前对话检索](./packages/opencode-plugin-session-search/README.zh-CN.md) | 搜索当前对话并跳到对应消息 | 长对话把某个决定、命令或报错埋得太深 |

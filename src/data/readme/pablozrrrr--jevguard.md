@@ -761,17 +761,18 @@ applies a change. The `V0.6` entry remains the
 future, unattended corrective loop; the proposer is a bounded, strategy-only step, not
 that loop.
 
-The enforce design is accepted and not implemented: [ADR 0022](./docs/adr/0022-enforce-fail-via-stop-hook.md)
-fixes the decisions — Claude Code only, opt-in in the user's own `claude-code.yaml`,
-interactive sessions only, `error` rules from the user's allowlist (the pilot uses
-`SECRETS-001` and `DESTRUCTIVE-001`), one block per unit, an 8 s budget, never a
-built-in, coexisting with remediation delivery, and `jevguard ack` as the user's
-per-unit override. The first pieces are in: the `enforce` section is validated
-strictly (the allowlist and the budget, with built-ins and duplicates kept out of it as
-[configuration](./docs/configuration.md) documents) and the decision that turns a review
-into a block is pure and tested, failing open on anything it cannot answer positively.
-The `Stop` hook that would apply it is not wired yet, so a review is still observe-only
-and an enabled section has no effect.
+Enforce is accepted ([ADR 0022](./docs/adr/0022-enforce-fail-via-stop-hook.md)) and
+implemented behind the user's own opt-in: Claude Code only, opt-in in the user's
+`claude-code.yaml`, interactive sessions only, `error` rules from the user's allowlist
+(the pilot uses `SECRETS-001` and `DESTRUCTIVE-001`), one block per unit, an 8 s budget,
+never a built-in, coexisting with remediation delivery, and `jevguard ack` as the
+user's per-unit override (that command is the remaining piece). The `Stop` hook now
+applies the decision: it waits, at most the budget and never past its own allowance, for
+the review the worker records for the closing unit, and a review that does not settle,
+a dead worker and an unknown session all end the turn with no decision. Observe stays
+the default: with the section off, a review is exactly what it was before and the hook
+still writes nothing. See [configuration](./docs/configuration.md) for the two host
+markers that decide whether a session is interactive.
 
 The `V0.4` `jev-init` skill is implemented: when no policy exists it bootstraps
 `.jev/rules.md` and `.jev/config.yaml` from the user's explicit constraints and

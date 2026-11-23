@@ -9,8 +9,9 @@
 
 **A gatekeeper that scans for sensitive content before you feed code, documents, or data to AI services.**
 
-Three supported modes:
+Four supported modes:
 - **OpenCode Plugin**: The enforced ingress gate for OpenCode. Use this when OpenCode sends content to a model.
+- **pi adapter**: An in-process pi extension that guards the agent's provider requests through the shared wire core.
 - **CLI**: Manual or CI scanning of text, files, and directories; supports redaction.
 - **Web UI**: Local browser interface and REST endpoint for manual scanning.
 
@@ -19,6 +20,7 @@ MCP server mode has been removed. It depended on the model voluntarily calling a
 | Mode | Start it with | Use it for |
 |------|---------------|------------|
 | OpenCode Plugin | Add the `leakshield` package or the `dist` directory to `opencode.json` (OpenCode v2) | Automatic, fail-closed protection for OpenCode model inputs and tool outputs |
+| pi adapter | `pi -e node_modules/leakshield/dist/adapters/pi/extension.js` (or first in pi `settings.extensions`) | Masked pi provider requests and restored read/write/edit/bash arguments |
 | CLI | `npm run scan -- --file ./path` (or `leakshield --file ./path` after a global install / `npm link`) | Explicit local or CI scans; it never sends content to a model |
 | Web UI | `npm run web` | Manual browser scans at `http://localhost:3000` |
 
@@ -28,6 +30,7 @@ MCP server mode has been removed. It depended on the model voluntarily calling a
 
 - Transparent mode has been verified on OpenCode v2.0.28 with local loopback providers, and once against a real OpenAI model. The 0.3.0 tool restoration was rechecked on OpenCode v2.2.5 with a loopback provider, the OpenChamber render tool and `rtk` ([record](docs/evidence/2026-11-06-opencode-2.2.5-tool-restoration.md)). It is **not** a guarantee that nothing sensitive reaches a model: the recommended hook-first setup is reported as `PARTIAL` by `--doctor`, and content added after the plugin's hooks or sent by permitted tools (curl, remote MCP) is outside its coverage.
 - Claude Code is supported through a local proxy (`leakshield --claude-code-proxy`, then `ANTHROPIC_BASE_URL`), verified with Claude Code 2.1.321 against a loopback stub upstream ([record](docs/evidence/2026-11-21-claude-code-proxy.md)). It masks model requests and restores assistant text, but does not restore placeholders at tool execution yet: see [Claude Code](docs/claude-code.md).
+- pi is supported through an in-process extension that wraps the agent's `fetch`, masks the three wire APIs it supports, and restores read/write/edit/bash arguments locally. Verified against pi 1.6.0 with a recording stub upstream ([record](docs/evidence/2026-11-23-pi-extension.md)); providers whose transport bypasses fetch (Codex WebSocket, Bedrock) are refused, and OAuth-only accounts are not supported. See [pi adapter](docs/pi.md).
 - Not yet verified: OS-keychain custody on Windows and Linux (macOS verified 2026-10-20), a real Anthropic provider, long histories on other providers, long-running use ([#26](https://github.com/jwcrystal/leakshield/issues/26)).
 - Defaults may still change during `0.x`; see the [changelog](CHANGELOG.md).
 - Verification records: [docs/evidence](docs/evidence/README.md). Report vulnerabilities privately: [SECURITY.md](SECURITY.md). License: [Apache-2.0](LICENSE).
@@ -267,7 +270,7 @@ The default `mode` is **`transparent`** (see [Transparent mode](docs/plugin/tran
 
 #### What `PARTIAL` means
 
-`leakshield --doctor` exits 0 for two statuses. They are install-level results, not a guarantee that nothing sensitive reaches a model.
+`leakshield --doctor` exits 0 for two statuses. They are install-level results, not a guarantee that nothing sensitive reaches a model. Pass `--doctor opencode`, `--doctor claude-code` or `--doctor pi` (also `--doctor=<host>`) to check one host with its own exit code.
 
 | Status | Setup | Meaning |
 |--------|-------|---------|
@@ -289,6 +292,7 @@ See [Wire protection](docs/plugin/wire-protection.md) for both levels.
 - [Mapping persistence](docs/plugin/persistence.md): opt-in encrypted storage, key custody, erasure
 - [Capacity and lifecycle](docs/plugin/capacity.md): budgets, session limits, retention
 - [Readonly env queries](docs/plugin/env-queries.md): opt-in tools that answer configuration questions without returning values
+- [Host capability matrix](docs/host-capabilities.md): per-host declaration of which model egress and surfaces are protected, refused, absent, or outside interception, and the invariants a new adapter must satisfy
 
 #### Persistence risk notes (read before enabling)
 
@@ -363,6 +367,17 @@ leakshield --doctor                                # the "Claude Code:" section 
 ```
 
 The proxy masks every Anthropic Messages request Claude Code sends (and `count_tokens`), restores placeholders in the assistant's JSON or streamed text, and blocks anything it cannot mask instead of forwarding it. It is verified with an API key; Claude Code documents that the base URL also applies to a claude.ai login, which has not been tested here. It does not restore placeholders inside tool calls, and it cannot see traffic that bypasses the base URL, such as WebFetch's domain check, which sends the hostname to Anthropic. Setup and the full list of gaps: [docs/claude-code.md](docs/claude-code.md).
+
+---
+
+### pi (in-process extension)
+
+```bash
+pi -e /path/to/node_modules/leakshield/dist/adapters/pi/extension.js   # load it first
+leakshield --doctor pi                                        # checks registration, order and wire API
+```
+
+pi resolves `fetch` when it builds a provider client, including compaction and branch summaries, so an extension that wraps `globalThis.fetch` covers the same traffic the OpenCode plugin covers through its wire hook. Every provider request is masked in-process; assistant text is restored in the reply, and `read`, `write`, `edit`, `bash` and `powershell` arguments are restored at the local execution boundary. Session files stay with pi, so `--continue`, `--resume` and `--session` keep working. Verified against pi 1.6.0 with a recording stub; providers that bypass fetch (Codex WebSocket, Bedrock, Google auth) are refused, OAuth-only accounts are not supported, and the extension has to load first. See [pi adapter](docs/pi.md).
 
 ---
 

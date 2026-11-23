@@ -63,15 +63,19 @@ Empty and cancelled reviews submit nothing. Opening a review makes no model call
 
 For a selection that spans messages, `/annotate-selection` reviews just the selected text.
 
-### Review Markdown and text documents
+### Review text and config files
 
 ```text
 /annotate docs/plan.md            # Review a Markdown document
 /annotate "docs/release plan.md"  # Path with spaces
 /annotate ~/Documents/notes.txt   # Plain text
+/annotate-file                    # Pick a file from this session's directory
+/annotate-file settings          # Narrow the file search
 ```
 
-Local UTF-8 `.md`, `.mdx`, `.markdown` and `.txt` files up to 2 MiB. Relative paths resolve against the captured session's working directory, not the directory from which the terminal client happened to start. Absolute and `~/` paths work too. The file must exist on the machine running the terminal client.
+`/annotate-file` uses OpenCode's `@` file search in the session's directory and its subdirectories, then lets you filter the results in the picker. You can also pass a supported path directly to `/annotate`.
+
+Supported files include Markdown, plain text, CSV, logs, JSON, YAML, TOML, XML, and common config files such as `.editorconfig`, `.gitignore`, `Dockerfile`, and `Makefile`. Files must be local UTF-8 and no larger than 2 MiB. `.env` and credential-looking names are excluded. Relative paths resolve against the captured session's working directory; absolute and `~/` paths work too.
 
 The reviewer reads a fixed snapshot and does not edit the original file. Feedback includes the original path and snapshot hash, with instructions to re-read the current file before applying suggestions. Document review works even before the session has an assistant reply.
 
@@ -99,6 +103,7 @@ Browser setup is separate from the plugin install. Safari supports local notes a
 /annotate docs/plan.md            Review a Markdown document
 /annotate "docs/release plan.md"  Review a path containing spaces
 /annotate ~/Documents/notes.txt   Review a plain-text document
+/annotate-file [query]            Choose a text or config file in the session directory
 /annotate-pick                    Choose a recent reply or mid-turn progress update
 /annotate-selection               Review the message containing your last transcript selection
 /annotate page.html              Review local HTML in the configured browser
@@ -211,7 +216,7 @@ After a page reload or same-site navigation, the panel reconnects its page tools
 
 ### Explicit routing
 
-Plain `/annotate`, `/annotate-pick` and `/annotate-selection` use the TUI; Markdown and plain-text files do too. Explicit URLs and HTML paths passed to `/annotate` enter the browser workflow. A reply containing HTML links or code fences does not change the default.
+Plain `/annotate`, `/annotate-file`, `/annotate-pick` and `/annotate-selection` use the TUI; text and config paths do too. Explicit URLs and HTML paths passed to `/annotate` enter the browser workflow. A reply containing HTML links or code fences does not change the default.
 
 ### Browser safeguards and limitations
 
@@ -366,6 +371,7 @@ See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 
 - `/annotate`：批注上一条完整回复。
 - `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
+- `/annotate-file [关键词]`：从当前会话目录及其子目录中选择文本或配置文件。
 - `/annotate-pick`：从最近的回复和运行中的进度说明里选一条批注。
 - `/annotate-selection`：先在会话里拖选文字，再批注包含这段文字的消息。
 - 0.16.0 移除 `/ref` 和代理会话搜索／读取工具，交由 Another 提供跨代理引用：安装 Another 0.28.0 或更高版本并运行 `another setup` 即可。原有插件配置继续有效，请移除 `annotate_session_*` 权限规则。

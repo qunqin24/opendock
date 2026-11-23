@@ -170,6 +170,9 @@ The keys are the same either way:
 | `alwaysShow` | `false` | Keep the meter visible when idle instead of hiding it |
 | `idleText` | `"idle"` | Placeholder shown with `alwaysShow` when there is no data (`tok/s idle`) |
 | `label` | `"tok/s"` | Leading label |
+| `llamaSwapUrl` | `"http://127.0.0.1:8080"` | V2: llama-swap base URL used to read live decode counts for local models |
+| `llamaSwapProviders` | `[]` | V2: provider IDs served by [llama-swap](https://github.com/mostlygeek/llama-swap); their live decode counts are polled via `/upstream/<model>/slots`. Off when empty |
+| `llamaSwapPollMs` | `250` | V2: how often the llama-swap slot counter is read during an execution |
 
 ## How it works
 
@@ -187,7 +190,8 @@ generation's event bus into the same normalized events.
 **OpenCode V2** (`src/v2.ts`, installed via `plugins`, renders in `prompt.footer.status`):
 
 - `session.step.started` — the first step of an execution opens the assistant turn and records its start time (for TTFT). Later steps in the same tool loop keep that graph.
-- `session.text.delta` / `session.reasoning.delta` — record streamed output and bucket it per second.
+- `session.text.delta` / `session.reasoning.delta` / `session.tool.input.delta` — record streamed output, including tool-call arguments such as a file body, and bucket it per second.
+- llama-swap models (`llamaSwapProviders`) — llama-server holds a tool call back until it is complete, so OpenCode emits no events while a local model writes one. From step start to execution end the meter polls llama-server's per-slot `n_decoded` counter through llama-swap and records the exact decoded tokens; event deltas are only used when llama-swap does not answer.
 - `session.tool.called` — restarts the live rate when a tool runs, keeping the graph continuous across the gap.
 - `session.step.ended` / `session.step.failed` — accumulate the provider's exact token usage per step, including prompt-cache reads and writes.
 - `session.execution.succeeded` / `.failed` / `.interrupted` — finish the turn with the summed tokens and cache hit rate, and freeze the final frame.

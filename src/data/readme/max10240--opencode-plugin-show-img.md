@@ -53,7 +53,7 @@ See the [Unicorn README](./packages/opencode-plugin-unicorn/README.md) for every
 | Plugin | What it gives you | Reach for it when |
 | --- | --- | --- |
 | [Unicorn](./packages/opencode-plugin-unicorn) | Everything below in one package, with independent switches | You want the whole toolkit without installing each plugin separately |
-| [God agent](./packages/opencode-plugin-god) | A `god` agent whose system prompt is selected by model ID from local files or HTTP | You want a separate agent with a model-specific prompt without affecting other agents |
+| [God agent](./packages/opencode-plugin-god) | A `god` agent whose system prompt is selected by model ID, with built-in prompts and local or HTTP overrides | You want a separate agent with a model-specific prompt without affecting other agents |
 | [Non-blocking](./packages/opencode-plugin-non-blocking) | Long-running Bash and subagent work moves to the background automatically | A build, test run, install, or research subagent is holding up your session |
 | [Prompt search](./packages/opencode-plugin-prompt-search) | Search prompts from every past session and insert one without sending it | You remember a prompt but not where or when you wrote it |
 | [Session search](./packages/opencode-plugin-session-search) | Search the current conversation and jump to the exact message | A long session has buried the decision, command, or error you need |
@@ -101,5 +101,7 @@ bun run check
 
 `check` is the complete everyday gate; `check:release` is the uncached release gate. All packages share one version.
 Releases go through `npm run release -- --release-type=<type>`. Local releases pause at each npm browser-auth link and
-print a `--resume <session-id>` command; authorize in the browser and run that command. See [AGENTS.md](AGENTS.md) for
-the full workflow and release rules.
+print a `--resume <session-id>` command; authorize in the browser and run that command. Each link reports its expiry
+time; the registry status endpoint is polled for approval, rejection, or expiry, and an exhausted link stops the release
+instead of waiting indefinitely. Set `RELEASE_AUTH_TIMEOUT_MS` to override the default 5m30s window. See
+[AGENTS.md](AGENTS.md) for the full workflow and release rules.

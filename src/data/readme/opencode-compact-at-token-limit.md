@@ -22,7 +22,7 @@ Add it to the `plugin` list in `opencode.json` (global `~/.config/opencode/openc
 Or pin a GitHub tag instead of npm:
 
 ```json
-{ "plugin": ["opencode-compact-at-token-limit@github:sblattj/opencode-compact-at-token-limit#v0.1.1"] }
+{ "plugin": ["opencode-compact-at-token-limit@github:sblattj/opencode-compact-at-token-limit#v0.1.2"] }
 ```
 
 ## Configure

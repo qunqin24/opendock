@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.1`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.3`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,8 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.3 | 9 | 0.40.3 | 0.40.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.3 (`hermes-agent` >=0.17.0) |
+| 0.40.2 | 9 | 0.40.2 | 0.40.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.2 (`hermes-agent` >=0.17.0) |
 | 0.40.1 | 9 | 0.40.1 | 0.40.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.1 (`hermes-agent` >=0.17.0) |
 | 0.40.0 | 9 | 0.40.0 | 0.40.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.0 (`hermes-agent` >=0.17.0) |
 | 0.39.0 | 9 | 0.39.0 | 0.39.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.39.0 (`hermes-agent` >=0.17.0) |
@@ -328,6 +330,21 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.3: self-contained npm plugins and one release tag (#790)
+
+- Pi and OpenCode now ship the shared CLI transport inside their packages, as DSH already does. Installing the new
+  packages no longer fetches `memcue-transport` from npm; older plugin versions can still install it.
+- The binary and all three npm plugins ship from one tag. npm package names and Git-based installation paths are
+  unchanged. There are no CLI or schema changes and no fact-base migration is needed from 0.40.2.
+
+### 0.40.2: Hermes searches memory when prior context matters (#787)
+
+- The Hermes system prompt and search tool tell the agent to look up memory when earlier context could change its
+  answer or next action, and to skip self-contained tasks. After an empty search, session history is a fallback only
+  when the missing context still matters.
+- The CLI, fact-base schema (9), and automatic delivery of repository pitfalls are unchanged from 0.40.1. Upgrading
+  from 0.40.1 does not require a fact-base migration.
 
 ### 0.40.1: capture standing preferences before acting (#783)
 

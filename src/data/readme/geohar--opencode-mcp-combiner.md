@@ -315,10 +315,28 @@ stands alone; a server that keeps state takes an explicit session id on its tool
   answers that way unless it pins itself to the handshake.
 - `2026`: always the 2026-07-28 revision.
 
-Clients and servers on different revisions are bridged both ways: a
-handshake-era client calling a 2026 server that asks for input mid-call is asked
-live and the call is retried with the answer; a 2026-era client calling a
-handshake server that elicits mid-call has the call held open across its retry.
+Clients and servers on different revisions are bridged both ways, for every
+kind of question a server can ask — a form, a URL to open, a sampling request,
+the client's roots — on tool calls, resource reads and prompts alike:
+
+- **A handshake client, a 2026 server.** The server asks by returning
+  `InputRequiredResult`; the combiner puts each question to the client live and
+  retries the request with the answers. A URL the user agreed to open isn't
+  asked again while the browser step runs: the combiner re-polls the server for
+  up to `MCP_COMBINER_URL_ASK_WAIT` seconds (default 300), then returns the
+  standard "URL elicitation required" error (`-32042`) so the client can call
+  again once the step is done.
+- **A 2026 client, a handshake server.** The server asks mid-request; the
+  combiner holds the request open and returns the question as
+  `InputRequiredResult`, and the client's retry carries the answer back. A
+  `-32042` from the server becomes a URL question the same way.
+- **Same revision on both sides:** questions pass straight through.
+
+A question needing a capability the client didn't declare (sampling, roots,
+URL elicitation) fails the request with an error saying so. A server's own
+`requestState` reaches a 2026 client wrapped as `up:<server>:<state>` (and
+sealed on the wire), so it can never be confused with the combiner's own
+continuations or replayed against another server.
 
 **Sessions on 2026 servers.** A 2026 server that keeps state hands out its own
 session ids (svg-mcp: `create_session`, then `session_id` on every call). The
@@ -342,12 +360,12 @@ The combiner itself answers clients on the handshake unless started with
 `MCP_COMBINER_OFFER_2026=1` — until then a client that would negotiate
 2026-07-28 (Claude Code does by default) falls back to the handshake. With the
 offer on, 2026 clients get per-chat `subscriptions/listen` streams, permission
-prompts as `InputRequiredResult`, and calls to handshake upstreams that ask
-mid-call held open for up to `MCP_COMBINER_HOLD_TIMEOUT` seconds (default 3600)
-awaiting the client's answer. Not bridged yet: an upstream's mid-call sampling
-or roots request to a 2026 client, and non-form questions (URL mode, sampling)
-from a 2026 upstream to a handshake client — those calls fail with an error
-saying so.
+prompts and the combiner's own OAuth links as `InputRequiredResult`, and
+requests to handshake upstreams that ask mid-request held open for up to
+`MCP_COMBINER_HOLD_TIMEOUT` seconds (default 3600) awaiting the client's
+answer. Not bridged: a server-initiated request a handshake upstream sends
+outside any request (e.g. a `roots/list` after a roots change) has no 2026
+request to ride on.
 
 ### isolate — per-chat sessions
 

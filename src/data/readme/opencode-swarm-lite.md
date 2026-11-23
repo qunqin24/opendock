@@ -1,13 +1,13 @@
-# opencode-swarm-lite
+# opencode-apax
 
-> **An adaptive execution runtime that knows when to swarm — and when not to.**
+> **APAX: An Adaptive Framework for Predictive Multi-Agent Task Scheduling and Execution**
 
-[![npm version](https://img.shields.io/npm/v/opencode-swarm-lite.svg)](https://www.npmjs.com/package/opencode-swarm-lite)
-[![CI](https://github.com/Arihant-Bharanidharan/opencode-swarm-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/Arihant-Bharanidharan/opencode-swarm-lite/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/opencode-apax.svg)](https://www.npmjs.com/package/opencode-apax)
+[![CI](https://github.com/Arihant-Bharanidharan/Opencode-APAX/workflows/ci.yml/badge.svg)](https://github.com/Arihant-Bharanidharan/Opencode-APAX/actions/workflows/ci.yml)
 [![tests](https://img.shields.io/badge/tests-991%20passed-brightgreen)](#testing)
-[![license](https://img.shields.io/npm/l/opencode-swarm-lite.svg)](LICENSE)
+[![license](https://img.shields.io/npm/l/opencode-apax.svg)](LICENSE)
 
-`opencode-swarm-lite` is an adaptive multi-model agent orchestration runtime for
+`opencode-apax` is an adaptive multi-model agent orchestration runtime for
 [OpenCode](https://opencode.ai). It predicts whether parallel agents are worth
 spawning, chooses different execution strategies across task subgraphs, routes work
 according to model/provider health and trust, adapts verification effort, and can
@@ -26,11 +26,13 @@ measured speedup bar before any worker is spawned.
 - 🛡️ **Crash recovery** — durable run manifests, checkpoints, selective rollback
 - ✅ **Adaptive verification** — V0 self-check → V4 adversarial verifier
 - 🧪 **Benchmark-driven** — 991 tests, published numbers including a case where the swarm *lost*
+- 🔄 **Two deployment modes** — `semi_adaptive` (default) and `full_adaptive` cost-optimized routing
 
 ## Contents
 
 - [Quick start](#quick-start)
 - [Why it exists](#why-it-exists)
+- [v2.1.0 Release](#v210-release)
 - [Benchmarks](#benchmarks)
 - [Adaptive decision example](#adaptive-decision-example)
 - [Architecture](#architecture)
@@ -51,9 +53,9 @@ measured speedup bar before any worker is spawned.
 **1. Install from npm:**
 
 ```bash
-npm install opencode-swarm-lite
+npm install opencode-apax
 # or
-bun add opencode-swarm-lite
+bun add opencode-apax
 ```
 
 **2. Register the plugin** in `~/.config/opencode/opencode.json` (or a project
@@ -63,7 +65,7 @@ bun add opencode-swarm-lite
 {
   "plugins": [
     {
-      "package": "opencode-swarm-lite",
+      "package": "opencode-apax",
       "options": {
         "mode": "adaptive",
         "ratePerSecond": 4,
@@ -90,8 +92,8 @@ with defaults.
 <summary>Installing from a source checkout instead</summary>
 
 ```bash
-git clone https://github.com/Arihant-Bharanidharan/opencode-swarm-lite.git
-cd opencode-swarm-lite
+git clone https://github.com/Arihant-Bharanidharan/Opencode-APAX.git
+cd opencode-apax
 bun install
 bun run typecheck
 bun run test
@@ -103,7 +105,7 @@ Then point the plugin at the local path:
 {
   "plugins": [
     {
-      "package": "file:///C:/path/to/opencode-swarm-lite",
+      "package": "file:///C:/path/to/opencode-apax",
       "options": { "mode": "adaptive" }
     }
   ]
@@ -117,13 +119,37 @@ Then point the plugin at the local path:
 ## Why it exists
 
 Naive agent swarms often waste time: startup, coordination, and verification overhead
-can exceed the useful work being parallelized. `opencode-swarm-lite` runs a cost model
+can exceed the useful work being parallelized. `opencode-apax` runs a cost model
 before dispatching, so small or tightly coupled tasks stay serial while large,
 independent workloads get batched, speculative, or full-swarm execution.
 
 The runtime is benchmark-driven, not a "spawn lots of bots" demo. It publishes measured
 speedups — including a case where swarm *lost* on small work — and uses those results to
 drive its cost-aware decisions.
+
+---
+
+## v2.1.0 Release
+
+### Two deployment modes
+
+- **`semi_adaptive`** (default): every lane uses the parent model; multiple APIs are
+  used only for rate-limit headroom. This is the simplest mode, ideal when you want
+  consistent model selection across all lanes.
+
+- **`full_adaptive`**: the router decides model + API per lane from task features
+  (intelligence requirements, cost budget, provider health). Enables cost-optimized
+  routing across different model tiers.
+
+### Control plane (v2.1)
+
+The v2.1 control plane tracks:
+- Per-endpoint rate limits and circuit-breaker health
+- Lane counts and load balancing
+- Failover behavior for endpoint failures
+
+All control plane decisions are made without real HTTP calls — it's a planning layer
+that selects model/API combinations based on static endpoint profiles.
 
 ---
 
@@ -425,6 +451,24 @@ Documented options (all read from `opencode.json` plugin options; full reference
 Runtime state files live under `stateDir` (stats, provider health, lanes, capsules,
 telemetry, history, trust, policy, run manifests, checkpoints). Memory, relay, and
 roles files live alongside (configurable via `memoryPath`, `relayPath`, `rolesPath`).
+
+### Deployment modes (v2.1)
+
+| Mode | Description |
+|---|---|
+| `semi_adaptive` | Default. Every lane uses the parent model; multiple APIs are used only for rate-limit headroom |
+| `full_adaptive` | Router decides model + API per lane from task features (intelligence, cost budget, provider health) |
+
+Override the mode in your task input:
+
+```json
+{
+  "deploymentMode": "full_adaptive",
+  "intelligence": 0.8,
+  "costBudget": 30,
+  "model": "mimo-v2.6-flash-free"
+}
+```
 
 ---
 

@@ -11,7 +11,7 @@ your terminal.
 [![CI](https://github.com/PhillipChaffee/ultraopen/actions/workflows/ci.yml/badge.svg)](https://github.com/PhillipChaffee/ultraopen/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/PhillipChaffee/ultraopen/badge.svg?branch=main)](https://coveralls.io/github/PhillipChaffee/ultraopen?branch=main)
 [![Security](https://github.com/PhillipChaffee/ultraopen/actions/workflows/security.yml/badge.svg)](https://github.com/PhillipChaffee/ultraopen/actions/workflows/security.yml)
-[![opencode](https://img.shields.io/badge/opencode-%3E%3D%201.18.20-7C3AED)](https://github.com/anomalyco/opencode)
+[![opencode](https://img.shields.io/badge/opencode-%3E%3D%202.3.2%20%3C3-7C3AED)](https://github.com/anomalyco/opencode)
 
 **Fan out many agents at once · validated results · resume instead of restarting**
 
@@ -20,8 +20,9 @@ your terminal.
 </div>
 
 > [!TIP]
-> **See it live.** `bash test/e2e/tui-dev.sh` starts opencode with the real TUI rendering —
-> nothing here between you and the thing.
+> **See it live.** `bun install && bun run build`, then add this checkout's absolute path to
+> `plugins` in your opencode config — the real TUI renders the workflow surfaces with nothing
+> between you and the thing.
 
 A workflow is a deterministic JavaScript driver in which `agent()` is the only nondeterministic
 call. Control flow — fan-out, loops, dedup, thresholds, early exit, synthesis — is real code, so
@@ -50,51 +51,54 @@ return { confirmed: results.flat().filter(Boolean) }
 
 ## 📦 Install
 
+ultraopen 0.2.x targets OpenCode V2 (`opencode >= 2.3.2 < 3`). The V1 line is frozen at
+`0.1.0`; it is never backported and does not share this runtime.
+
 ```bash
-opencode plugin ultraopen -g
+opencode plugin add ultraopen@next
 ```
 
-One command: it installs the package and registers it in both config files — `opencode.json` for
-the server (the tools), `tui.json` for the TUI surfaces — then restart opencode. Without `-g` the
-plugin scopes to the project's `.opencode/` configs instead.
+`next` carries `0.2.0-next.N` previews; stable `0.2.0` publishes to `latest` once the live e2e
+suites pass on the released package. The command installs the package and writes it to
+`plugins` in your opencode config — one config, one plugin entry: V2 auto-loads both the server
+and TUI exports from the same entry, so there is no separate `tui.json`.
 
-The first boot pays the registry fetch — the TUI's startup window may stretch while the package
-downloads. After that, everything is local.
+The first boot pays the registry fetch into `~/.cache/opencode/npm/` — the TUI's startup
+window may stretch while the package downloads. After that, everything is local.
 
-Options go through the tuple form — never a new top-level key, which opencode hard-rejects:
+Options go in the entry's `options` object:
 
 ```json
-{ "plugin": [["ultraopen", { "concurrency": 8, "ultracode": true }]] }
+{ "plugins": [{ "package": "ultraopen", "options": { "concurrency": 8, "ultracode": true } }] }
 ```
 
 <details>
 <summary>Manual install — write the config yourself</summary>
 
-The `plugin` array lives in both `opencode.json` and `tui.json` — TUI plugins are read only from
-`tui.json`; `opencode.json`'s array never reaches the TUI runtime:
+`plugins` accepts either a bare package spec or a `{ package, options }` entry:
 
 ```jsonc
-// opencode.json and tui.json, both:
-{ "plugin": ["ultraopen"] }
+// $XDG_CONFIG_HOME/opencode/opencode.json
+{ "plugins": ["ultraopen"] }
 ```
 
-`opencode plugin` does exactly this — it reads the package's manifest (its `./server` and `./tui`
-exports) and patches each config file.
+That single entry loads both halves. A local checkout works the same way with an absolute path;
+the path is classified as a file plugin and skips the version gate while you iterate.
 
 </details>
 
 ### Updating
 
-Published installs are cached and `@latest` resolves only on first install — a new release doesn't
-reach an existing install on its own. To pick one up:
+Published installs are cached and a dist-tag resolves only when an install runs — a new release
+doesn't reach an existing install on its own. To pick one up:
 
 ```bash
-rm -rf ~/.cache/opencode/packages/ultraopen*
+rm -rf ~/.cache/opencode/npm/ultraopen*
 ```
 
-then restart opencode. To pin a version instead, name it: `plugin: ["ultraopen@0.1.0"]` installs
-into a versioned cache tree, and `opencode plugin ultraopen@0.2.0 -g -f` rewrites the pin (`-f`
-rewrites config entries; it never refetches a bare `@latest`).
+then restart opencode. To pin a version instead, name it: `plugins: ["ultraopen@0.2.0"]`
+installs into a versioned cache tree, and `opencode plugin add ultraopen@0.2.0` rewrites the
+pin.
 
 | Option | Default · meaning |
 | --- | --- |
@@ -128,12 +132,12 @@ and ships the workflow-authoring skill (see [Authoring workflows](#authoring)).
 | **Notifications, not polling** | `<workflow-completed>`/`<workflow-failed>` lands in the conversation when the run settles (mechanics in [docs/launch-contract.md](./docs/launch-contract.md)) |
 | **Stop & auto-resume** | `workflow({ stop })` cancels a detached run; a run its process interrupted auto-resumes on the next start (guards in [docs/launch-contract.md](./docs/launch-contract.md)) |
 | **Saved workflows** | Named scripts run by name: `workflow('deploy-check')` in any script, one `/workflow-<name>` command per saved file, `/workflow-resume <runId>` to replay a past run. Defaults: `<config>/ultraopen/workflows` and the project's `.opencode/ultraopen/workflows` (which wins on collision); `workflowPaths` adds more |
-| **Schema-forced output** | `agent(prompt, { schema })` returns a validated object; invalid output retries up to three attempts in the same session; a schema that can never be satisfied is rejected before the subagent starts |
+| **Schema-forced output** | `agent(prompt, { schema })` returns a validated object through V2's tool-using `StructuredOutput` capture — no V1 `format` field and no history poisoning. Invalid output retries up to three attempts in the same session; a schema that can never be satisfied is rejected before the subagent starts |
 | **Resume** | `resumeFromRunId` replays unchanged calls instantly; the first edited call and everything after it in the same scope runs live. Failed runs keep their partial journal |
 | **`ultracode` mode** | Raises reasoning effort and makes fan-out the default. Four ways in: the `ultracode` agent, the keyword, `/ultracode`, a project config flag. A filename mention (`src/ultracode.ts`) never triggers the keyword (`keywordBehavior` flips the default, [Install](#install)) |
-| **Safety rails** | Recursion guard (a nested `workflow()` runs one level only), per-agent inactivity deadline plus wall-clock ceiling, global concurrency cap, orphan reaper, retention pruning, large-run advisory — advice only, never a block (numbers below) |
-| **Per-agent transcript recording** | Every agent of every run records its full part-event stream append-only to its own JSONL in the run directory (`recordings/<index>-<label>.jsonl`, always on — [ADR-0004](./docs/adr/0004-agent-recording.md)). Upstream's child-transcript view is unreliable for schema-forced children — `format` poisons the message listing that view reads (observed blank in repeated probes through opencode 1.18.33), so the recording is the only predictable readable copy of that agent's stream. The launch result and the agent rows point at the human path: the `/sessions` picker (children are titled `ultraopen · <label>`) and child navigation on a transcript line — leader+down enters, right/left cycles, up returns; locate by id or title, never by position |
-| **Run control (in progress)** | `stop` is live; a run's directory accepts `control.jsonl`: `pause`/`resume` gate new agents while in-flight work finishes, `stop-run`/`stop-agent` abort the run or one child — `stop-run` records the run `cancelled` exactly as `workflow({ stop })` does (#134), `restart-agent` parsed but not implemented. TUI selection/restart keys and the drill-down view are the next slice |
+| **Safety rails** | Recursion guard (a nested `workflow()` runs one level only), per-agent inactivity deadline plus wall-clock ceiling, global concurrency cap, orphan reaper, retention pruning, large-run advisory — advice only, never a block (numbers below). Child approvals are checked against the live parent chat's effective policy (`#149` transitive inheritance); `isolation: "worktree"` is plumbed through child creation and verified against the target directory |
+| **Per-agent transcript recording** | Every agent of every run records its full part-event stream append-only to its own JSONL in the run directory (`recordings/<index>-<label>.jsonl`, always on — [ADR-0004](./docs/adr/0004-agent-recording.md)). V2 has no transcript/tool-renderer slot and its child view is unreliable for schema-forced children, so the recording is the only predictable readable copy of that agent's stream. Inspect runs in the `/workflows` panel (clickable child rows); find a child by title (`ultraopen · <label>`) in `/sessions` |
+| **Run control (in progress)** | `stop` is live; a run's directory accepts `control.jsonl`: `pause`/`resume` gate new agents while in-flight work finishes, `stop-run`/`stop-agent` abort the run or one child — `stop-run` records the run `cancelled` exactly as `workflow({ stop })` does (#134), `restart-agent` parsed but not implemented. `/workflow-stop <runId>` stops a background run directly through `UltraopenRpc` with no extra confirmation; `/workflows` opens the session panel |
 | **Approval prompt** | Names the real workflow (the launch's `title` argument is run metadata — it surfaces on the run's own renders, not in the prompt), its description and phases, the run id, the projected agent count. The script is persisted to the run directory **before** the prompt — open its `script.js` and read exactly what will run. `always` is scoped per workflow name |
 
 **Script globals.**
@@ -202,12 +206,11 @@ here, concrete findings on a staged demo diff, from an uncaught fetch to an off-
 ![Findings in the transcript](https://github.com/PhillipChaffee/ultraopen/raw/main/assets/screenshots/04-results.png)
 
 Agents show as `⠋` running, `✓` done, `✗` failed; a row that has spawned its child carries the
-child's session id, and the sidebar carries the transcript hint (picker + gesture) under the rows
-(#150). All three surfaces (strip, sidebar, prompt
-status) are served by one shared poller — one directory pass per second — so having them all
-open costs one read. The surfaces update imperatively (`node.content` + `requestRender()`) to
-work around an upstream 1.18.x rendering limitation; `src/tui/index.tsx` documents the
-constraint.
+child's session id, and the sidebar carries the transcript hint (the `/workflows` panel plus
+`/sessions`) under the rows (#150). The three progress surfaces — `session.composer.top`, the
+sidebar panel, and `prompt.footer` — are reactive Solid slots fed by `UltraopenRpc` (`listRuns`
+on mount, `runUpdated` events after that); the `/workflows` session panel and `/workflow-stop`
+slice is described below.
 
 <a id="why"></a>
 
@@ -243,20 +246,25 @@ reference.
 
 ## 🧭 Compatibility and known limits
 
-ultraopen is tested against opencode 1.18.x and aims to keep current with opencode releases; 0.1.0
-was verified against opencode 1.18.31 by the live e2e suites (`test/e2e`). The full working,
+ultraopen is tested against opencode V2.3.2 (`>= 2.3.2 < 3`); 0.2.0 is verified by the live e2e
+suites (`test/e2e`). The V1 line is frozen at 0.1.0 and never backported. The full working,
 known-gap, and cosmetic inventory — each probe with its implementation note — lives in
-[docs/compatibility.md](./docs/compatibility.md). On an opencode older than 1.18.20, the npm
-install loads nothing: the version gate skips the plugin at boot with a version error (path
-installs skip this gate). Headline gaps:
+[docs/compatibility.md](./docs/compatibility.md). On an opencode older than 2.3.2 the npm install
+loads nothing: the version gate skips the plugin at boot with a version error (path installs skip
+this gate). Headline gaps:
 
-- `agent()`'s `isolation: "worktree"` option is inert in the live wiring — ours to wire, not
-  upstream (`worktreeRoot` is never passed).
-- Schema-forced agents (`schema:` on `agent()`) can fail against Together with an empty
-  `APIError` when ANY tool in the session's toolset carries a `$ref` in its JSON Schema
-  (workarounds in the doc).
-- The TUI hides synthetic user messages from the timeline (upstream 1.18.x), so a completion
-  notification never shows as its own row — the turn it starts is what you see.
+- Workflow children are created **without** `parentID` by design: V2's native `<subagent>` report
+  wakes and steers the parent unconditionally for every parented session, so lineage lives in
+  `metadata.ultraopen` and child navigation uses the plugin's `/workflows` panel, `/sessions`
+  titles, and recordings instead of V2's `down` picker.
+- V2 exposes no transcript/tool-renderer slot; `GenericTool` renders `⠋`/`✓`/`✗ workflow` and
+  ignores tool metadata. Progress and inspection live on the reactive slots, `/workflows`, and the
+  `◈` synthetic transcript rows.
+- A non-`opencode` shell wrapper talking directly to an already-running `shared-service` daemon can
+  bypass the child-shell correlation containment (the residual edge of the shell-wrapper gap).
+- V2's `Plugin.Context` cannot enumerate saved `Allow always` policies (`saved.list` is absent);
+  child requests are evaluated against the host's effective policy and fail closed where a saved
+  allow cannot be verified to preserve child bounds.
 
 <a id="development"></a>
 
@@ -268,18 +276,18 @@ installs skip this gate). Headline gaps:
    ```bash
    bun install && bun run build
    ```
-2. Reference it from both config files — the same `plugin` array in each. TUI plugins are read
-   only from `tui.json`; `opencode.json`'s `plugin` array never reaches the TUI runtime.
+   The build emits `dist/server.js`, `dist/tui.js`, and `dist/rpc.js`. V2 auto-loads both the
+   `./server` and `./tui` exports from one `plugins` entry; there is no separate `tui.json`.
+2. Reference this checkout from `plugins` in `$XDG_CONFIG_HOME/opencode/opencode.json`:
    ```jsonc
-   // opencode.json and tui.json, both:
-   { "plugin": ["/absolute/path/to/ultraopen"] }
+   { "plugins": [{ "package": "/absolute/path/to/ultraopen" }] }
    ```
    That's it — opencode loads the plugin on next start.
 3. An absolute path is classified as a file plugin, which skips the version-compatibility gate,
    so there is no publish step while iterating.
-4. Options go through the tuple form — never a new top-level key, which opencode hard-rejects:
+4. Options go in the entry's `options` object:
    ```json
-   { "plugin": [["/path/to/ultraopen", { "concurrency": 8, "ultracode": true }]] }
+   { "plugins": [{ "package": "/path/to/ultraopen", "options": { "concurrency": 8, "ultracode": true } }] }
    ```
 
 ### Testing
@@ -290,27 +298,26 @@ bun run m0      # provider smoke test against a live model
 
 bash test/e2e/probe-timeout-test.sh   # harness regression test: bounded curl probes, no live processes
 bash test/e2e/technical.sh   # live end-to-end: real opencode processes, real model calls
-bash test/e2e/visual.sh      # live TUI in tmux: all three progress surfaces, permission flow
-bash test/e2e/tui-dev.sh     # run `opencode` locally with the TUI plugin actually rendering
+bash test/e2e/visual.sh      # live TUI in tmux: progress surfaces, /workflows panel, permission flow
 ```
 
 The e2e suites run in an isolated scratch XDG home (real provider auth, throwaway state) and
-assert on the plugin's own on-disk run artifacts plus captured tmux panes. They make real model
-calls — pennies per run on Together, on the default suite model (override with `E2E_MODEL`).
-Measured flake rate: zero flake events in one clean run of both suites — bad weather is
-unmeasured, but the watchdog plus per-case retry bound it. The screenshots above are rendered
-from `visual.sh` frame captures (see `assets/`).
+assert on the plugin's own on-disk run artifacts plus captured tmux panes. Every suite starts
+`opencode serve` with a deterministic `OPENCODE_PASSWORD` and authenticates every `/api/*` probe;
+the TUI attaches with `opencode --server <url> --session <id>`. Pre-created sessions mean the
+synthetic visual cases make zero paid model calls. The live cases make real model calls — pennies
+per run on Together, on the default suite model (override with `E2E_MODEL`). The screenshots above
+are rendered from `visual.sh` frame captures (see `assets/`).
 
-`tui-dev.sh` exists because of a dev-checkout trap: the TUI host injects its own Solid/OpenTUI
-into a plugin only when the plugin directory cannot resolve them, and `node_modules/solid-js`
-ships Solid's SSR build — signals never update, so the surfaces silently render nothing. A dev
-checkout must stash the shadowing packages (the wrapper does it for you); a published install is
-unaffected.
+V2's runtime module loader injects the host's Solid/OpenTUI instances into the plugin, so the old
+dev-checkout stash of `node_modules/{solid-js,@opentui}` is gone; `dist/tui.js` is built with the
+Solid transform and renders reactively in both a checkout and a published install.
 
-`bun run m0` is a re-runnable health check for the one interaction that cannot be verified from
-source: that `format: {type:"json_schema"}` works together with a high reasoning variant, and
-that forced tool choice still leaves an agent free to research first — a path upstream has no
-test coverage for, so it can regress silently in an opencode release.
+`bun run m0` is a re-runnable health check for the interaction that cannot be verified from
+source: that the provider answers through V2's async session API, exposes the expected effort
+variants, and can run a multi-step tool loop before answering — the provider substrate the
+plugin's `StructuredOutput` capture tool depends on. V1's request-level `format` field no longer
+exists, so there is no `info.structured` envelope to probe.
 
 CI runs lint, typecheck, the coverage-gated tests, and Node parity on ubuntu and macOS. The
 **Coverage Status** badge is the percentage Coveralls computes from each coverage-gated run

@@ -30,7 +30,7 @@ you change the number:
 
 ```json
 {
-  "plugins": ["opencode-git-config-sync@0.2.0"]
+  "plugins": ["opencode-git-config-sync@0.3.0"]
 }
 ```
 
@@ -54,7 +54,7 @@ All of them are also in the command palette under **Config sync**.
 ### Setup
 
 - **Start new** (first machine): runs `git init`, adds a `.gitignore` for machine-local files (`service.json`,
-  `*.local.json(c)`, `node_modules/`, OS junk), commits, and pushes to the URL you enter. The remote must be empty.
+  `*.local.json(c)`, `.env*`, `*.pem`, `*.key`, `node_modules/`, OS junk), commits, and pushes to the URL you enter. The remote must be empty.
 - **Pull existing config** (every other machine): fetches the remote and checks it out. Local files that the remote
   also has (there will be some, at least `cli.json`) are moved to `.config-sync-backup-<date>/` first, so you can merge
   anything you want to keep. The backup folder is ignored by git.
@@ -63,6 +63,19 @@ If a setup step fails (wrong URL, missing credentials, push rejected, checkout c
 `.git` is removed, and the `.gitignore` or the backed-up files are restored, so you can simply run it again.
 
 If the config folder is not a repository, the plugin suggests setup once a day.
+
+### Commit message
+
+The commit dialog takes a multi-line message: Enter starts a new line, Ctrl+S commits, and Tab moves to the
+**Commit** / **Cancel** buttons, where Enter chooses. Esc cancels.
+
+### Possible secrets
+
+Before a commit (`/config-sync` and **Start new**), the staged changes are checked for things that look like secrets:
+file names (`.env*`, `*.pem`, `*.key`, SSH keys, `auth.json`), private keys, common token formats (OpenAI, GitHub,
+GitLab, Slack, AWS), and `apiKey` / `token` / `secret` / `pass` / `password` keys set to a literal value. Values that
+reference `{env:…}` or `{file:…}` are fine. On a match, a warning lists them with **Cancel** focused; only
+**Ignore and continue** goes on. It is a heuristic: keep secrets out of the folder, or in ignored files.
 
 ## How it works
 
@@ -125,6 +138,16 @@ A status is outdated when either of these is older than `staleHours` (default 24
 - an uncommitted file.
 
 When outdated, the status bar turns red with an `❗ ` prefix, the sidebar shows `❗ OUTDATED!`, and a toast appears once per day per machine until you dismiss it. `/config-sync-refresh` shows the warning again.
+
+## Security model
+
+The remote must be trusted like code: your opencode config can load plugins, start MCP servers and set permissions,
+so whoever can push to the config repo can run code on every machine after its next `/config-sync`. Keep it private,
+limit who can push, and keep `git` up to date (submodules are cloned from the URLs in the repo's `.gitmodules`).
+
+The plugin itself never pulls on its own, refuses remote paths that would leave the config folder during setup
+(and fetches with `transfer.fsckObjects`), hides credentials embedded in URLs in its error messages, and shows control
+characters in file names and git output as `�`.
 
 ## Options
 

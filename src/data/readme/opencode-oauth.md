@@ -102,9 +102,14 @@ Pinning a version (`opencode-oauth@<version>`) turns update checks off.
 | `searchURL` | no | A SearXNG search endpoint that accepts the same access token, such as `https://search.example.com/search`. See below. |
 | `discoverModels` | no | `false` stops the plugin reading the provider's `/models`: it adds no models and takes no context sizes. |
 
+An option not listed here, such as a misspelled one, stops the plugin loading,
+and `/plugins` names it.
+
 Plain `http` is accepted for `issuer`, the endpoints and `searchURL` only on
 `127.0.0.1` or `[::1]`, and models are listed only from a provider `baseURL`
-that follows the same rule.
+that follows the same rule. Each of these URLs needs a host, and may not carry
+a user name, password or whitespace; the endpoints may not have a fragment, and
+an `https` issuer's metadata must name `https` endpoints.
 
 ### Web search through SearXNG
 
@@ -149,11 +154,15 @@ The SearXNG instance must allow JSON output (`json` in `search.formats` in its
   `state`; anything else on the port is refused without ending the sign-in.
 - With `issuer`, the server's metadata must name that same issuer, and an
   authorization response from another issuer is refused (RFC 9207).
+- An authorization response that repeats a parameter the plugin reads ends the
+  sign-in (RFC 6749 section 3.1), so a planted value can't hide the real one.
 - Concurrent renewals of one refresh token share a single request, so a server
   that revokes a reused rotated refresh token does not sign you out.
-- Error messages carry an HTTP status and, only when it is short plain text, the
-  server's OAuth error code, error description, refused token type or metadata
-  issuer; never a response body.
+- Error messages carry an HTTP status and, only when it is short plain text, an
+  OAuth error code, the authorization response's error description, a refused
+  token type or a metadata issuer, always quoted after where it came from; never
+  a response body or the token endpoint's error description, which may echo the
+  code or refresh token.
 
 Report vulnerabilities privately, as [SECURITY.md](SECURITY.md) describes.
 

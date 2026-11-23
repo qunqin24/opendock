@@ -27,12 +27,25 @@ tests Claude writes are checked while it's still in the code, not later in CI or
   says it's finished, it runs mutastic on the lines the task changed. While a mutant there is
   missed, Claude gets the cards back and carries on. An ignore Claude made itself, or a test taken
   away, holds it too. When Claude can't get there, the gate lets it stop and tells you what's left.
+  To hold Claude's tasks to more operators than your everyday runs, give the gate its own in
+  `mutastic.yaml` (mutastic 1.2.0 or later):
+
+  ```yaml
+  gate:
+    operators:
+      - stronger
+  ```
+
+  A check keeps within the ten minutes the hook allows; if your agent allows more or less, set
+  `MUTASTIC_GATE_BUDGET` to match, in seconds. The
+  [docs](https://docs.mutastic.io/agents/gate/#which-operators) say more.
 
 ### What you need
 
 - **mutastic itself**, with `mutastic gate`: `curl -fsSL https://mutastic.io/install.sh | sh`. The
   plugin tells you, and Claude, if it's missing or too old.
-- **A project in git that mutastic reads:** today, Java built with Gradle or Maven, with a JDK.
+- **A project in git that mutastic reads:** Java built with Gradle or Maven, with a JDK, or Rust
+  built with Cargo.
   mutastic decides which projects it reads, so the plugin stays out of the way anywhere else.
 - **Permission for Claude to run mutastic.** A plugin can't grant it, so add it to the project's
   `.claude/settings.json`, or your own:

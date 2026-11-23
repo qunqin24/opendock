@@ -5,10 +5,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.8.0-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.9.2-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/npm-@alexprietoromani%2Fproject--suite-CB3837?style=flat-square" alt="paquete npm">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity%20%7C%20Codex-111111?style=flat-square" alt="Works with Claude Code, opencode, Antigravity and Codex">
   <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
-  <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
+  <img src="https://img.shields.io/badge/commands-8-111111?style=flat-square" alt="8 comandos">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
 
@@ -64,6 +65,20 @@ flowchart LR
 5. Todo commit pasa por `semantic-commit`; todo PR, por `pull-request` — nunca push directo, nunca `--no-verify` sin permiso explícito.
 
 Los documentos viven en `docs/` dentro de tu repo (auditables), en el idioma que elijas (`es | en`). Los archivos de trabajo (`docs/task/`, `docs/plan/`, `docs/logs/`, `CLAUDE.md`, `AGENTS.md`) quedan **locales por defecto** — no se versionan salvo que lo pidas al iniciar. Por eso una worktree los recibe por copia y los devuelve con `tablero.py --sync`, no por merge.
+
+## Visores HTML Interactivos Offline (drawDB + Archify)
+
+Las especificaciones no son texto plano muerto. Cada especificación técnica generada con `especificar` compila automáticamente dos visores HTML interactivos y 100% offline compañeros (cero dependencias externas, archivos autocontenidos y verificables con `--check` mediante hash SHA-256):
+
+- **`docs/db/diseno_db.html` (`scripts/render_db_html.py` — estilo drawDB):** Lienzo Entidad-Relación (ER) interactivo con paneo y zoom, inspector de tablas y columnas en tiempo real, definiciones de tipos (SQLite, PostgreSQL, MySQL), significado conceptual de PKs, políticas de escritura y matriz CRUD completa por componente.
+- **`docs/architecture/architecture.html` (`scripts/render_arch_html.py` — estilo Archify):** Explorador blueprint multi-vista con soporte para C4 Contexto, C4 Contenedor, mapa maestro de flujos, diagramas de secuencia, invariantes por flujo y buscador interactivo de decisiones arquitectónicas (ADRs).
+
+Ambos visores se compilan determinísticamente usando la biblioteca estándar de Python (`render_db_html.py` y `render_arch_html.py`). Cualquier cambio en el Markdown fuente invalida el hash embebido, permitiendo que CI y los gates (`verificar-dod`, `auditar-coherencia`) detecten drift inmediatamente:
+
+```bash
+python scripts/render_db_html.py --check docs/db/diseno_db.md
+python scripts/render_arch_html.py --check docs/architecture/architecture.md
+```
 
 ## Varios planes en un mismo repo (tracks)
 
@@ -121,6 +136,20 @@ curso** —nunca como una Fase nueva al final— y marcando cada bloque tocado c
 `> ⟳ Ajustado en SF{x.y} — <motivo>`. Siempre avisa; solo pide permiso si el ajuste cambiaría el
 entregable global de la Fase.
 
+## Motor CLI Determinista y Gobernanza
+
+`project-suite` no delega las invariantes mecánicas exclusivamente en el criterio del LLM. Incluye una suite de herramientas CLI deterministas y sin dependencias externas (100% Python stdlib) bajo `scripts/` para gobernar el repositorio, validar gates de calidad y operar desde la terminal o CI/CD:
+
+| Script | Responsabilidad | Comandos / Flags Clave |
+|---|---|---|
+| `scripts/suite.py` | CLI unificado de gobernanza del proyecto. Punto de entrada único para mantenimiento y verificación. | `status`, `verify`, `sync`, `audit`, `hooks`, `dod` |
+| `scripts/scaffold_project.py` | Scaffolder determinista de proyectos spec-driven. Genera plantillas, reglas y configuración. | `--visibility`, `--agent`, `--orchestration`, `--stack`, `--rules` |
+| `scripts/nueva_fase.py` | Generador determinista de nuevas Fases. Crea `fases/FNN-slug.md`, actualiza `plan_maestro.md` y regenera el índice sin drift. | `--title`, `--objetivo`, `--subfases` |
+| `scripts/verificar_dod.py` | Gate determinista de Definition of Done. Evalúa tests, cobertura, drift de DB y emite recibos JSONL auditables. | `--fase`, `--subfase`, `--tarea`, `--json` (emite en `docs/logs/recibos/`) |
+| `scripts/auditar_coherencia.py` | Auditor estático de drift entre `architecture.md`/`diseno_db.md` y el código/SQL real. | `--strict`, `--fix` |
+| `scripts/log_index.py` | Índice de `Cues` transferibles y clasificación `DOM` (dominio) vs `INV` (invariantes) en `docs/logs/log.md` (base Harness²). | `--resumen`, `--formato json` |
+| `scripts/install_hooks.py` | Gestor nativo de Git Hooks (`pre-commit` y `pre-push`) con escáner de secretos y artefactos prohibidos. | `--verify`, `--uninstall` |
+
 ## Orquestación Jerárquica en 3 Niveles
 
 Project-suite coordina la ejecución mediante una jerarquía estricta de 3 niveles (`Orquestador -> Especialista -> Ejecutor`), gobernada por `.project-suite/orchestration.json`:
@@ -175,7 +204,7 @@ Los hallazgos se clasifican mediante la matriz de triage del Orquestador en `fix
 |---|---|
 | `/init [idea]` | Arranca un proyecto: entrevista de diseño → `docs/` → reglas → `.gitignore` → autoría. |
 | `/nueva-fase [cambio]` | Gate spec-driven: evalúa si un cambio amerita una nueva Fase y la redacta **antes** de codear. |
-| `/modo [estricto/relajado/off]` | Cambia o consulta la intensidad del recordatorio ambiental. |
+| `/modo [estricto\|relajado\|off]`<br>`/modo orquestacion [single-agent\|orca\|bridge\|private\|public]` | Cambia la intensidad del recordatorio ambiental o conmuta la topología de orquestación y visibilidad en vivo. |
 | `/track [slug \| nuevo <slug>]` | Lista, cambia o crea los planes (tracks) del repo. |
 | `/fase <FNN \| SFx.y>` | Abre worktree y rama para una Fase o Subfase, con scope acotado y documentos aislados. |
 | `/review [commit]` | Revisa el diff actual contra el plan: detecta código sin planificar o que contradice la spec. |
@@ -192,7 +221,7 @@ Los hallazgos se clasifican mediante la matriz de triage del Orquestador en `fix
 
 **Empaquetadas:** `generar-diagramas` (Mermaid), `semantic-commit`, `pull-request`, `caveman`, `visualizar-datos`.
 
-## Install
+## Instalación
 
 ### Claude Code
 
@@ -242,6 +271,8 @@ Abre opencode dentro del repo (lee `.opencode/` + `opencode.json`), o copia `.op
 
 > `.opencode/` y `opencode.json` son **generados**, no los edites a mano. Tras tocar `skills/`, `commands/` o `.mcp.json`: `python scripts/sync_opencode.py`. Verifica con `python scripts/validate_plugin.py`.
 
+> **Aviso sobre `Duplicate plugin ID: project-suite`:** Si tienes instalado `@alexprietoromani/project-suite` globalmente en OpenCode y ejecutas `opencode` *dentro del propio repositorio de desarrollo de `project-suite`*, OpenCode emitirá un aviso indicando que tanto el plugin global como la carpeta local `.opencode/plugins/` comparten el ID `project-suite`. Este aviso es completamente benigno y solo ocurre al desarrollar el propio plugin; en cualquier proyecto de usuario solo se carga el plugin global.
+
 ### Antigravity CLI
 
 Antigravity CLI (`agy`) es el sucesor de Gemini CLI —un agente de terminal nuevo, escrito en Go, no un renombre:
@@ -256,9 +287,24 @@ La raíz del plugin trae un manifiesto `plugin.json`; `agy plugin validate` proc
 
 project-suite ofrece soporte nativo de primera clase para OpenAI Codex:
 
-- Manifiestos `.codex-plugin/plugin.json` y `.agents/plugins/marketplace.json` que exponen las 22 skills, comandos de gobierno y `.mcp.json`.
-- Utiliza `AGENTS.md` para las reglas e instrucciones del proyecto.
-- Totalmente compatible con la jerarquía de orquestación en 3 niveles (`sol -> terra -> luna`).
+- **Manifiestos:** `.codex-plugin/plugin.json` expone nativamente las 22 skills (`skills/`), los 8 comandos (`commands/`) y `.mcp.json`. El catálogo `.agents/plugins/marketplace.json` permite el autodescubrimiento e instalación local.
+- **Reglas e instrucciones:** Consume nativamente `AGENTS.md` para las directrices de gobernanza e instrucciones de sesión.
+- **Orquestación:** Totalmente integrado con la jerarquía en 3 niveles usando los presets de Codex (`sol` Orquestador -> `terra` Especialista -> `luna` Ejecutor).
+
+Estructura de `.codex-plugin/plugin.json`:
+
+```json
+{
+  "name": "project-suite",
+  "version": "1.9.2",
+  "description": "Spec-driven project scaffolder and governor",
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "mcpServers": "./.mcp.json"
+}
+```
+
+Codex reconoce y carga los comandos (`/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`) y las skills directamente en el espacio de trabajo.
 
 ### Gemini CLI (legacy — enterprise y API keys)
 

@@ -7,7 +7,7 @@ assertion with evidence: guardrails, per-edit formatting and lint feedback,
 a completion gate that runs your real checks, and verified goals that require
 a tool-result PASS on the final tree. Exit codes don't negotiate.
 
-One shared enforcement core powers native adapters for
+One shared enforcement core powers adapters for
 [OpenCode](https://opencode.ai) and [DSH](https://www.deepseek.com/en/harness/)
 (DeepSeek Harness, via Cordis), with
 the same config, profiles, rules, and gates on both.
@@ -73,7 +73,7 @@ npx df init [--dsh]
 ```
 
 Conflicts need `--overwrite-existing` or `--skip-existing` — everything
-else is under `npx df init --help`.
+else is under `npx df --help`.
 
 On DSH, run `dsh` from the project root (or export `ODF_WORKDIR`), and
 accept template drift via `df-update` if the session reports any.

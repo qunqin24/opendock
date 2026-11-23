@@ -4,7 +4,7 @@
 
 # Go Switch
 
-`opencode-go-switch` keeps an OpenCode Go session running: it stays on the account that still has headroom and moves to the next account inside the same request when a limit hits.
+`opencode-go-switch` keeps an OpenCode Go session running: it stays on the account that still has headroom and moves to the next account inside the same request when a limit hits. It is a plugin for OpenCode and an extension for [Pi](https://pi.dev), in one package; install it in either or both. The rules below are the same in both, and [Pi](#pi) lists what differs there.
 
 [![CI workflow status](https://github.com/xonika9/opencode-go-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/xonika9/opencode-go-switch/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/opencode-go-switch)](https://www.npmjs.com/package/opencode-go-switch)
@@ -58,6 +58,8 @@ Clients that do not render plugin toasts show nothing on a switch; the `go_accou
 - **OpenCode 2.3.0 or newer.** The plugin is built and tested against the 2.3.0 plugin API, with `@opencode/plugin` `>=2.3.0 <3` and `effect` as peer dependencies.
 - **One or more OpenCode Go key credentials.** One is enough to report status; two or more are needed to switch.
 - **Bun**, for development, tests, and building a local clone. OpenCode runs the plugin itself.
+
+For Pi, see [Pi](#pi).
 
 ## Install
 
@@ -160,6 +162,43 @@ Refusals keep the tool from moving to an account that cannot serve a request; th
 - a cooling-down account, naming when the cooldown ends;
 - a disabled account or one with an invalid key.
 
+## Pi
+
+Built and tested against Pi 1.6.0. Install the extension and reload:
+
+```bash
+pi install npm:opencode-go-switch
+```
+
+```text
+/reload
+```
+
+From a local clone, run `bun install` and `bun run build`, then `pi install /path/to/opencode-go-switch`.
+
+### Accounts
+
+Pi keeps one key per provider, so the first account is Pi's own OpenCode Go login and each further account gets a slot of its own. Add them inside Pi; each login asks for an account name and the key, and the key is visible while you type it:
+
+```text
+/login opencode-go
+/login opencode-go-2
+```
+
+Once a slot holds a key, the next one (`opencode-go-3`, and so on, up to 20 accounts) appears after the next `/go-accounts`. `/logout` removes an account. The slots exist only inside a Pi session, so `pi auth login` in a shell can log in to the first account only. The first account must be connected (a login or `OPENCODE_API_KEY`), because Pi offers Go models only for a connected provider. An account without a name goes by its provider id. Accounts are separate from OpenCode's, but the same key may be used in both.
+
+### What differs from OpenCode
+
+- `/go-accounts` prints the status, and `/go-accounts <account label>` makes an account current. The `go_accounts` tool does the same for the model.
+- The extension replaces Pi's `opencode-go` provider with a copy that sends requests through the switch. Models, protocols, and settings stay Pi's, and compaction requests switch too.
+- There are no options; the defaults in [Options](#options) apply.
+- Switches are shown as Pi notifications.
+- Pi does not retry a Go limit on its own, so there is no retry to decline.
+- The current account id is kept in `opencode-go-switch.json` in Pi's agent directory, separately from OpenCode's choice.
+- If another extension already replaces the `opencode-go` provider when the session starts, Go Switch says so and stays off.
+- A removed `models.json` override for `opencode-go` takes effect after `/reload`.
+- An agent that starts its own Pi process needs the extension loaded there; a child that loads only a fixed list of extensions must include this one.
+
 ## Usage data
 
 The plugin reads `GET https://opencode.ai/zen/go/v1/usage` with the account key as a bearer token. When a credential's metadata names a `server`, the request goes to that server's origin at `/zen/go/v1/usage`; an `orgID` in the metadata is sent as `x-opencode-org-id`. A URL that is not `https`, or a `server` value that does not parse as a URL, means no request is sent and usage stays unknown. Redirects are not followed.
@@ -176,16 +215,16 @@ The endpoint is undocumented and may change. It is an optimization, not a depend
 
 ## Privacy
 
-- Keys stay in OpenCode's credential store. The plugin resolves them through the plugin API and holds them in memory only.
-- Keys are never logged, stored, returned in tool output, put in notifications, or written to tests and fixtures. Storage holds a credential id, nothing else.
-- Usage requests go only over `https`, to the Go usage endpoint (or the https origin named in the credential's `server` metadata). A key otherwise travels only on the provider request OpenCode already made, under the account the plugin selected. There is no telemetry, and no other network request is made.
+- Keys stay in the host's credential store: OpenCode's, or Pi's `auth.json`. The plugin resolves them through the host's API and holds them in memory only.
+- Keys are never logged, stored, returned in tool output, put in notifications, or written to tests and fixtures. Plugin storage holds a credential id, nothing else; in Pi, an account name you enter is stored beside its key.
+- Usage requests go only over `https`, to the Go usage endpoint (or the https origin named in the credential's `server` metadata). A key otherwise travels only on the provider request the host already made, under the account the plugin selected. There is no telemetry, and no other network request is made.
 - Status text and notifications contain labels, percentages, window names, and reset times, never key material.
 
 ## Limitations and what is not built
 
-- **One OpenCode host at a time.** The current account id is kept in plugin storage, which is last-writer-wins. Two hosts sharing a data directory can overwrite each other's choice; each process still keeps its own choice in memory.
+- **One host at a time.** The current account id is kept in plugin storage (in Pi, a file), which is last-writer-wins. Two hosts or Pi processes sharing it can overwrite each other's choice; each process still keeps its own choice in memory.
 - **A limit inside a streaming `200` response is not detected.** The plugin sees response headers, not the streamed body. The next request that hits a limit switches.
-- **Environment-variable keys are not listed.** Only key credentials from the integration are accounts.
+- **Environment-variable keys are not listed in OpenCode.** Only key credentials from the integration are accounts. In Pi, `OPENCODE_API_KEY` is the first account when no login is stored.
 - **No option to mute toasts.** Every switch notifies; clients that do not render the toast simply show nothing.
 - **The usage endpoint is undocumented.** If it changes shape, accounts report `usage unknown` and switching falls back to provider errors.
 - **Manual activation in a UI does not steer the plugin.** Use `select` in `go_accounts`.

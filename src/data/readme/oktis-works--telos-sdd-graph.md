@@ -10,7 +10,8 @@ A **Spec-Driven Development (SDD)** plugin for [OpenCode](https://github.com/ano
 - **@ references**: reads `.md` files to extract stack specifications
 - **Code generation**: generates code for supported stacks (Express+React+SQLite) or uses AI for arbitrary stacks
 - **SDD-first enforcement**: blocks code modifications that did not go through the specification
-- **Change management**: every change becomes a trackable Change node in the graph
+- **Lifecycle-aware change management**: bootstrap builds docs/tasks without Change nodes; delivery is authorized by an approved task; evolution records later modifications as Change nodes
+- **Task dossiers**: every task gets `.sdd/tasks/<TASK-ID>/` with Markdown traceability and Mermaid flow/ER/sequence/architecture diagrams
 - **Impact analysis**: traverses the graph to show what will be affected
 - **Drift detection**: detects when the code deviated from the specification
 - **Web dashboard**: real-time 3D graph visualization with 3d-force-graph
@@ -154,7 +155,9 @@ depending on the LLM to perform the action):
 | `/sdd tasks` | `tasks` | Lists the Kanban task board |
 | `/sdd tasks integrate` | `tasks integrate` | Shows the AI integration plan for tasks pending integration |
 | `/sdd tasks board` | `tasks board` | Opens the dashboard on the Kanban board |
-| `/sdd tasks change <TASK-ID>` | `tasks change <id>` | Opens the SDD Change that authorizes the code of a task (`--approve` approves it) |
+| `/sdd tasks approve <TASK-ID>` | `tasks approve <id>` | Approves the task — the single delivery gate; its declared files become writable |
+| `/sdd tasks reject <TASK-ID>` | `tasks reject <id>` | Rejects the task and blocks its files |
+| `/sdd tasks change <TASK-ID>` | `tasks change <id>` | Evolution only: opens/approves the SDD Change record for a task |
 | `/sdd acceptance <REQ-ID>` | `acceptance <id>` | Lists the Requirement's canonical human acceptance criteria |
 | `/sdd acceptance accept <AC-ID>` | `acceptance accept <id>` | Accepts one criterion through the central service |
 | `/sdd acceptance accept-all <REQ-ID>` | `acceptance accept-all <id>` | Accepts all pending criteria as one audited operation |
@@ -190,9 +193,9 @@ When disabled:
 - The agent can modify code directly
 
 When enabled:
-- Mandatory SDD-first workflow
-- Spec before code
-- Change nodes for every modification
+- **bootstrap**: discovery, graph, Markdown and task backlog — no Change nodes
+- **delivery**: an approved task is the only write authorization; no Change required
+- **evolution**: a modification after the baseline creates a Change record for audit/traceability
 
 The toggle state is persisted in `.sdd/enabled` inside the project.
 
@@ -431,39 +434,50 @@ consumers.
 Each card shows a colored priority badge and, when a Change has been opened,
 a `CHG-xxx · STATUS` badge.
 
-### From task to code: the SDD Change
+### From task to code: task approval, not Change approval
 
-A task is only a work item — the write hook refuses any `Write`/`Edit` that is
-not covered by an **APPROVED `change`** node. So an integrated task opens its
-own Change, and that Change is what unlocks code generation:
+A task is the unit of delivery. During **delivery**, `Write`/`Edit` is released
+for the files declared by an **APPROVED task** — no Change is created:
 
-1. `mark_integrated` (or the card's **Open SDD Change** button,
-   `POST /api/tasks/:id/change`, or `/sdd tasks change <TASK-ID>`) creates a
-   `change` node through the standard `createChange` path — impact analysis,
-   approval level, `affected_files`/`affected_tests` taken from
-   `task.metadata.files`, `implementation_tasks: [task.id]`, and
-   `change → affects → <spec nodes linked to the task>`.
-2. The link is recorded both ways (`change.affects → task` and
-   `task.metadata.change_id` / `change_status`), so the card shows a
-   `CHG-xxx · STATUS` badge and the topbar counts the Changes awaiting approval.
-3. **AUTO**-level Changes with a complete file scope are approved immediately;
-   `REVIEW`/`APPROVAL` ones stay in draft and the modal offers
-   **Approve + generate code** (`{ "approve": true }`) or
-   `/sdd tasks change <TASK-ID> --approve`. A Change without `affected_files`
-   cannot be approved — the write hook would reject every file — so the blocker
-   is reported instead.
-4. Once approved, the agent is handed
-   `buildChangeImplementationPrompt(...)`: implement the code **covered by that
-   Change**, run the tests and finish with `sdd.complete_change`. Without an
-   active session nothing is lost: the next turn surfaces the tasks whose Change
-   still needs approval, and the same steps are available as tools.
+1. **Integrate** the task (`mark_integrated` or the card's **Integrate with AI**
+   button). Integration links the task to the graph and writes its dossier under
+   `.sdd/tasks/<TASK-ID>/`; it does **not** create a Change.
+2. **Approve** the task (`sdd.integrate_tasks` action=`approve_task`,
+   `/sdd tasks approve <TASK-ID>`, or the card's **Approve task** button).
+   The approval records `metadata.approval` and moves the task to `in_progress`.
+3. The write hook releases exactly `task.metadata.files`. A task without files
+   cannot be approved; changing its scope invalidates the previous approval.
+4. Implement, run the tests and finish the task. `sdd.verify_implementation` and
+   requirement→test evidence remain available as evidence.
 
-The bridge is idempotent — calling it twice returns the same Change — and never
-writes source code itself.
+After the baseline, a modification request is **evolution**: `sdd.enforce`
+creates a Change record, but task approval is still the human gate. `mark_integrated`
+never opens a Change automatically; `open_change`/`approve_change` remain for
+explicit evolution workflows.
+
+### Task dossier (`.md` + `.mmd`)
+
+Every integrated/approved task writes:
+
+```
+.sdd/tasks/<TASK-ID>/
+  README.md          objective, approval, files, tests, links
+  traceability.md    resolved graph slice, relationships, acceptance, node docs
+  flow.mmd           flowchart TD
+  data-model.mmd     erDiagram
+  sequence.mmd       sequenceDiagram
+  architecture.mmd   flowchart LR
+.sdd/tasks/index.md
+```
+
+`README.md` and `traceability.md` link to the per-node Markdown in
+`.sdd/docs/v<N>/`. `sdd.sync_markdown` regenerates the node docs and all task
+dossiers.
 
 | Tool | Description |
 |---|---|
-| `sdd.integrate_tasks` | Kanban bridge: `list` tasks pending integration, `create`/`update`/`remove` tasks, `mark_integrated` (which opens the Change) and `open_change`/`approve_change` to drive the code authorisation |
+| `sdd.finalize_baseline` | Closes the documentation baseline and moves the project to delivery (`confirm=true`) |
+| `sdd.integrate_tasks` | Kanban bridge: `list`, `create`/`update`/`remove`, `mark_integrated`, `approve_task`, `reject_task`, `dossier`; `open_change`/`approve_change` remain for evolution |
 
 ## Dashboard HTTP API
 
@@ -480,7 +494,9 @@ requests and non-loopback `Host` headers.
 | `GET /api/executions?run_id=&call_id=&limit=` | Execution ledger records |
 | `GET /api/tasks?q=&priority=&sort=&order=` | Kanban tasks (search/filter/sort) |
 | `POST /api/tasks`, `POST/PATCH /api/tasks/:id`, `DELETE /api/tasks/:id` | Create / update / delete a task |
-| `POST /api/tasks/:id/integrate`, `/integrated`, `/change` | AI integration and task → Change bridge |
+| `POST /api/tasks/:id/integrate`, `/integrated` | AI integration, dossier generation |
+| `POST /api/tasks/:id/approve`, `/reject` | Task approval/rejection — the delivery write gate |
+| `POST /api/tasks/:id/change` | Evolution only: opens/approves the SDD Change record |
 | `GET /api/acceptance?requirement_id=` | Acceptance criteria for a Requirement |
 | `POST /api/acceptance/:id/:action` | `accept`, `reject`, `waive`, `reopen`, `update_text` |
 | `POST /api/acceptance/accept-all?requirement_id=` | Accept all pending criteria transactionally |
@@ -675,7 +691,8 @@ again would create a new Change and orphan the previous one.
 | Tool | Description |
 |---|---|
 | `sdd.generate_code` | Generates code (templates or via AI for arbitrary stacks) |
-| `sdd.enforce` | Enforces the SDD-first workflow |
+| `sdd.enforce` | Evolution only: classifies the modification and creates a Change record |
+| `sdd.finalize_baseline` | Closes the documentation baseline (bootstrap → delivery) |
 | `sdd.enforce_rules` | Shows the enforcement rules |
 | `sdd.full_cycle` | Full cycle: enforce → validate → generate → sync |
 
@@ -858,32 +875,24 @@ USER: "Add X"
     ↓
 Write/Edit intercepted by the hook
     ↓
-Hook checks: source file? SDD initialized? Approved Change covering this file?
+Hook checks: source file? SDD initialized? Approved task (delivery)
+            or approved Change (evolution) covering this file?
     ↓
-If there is NO approved Change → ERROR: operation blocked
+If neither authorizes the file → ERROR: operation blocked
     ↓
-The agent is forced to follow the SDD workflow:
-    ↓
-sdd.enforce → classifies the change
-    ↓
-sdd.discover → collects missing information
-    ↓
-question → selection menus for the user
-    ↓
-sdd.update_from_answers → updates the graph
-    ↓
-sdd.create_change → creates a Change node (needs affected_files)
-    ↓
-sdd.approve_change → approves the Change
-    ↓
-Write/Edit → operation released by the hook for files covered by the Change
-    ↓
-sdd.generate_code → generates/updates code
-    ↓
-sdd.verify_implementation → scripts + requirement→test evidence + file hashes
-    ↓
-sdd.complete_change → completes only when every gate passes
-    (if the 30-min window expires: sdd.renew_workflow keeps the same Change)
+Delivery:
+  sdd.integrate_tasks(mark_integrated) → graph links + task dossier
+  sdd.integrate_tasks(approve_task)    → the only human gate
+  Write/Edit                            → files declared by the task
+  sdd.verify_implementation             → scripts + requirement→test evidence
+  mark the task done
+
+Evolution:
+  sdd.enforce → Change record (audit/trace)
+  sdd.update_from_answers / graph_mutation → spec update
+  approve/execute the linked task
+  sdd.verify_implementation → sdd.complete_change
+  (if the 30-min window expires: sdd.renew_workflow keeps the same Change)
 ```
 
 **What is blocked:** any write operation on `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`, `.rb`, `.vue`, `.svelte` files (outside `node_modules`, `.sdd/`, `dist/`, `build/`, `.git/`, `.opencode/`, and unfollowed files like `package.json`, `tsconfig.json`, `.env`).

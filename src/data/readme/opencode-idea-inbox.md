@@ -1,7 +1,7 @@
 # opencode-idea-inbox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.2.6-blue)](https://opencode.ai)
+[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.4.0-blue)](https://opencode.ai)
 [![npm](https://img.shields.io/npm/v/opencode-idea-inbox)](https://www.npmjs.com/package/opencode-idea-inbox)
 
 **English** | [Русский](./README.ru.md)
@@ -40,7 +40,7 @@ There are two lines of this package, one per major version of opencode:
 
 | Your opencode              | Install                            | Where it lives |
 | -------------------------- | ---------------------------------- | -------------- |
-| **v2** (≥ 2.2.6)          | `opencode-idea-inbox` (`latest`)   | branch [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (default) |
+| **v2** (≥ 2.4.0)          | `opencode-idea-inbox` (`latest`)   | branch [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (default) |
 | **v1**                    | `opencode-idea-inbox@legacy-v1` (currently 0.3.5) | branch [`legacy-v1`](https://github.com/apilot/opencode-idea-inbox/tree/legacy-v1) |
 
 Not sure what you're running? Check `opencode --version`.
@@ -57,7 +57,7 @@ Add one line to your `opencode.json` / `opencode.jsonc` — global
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-idea-inbox"]
+  "plugins": ["opencode-idea-inbox@latest"]
 }
 ```
 
@@ -73,9 +73,14 @@ For opencode **v1**, the same key in the v1 format:
 { "plugin": ["opencode-idea-inbox@legacy-v1"] }
 ```
 
-Restart opencode afterwards — the config is not hot-reloaded — and verify with
-`opencode plugin list`. If the sidebar panel isn't visible yet, toggle it once
-with your sidebar keybind; the plugin never force-opens it.
+Restart opencode after install — the config is not hot-reloaded — and verify
+with `opencode plugin list`. If the sidebar panel isn't visible yet, toggle it
+once with your sidebar keybind; the plugin never force-opens it.
+
+On **opencode ≥ 2.4**, the `@latest` spec keeps itself current: opencode checks
+for a newer matching version on startup and every 24 hours, installs it and
+reloads the plugin without a restart. On older opencode pin the package by
+hand instead: `opencode-idea-inbox@0.6.5` for 2.3.x, `@0.6.4` for 2.2.x.
 
 <details>
 <summary>Installing from a local clone (development)</summary>

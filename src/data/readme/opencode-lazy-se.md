@@ -3,8 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/opencode-lazy-se?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-lazy-se)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-lazy-se?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-lazy-se)
 [![OpenCode: V2 (>=2.3.0)](https://img.shields.io/badge/OpenCode-V2%20(%3E%3D2.3.0)-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
-[![Host baseline](https://img.shields.io/badge/Host%20baseline-v2.3.2%20verified-10b981?logo=checkmarx&logoColor=white)](docs/QUALITY.md)
-[![Tests: 179/179 Passing](https://img.shields.io/badge/Tests-179%2F179%20Passing-339933?logo=githubactions&logoColor=white)](docs/QUALITY.md)
+[![Host baseline](https://img.shields.io/badge/Host%20baseline-v2.4.0%20verified-10b981?logo=checkmarx&logoColor=white)](docs/QUALITY.md)
+[![Tests: 186/186 Passing](https://img.shields.io/badge/Tests-186%2F186%20Passing-339933?logo=githubactions&logoColor=white)](docs/QUALITY.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,16 +21,16 @@ It operates 100% standalone without requiring any external orchestrator package,
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> Lazy Skill Engine **v1.5.0** (`opencode-lazy-se`) was verified on **20 November 2026** against live **OpenCode v2.3.2** on Node **26.13.1**:
+> Lazy Skill Engine **v1.5.4** (`opencode-lazy-se`) was verified on **23 November 2026** against live **OpenCode v2.4.0** on Node **26.13.1**:
 
-- **Unit, Integration & Regression Suite:** **179 / 179** tests passing across 13 test suites (`npm test` / `npm run check`).
+- **Unit, Integration & Regression Suite:** **186 / 186** tests passing across 13 test suites (`npm test` / `npm run check`).
 - **Strict TypeScript & Dual-Target TUI Build:** `tsc --noEmit --noUnusedLocals --noUnusedParameters --noUncheckedIndexedAccess --exactOptionalPropertyTypes` passes with **0 warnings / 0 errors**; `scripts/emit-tui.mjs` verifies dual-target Solid/OpenTUI emission (`dist/tui-runtime.js`, `dist/tui-standalone.js`, `dist/tui.js`) and syntax across all **39** compiled JS modules.
-- **Packed-Artifact Sandbox Verification:** Packed `.tgz` (`npm pack`) installation, `opencode v2.3.2 --standalone` startup, `skill.list`, and `session.create` pass in an isolated host sandbox.
+- **Packed-Artifact Sandbox Verification:** Packed `.tgz` (`npm pack`) installation, live `opencode` `serve` startup, `skill.list`, `session.create`/`delete`, adversarial vault/mesh boundary checks, and clean git hygiene pass in an isolated host sandbox.
 - **Zero Runtime Dependencies:** Pure TypeScript compiled to `dist/` with `0` third-party runtime dependencies.
 
 Read the detailed [Quality & Verification Matrix](docs/QUALITY.md), [Architecture Guide](docs/ARCHITECTURE.md), and [Standalone & Multi-Plugin Coexistence Guide](docs/COEXISTENCE.md).
 
-See the [1.5.0 release notes](CHANGELOG.md) for the full TypeScript + `dist/` migration, `LazySidebar` TUI widget (`./tui`), typed `opencode-lazy-skill.stats` RPC (`./rpc`), Universal OpenCode V2 Plugin Mesh Bridge (`src/bridge.ts` v2.3.0), and multi-vault/native conflict detection.
+See the [1.5.4 release notes](CHANGELOG.md) for **OpenCode v2.4.0** compatibility (`plugin.updated` hot-reload cache invalidation, `session.compaction.ended` vault reload reset, structured `Tool.Result` `output`, `sidebar.content` `{ sessionID }` location tracking, and `@opentui/* >=0.9.4` peer alignment).
 
 ---
 
@@ -41,15 +41,15 @@ See the [1.5.0 release notes](CHANGELOG.md) for the full TypeScript + `dist/` mi
 - **Fast Local 13-Language Search (Zero Network / Zero Embeddings):** Uses bounded frontmatter scanning (`peekMetadata`), an inverted postings index, BM25F-style field-weighted scoring, Unicode normalization, camelCase/acronym splitting, conservative Turkish/English stemming, and a 13-language engineering concept bridge.
 - **Adaptive Single-Agent & Multi-Agent Routing:** Automatically binds high-confidence native skills in single-agent sessions and narrows automatic binding to permitted child workers when an orchestrated subagent roster is detected.
 - **No Privilege Escalation:** When `ctx.agent.list()` is available, ordered host `skill` permission rules (`allow` / `ask` / `deny` with linear glob matching, last matching rule wins) filter automatic candidates and fail closed if worker policy lookup fails.
-- **Safe Cold-Vault Access:** Vault skill bodies are never auto-injected unless `vaultAutoBind: true` (and `projectAutoBind: true` for project-local vaults) is explicitly enabled. Vault reads enforce symlink containment (`safeRead`), binary/size guards, and escaped `<lazy_bound_skill>` XML boundaries.
+- **Safe Cold-Vault Access:** Global vault skills (`~/.config/opencode/skill-vault`) are safely bound on demand when `vaultAutoBind: true` (default), while project-local vaults (`.opencode/skill-vault`) require explicit `projectAutoBind: true`. Vault reads enforce symlink containment (`safeRead`), binary/size guards, host/mesh permission checks, and escaped `<lazy_bound_skill>` XML boundaries.
 - **Live TUI Sidebar (`LazySidebar`):** Collapsible `sidebar.content` status widget displaying live total skills, local vs. global breakdown, and conflict IDs (`native-vs-vault`, `native-vs-native`, `multi-vault`) via typed RPC.
-- **Universal V2 Plugin Mesh Bridge (`src/bridge.ts` v2.3.0):** Zero-dependency interoperability with **[OpenCode Hi](https://github.com/huseyincig/opencode-hi)**, **[OpenCode Guardian](https://github.com/huseyincig/opencode-guardian)**, and **[OpenCode Smart Questions](https://github.com/huseyincig/opencode-smart-questions)** via `skills.catalog` capability discovery, `queryMeshSkills`, turn-level `claimPromptSkillBinding` deduplication, cryptographic provenance verification, and protected `skill-injection` metadata.
+- **Universal V2 Plugin Mesh Bridge (`src/bridge.ts` v2.3.1):** Zero-dependency interoperability with sibling OpenCode V2 mesh plugins (`orchestration.task`, `policy.gate`, `interaction.ask`, `context.prune`) via `skills.catalog` capability discovery, `queryMeshSkills`, turn-level `claimPromptSkillBinding` deduplication, cryptographic provenance verification, and protected `skill-injection` metadata.
 
 ---
 
 ## 📦 Installation
 
-The npm package name is **`opencode-lazy-se`** (internal plugin ID: `opencode-lazy-skill-engine`). Current version: **1.5.0** (OpenCode **v2.3.0+**, verified on **v2.3.2**).
+The npm package name is **`opencode-lazy-se`** (internal plugin ID: `opencode-lazy-skill-engine`). Current version: **1.5.4** (OpenCode **v2.3.0+**, verified on **v2.4.0**).
 
 OpenCode Lazy Skill Engine supports **Global**, **Project-Local**, **`.opencode/plugins/` Local Wrapper / Symlink**, **Local Development (`file://`)**, and **Remote TUI Client (`cli.json`)** installation modes.
 
@@ -76,7 +76,7 @@ Or pass optional inline plugin configuration:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     [
-      "opencode-lazy-se@1.5.0",
+      "opencode-lazy-se@1.5.4",
       {
         "mode": "auto",
         "autoBind": "adaptive",
@@ -196,7 +196,7 @@ OpenCode Lazy Skill Engine includes a dedicated V2 TUI extension (`./tui`) that 
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ lazy v1.5.0 · ● ready
+▶ lazy v1.5.4 · ● ready
 ```
 
 ### 🔼 Expanded View (Click to Toggle)
@@ -204,7 +204,7 @@ OpenCode Lazy Skill Engine includes a dedicated V2 TUI extension (`./tui`) that 
 Clicking the header toggles the expanded statistics panel:
 
 ```text
-▼ lazy v1.5.0 · ● ready
+▼ lazy v1.5.4 · ● ready
   Skills                               18
   Local                                 6
   Global                               12
@@ -251,10 +251,10 @@ Selection precedence during `ctx.session.hook("prompt")`:
 
 | Tool | Purpose | Loads Full Body? |
 | :--- | :--- | :---: |
-| `lazy_skill_search` | Multilingual skill search (string or term array) with `ids`, `summary`, or `full` detail | **No** |
+| `lazy_skill_search` | Multilingual skill search (string or term array) with `ids`, `summary` (includes `matched` terms), or `full` detail | **No** |
 | `lazy_skill_info` | Inspect one (`id`) or multiple (`ids`) skills' metadata, origin, and relative resource paths | **No** |
-| `lazy_skill_plan` | Read-only binding preview matching `prompt` hook permission/scope rules and reporting `semanticSkipped` | **No** |
-| `lazy_skill_status` | Catalog counts, conflict IDs, active configuration, and last session binding receipt | **No** |
+| `lazy_skill_plan` | Read-only target-role binding preview returning `bindMode`, `bindReason`, `outsideRoleAllowed`, and `semanticSkipped` | **No** |
+| `lazy_skill_status` | Catalog counts, conflict IDs, `roleProfiles` effective bind modes, `vaultNote`, active configuration, and last session binding receipt | **No** |
 | `lazy_skill_load` | Safely load one selected cold-vault skill body on demand (wrapped in escaped `<skill>` boundaries) | **Yes (Vault)** |
 | `lazy_skill_resource` | Bounded UTF-8 text read of a relative resource file inside a vault skill (`references/`, `scripts/`, etc.) | **Yes (Resource)** |
 
@@ -264,7 +264,7 @@ Native skills are loaded using the host's built-in `skill` tool. Content read fr
 
 ## 🤝 Universal V2 Plugin Mesh Interoperability
 
-Lazy Skill Engine is **100% standalone** and requires no sibling plugins. When installed alongside **[OpenCode Hi](https://github.com/huseyincig/opencode-hi)**, **[OpenCode Guardian](https://github.com/huseyincig/opencode-guardian)**, **[OpenCode Smart Questions](https://github.com/huseyincig/opencode-smart-questions)**, or other V2 mesh plugins, it coordinates automatically via `src/bridge.ts` (`BRIDGE_REVISION = "2.3.0"`):
+Lazy Skill Engine is **100% standalone** and requires no sibling plugins. When installed alongside other OpenCode V2 mesh plugins, it coordinates automatically via `src/bridge.ts` (`BRIDGE_REVISION = "2.3.1"`):
 
 - **Shared Skill Catalog Provider:** Registers the `skills.catalog` capability and exposes `registerSkillSearchProvider` so sibling orchestrators can query multilingual skills via `queryMeshSkills` without scanning disk twice.
 - **Turn-Level Binding Deduplication (`claimPromptSkillBinding`):** Coordinates `(sessionID, turnKey)` binding claims so two mesh plugins never run duplicate LLM semantic routing or double-bind competing automatic skills on the same turn.
@@ -352,7 +352,7 @@ npm run benchmark
 npm pack --dry-run
 ```
 
-- **Quality Matrix:** See [Quality & Verification Matrix](docs/QUALITY.md) for the complete test breakdown (`179 / 179` tests across 13 suites).
+- **Quality Matrix:** See [Quality & Verification Matrix](docs/QUALITY.md) for the complete test breakdown (`186 / 186` tests across 13 suites).
 - **Coexistence Guide:** See [Standalone & Multi-Plugin Coexistence](docs/COEXISTENCE.md).
 - **Architecture Details:** See [Architecture](docs/ARCHITECTURE.md).
 
@@ -364,7 +364,7 @@ npm pack --dry-run
 - `src/plugin.ts`: OpenCode V2 server adapter (`prompt`/`context` hooks, 6 tools, `opencode-lazy-skill.stats` RPC, event subscriptions, mesh integration).
 - `src/tui.tsx`: OpenCode V2 TUI plugin (`LazySidebar` collapsible `sidebar.content` widget built with `@opentui/solid`).
 - `src/stats-rpc.ts`: Typed RPC contract (`LAZY_SKILL_STATS_RPC`) for server-to-TUI catalog snapshots.
-- `src/bridge.ts`: Universal OpenCode V2 Plugin Mesh bridge (`BRIDGE_REVISION: "2.3.0"`).
+- `src/bridge.ts`: Universal OpenCode V2 Plugin Mesh bridge (`BRIDGE_REVISION: "2.3.1"`).
 - `src/core/catalog.ts`: Combined native + cold-vault skill catalog with incremental frontmatter caching and conflict detection.
 - `src/core/scanner.ts`: Bounded frontmatter parser (`parseFrontmatter`) and security-hardened vault directory walker (`scanVaults`).
 - `src/core/rank.ts`: Inverted postings index and BM25F-style multilingual ranker (`createSearchIndex`, `search`).

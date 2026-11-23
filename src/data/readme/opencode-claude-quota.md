@@ -1,6 +1,6 @@
 # opencode-claude-quota
 
-**Claude Code usage, quota and rate limits in the OpenCode TUI sidebar — 5-hour session, weekly, per-model and per-surface limits, themed by your OpenCode theme.**
+**Claude Code usage, quota and rate limits in the OpenCode TUI sidebar — 5-hour session, weekly and per-model limits, themed by your OpenCode theme.**
 
 [![npm version](https://img.shields.io/npm/v/opencode-claude-quota.svg)](https://www.npmjs.com/package/opencode-claude-quota)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-claude-quota.svg)](https://www.npmjs.com/package/opencode-claude-quota)
@@ -10,7 +10,7 @@
 [![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-blue.svg)](https://opencode.ai)
 
 An [OpenCode](https://opencode.ai) V2 CLI/TUI plugin that shows your Claude subscription's 5-hour session and weekly
-limits, per-model weekly caps, weekly usage by surface and extra paid usage, right next to your session.
+limits, per-model weekly caps and extra paid usage, right next to your session.
 
 ```
 Claude Quota
@@ -18,18 +18,13 @@ Claude Quota
        resets in 1h 10m
 Week   ━───────────────   6%
        resets in 1d 22h
-This week
-Claude Code            86%
-Chats                   7%
-Cowork                  7%
-updated 12s ago
 ```
 
 ## Features
 
 - 5-hour session and weekly usage bars, coloured by severity (green → yellow → red).
 - Per-model weekly limits (Opus, Sonnet) when your plan reports them.
-- Weekly usage breakdown by surface (Claude Code, Chats, Cowork, …) and extra usage when enabled.
+- Extra paid usage when enabled.
 - Relative reset times that tick without refetching; stale data stays visible with a `(stale)` marker on errors.
 - Polite polling: 120s default (60s minimum), shared across OpenCode windows, `Retry-After` support and persisted
   exponential backoff; a refresh after a finished turn only fetches when the data is older than 60s.
@@ -61,7 +56,7 @@ With options:
   "plugins": [
     {
       "package": "opencode-claude-quota",
-      "options": { "refreshInterval": 90, "showBreakdown": false }
+      "options": { "refreshInterval": 90, "showModels": false }
     }
   ]
 }
@@ -89,7 +84,6 @@ wide terminal).
 | Option            | Type    | Default | Description                                                         |
 | ----------------- | ------- | ------- | ------------------------------------------------------------------- |
 | `refreshInterval` | number  | `120`   | Polling interval in seconds. Values below `60` are raised to `60`.  |
-| `showBreakdown`   | boolean | `true`  | Show the "This week" usage-by-surface rows (0% rows are skipped).   |
 | `showModels`      | boolean | `true`  | Show per-model weekly windows (Opus, Sonnet) when present.          |
 | `credentialsPath` | string  | –       | Credentials file location, used as-is (`~` is not expanded).        |
 

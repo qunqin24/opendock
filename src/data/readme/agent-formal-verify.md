@@ -73,9 +73,11 @@ In Claude Code, use `/agent-formal-verify:formal-verify`. In Codex, type `$forma
 
 ## How it works
 
-![Agent formal verify works with Claude Code, Codex and Pi. Thread protocols use TLA+ and TLC; arithmetic and state transitions use Lean 4; bounded Rust functions use Kani to check production code. The agent finds counter-examples, reproduces reachable bugs, fixes code and models, and tests mutations. Checks rerun in CI. Set up once, verify each repository, and report assumptions and bounds.](assets/formal-verify-overview-v3.png)
+![Recheck existing models against source changes. Use TLA+ and TLC for thread protocols, Lean 4 for arithmetic and state invariants, and Kani for bounded Rust functions. Rerun checks and mutations, compare recorded guarantees, and trace failures back to code. Report assumptions, bounds and recheck commands. Production fixes are by request and model CI is optional.](assets/formal-verify-overview-v4.png)
 
-The agent selects risky code, builds TLA+ or Lean models or adds Kani harnesses that call the Rust code, and checks their properties. Reachable counter-examples guide reproductions and fixes to both the code and model. Mutation checks test whether the properties detect mistakes. On request, a second agent reviews each model's properties against the code and proposes mistakes for those checks. CI reruns the models as the code changes.
+1. **Choose what to check.** If the repository already has models, the agent reads the source changes since each model was last checked, reruns its checks and mutations, and records what it promises before editing it. For new targets, it builds a TLA+ or Lean model or writes a Kani harness that calls the production Rust function.
+2. **Test the guarantees.** The agent reruns the checks itself, tests each property against deliberate mistakes, and compares existing guarantees with the record. Past bug fixes supply mutations where practical. You can also request an independent review of the properties against the code.
+3. **Follow failures back to the code.** The agent maps each counter-example to source lines, checks whether shipped settings can reach it, and tries to reproduce it. It reports a proposed fix and changes production code only if you ask. It gives you commands to rerun the checks and adds them to CI if you request it or the repository already runs models there.
 
 A passing check establishes its stated properties under its assumptions and bounds. Reports must identify omitted constraints and unfinished proofs. See [scope and evidence](docs/reference.md#scope-and-evidence).
 
@@ -91,7 +93,7 @@ A passing check establishes its stated properties under its assumptions and boun
 
 ## Data handling
 
-The plugin configures no MCP servers or hooks, requires no credentials and has no telemetry. Its OpenCode entry point, `opencode.mjs`, only reads the bundled skill files and registers them; it runs no commands and makes no network requests. The agent sends selected source excerpts, models and results to its model provider. Helpers run locally and download nothing. Setup verifies a TLC JAR you obtain from the pinned TLA+ release, and Lean preparation installs the pinned toolchain through elan. Install the pinned Kani through Cargo and run its setup command as described in [tool setup](skills/formal-verify/references/setup.md). The plugin's Kani helpers install nothing.
+The plugin configures no MCP servers or hooks, requires no credentials and has no telemetry. Its OpenCode entry point, `opencode.mjs`, reads and registers the bundled skills without running commands or making network requests. The agent sends selected source excerpts, models and results to its model provider. Verification runs locally. Setup verifies a TLC JAR you obtain from the pinned TLA+ release and uses elan to install a missing Lean toolchain. The Kani helpers use the pinned installation you prepare through Cargo. See [tool setup](skills/formal-verify/references/setup.md).
 
 ## Contributing
 

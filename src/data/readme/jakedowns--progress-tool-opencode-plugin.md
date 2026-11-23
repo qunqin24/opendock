@@ -1,5 +1,11 @@
 # Progress Tool — live task trees for OpenCode (TUI + desktop/web)
 
+[![plugin version](https://img.shields.io/npm/v/@jakedowns/progress-tool-opencode-plugin?style=flat-square&logo=npm&label=plugin)](https://www.npmjs.com/package/@jakedowns/progress-tool-opencode-plugin)
+[![plugin downloads](https://img.shields.io/npm/dm/@jakedowns/progress-tool-opencode-plugin?style=flat-square&label=downloads%2Fmo)](https://www.npmjs.com/package/@jakedowns/progress-tool-opencode-plugin)
+[![mcp version](https://img.shields.io/npm/v/@jakedowns/progress-tool-mcp?style=flat-square&logo=npm&label=mcp)](https://www.npmjs.com/package/@jakedowns/progress-tool-mcp)
+[![mcp downloads](https://img.shields.io/npm/dm/@jakedowns/progress-tool-mcp?style=flat-square&label=downloads%2Fmo)](https://www.npmjs.com/package/@jakedowns/progress-tool-mcp)
+[![license](https://img.shields.io/npm/l/@jakedowns/progress-tool-opencode-plugin?style=flat-square)](./LICENSE)
+
 <img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/1.png" width="300" alt="Progress pill showing a live task tree">
 <img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/subagents.png" width="300" alt="Progress pill showing subagent rows">
 
@@ -18,7 +24,7 @@ Implements the [Agent Progress Tool proposal](https://gist.github.com/jakedowns/
 for OpenCode 2, and is written as a portable reference implementation any
 harness can copy or adapt.
 
-**Versions:** MCP server `2.10.1` · OpenCode plugin `2.18.7`
+**Versions:** MCP server `2.10.2` · OpenCode plugin `2.19.0`
 
 > **Advanced docs:** [schema, relay internals, state store, architecture, all
 > options, file map →](./README-advanced.md)
@@ -121,8 +127,13 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 - **Desktop/web pill:** one row per root, with `(N · agg%)` when several roots
   exist, hover details, and a menu with the full tree.
 - **TUI:** compact tree above the composer, roots collapsed, capped at
-  `tuiMaxRows` (default 8) so long lists never push the prompt away. `/progress`
-  opens a dialog to expand a tree or dismiss tasks.
+  `tuiMaxRoots` (default 3) and scrollable inside `tuiMaxRows` (default 8) so
+  long lists never push the prompt away. A `--- scroll to see N more ---` hint
+  appears on overflow; `/progress` opens a dialog to expand a tree or dismiss
+  tasks, and the palette can change the root cap or collapse the tree to a
+  one-line status summary. Set `tuiLayout: "sidebar"` to
+  park the tree in the sidebar instead, or run `/progress swap-layout` to flip
+  placements at runtime.
 - Running and waiting tasks stay visible; errors stay until dismissed or
   updated; completed tasks stay unless dismissed (or `autoHideDone` is on).
 - Dismissal is view-plane, not a status change: a dismissed tree stays hidden
@@ -143,8 +154,12 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 |---|---|
 | `scope` | `"session"` (default) or `"all"` |
 | `tuiMaxRows` | TUI tree row cap (default 8, max 50) |
+| `tuiMaxRoots` | TUI root cap before the full-tree summary (default 3, max 50) |
+| `tuiLayout` | TUI placement: `"composer"` (default) or `"sidebar"` |
+| `tuiSidebarRows` | Sidebar viewport height in rows (default 0 = full tree, sidebar scrolls; max 100) |
 | `expandRootsByDefault` | Expand trees by default (default collapsed) |
 | `strictMode` | `"nudge"` / `"force"` / `"off"` silent-work nudges |
+| `staleEscalateAfter` | Entry reminders before one synthetic escalation (default 3; `0` disables) |
 | `idleReminder` | Turn-end nudge when tasks remain (default on) |
 | `demoSkills` | Register the demo skills (default off) |
 | `barStyle` | `"blocks"` or `"emoji"` |
