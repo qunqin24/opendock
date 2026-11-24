@@ -102,12 +102,14 @@ mcp-combiner disable <server>          # unmount + disconnect
 mcp-combiner restart-server <server>   # hard bounce one upstream (like :MCPRestartServer)
 mcp-combiner reload                    # re-read config, apply the diff
 mcp-combiner authorize <server> [--open]   # start OAuth, print (or open) the link
-mcp-combiner profile list|enable|disable [name]   # server profiles
+mcp-combiner collection list|enable|disable [name]   # server collections
 mcp-combiner tools                     # list advertised tools
 mcp-combiner call myserver_echo --args '{"message": "hi"}'
 mcp-combiner session status                              # list sessions
-mcp-combiner session disable <server> --token <uuid>     # per-chat filter (WIP)
-mcp-combiner session allow --servers a,b --token <uuid>  # allow-list (WIP)
+mcp-combiner session disable <server> --token <uuid>     # a server off for one chat
+mcp-combiner session allow --servers a,b --token <uuid>  # allow-list for one chat
+mcp-combiner session enable-collection <name> --token <uuid>  # a collection on for one chat
+mcp-combiner session reset-collection <name> --token <uuid>   # back to the combiner's setting
 ```
 
 #### Process lifecycle: `start` / `stop` / `restart`
@@ -477,51 +479,76 @@ their downstream sessions, nvim binds, and the isolated live/parked tiers.
 }
 ```
 
-### profiles — groups of servers by machine or purpose
+### collections — groups of servers by machine or purpose
 
-A **profile** is a named group of servers. Profiles make one config file
+A **collection** is a named group of servers. Collections make one config file
 portable (servers that only make sense on a Mac, or at work) and let you
-switch a set of servers on or off together.
+switch a set of servers on or off together — for the whole combiner, or for
+one chat. They overlap: a server can be in several, and runs if any of them
+is on.
 
 ```json
 {
-  "profiles": {
+  "collections": {
     "mac":    { "when": { "platforms": ["darwin"] } },
     "work":   { "when": { "hosts": ["work-laptop"] } },
     "music":  { "enabled": false },
     "google": {}
   },
   "mcpServers": {
-    "ableton-osc":      { "command": "...", "profiles": ["mac", "music"] },
-    "gws_georgeharker": { "url": "...",     "profiles": ["google"] },
+    "ableton-osc":      { "command": "...", "collections": ["mac", "music"] },
+    "gws_georgeharker": { "url": "...",     "collections": ["google"] },
     "github":           { "url": "..." }
   }
 }
 ```
 
-- **Where a profile loads** — `when` (every condition given must match;
+- **Where a collection loads** — `when` (every condition given must match;
   none means everywhere):
   - `platforms`: `darwin`, `linux`, `win32`;
   - `hosts`: short host names (case-insensitive);
   - `env`: a list of variables that must be set, or an object of variable →
     required value.
 
-  A server whose profiles all fail to load is skipped entirely on this
+  A server whose collections all fail to load is skipped entirely on this
   machine: no process, not listed anywhere.
-- **Whether it's on** — a loaded profile is on unless `"enabled": false`. A
-  server runs if **any** of its loaded profiles is on, and it isn't itself
-  `"disabled": true`. A server with no `profiles` isn't affected by them.
-- **Switching at runtime** — `combiner__enable_profile` /
-  `combiner__disable_profile` (or `mcp-combiner profile enable <name>`)
-  start or stop the profile's servers; a server another enabled profile
-  still needs keeps running. `combiner__profiles` (`mcp-combiner profile
-  list`) shows each profile and its servers. Runtime changes last until the
-  combiner restarts or reloads its config, like `combiner__enable_server`.
-- **At startup** — `MCP_COMBINER_PROFILES=+music,-google` turns profiles on
-  (`+name` or bare `name`) or off (`-name`), overriding `enabled`.
+- **Whether it's on** — a loaded collection is on unless `"enabled": false`.
+  A server runs if **any** of its loaded collections is on, and it isn't
+  itself `"disabled": true`. A server with no `collections` isn't affected by
+  them.
+- **Switching for everyone** — `combiner__enable_collection` /
+  `combiner__disable_collection` (or `mcp-combiner collection enable <name>`)
+  start or stop the collection's servers; a server another collection that's
+  on still needs keeps running. `combiner__collections` (`mcp-combiner
+  collection list`) shows each collection, its servers, and what the calling
+  chat sees. Runtime changes last until the combiner restarts or reloads its
+  config, like `combiner__enable_server`.
+- **Switching for one chat** — `combiner__session_enable_collection` /
+  `combiner__session_disable_collection` turn a collection on or off for the
+  calling chat only, and `combiner__session_reset_collection` makes it follow
+  the combiner's setting again. Turning one on in a chat starts its servers if
+  they weren't running; other chats don't see them unless the collection is on
+  for them too, and they stop once no chat (and no global setting) wants them.
+  Turning one off hides its servers from that chat only. Per-chat toggles of a
+  single server win over the chat's collections: `combiner__session_enable_server`
+  on a server the chat's collections hide turns it on there. A global
+  `combiner__disable_server` wins over every chat. The same toggles are on the
+  token route (`POST /sessions/token/<token>/filter` with `collection_on`,
+  `collection_off`, `collection_unset`, or `collections: {name: true|false|null}`),
+  the CLI (`mcp-combiner session enable-collection <name> --token <t>`), Pi
+  (`/mcp-combiner collection on|off|reset <name>`) and Neovim (`/mcp-collection`).
+  A tokened chat keeps its collections across reconnects and sanctioned
+  restarts; a tokenless one's go with its session. A chat that's gone — no
+  connection and no requests for the isolation timers (`grace_seconds` +
+  `park_ttl_seconds`, about an hour by default) — has its collections
+  forgotten; only its own vote goes, so servers another chat or a global
+  setting still wants keep running.
+- **At startup** — `MCP_COMBINER_COLLECTIONS=+music,-google` turns collections
+  on (`+name` or bare `name`) or off (`-name`), overriding `enabled`.
 
-Unknown profile names, platforms or keys fail the config load rather than
-being ignored.
+Unknown collection names, platforms or keys fail the config load rather than
+being ignored. Collections were called *profiles* before 0.26.0; a config that
+still says `profiles` fails to load with an error naming the new key.
 
 ### sharedServer — per-server process management
 
@@ -1658,6 +1685,8 @@ The combiner exposes management tools that the LLM can call:
 - `combiner__enable_server` / `combiner__disable_server` — toggle servers globally (all sessions)
 - `combiner__authorize_server` — start OAuth authorization for a server and hand over the link (see [Authorizing from another device](#authorizing-from-another-device))
 - `combiner__session_disable_server` / `combiner__session_enable_server` — toggle a server for the calling session only
+- `combiner__collections`, `combiner__enable_collection` / `combiner__disable_collection` — server collections, switched for everyone
+- `combiner__session_enable_collection` / `combiner__session_disable_collection` / `combiner__session_reset_collection` — a collection on or off for the calling session only (see [collections](#collections--groups-of-servers-by-machine-or-purpose))
 - `combiner__session_hide_tools` / `combiner__session_show_tools` — hide or show individual tools (names or globs) for the calling session only
 
 ### Usage
@@ -2046,9 +2075,17 @@ A picker lists all connected servers with their current session status
 
 - **ACP chats** — the agent receives a `notifications/tools/list_changed`
   signal and sees the updated tool list immediately.
-- **Non-ACP chats** — the server's tool group is removed from (or re-added
-  to) the CC tool registry and context block. Tools from a hidden server
-  disappear from `@`-mention suggestions and the LLM's available tools.
+- **Non-ACP chats** — the chat's own combiner client re-lists its tools, and
+  the chat's tool groups follow: a server it can no longer see loses its group
+  in this chat, one it newly sees gains its group. Nothing changes for other
+  chats. Tools from a hidden server disappear from this chat's `@`-mention
+  suggestions and the LLM's available tools.
+
+`/mcp-collection` does the same for [collections](#collections--groups-of-servers-by-machine-or-purpose):
+pick a collection, then turn it on or off for this chat, or make it follow
+the combiner's setting again. Servers hidden by the chat's collections show
+as `[OFF]` in `/mcp-session`; turning one on there turns it on for this chat
+over its collections.
 - **`:MCPStatus`** — shows `[session off]` next to servers hidden in the
   currently focused chat.
 
@@ -2148,11 +2185,12 @@ Filtering is enforced at two layers:
    can execute tools on. This prevents tool calls from reaching a disabled
    server regardless of what the client sends.
 
-2. **Neovim-side** (mirrors combiner state) — for non-ACP chats, the plugin also
-   adds or removes tool groups from the CC `tool_registry` so the LLM's
-   available tools stay in sync. For ACP chats, the combiner sends a
-   `notifications/tools/list_changed` notification and the agent re-fetches
-   tools directly.
+2. **Neovim-side** (follows the combiner) — for non-ACP chats, the chat's own
+   combiner client lists its tools after setup and after every toggle; servers
+   only some chats see are registered in CodeCompanion's MCP registry once,
+   and the chat's tool groups are aligned with its own list. For ACP chats,
+   the combiner sends a `notifications/tools/list_changed` notification and
+   the agent re-fetches tools directly.
 
 The initial filter for a new chat is derived in this order of precedence:
 
@@ -2215,7 +2253,10 @@ along with the server filter.
 | --------- | ------------------- | ------------- |
 | `chat_id` | `string` (optional) | Same as above |
 
-Returns JSON: `{ "session_id": "...", "disabled_servers": [...], "hidden_tools": [...] }`
+Returns JSON: `{ "session_id": "...", "disabled_servers": [...], "hidden_tools": [...], "collections": {...}, "enabled_servers": [...], "hidden_by_collections": [...] }`
+— `collections` is what this chat set (name → on/off), `enabled_servers` the
+servers it turned on over its collections, `hidden_by_collections` the servers
+its collections hide.
 
 These complement the global `combiner__enable_server` / `combiner__disable_server`
 tools, which affect all sessions simultaneously.

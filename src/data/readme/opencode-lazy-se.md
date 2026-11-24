@@ -3,15 +3,15 @@
 [![npm version](https://img.shields.io/npm/v/opencode-lazy-se?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-lazy-se)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-lazy-se?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-lazy-se)
 [![OpenCode: V2 (>=2.3.0)](https://img.shields.io/badge/OpenCode-V2%20(%3E%3D2.3.0)-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
-[![Host baseline](https://img.shields.io/badge/Host%20baseline-v2.4.0%20verified-10b981?logo=checkmarx&logoColor=white)](docs/QUALITY.md)
-[![Tests: 186/186 Passing](https://img.shields.io/badge/Tests-186%2F186%20Passing-339933?logo=githubactions&logoColor=white)](docs/QUALITY.md)
+[![Host baseline](https://img.shields.io/badge/Host%20baseline-v2.4.1%20verified-10b981?logo=checkmarx&logoColor=white)](docs/QUALITY.md)
+[![Tests: 210/210 Passing](https://img.shields.io/badge/Tests-210%2F210%20Passing-339933?logo=githubactions&logoColor=white)](docs/QUALITY.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [Installation](#-installation) · [TUI Sidebar](#-tui-sidebar-interface) · [Operating Modes](#-operating-modes) · [Skill Binding Contract](#-skill-binding-contract) · [Tools](#-tools) · [Mesh Interoperability](#-universal-v2-plugin-mesh-interoperability) · [Configuration](#️-configuration) · [Architecture](#-architecture--turn-lifecycle) · [Verification](#-verification--testing)
 
-A high-performance, host-neutral, deterministic **OpenCode V2** plugin (`@opencode/plugin >=2.0.0`, verified on `v2.3.2`) providing **13-language lazy skill discovery**, **permission-aware native skill binding**, **safe cold-vault access**, and a **live OpenTUI/Solid sidebar widget** (`./tui`) for both **single-agent** and **multi-agent** workspaces.
+A high-performance, host-neutral, deterministic **OpenCode V2** plugin (`@opencode/plugin >=2.0.0`, verified on `v2.4.1`) providing **13-language lazy skill discovery**, **strict-frontmatter (`name` + `description`) compatibility**, **permission-aware native skill binding**, **safe cold-vault access**, and a **live OpenTUI/Solid sidebar widget** (`./tui`) for both **single-agent** and **multi-agent** workspaces.
 
 It operates 100% standalone without requiring any external orchestrator package, fixed role names, custom task tools, specific model, or pinned host patch version, while seamlessly interoperating with sibling V2 mesh plugins when installed together.
 
@@ -21,16 +21,16 @@ It operates 100% standalone without requiring any external orchestrator package,
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> Lazy Skill Engine **v1.5.4** (`opencode-lazy-se`) was verified on **23 November 2026** against live **OpenCode v2.4.0** on Node **26.13.1**:
+> Lazy Skill Engine **v1.7.0** (`opencode-lazy-se`) was verified on **24 November 2026** against live **OpenCode v2.4.1** (`@opencode/plugin@2.4.1`) on Node **26.13.1**:
 
-- **Unit, Integration & Regression Suite:** **186 / 186** tests passing across 13 test suites (`npm test` / `npm run check`).
-- **Strict TypeScript & Dual-Target TUI Build:** `tsc --noEmit --noUnusedLocals --noUnusedParameters --noUncheckedIndexedAccess --exactOptionalPropertyTypes` passes with **0 warnings / 0 errors**; `scripts/emit-tui.mjs` verifies dual-target Solid/OpenTUI emission (`dist/tui-runtime.js`, `dist/tui-standalone.js`, `dist/tui.js`) and syntax across all **39** compiled JS modules.
-- **Packed-Artifact Sandbox Verification:** Packed `.tgz` (`npm pack`) installation, live `opencode` `serve` startup, `skill.list`, `session.create`/`delete`, adversarial vault/mesh boundary checks, and clean git hygiene pass in an isolated host sandbox.
+- **Unit, Integration & Regression Suite:** **210 / 210** tests passing across 16 test suites (`npm test` / `npm run check`), including full JSON Schema `output` contract validation (`tests/tool-output-schema.test.js`), strict-frontmatter discovery (`tests/strict-frontmatter.test.js`), and adaptive role baseline / mesh binding ownership (`tests/baseline-mode.test.js`).
+- **Strict TypeScript & Dual-Target TUI Build:** `tsc --noEmit --noUnusedLocals --noUnusedParameters --noUncheckedIndexedAccess --exactOptionalPropertyTypes` passes with **0 warnings / 0 errors**; `scripts/emit-tui.mjs` verifies dual-target Solid/OpenTUI emission (`dist/tui-runtime.js`, `dist/tui-standalone.js`, `dist/tui.js`) and syntax across all **42** compiled JS modules.
+- **Live OpenCode v2.4.1 Host & Packed-Artifact Verification:** All 6 `lazy_skill_*` tools verified live inside an isolated `opencode v2.4.1 --standalone` host with declared `output` schemas and structured `{ content, output }` responses; packed `.tgz` (`npm pack`), benchmark (`3000` skills in ~165ms, `<1ms` mean query), and security checks pass.
 - **Zero Runtime Dependencies:** Pure TypeScript compiled to `dist/` with `0` third-party runtime dependencies.
 
 Read the detailed [Quality & Verification Matrix](docs/QUALITY.md), [Architecture Guide](docs/ARCHITECTURE.md), and [Standalone & Multi-Plugin Coexistence Guide](docs/COEXISTENCE.md).
 
-See the [1.5.4 release notes](CHANGELOG.md) for **OpenCode v2.4.0** compatibility (`plugin.updated` hot-reload cache invalidation, `session.compaction.ended` vault reload reset, structured `Tool.Result` `output`, `sidebar.content` `{ sessionID }` location tracking, and `@opentui/* >=0.9.4` peer alignment).
+See the [1.7.0 release notes](CHANGELOG.md) for **adaptive role baseline binding (`baselineMode`)**, **explicit mesh `bindingOwner` (`"self"` / `"external"`) ownership**, **OpenCode v2.4.1 tool `output` schemas**, strict-frontmatter (`name` + `description`) scoring, and optional **`lazy-skill.json` / `skill.meta.json` sidecar metadata**.
 
 ---
 
@@ -38,7 +38,7 @@ See the [1.5.4 release notes](CHANGELOG.md) for **OpenCode v2.4.0** compatibilit
 
 - **Pure OpenCode V2 Architecture:** Built natively for **OpenCode V2** with dedicated `.` (server plugin), `./tui` (OpenTUI/Solid sidebar), and `./rpc` (`opencode-lazy-skill.stats` contract) exports.
 - **Host Remains Authoritative:** Native skills registered by other plugins, the built-in `skill` tool, ordered agent permissions (`ctx.agent.list()`), and existing `prompt.skills` attachments are always preserved.
-- **Fast Local 13-Language Search (Zero Network / Zero Embeddings):** Uses bounded frontmatter scanning (`peekMetadata`), an inverted postings index, BM25F-style field-weighted scoring, Unicode normalization, camelCase/acronym splitting, conservative Turkish/English stemming, and a 13-language engineering concept bridge.
+- **Fast Local 13-Language Search (Zero Network / Zero Embeddings):** Uses bounded frontmatter scanning (`peekMetadata`), optional sidecar metadata (`lazy-skill.json` / `skill.meta.json`), bounded synthetic identifier/heading extraction for strict `name + description` skills, an inverted postings index, adaptive BM25F-style scoring with non-empty field length normalization, Unicode normalization, camelCase/acronym splitting, conservative Turkish/English stemming, and a 38-concept 13-language engineering bridge.
 - **Adaptive Single-Agent & Multi-Agent Routing:** Automatically binds high-confidence native skills in single-agent sessions and narrows automatic binding to permitted child workers when an orchestrated subagent roster is detected.
 - **No Privilege Escalation:** When `ctx.agent.list()` is available, ordered host `skill` permission rules (`allow` / `ask` / `deny` with linear glob matching, last matching rule wins) filter automatic candidates and fail closed if worker policy lookup fails.
 - **Safe Cold-Vault Access:** Global vault skills (`~/.config/opencode/skill-vault`) are safely bound on demand when `vaultAutoBind: true` (default), while project-local vaults (`.opencode/skill-vault`) require explicit `projectAutoBind: true`. Vault reads enforce symlink containment (`safeRead`), binary/size guards, host/mesh permission checks, and escaped `<lazy_bound_skill>` XML boundaries.
@@ -49,7 +49,7 @@ See the [1.5.4 release notes](CHANGELOG.md) for **OpenCode v2.4.0** compatibilit
 
 ## 📦 Installation
 
-The npm package name is **`opencode-lazy-se`** (internal plugin ID: `opencode-lazy-skill-engine`). Current version: **1.5.4** (OpenCode **v2.3.0+**, verified on **v2.4.0**).
+The npm package name is **`opencode-lazy-se`** (internal plugin ID: `opencode-lazy-skill-engine`). Current version: **1.7.0** (OpenCode **v2.3.0+**, verified on **v2.4.1**).
 
 OpenCode Lazy Skill Engine supports **Global**, **Project-Local**, **`.opencode/plugins/` Local Wrapper / Symlink**, **Local Development (`file://`)**, and **Remote TUI Client (`cli.json`)** installation modes.
 
@@ -76,7 +76,7 @@ Or pass optional inline plugin configuration:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     [
-      "opencode-lazy-se@1.5.4",
+      "opencode-lazy-se@1.7.0",
       {
         "mode": "auto",
         "autoBind": "adaptive",
@@ -196,7 +196,7 @@ OpenCode Lazy Skill Engine includes a dedicated V2 TUI extension (`./tui`) that 
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ lazy v1.5.4 · ● ready
+▶ lazy v1.7.0 · ● ready
 ```
 
 ### 🔼 Expanded View (Click to Toggle)
@@ -204,7 +204,7 @@ OpenCode Lazy Skill Engine includes a dedicated V2 TUI extension (`./tui`) that 
 Clicking the header toggles the expanded statistics panel:
 
 ```text
-▼ lazy v1.5.4 · ● ready
+▼ lazy v1.7.0 · ● ready
   Skills                               18
   Local                                 6
   Global                               12
@@ -267,7 +267,7 @@ Native skills are loaded using the host's built-in `skill` tool. Content read fr
 Lazy Skill Engine is **100% standalone** and requires no sibling plugins. When installed alongside other OpenCode V2 mesh plugins, it coordinates automatically via `src/bridge.ts` (`BRIDGE_REVISION = "2.3.1"`):
 
 - **Shared Skill Catalog Provider:** Registers the `skills.catalog` capability and exposes `registerSkillSearchProvider` so sibling orchestrators can query multilingual skills via `queryMeshSkills` without scanning disk twice.
-- **Turn-Level Binding Deduplication (`claimPromptSkillBinding`):** Coordinates `(sessionID, turnKey)` binding claims so two mesh plugins never run duplicate LLM semantic routing or double-bind competing automatic skills on the same turn.
+- **Turn-Level Binding Deduplication & Ownership (`claimPromptSkillBinding`, `bindingOwner`):** Coordinates `(sessionID, turnKey)` binding claims and honors `MeshAgentProfile.bindingOwner` (`"self"` suppresses Lazy auto-binding while keeping explicit/required skills; `"external"` delegates automatic binding to Lazy) so two mesh plugins never compete on the same turn.
 - **Cryptographic Provenance Verification (`isTrustedMeshMessage`):** Distinguishes trusted `task-contract` mesh handoffs from synthetic remediation prompts using per-session HMAC provenance tokens.
 - **Context Pruner Protection (`kind: "skill-injection"`):** Stamps injected `<lazy_bound_skill>` vault blocks with `protected: true` mesh metadata so sibling context-compaction plugins preserve active skill instructions.
 
@@ -310,6 +310,7 @@ All options are optional and safe out of the box. Pass them inline in `opencode.
 | :--- | :---: | :--- |
 | `mode` | `"auto"` | `"auto"`, `"single"`, or `"orchestrator"`. |
 | `autoBind` | `"adaptive"` | `"adaptive"`, `"off"`, `"workers"`, or `"all"`. |
+| `baselineMode` | `"adaptive"` | `"adaptive"` (`"fallback"` standalone, `"always"` when mesh-managed), `"always"` (bind safe non-project `role.default` first, then router fill), or `"fallback"` (legacy either-or). |
 | `coexistence` | `"respect"` | `"respect"` (skip automatic binding if `prompt.skills` is non-empty) or `"augment"`. |
 | `respectHostPermissions` | `true` | Filter automatic candidates by `ctx.agent.list()` ordered `skill` permission rules. |
 | `nativeCatalog` | `"preserve"` | `"preserve"`, `"hide"` (sets `autoinvoke: false` + context guidance), or `"compact"`. |

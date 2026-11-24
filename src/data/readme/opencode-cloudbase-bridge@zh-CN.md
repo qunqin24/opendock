@@ -1,6 +1,10 @@
+<p align="center"><img src="https://raw.githubusercontent.com/DaBinBinah/cloudbase-bridge/main/docs/images/logo.png" width="110" alt="CloudBase Bridge logo"></p>
+
 # CloudBase Bridge
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+<p align="center">[English](README.md) | [简体中文](README.zh-CN.md) · **GitHub**：[DaBinBinah/cloudbase-bridge](https://github.com/DaBinBinah/cloudbase-bridge)</p>
+
+通过你自己部署的 `aiProxy` 云函数，把腾讯云开发 CloudBase「小程序成长计划」的 AI 额度接入 [Magpie](https://usemagpie.ai)，作为普通的 OpenAI 兼容供应商使用。装好之后，它就是你账号下的一个普通供应商，各个 agent 都能直接用。
 
 **GitHub**：[github.com/DaBinBinah/cloudbase-bridge](https://github.com/DaBinBinah/cloudbase-bridge)
 
@@ -24,13 +28,14 @@ Agent ─► magpie 网关 ─► 插件 ── POST /v1/functions/aiProxy ─�
 
 | 模型 ID | 上下文长度 |
 | --- | --- |
-| `hy3` | 256K |
+| `hy4-flash` | 1M |
 | `hy4` | 1M |
 | `hy4-preview` | 1M |
+| `hy3` | 256K |
 | `deepseek-v4.1-flash` | 1M |
 | `deepseek-v4.1-flash-1017` | 1M |
 
-这些模型不用在控制台开启，用量会自动从赠送额度里扣。个别模型在部分环境不一定放开——如果 CloudBase 返回 `AI_MODEL_NOT_SUPPORTED`，以你环境的实际支持为准。
+这些模型不用在控制台开启，用量会自动从赠送额度里扣。个别模型在部分环境不一定放开——如果 CloudBase 返回 `AI_MODEL_NOT_SUPPORTED`，以你环境的实际支持为准。生图模型 `hy-image-v3.5-preview` 不在本插件范围内：桥接只走文本对话通道。
 
 ## 准备工作
 
@@ -100,7 +105,8 @@ m plugin options cloudbase-bridge '{"gatewayBaseUrl":"http://127.0.0.1:8787"}'
 ## 已知限制
 
 - 没有真流式：上游是一次性返回，SSE 在本地合成，所以首 token 要等整段生成完；
-- 不支持工具调用和图片输入，`max_tokens` 也会被忽略（SDK 通道只接受 `{ model, messages, temperature, topP }`）；
+- 工具调用需要 aiProxy 1.1.0 及以上——插件从 0.2.4 或更早版本升级后，要重新部署一次云函数（`tcb fn deploy aiProxy --force`）；
+- 不支持图片输入；
 - 特别长的输出可能撞上云函数 120 秒超时；
 - 没有额度展示（官方没给查询 API）；赠送额度本身有期限（6 个月）。
 

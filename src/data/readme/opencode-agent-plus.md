@@ -78,25 +78,39 @@ You help the user write and edit text.
 
 | Key | Value | Effect |
 | --- | --- | --- |
-| `reminder` | `concise`, `ultra-concise`, `creative`, `off`, or text (one line or a `\|` block) | Preset or custom reminder, added as the last message of every model request |
+| `reminder` | `concise`, `off`, or text (one line or a `\|` block) | Preset or custom reminder, added as the last message of every model request |
 | `on_error_command` | shell command, one line or a `\|` block | Run when a request fails with a connection error (server off), then retry |
-| `safe_commands` | `none` (default: on) | Turn safe-command auto-allow off for this agent |
+| `safe_commands` | `off` (default: on) | Turn safe-command auto-allow off for this agent |
 | `max_word_repeat` | `on` or `off` (default: off) | Stop the reply when the model repeats the same text |
 | `max_tool_repeat` | whole number | Max times the same tool call may repeat in a row |
 | `manual_green_light` | `on` or `off` (default: off) | Tools run only when your message ends with an approval word |
 | `manual_green_light_words` | comma-separated words | The approval words for `manual_green_light` |
 | `auto_green_light` | `on` or `off` (default: off) | The model checks itself before the first tool call of each turn |
-| `temperature` | number | Request body |
+| `temperature` | number from `0` to `1` | Request body |
 | `max_completion_tokens` | whole number | Request body |
 | `reasoning_budget_tokens` | whole number | Request body |
-| `reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high` or `xhigh` | Request body |
+| `reasoning_effort` | `low`, `medium`, `high` or `xhigh` | Request body |
 | `enable_thinking` | `true` or `false` | Request body, under `chat_template_kwargs` |
 | `tools_override` | path to a JSON file (relative to the agent file) | Replace tool descriptions with your own |
 | `pondering` | `on` or `off` (default: off) | Run a quiet thinking request when the session goes idle |
 | `misplaced_tag_filter` | `on` or `off` (default: off) | Replace leaked tag signs in thinking/message text |
+| `show_settings_on_sidebar` | `on` or `off` (default: on) | Show this agent's settings in the TUI sidebar |
 | `clockwork` | `on` or `off` (default: off) | Run the agent hands-off with auto-continue |
 
 Names are sent as written. A setting with a wrong value is not sent.
+
+## Settings menu
+
+Type `/agent-plus` in the chat input to open a settings menu for the current agent. Every key from the table above
+has a row:
+
+- Toggles (`on` / `off`) flip with **space**.
+- Choice rows (`reasoning_effort`, `temperature`, …) offer the valid values in a picker.
+- `reminder` offers the presets, `edit…` for your own text, and `off`.
+- Every row has a `default (…)` option that removes the key from the file, so the model default applies.
+
+Choices are written straight into the agent's `.md` frontmatter (agent-plus keys are kept first, in menu order), so
+the sidebar and the file always match.
 
 ## Reminders
 
@@ -109,12 +123,9 @@ the most.
 
 ### How
 
-Before every model request, agent-plus adds one message at the end of the conversation with, in this order:
+Before every model request, agent-plus adds one message at the end of the conversation with the agent's `reminder`.
 
-1. the agent's `reminder`
-2. the `reminder` from `AGENTS.md` in the project folder, for every agent
-
-`reminder` takes a preset name (`concise`, `ultra-concise`, `creative`, `off`) for wording held in
+`reminder` takes a preset name (`concise`, `off`) for wording held in
 the plugin, or your own text (more than 3 words). A short unknown value means
 `off`.
 
@@ -182,7 +193,7 @@ It never overrides a configured `deny`, and only turns `ask` into `allow`. Doubt
 Known unsafe flags are refused, e.g. `find -exec`, `env <cmd>`, `rg --pre`, `sort -o`, `git branch -D`,
 `git log --output=`, `ssh -o ProxyCommand=`.
 
-Turn it off for one agent with `safe_commands: none` in its frontmatter.
+Turn it off for one agent with `safe_commands: off` in its frontmatter.
 
 ## Anti-repetition
 

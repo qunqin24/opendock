@@ -7,9 +7,14 @@
 [![license](https://img.shields.io/npm/l/@jakedowns/progress-tool-opencode-plugin?style=flat-square)](./LICENSE)
 
 <img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/1.png" width="300" alt="Progress pill showing a live task tree">
+
 <img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/subagents.png" width="300" alt="Progress pill showing subagent rows">
 
-A non-blocking twin of `question` so coding agents can signal long-running work
+<img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/tui.png" width="600" alt="Progress pill showing a live task tree with subagent work callouts"> 
+
+<img src="https://raw.githubusercontent.com/jakedowns/progress-tool/master/screenshots/tui2.png" width="600" alt="Progress pill showing a live task tree with subagent work callouts">
+
+Enhanced version of todowrite so coding agents can signal long-running work
 without looking dead, plus a **zero-token-burn out-of-band relay** so the agent
 never has to poll `stdout` just to keep the UI alive. Token cost scales with
 milestones, not with task duration.
@@ -24,7 +29,7 @@ Implements the [Agent Progress Tool proposal](https://gist.github.com/jakedowns/
 for OpenCode 2, and is written as a portable reference implementation any
 harness can copy or adapt.
 
-**Versions:** MCP server `2.10.2` · OpenCode plugin `2.19.0`
+**Versions:** MCP server `2.11.0` · OpenCode plugin `2.20.0`
 
 > **Advanced docs:** [schema, relay internals, state store, architecture, all
 > options, file map →](./README-advanced.md)
@@ -125,13 +130,26 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 ## What the views do
 
 - **Desktop/web pill:** one row per root, with `(N · agg%)` when several roots
-  exist, hover details, and a menu with the full tree.
+  exist, hover details, and a menu with the full tree. Set
+  `guiLayout: "sidebar"` to move the tree into a pinned tab in the session's
+  side panel (`guiSidebarWidth` sets its initial width), or use the pill's
+  `[Sidebar]` action / the "Progress: swap layout" command at runtime.
+  `guiDetailLines` caps detail text in both the pill menu and sidebar
+  (default `1` line with `…`; `0` hides details; `-1` shows full text).
+  `treeTheme: "compact"` renders tree rows (pill popover and sidebar) without
+  progress-bar glyphs or the started line, with a single clamped detail line
+  and a `40% · & N more` meta suffix. The composer pill capsule itself keeps
+  its `barStyle` rendering. Use the **Progress: switch tree theme** palette
+  command to pick `Default` or `Compact`; the choice applies immediately and is
+  saved as `treeTheme` in the OpenCode config that declares the plugin.
 - **TUI:** compact tree above the composer, roots collapsed, capped at
   `tuiMaxRoots` (default 3) and scrollable inside `tuiMaxRows` (default 8) so
   long lists never push the prompt away. A `--- scroll to see N more ---` hint
   appears on overflow; `/progress` opens a dialog to expand a tree or dismiss
-  tasks, and the palette can change the root cap or collapse the tree to a
-  one-line status summary. Set `tuiLayout: "sidebar"` to
+  tasks, and the palette can change the root cap, switch the tree theme, or
+  collapse the tree to a one-line status summary. With `treeTheme: "compact"`,
+  TUI rows drop the progress bar and show `title 40% · & N more` instead. Set
+  `tuiLayout: "sidebar"` to
   park the tree in the sidebar instead, or run `/progress swap-layout` to flip
   placements at runtime.
 - Running and waiting tasks stay visible; errors stay until dismissed or
@@ -141,6 +159,31 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
   dismissal** on that entry and its ancestors — except a terminal dismissal
   (dismissed while done/error), which later done/error re-reports do not revive;
   a restart or a child failure does.
+- **Clear/delete are palette commands** (not pill buttons): *Progress: clear
+  list* soft-deletes finished/dismissed entries while keeping records on disk,
+  *hard clear this session* removes one session's store copy, and *hard clear
+  entire progress store* requires typing `DELETE`. Deleting a chat purges its
+  store entries unless `retainDeletedSessionProgress` is enabled; the mirrored
+  Markdown tasklist is never removed.
+- **Narration (`say`, opt-in):** set `say: true` to give the agent a mid-turn
+  note tool. `sayModes` chooses the surfaces (default `["tree"]`; `sayMode` is a
+  scalar alias): `tree` shows a dim latest-note line above the tree (TUI;
+  GUI sidebar panel and pill popover), `pill` shows the notes composer pill,
+  and `toast` raises one toast per new note (warning tone for
+  `blocked`/`question`, with `[Subagent (X)]` attribution). The TUI has no
+  pills, so `pill` maps to its tree line; the GUI composer layout has no tree,
+  so `tree` falls back to the pill. An empty array records notes without
+  showing them. Click the TUI line or open `/progress` → **Notes** / the pill
+  popover for newest-first history; dismiss one note with its `×` or all notes
+  at once. Dismissals delete the note from the shared ring buffer, so every
+  client updates. Notes also auto-hide from every surface after
+  `sayAutoHideTimeoutMs` (default 60s; `0` keeps them until dismissed). An
+  opt-in `sayNudge` reminds a silent agent after a long tool, without
+  deleting them. **Recommended note length: 20–80 characters** for terse
+  intent/status pings; set `sayMinChars: 20` and `sayMaxChars: 80`. The
+  shipped defaults stay `180`/`260` for longer intent-plus-ETA notes. Notes
+  survive clear-list, roll child sessions up to the parent, and are purged with
+  the session or a hard clear. A note never ends the turn.
 - **Subagents:** child sessions are mapped to their parent automatically
   (`session.created` → `~/.opencode-progress-sessions.json`), and the parent id
   is stamped into subagent prompts as a fallback. Roots created by a child
@@ -157,6 +200,16 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 | `tuiMaxRoots` | TUI root cap before the full-tree summary (default 3, max 50) |
 | `tuiLayout` | TUI placement: `"composer"` (default) or `"sidebar"` |
 | `tuiSidebarRows` | Sidebar viewport height in rows (default 0 = full tree, sidebar scrolls; max 100) |
+| `guiLayout` | Desktop/web placement: `"composer"` pill (default) or pinned `"sidebar"` panel |
+| `guiSidebarWidth` | Desktop sidebar initial width in CSS pixels (default 360, clamp 240-800) |
+| `guiDetailLines` | Detail line cap in pill menu and sidebar: `-1` full, `0` hidden, `n` lines (default 1) |
+| `treeTheme` | Tree row theme: `"default"` or `"compact"` (no bars/started line, one detail line; pill capsule unaffected). **Progress: switch tree theme** picks it and writes it back to the config |
+| `taskListFile` | Mirror tasks to a local Markdown checklist (default off) |
+| `taskListLocation` | `1` = project root (default), `0` = `.progress/`, `2` = `~/.opencode-progress/` |
+| `taskListView` | `"ui"` (hide dismissed + rolled-up status) or `"raw"` |
+| `taskListDetail` | `"code"` (safe fenced block), `"escaped"`, or `"raw"` |
+| `taskListOrder` | `"newest-first"` (default) or `"oldest-first"` |
+| `relayMirrorLevel` | `0` off (default), `1` all relay entries, `2` relay errors only |
 | `expandRootsByDefault` | Expand trees by default (default collapsed) |
 | `strictMode` | `"nudge"` / `"force"` / `"off"` silent-work nudges |
 | `staleEscalateAfter` | Entry reminders before one synthetic escalation (default 3; `0` disables) |
@@ -164,6 +217,14 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 | `demoSkills` | Register the demo skills (default off) |
 | `barStyle` | `"blocks"` or `"emoji"` |
 | `refreshMs` | View refresh interval (default 1000) |
+| `say` | Enable the opt-in narration tool and notes lane (default off) |
+| `sayModes` | Note surfaces: string or array of `"pill"`, `"toast"`, `"tree"` (default `["tree"]`; `sayMode` is a scalar alias; `[]` records without showing) |
+| `sayAutoHideTimeoutMs` | Hide notes older than this from every surface (default `60000`, clamp `0..86400000`; `0` keeps until dismissed; view-only) |
+| `sayToastScope` | Toast `"own"` notes (default), own + child `"warnings"`, or `"all"`; child notes still roll up in the tree/pill |
+| `sayNudge` | Opt-in long-tool reminder: `"long-tool"` or `true` (default off; context-only, never synthetic) |
+| `retainDeletedSessionProgress` | Keep store entries when a session is deleted (default off) |
+
+The optional task-list mirror is always written as `tasklist-<session>.md`. Add `tasklist-*.md` (and `.progress/` if you use location `0`) to your `.gitignore` — it contains plaintext task titles and details. When enabled, the palette command **Progress: task-list mirror view** switches between the UI view and the raw store view.
 
 [Full option list →](./README-advanced.md#plugin-options-full-list)
 
@@ -187,12 +248,15 @@ Register the checkout (desktop/browsers read the **global** config):
 }
 ```
 
-For the TUI, add the same entry to `~/.config/opencode/cli.json`. `opencode
-plugin add` only accepts npm/Git specifiers, so a local checkout must be
-registered via config. Build details and the precompiled-TUI rationale live in
-the [advanced guide](./README-advanced.md#build-notes).
+No separate `cli.json` entry is needed in V2: the TUI part loads with the
+server plugin. `opencode plugin add` only accepts npm/Git specifiers, so a local
+checkout must be registered via config. Build details and the precompiled-TUI
+rationale live in the [advanced guide](./README-advanced.md#build-notes).
 
-Verify with `opencode plugin list` (features `server`, `tui`, `rpc`, `gui`).
+Reload the window or restart the service. The plugin server log shows
+`loading plugin … entrypoint=…/src/index.ts`, and the pill appears above the
+composer. (`opencode plugin list` only lists registry-installed packages, not
+local checkouts.)
 
 **Standalone GUI:** `./launch-gui.sh`, then open `http://localhost:8765`.
 
@@ -220,8 +284,9 @@ The value is the plugin id, not the package name. Only `setup` runs on the web
 opencode mcp remove progress-server
 ```
 
-Remove the plugin entry from `~/.config/opencode/opencode.json` and, if used,
-`~/.config/opencode/cli.json`. For a published package,
+Remove the plugin entry from `~/.config/opencode/opencode.json`. V2 needs no
+`cli.json` entry; remove the old one if an earlier version added it. For a
+published package,
 `opencode plugin remove <package>` also works. If you linked the relay:
 `cd mcp-server && npm unlink -g progress-mcp-server`.
 

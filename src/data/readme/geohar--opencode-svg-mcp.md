@@ -170,7 +170,7 @@ The full inkex catalog is mapped through to **181 MCP tools** (see
 [`INKEX_PRIMITIVES.md`](./INKEX_PRIMITIVES.md)), plus the theme system and the declarative
 facade families (diagrams, charts, annotations), with ruff/mypy clean and the test suite green.
 
-- **Document model** (inkex-backed, multi-document with an active-document default): shapes,
+- **Document model** (inkex-backed, multi-document, every document named by its id): shapes,
   paths (+ arc/star factories and path-data ops), text + tspan runs + text-on-path + flowed
   text, images (base64/file embed), groups (+ ungroup, z-order, duplicate, world-preserving
   reparent), **layers** (+ visible/locked/opacity), symbols/use, hyperlinks.
@@ -262,8 +262,9 @@ facade families (diagrams, charts, annotations), with ruff/mypy clean and the te
   extraction; metadata (title/desc/RDF); guides & pages.
 - **Render-and-see loop**: serialize-then-rasterize via the **resvg** engine — in-process by
   default (bundled `resvg-py`), or the CLI when present; the image is handed back directly as
-  base64 image content. Documents are also published as readable MCP **resources**
-  (`svg://documents`, `svg://{id}/svg`, `svg://{id}/render`) with change notifications.
+  base64 image content. Documents are also published as readable MCP **resources**, scoped to
+  the session (`svg://<token>/documents`, `svg://<token>/<id>/svg`, `svg://<token>/<id>/render`)
+  with change notifications.
 - **File export** (`export_render`): faithful raster (png/jpeg/webp via resvg) and **true vector**
   (pdf/ps/eps via librsvg). cairo is intentionally avoided — it silently drops SVG filters (a drop
   shadow renders blank), so it is not faithful to the document.
@@ -550,6 +551,7 @@ export SVG_MCP_WEB_AUTH='{"mode": "password", "session_days": 7}'
 | `shutdown_grace` | `0` | Seconds to let in-flight http connections drain on shutdown |
 | `preview` | `false` | Auto-start the [live preview](#live-preview) web server on boot |
 | `preview_host` / `preview_port` | `127.0.0.1` / `8808` | Bind address for the live preview |
+| `preview_public_url` | unset | Where browsers reach the preview behind a reverse proxy, e.g. `https://host.example/svg/`. Links use it, a path prefix is honoured on every route and login redirect, and its host counts as this machine's name |
 | `web_auth` | off | Browser login for the live preview (see [Web login](#web-login)) |
 | `web_password_hash` | unset | The login's password hash (`svg-mcp hash-password`); overrides `web_auth.password_hash` |
 | `web_password` | unset | The login password, RAW — hashed with a fresh salt at startup, in memory only (the explicit hash wins when both are set) |
@@ -602,12 +604,50 @@ svg-mcp --transport streamable-http --port 7731  # or streamable HTTP at 127.0.0
 ```
 
 A long-running HTTP server is handy for a shared/persistent endpoint a bridge can connect to
-(the server runs as a single process; each client connection gets its own isolated documents).
+(the server runs as a single process; each session from `create_session` gets its own isolated
+documents).
+
+### Running in a container
+
+Serve streamable HTTP and point clients (or mcp-combiner) at its URL:
+`svg-mcp --transport streamable-http --host 0.0.0.0 --port 7732`. `GET /health` answers
+`{"status": "ok"}` without authentication, for healthchecks.
+
+svg-mcp itself needs no compiler, but **inkex** (its SVG document model) does on Linux:
+it requires PyGObject, which has no Linux wheels, and caps lxml below 6, which has no
+Python 3.14 wheels. svg-mcp never imports PyGObject, but pip installs it anyway. Build on
+Python 3.13 (lxml 5 has wheels there) in two stages:
+
+```dockerfile
+FROM python:3.13-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc pkg-config libgirepository-2.0-dev libcairo2-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN python -m venv /opt/svg-mcp && /opt/svg-mcp/bin/pip install --no-cache-dir svg-mcp
+
+FROM python:3.13-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgirepository-2.0-0 libcairo2 fonts-dejavu-core librsvg2-bin \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/svg-mcp /opt/svg-mcp
+ENV PATH=/opt/svg-mcp/bin:$PATH XDG_STATE_HOME=/state
+VOLUME /state
+EXPOSE 7732 8808
+HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7732/health')"
+CMD ["svg-mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "7732"]
+```
+
+- **Fonts:** install at least one font package (`fonts-dejavu-core`), or text renders blank
+  and `measure_text` finds no family. `librsvg2-bin` is only for PDF/PS/EPS export.
+- **State:** sessions and documents are in memory and end with the process. Only the web
+  login's signing key (`$XDG_STATE_HOME/svg-mcp/web-auth.key`) is worth a volume.
+- **Preview behind a proxy:** bind it with `preview_host = "0.0.0.0"`, set
+  `preview_public_url`, and use `exempt_local = false` (see [Web login](#web-login)).
 
 ## Live preview
 
 Rendering each step back into the chat costs tokens and, in a terminal, the model sees the image
-but you don't. The live preview solves both: a tiny loopback web page that mirrors the active
+but you don't. The live preview solves both: a tiny loopback web page that mirrors a
 document and **auto-refreshes on every edit** over Server-Sent Events — so you watch the drawing
 build in a browser while the model keeps working, with no render bytes spent on the conversation.
 
@@ -618,14 +658,19 @@ build in a browser while the model keeps working, with no render bytes spent on 
 - **Start it:** the model is instructed to open a preview and hand you the URL up front on any
   non-trivial drawing, so you can watch (and redirect) as it builds. You can also ask for it
   outright — *"show me"*, *"open a preview"* — or set `preview = true` (`SVG_MCP_PREVIEW=1`) to auto-start on boot.
+- **One page per document:** `start_preview(document_id)` returns that document's page,
+  `/<token>/<document_id>/`. It stays on that document; a new document gets its own page, and
+  `/<token>/` lists every document in the chat.
 - **Watch it:** open the URL once and leave it — it repaints on each change. Toggle **PNG**
   (faithful resvg output) vs **SVG** (crisp vector), zoom, drag to pan, and **Save** the current
   frame as PNG/SVG/WebP/JPEG/PDF straight from the page.
-- **Per-chat:** the URL carries a session token (`/<token>/`), so each chat gets its own isolated
-  preview even though they share one server and port — one chat's edits never appear in another's.
+- **Per-chat:** the URL carries the session's token (`/<token>/…`), so each chat gets its own
+  isolated preview even though they share one server and port — one chat's edits never appear in
+  another's. The token is a hash of the session id: the URL lets someone watch, never edit.
 
-The page just mirrors the read-only [`svg://` resources](#resources): `GET /<token>/active/render`
-is the same render as the `svg://{id}/render` resource, refreshed by the same change signal.
+The page just mirrors the read-only [`svg://` resources](#resources):
+`GET /<token>/<document_id>/render` is the same render as the `svg://<token>/<document_id>/render`
+resource, refreshed by the same change signal.
 
 ### Web login
 
@@ -680,6 +725,18 @@ at startup.
 its own domain at `127.0.0.1` connects from loopback, but its requests still say
 `Host: attacker.example`, so they get the login.
 
+Behind a reverse proxy, set `preview_public_url` to the address browsers use, so the links
+`start_preview` hands out point there. A path prefix works; for nginx:
+
+```nginx
+location /svg/ {
+    proxy_pass http://127.0.0.1:8808/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_buffering off;   # keeps the page's live-update stream flowing
+}
+```
+
 A proxy on this machine is believed only from `127.0.0.1` / `::1`, and only when it names the
 real browser in `X-Forwarded-For`.
 
@@ -706,7 +763,7 @@ preview. `/mcp` keeps its bearer ([Authentication](#authentication)).
 ## Inline widget (`show_widget`)
 
 `show_widget` is the in-chat companion to the live preview: instead of a browser page, it renders
-the active document **inside the conversation** as an interactive card — zoom, pan, backdrop,
+a document **inside the conversation** as an interactive card — zoom, pan, backdrop,
 refresh, and a jump to the full browser preview — on Claude surfaces that render MCP-Apps widgets
 (**Claude Desktop chat**, claude.ai). The rendered PNG also rides in the tool result, so on surfaces
 that *don't* render widgets (**Claude Code**, and the model's own render-and-see loop) you still get
@@ -750,7 +807,7 @@ claude mcp add svg-mcp -- /Users/geohar/Development/svg-mcp/.venv/bin/svg-mcp
 uv run fastmcp dev src/svg_mcp/server.py:mcp
 ```
 
-The model's loop is: `create_document` → add nodes / resources → `render_document` to see the
+The model's loop is: `create_session` → `create_document` → add nodes / resources → `render_document` to see the
 result inline → iterate → `export_svg`. The server's `instructions` describe the full workflow
 and conventions; each tool carries its own description.
 
@@ -759,28 +816,33 @@ and conventions; each tool carries its own description.
 The tools are called by an LLM over MCP. The core loop is **create → build → render-and-see →
 iterate → export**. A minimal session (arguments shown as the JSON each tool receives):
 
+Every call also carries `session_id` (from `create_session`), and every call that acts on a
+document carries `document_id`. They're shown once here and elided after:
+
 ```text
-create_document(width=320, height=120)                 # → {document_id:"doc1", active:true}
+create_session()                                       # → {session_id:"…"}
+create_document(session_id, width=320, height=120)     # → {document_id:"doc1", resources:{…}}
 
 # define a reusable gradient, then paint with it by name (@name) or url(#id)
-define_linear_gradient(x1=0, y1=0, x2=1, y2=0,
+define_linear_gradient(document_id="doc1", x1=0, y1=0, x2=1, y2=0,
     stops=[{offset:0, color:"#7dd3fc"}, {offset:1, color:"#1e3a8a"}], name="brand")
-add_rect(x=0, y=0, width=320, height=120, rx=16, style={fill:"@brand"})
+add_rect(document_id="doc1", x=0, y=0, width=320, height=120, rx=16, style={fill:"@brand"})
 
-add_text(x=160, y=72, content="svg-mcp", name="title",
-    style={font_family:"Helvetica", font_size:"40px", font_weight:"bold",
-           text_anchor:"middle", fill:"#ffffff"})
-apply_drop_shadow(target="title", dx=0, dy=2, blur=3, color="#000", opacity=0.4)
+add_text(…, x=160, y=72, content="svg-mcp", name="title",
+    style={"font-family":"Helvetica", "font-size":"40px", "font-weight":"bold",
+           "text-anchor":"middle", fill:"#ffffff"})
+apply_drop_shadow(…, target="title", dx=0, dy=2, blur=3, color="#000", opacity=0.4)
 
-render_document(scale=2)        # returns the rendered PNG inline — look, then adjust
-export_svg()                    # final SVG source string
+render_document(…, scale=2)     # returns the rendered PNG inline — look, then adjust
+export_svg(…)                   # final SVG source string
 ```
 
 ### Conventions
 
-- **Active document.** `create_document` returns a `document_id` and makes it active; you may
-  **omit `document_id`** on later calls to target it. Pass it explicitly to switch, or use
-  `set_active_document`. Call `current_context()` to re-anchor (active id, open docs, outline).
+- **Always named.** Every call needs a `session_id` from `create_session`, on every client and
+  transport; there is no per-connection fallback. Every call that acts on a document needs its
+  `document_id`; there is no active or current document. Missing either is an error, not a guess.
+  Call `current_context()` or `list_documents()` to re-anchor (the session's open documents).
 - **Targets by id or name.** Every `target`/`parent`/`content` arg takes a node's returned id
   **or** the friendly `name` you gave it. Name things you'll revisit; reason via `find(name=…)`
   and `outline`. A bare handle is an **id**, else an **exact name** — never a hierarchy query, so
@@ -794,8 +856,9 @@ export_svg()                    # final SVG source string
 - **Stacking.** Later siblings paint on top. Restack relative to a sibling with
   `reparent(target, above=<node>)` / `below=<node>` instead of counting child indices.
 - **Coordinates.** User units, origin top-left, y increases downward.
-- **Style.** A structured object — `fill`, `stroke`, `stroke_width`, `opacity`, plus typography
-  (`font_family`, `font_size`, `font_weight`, `font_style`, `text_anchor`). Colors accept hex /
+- **Style.** A structured object keyed by CSS property names — `fill`, `stroke`, `stroke-width`,
+  `opacity`, plus typography (`font-family`, `font-size`, `font-weight`, `font-style`,
+  `text-anchor`). Use the hyphenated names: they are what the schema accepts. Colors accept hex /
   `rgb()` / CSS names / `none`, **or** a paint reference `url(#id)` / `@name` to a defined
   gradient or pattern.
 - **Resources** follow *create → define → reference/apply*: `define_*` returns an id you use as
@@ -811,9 +874,12 @@ export_svg()                    # final SVG source string
 
 ### Resources
 
-Open documents are also exposed as readable MCP resources, so a host can surface live state:
-`svg://documents` (index + which is active), `svg://{id}/svg` (source), `svg://{id}/render`
-(PNG). Mutations emit `resources/updated` notifications.
+Open documents are also exposed as readable MCP resources, so a host can surface live state.
+They're scoped to the session by its token: `svg://<token>/documents` (index),
+`svg://<token>/<id>/svg` (source), `svg://<token>/<id>/render` (PNG). The token is a hash of the
+session id, so tools return the URIs (`create_document`'s `resources`, `list_documents`' `index`).
+A session owned by its connection only reads from that connection. Mutations emit
+`resources/updated` notifications for the documents they touched.
 
 ### Example: the logo
 

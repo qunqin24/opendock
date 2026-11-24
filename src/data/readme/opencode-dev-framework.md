@@ -3,7 +3,8 @@
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jwitmann/opencode-dev-framework) [![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-111827)](https://opencode.ai/docs/plugins/) [![npm version](https://img.shields.io/npm/v/opencode-dev-framework.svg)](https://www.npmjs.com/package/opencode-dev-framework) [![CI](https://github.com/jwitmann/opencode-dev-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/jwitmann/opencode-dev-framework/actions) [![License: MIT](https://img.shields.io/npm/l/opencode-dev-framework.svg)](https://github.com/jwitmann/opencode-dev-framework/blob/main/LICENSE)
 
 AI agents can say they're done without proving it. This plugin replaces
-assertion with evidence: guardrails, per-edit formatting and lint feedback,
+assertion with evidence: guardrails, per-edit lint feedback (and formatting
+on DSH, where the host provides none),
 a completion gate that runs your real checks, and verified goals that require
 a tool-result PASS on the final tree. Exit codes don't negotiate.
 
@@ -17,6 +18,16 @@ Inspired by
 which supports Copilot CLI, Claude Code, and Codex CLI; this is an independent
 implementation. DSH guide: [`docs/user/dsh.md`](docs/user/dsh.md).
 
+## Principles
+
+These principles guide every mechanism in this plugin:
+
+- **Verbatim evidence.** Work is judged as performed — original output or explicitly marked pointers, never silently rewritten. No output redaction, no revised reports, no laundered context.
+- **Read-only reviewers.** The judging party cannot touch the work. Findings are reported visibly; rework happens in the open, and the gate re-verifies from scratch.
+- **Reveal, don't sanitize.** Audit trails over hidden rewrites — what happened stays inspectable.
+- **No bypass-required measures.** Nothing that fights legitimate use; if a control needs a workaround, it's the control that's wrong.
+- **Bounded and loud.** Enforcement budgets are explicit and stand-down is announced, never a quiet pass.
+
 ## Quickstart
 
 Five minutes from zero to your first gated session.
@@ -25,7 +36,7 @@ Five minutes from zero to your first gated session.
 
 **On OpenCode:**
 
-Requires OpenCode `v2.x` (live-verified on `v2.0.26` and `v2.2.0`).
+Requires OpenCode `v2.x` (live-verified on `v2.0.26` and `v2.2.0`). V1 agent frontmatter and the V1 plugin API are deprecated upstream and unsupported — agent names come from filenames.
 
 ```bash
 opencode plugin add opencode-dev-framework
@@ -36,11 +47,13 @@ Or declare it in `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-dev-framework"]
+  "plugins": ["opencode-dev-framework"]
 }
 ```
 
 **On DSH:**
+
+Requires DSH `0.2.2-rc.3` or newer (live-verified on `0.2.2-rc.5`).
 
 ```bash
 dsh plugin --profile <name> add opencode-dev-framework
@@ -69,14 +82,14 @@ scripted runs (add `--dsh` on DSH so the host-visible skill mirror is
 scaffolded too):
 
 ```bash
-npx df init [--dsh]
+npx opencode-dev-framework init [--dsh]
 ```
 
 Conflicts need `--overwrite-existing` or `--skip-existing` — everything
-else is under `npx df --help`.
+else is under `npx opencode-dev-framework --help`.
 
 On DSH, run `dsh` from the project root (or export `ODF_WORKDIR`), and
-accept template drift via `df-update` if the session reports any.
+accept template drift via `/df-update` if the session reports any.
 
 Then ask the agent for a small edit. You will see the plugin working: the
 edit is checked against guardrails before it lands, your linter runs on the
@@ -112,7 +125,7 @@ differ. Neither harness is the "real" one; each is stronger somewhere:
 | Redirect targets (`a > file`) | Not guard-checked | **Guard-checked** (wider than OpenCode) |
 | denial identity | Reason text | Reason text + structured `{name, code}` |
 | Skills | `.opencode/skills` (native) | `.dsh/skills` (installed by `df-init`, kept current by `df-update`) |
-| Reviewer agents | `.opencode/agents` specialists run as subagents | **Adapter-dispatched DSH children on review-blocks** (one per kind; read-only preset where the registry exists; findings fold into the steer; customize via `.dev-framework/agents/`); inline steer when the seam is absent |
+| Reviewer agents | `.opencode/agents` specialists run as subagents (least-privilege `permissions` frontmatter: no edits, no shell except test-grounder) | **Adapter-dispatched DSH children on review-blocks** (one per kind; read-only preset where the registry exists; findings fold into the steer; customize via `.dev-framework/agents/`); inline steer when the seam is absent |
 | Goals | `/df-goal` wraps native `/goal` | `df-goal` creates the host goal with the same verification contract |
 | Install | One command (`opencode plugin add`) | `dsh plugin add` + `df install-dsh` (bundle auto-wires the base entry) |
 | Review UI | Instant TUI modals, never feed the LLM | Host commands returning text |
@@ -136,11 +149,14 @@ semantics, block budgeting, `protect_off` scope, and all eight
   at session start (bundled default, overridable per project).
 - **Guardrails.** Blocks or warns on protected paths (`.env`, vendored
   code, your own globs) and dangerous shell commands (`git push`, `rm -rf`).
+  Secrets are blocked at the write, never scrubbed from sight —
+  [secret handling](docs/user/enforcement.md#secrets) recommends gitleaks
+  at the commit boundary.
 - **Per-edit lint.** Runs your linter on each edited file. On OpenCode
   the result is logged against the landed edit; on DSH a finding fails
   the tool call so the agent retries clean in the same turn.
 - **Completion gate.** At the would-go-idle boundary, runs typecheck, tests,
-  acceptance checks, and (optionally) lint on changed files — plus a required
+  acceptance checks, and (in `strict`, lint on changed files) — plus a required
   substantive peer-review artifact in `standard`/`strict` (length floors, no
   template checkboxes, written after the latest session edit). On OpenCode, failures steer the session back via a
   synthetic continuation, bounded by `gate.max_blocks` (fewer when
@@ -182,6 +198,10 @@ synthetic continuation); on DSH the same verdict bites earlier — the
 pre-terminal completion block, same-turn lint `block`s, and dispatched
 reviewers above all run inside the turn instead of round-tripping through it:
 
+![Enforcement flow: implement, guardrails, lint, gate, wrapped by verified goals](https://raw.githubusercontent.com/jwitmann/opencode-dev-framework/HEAD/docs/assets/flow.svg)
+
+Text version of the same diagram (identical content, for text-mode readers):
+
 ```text
                         user prompt
                   (plain or /df-goal plan)
@@ -220,8 +240,10 @@ wrappers (dotted lines in the diagram version):
   native /goal ── wraps the loop, drives turns ──> agent implements
 ```
 
-The diagram version of this flow (rendered on GitHub) lives in
-[`docs/user/enforcement.md`](docs/user/enforcement.md#flow) — update both
+Flow source lives in [`docs/user/enforcement.md`](docs/user/enforcement.md#flow)
+as mermaid; `docs/assets/flow.svg` is rendered from it
+(`npx @mermaid-js/mermaid-cli -i <mermaid> -o docs/assets/flow.svg`) and
+embedded above by absolute URL so it renders on npm too — update all three
 together.
 
 ## Profiles
@@ -266,8 +288,12 @@ of modals. Full reference:
   from the bounded completion mechanisms below.
 - A cached pass never survives a restart — after a restart the gate
   always re-verifies the final tree from scratch.
-- Formatting and linting stay with your project tooling — the framework
-  does not reimplement them.
+- Formatting and linting use your project tooling — the framework never
+  reimplements them. On OpenCode the host runs the formatter; on DSH the
+  adapter runs your configured formatter command before linting. Want
+  formatting on OpenCode? Configure the host `formatter` in
+  `opencode.json` ([docs](https://opencode.ai/docs/formatters/)) — the
+  plugin defers to it and never runs its own.
 
 ### OpenCode
 

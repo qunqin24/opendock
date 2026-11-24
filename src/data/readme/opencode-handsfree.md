@@ -121,15 +121,13 @@ With `autoSend` off, the transcript is inserted into the composer for review. Wi
 
 ## Settings > Voice
 
-The page has three tabs.
+The page has three tabs and also sets the defaults for the per-chat switches.
+
+Manual API keys are encrypted at rest with the operating system keychain (`safeStorage`, DPAPI on Windows) and are never written to `opencode.json` or the logs. If the keychain is unavailable the key is stored as plain text and a warning is written to the log.
+
+### Input
 
 ![Input settings](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-input.png)
-
-![Output settings](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-output.png)
-
-![Experimental settings](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-experimental.png)
-
-**Input**
 
 - Engine: `Local` or `Cloud`.
 - Microphone: any input device or the system default.
@@ -137,7 +135,11 @@ The page has three tabs.
 - Models load only after the provider or URL/key is set. Changing the provider clears the selected model. The picker is a searchable dialog that lists every model (audio models first); if the provider returns models you must pick one, and the text field is only a fallback when none load.
 - Local engine: path or command of the speech-to-text binary, model file and language.
 
-**Output**
+* * *
+
+### Output
+
+![Output settings](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-output.png)
 
 - Engine: `Local` or `Cloud`.
 - Output device: any sink or the system default.
@@ -145,15 +147,15 @@ The page has three tabs.
 - Local: the system voice must be enabled explicitly before replies can be read; voices are listed from the OS and the rate is adjustable.
 - **Test** plays a short sample with the current output settings.
 
-**Experimental**
+* * *
+
+### Experimental
+
+![Experimental settings](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-experimental.png)
 
 - Start new chats in conversation mode.
 - Silence after speech that closes a turn (1200 ms by default).
 - Close the microphone while the window is not focused.
-
-The page also sets the defaults for the per-chat switches.
-
-Manual API keys are encrypted at rest with the operating system keychain (`safeStorage`, DPAPI on Windows) and are never written to `opencode.json` or the logs. If the keychain is unavailable the key is stored as plain text and a warning is written to the log.
 
 ## Development
 

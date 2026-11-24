@@ -155,6 +155,12 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   publica el upstream (32k por defecto, hasta 131k). No se fuerza temperatura ni
   `top_p`: la petición real no los incluye, así que el gateway aplica su propio
   valor. El prompt se envía con rol `system`, no `developer`.
+- **Sin razonamiento reenviado**: OpenCode guarda el pensamiento del modelo en
+  los mensajes del asistente y lo devuelve dentro de `reasoning_content`. La
+  captura con `curl_cffi` mostró que el gateway lo cobra como entrada (mismo
+  prompt y misma respuesta pasaron de 27 a 188 tokens en `glm-5.3-flash`), así
+  que el plugin lo quita antes de enviar. No cambia la respuesta: el modelo ya
+  razonó en su turno y el historial conserva el texto visible.
 - **Límites medidos, no inventados**: `/client-version` solo devuelve id,
   nombre, `free`, `section`, `note`, `stats_id` y `usage_x`; no hay endpoint de
   capacidades ni de ventana. El plugin no se queda en constantes: confirma la
@@ -168,6 +174,10 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   omitir: leer antes de editar, ejecutar las comprobaciones de verdad, no
   afirmar que algo pasó si no se ejecutó, reutilizar las decisiones y rutas ya
   establecidas en la conversación y no fingir que se compactó el contexto.
+  Además, cuando una herramienta falla por un motivo que el modelo repite (un
+  heredoc rechazado por el scanner del shell, un `edit` con cadenas idénticas o
+  con un `oldString` ambiguo), el error que recibe añade el siguiente paso
+  concreto en lugar de dejar solo el mensaje técnico.
 - **Compactación con instrucciones**: el resumen de compactación recibe además
   un bloque que le pide conservar requisitos sin resolver, decisiones y sus
   motivos, rutas y símbolos exactos, comandos con su resultado, errores y
@@ -182,7 +192,12 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   free-pi. El CLI nunca los hace y cada ping gastaría créditos y anuncios.
 - **Timeouts del CLI**: 5 minutos para las cabeceras y para cada trozo de la
   respuesta, los mismos valores que `httpIdleTimeoutMs` de pi.
-- Anuncios e impresiones asociados al turno correcto.
+- Anuncios e impresiones asociados al turno correcto. El contexto del anuncio se
+  construye solo con el último mensaje real del usuario: se ignoran el
+  recordatorio del plugin y los mensajes sintéticos que OpenCode inserta en el
+  mismo turno (resultado de un subagente, salida de un shell en segundo plano,
+  AGENTS.md, reinicio del servidor o respuesta interrumpida), que antes
+  rotaban el anuncio a mitad de turno y enviaban ids internos como contexto.
 - Cada agente y subagente usa su propio `x-session-id`, `x-turn-id` y contexto
   de anuncios; nunca reutiliza los del agente principal.
 - **Cierre de sesión**: free-pi limita la cuenta a 4 sesiones simultáneas. El
@@ -208,7 +223,30 @@ Después de iniciar sesión, ejecuta `/reload` en OpenCode o reinícialo.
   petición se reintenta una vez de inmediato y, si aun así falla, el plugin
   vuelve a pedir el catálogo en segundo plano (2 s, 5 s, 10 s, 20 s, 30 s y 60 s)
   y, en cuanto lo obtiene, registra los modelos y recarga proveedor y modelo en
-  caliente. No hace falta reiniciar OpenCode ni elegir otra carpeta.
+  caliente. Si la caída dura más que esa ráfaga, sigue reintentando cada 60 s
+  mientras no haya ningún modelo registrado, así que un arranque sin red (VPN
+  caída, DPI bloqueando el gateway) se recupera solo cuando vuelve la conexión.
+  No hace falta reiniciar OpenCode ni elegir otra carpeta.
+- **Proxy de VPN o red corporativa**: el CLI oficial de free-pi lee `HTTPS_PROXY`,
+  `HTTP_PROXY` y `ALL_PROXY` (en mayúsculas o minúsculas), pero `fetch` de Node
+  los ignora salvo que se active. Por eso, si el entorno define un proxy, el
+  plugin lo activa al arrancar con `http.setGlobalProxyFromEnv()`: el catálogo,
+  la cuota, los anuncios, la visión, los reintentos y las peticiones al gateway
+  pasan por el proxy en vez de salir directos y fallar con `ETIMEDOUT`. `ALL_PROXY`
+  se copia a `HTTPS_PROXY`/`HTTP_PROXY` porque Node solo lee esos dos. Sin
+  variables de proxy no cambia nada. `setGlobalProxyFromEnv()` existe desde Node
+  24.5; en un Node anterior el plugin escribe en el log que hay que arrancar
+  OpenCode con `NODE_USE_ENV_PROXY=1` (o actualizar Node), porque esa versión
+  ignora el proxy en `fetch` aunque se defina el resto. Un proxy SOCKS no se
+  puede usar con esta API y también se avisa. En Node 26 la
+  verificación fue real: con `HTTPS_PROXY` apuntando a un proxy local, las
+  conexiones a `api.freepi.ai`, `models.opencode.ai` y `registry.npmjs.org`
+  aparecieron en el proxy y una sesión completa respondió correctamente.
+  `fetch` solo admite el proxy de forma global en el proceso, así que la
+  activación equivale a arrancar con `NODE_USE_ENV_PROXY=1`: cualquier cliente
+  del proceso que respete el proxy global lo usará, y los demás proveedores del
+  mismo OpenCode también dejan de fallar detrás de una red que solo permite
+  proxy.
 - **Aislamiento por proveedor**: todo lo que añade el plugin —herramientas,
   cabeceras, anuncios, reglas de prompt, compactación, reintentos, topes de
   tokens y ajustes— se aplica solo a `free-pi` y `free-pi-defense`. Los demás
@@ -424,6 +462,9 @@ puede completarse el hook de reintento rota el id para los siguientes pasos. Un
 turno que se aborta o falla a mitad de stream marca su `x-session-id` como sucio:
 la siguiente petición arranca directamente con un id nuevo y libera el anterior,
 de modo que la sesión continúa sin interrupciones y sin pasar por un reintento.
+Una compactación también deja el id marcado: el resumen y el turno siguiente se
+solapan en el gateway y ese solape producía un 429 `concurrent` y un replay en
+cada compactación, así que el turno posterior ya sale con un id nuevo.
 
 Los fallos de transporte (`ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, DNS
 temporal, `socket hang up`) no son límites de cuenta: el plugin los reintenta con

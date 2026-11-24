@@ -28,13 +28,17 @@ Small TUI plugin built on the official [`@opencode/plugin/tui`](https://opencode
 | Where | What |
 | --- | --- |
 | Prompt footer (`prompt.footer.status`) | current-turn elapsed time, `⏱ MM:SS` (or `⏱ H:MM:SS`). Starts when the first assistant step begins after the last user input and freezes when the turn completes. If that step is outside the loaded message window, it falls back to the last user input time. |
-| Sidebar (`sidebar.content`) | `Session` block styled like the built-in `Context`/`MCP` blocks (session start, request/step counters), plus a `Last answer` section: last user input, model thought phases (count ×N and total duration), last model reply, and top tool counts. Rows are laid out in a fixed order with the timestamp/payload right-aligned; they refresh on data events. Historical values are backfilled from the API when they are outside the loaded window. |
+| Sidebar (`sidebar.content`) | `Session` block styled like the built-in `Context`/`MCP` blocks (session start, request/step counters), plus a `Last answer` section: last user input, model thought phases (count ×N and total duration), last model reply, and top tool counts. Rows are laid out in a fixed order with the timestamp/payload right-aligned; they refresh on data events. Historical values are backfilled from the API when they are outside the loaded window. **Click any timestamp row to flip the whole block between absolute clock time and relative `x ago` ages; click again to switch back** (the choice persists). |
 | `/time` command (palette popup) | assistant turn timeline as a searchable popup, newest first: time, agent, model, duration, reply preview. **Enter** opens a per-turn details card (timing, tokens, cost, finish reason); **Esc** returns to the list, **Esc** again closes. |
 
-The sidebar block updates on data events: timestamps and durations re-render whenever
-the data behind them changes. There is no per-second "x ago" countdown — timestamps are
-absolute times. The prompt-footer timer is a turn stopwatch, not a wall clock; it shows
-`00:00` while waiting for the first assistant step and `—` when there is no turn.
+The sidebar block updates on data events (and once per second): timestamps and durations
+re-render whenever the data behind them changes. By default the timestamps are absolute
+clock times; clicking any timestamp row (`Started`, `User`, `Thought`, `Reply`) switches
+the block to relative ages — fine-grained below one hour so it ticks every second:
+`45s ago` · `40m34s ago` · `3h12m ago` · `5d ago` · `2mo ago` — and clicking again
+switches back — the mode is stored in durable storage, so it survives restarts. The
+prompt-footer timer is a turn stopwatch, not a wall clock; it shows `00:00` while waiting
+for the first assistant step and `—` when there is no turn.
 
 Per-session anchors are persisted in durable storage, so a TUI restart restores the
 last input, thought, and reply immediately; the API backfill covers new sessions and

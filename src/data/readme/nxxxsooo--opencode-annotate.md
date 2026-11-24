@@ -114,6 +114,14 @@ Numbered `/annotate N`, `/annotate-last` and `/annotate-web` are retired. Use `/
 
 ## Herdr
 
+Bind **prefix, then `a`** (`Ctrl+B`, then `a` by default) to
+`annotate.review` using the [manifest and keybinding setup](tui/README.md#herdr).
+In AGY this opens a floating Markdown reviewer without starting a model turn.
+Send starts a turn if AGY is idle or done, or queues feedback if it is working.
+Quit sends nothing. Claude, Codex, Pi, and OpenCode use the existing `herdr last`
+route. With the AGY hooks installed, `/annotate` can open the same popup before
+the model runs; the skill remains available as a fallback.
+
 Run the bundled `annotate-tui` directly from a Herdr pane. Herdr needs an enabled
 `annotate` plugin with a `doc` pane entrypoint; see the [TUI setup](tui/README.md#herdr).
 OpenCode's `/annotate` keeps its own session delivery, even when OpenCode runs in Herdr.
@@ -151,11 +159,25 @@ documents and webpages.
 
 ## Antigravity (AGY) support
 
-`opencode-annotate` provides companion support for Google Antigravity CLI (`agy`) via `agy-annotate`:
+In a configured Herdr AGY pane, `/annotate` opens a native overlay before the
+model runs. `prefix+a` opens the latest reply, and `/annotate <local-document>`
+can review a file. Outside Herdr on macOS, the skill opens Ghostty or Terminal
+for text reviews. URL and HTML targets use the browser companion.
 
-- **Slash command `/annotate`**: Built-in AGY skill at `agy/skills/annotate/` handles text and explicit URL/HTML review within active AGY sessions.
-- **Interactive TUI**: Uses the same bundled reviewer as OpenCode, with Dracula theme inheritance and one-key send.
-- **Native Delivery**: Hooks into AGY lifecycle (`SessionStart`, `PreInvocation`, `Stop`) to deliver feedback directly into the conversation turn without network listeners.
+Set up AGY manually from one installed package (`npm install -g @nxxxsooo/opencode-annotate`;
+find the package under `npm root -g`) or a checkout with `npm run build:tui`:
+
+1. Link the package's `agy/skills/annotate` directory as `~/.agents/skills/annotate`.
+2. Merge the `agy-annotate` entries from `agy/hooks.json` into
+   `~/.gemini/config/hooks.json`, replacing `./hooks.mjs` in all three commands
+   with the absolute path to `agy/hooks.mjs` from that installation.
+3. For Herdr, follow the [manifest and keybinding setup](tui/README.md#herdr)
+   using the CLI and native reviewer from the same installation.
+
+**Send** (`Ctrl+S` or the Send button) returns feedback to the captured AGY
+conversation. In Herdr it starts a turn if AGY is idle or done, or queues
+feedback for its lifecycle hooks if AGY is working. `q` and `Ctrl+C` do not send.
+
 - **CLI Commands**:
   ```sh
   npx --package @nxxxsooo/opencode-annotate@latest agy-annotate status

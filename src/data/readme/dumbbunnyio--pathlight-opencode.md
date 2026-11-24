@@ -21,7 +21,7 @@ Only open trusted LikeC4 workspaces. LikeC4 can load executable JavaScript or Ty
 
 ## Install
 
-Install the `pathlight` command (needs tmux; verified on Linux x64, and the macOS builds the release publishes have not been tried), with npm or the install script:
+Install the `pathlight` command (tmux puts the viewer beside the conversation; without it the map opens in a browser window; verified on Linux x64, and the macOS builds the release publishes have not been tried), with npm or the install script:
 
 ```sh
 npm i -g @dumbbunnyio/pathlight     # npm i -g pathlight installs the same
@@ -88,14 +88,14 @@ To reopen the viewer yourself, with no agent involved:
 
 | Where you are | Command | Result | Inference |
 | --- | --- | --- | --- |
-| A shell prompt in a tmux pane | `pathlight open [VIEW]` | That pane becomes the viewer | none |
-| Inside Claude Code | `/pathlight:open [tmux\|pane] [VIEW]` | A viewer pane is split beside the conversation, bound to it; with `pane`, or a saved `pane` choice, Pathlight is drawn in Claude Code's own pane instead, which is experimental ([Inside Claude Code](#inside-claude-code)) | none (the plugin answers the command itself, so the model is never called) |
-| Inside OpenCode | `/pathlight-open [VIEW]` | A viewer pane is split beside the conversation | none (the CLI plugin handles it) |
-| Inside Claude Code or OpenCode | `! pathlight open [VIEW]` | The same split | none (a shell escape) |
+| A shell prompt (in tmux or not) | `pathlight open [VIEW]` | That terminal becomes the viewer | none |
+| Inside Claude Code | `/pathlight:open [tmux\|pane] [VIEW]` | A viewer pane is split beside the conversation, bound to it (outside tmux, the map opens in a browser window); with `pane`, or a saved `pane` choice, Pathlight is drawn in Claude Code's own pane instead, which is experimental ([Inside Claude Code](#inside-claude-code)) | none (the plugin answers the command itself, so the model is never called) |
+| Inside OpenCode | `/pathlight-open [VIEW]` | A viewer pane is split beside the conversation; outside tmux, the map opens in a browser window | none (the CLI plugin handles it) |
+| Inside Claude Code or OpenCode | `! pathlight open [VIEW]` | The same split; outside tmux, the browser window | none (a shell escape) |
 
 `open` follows the most recent recorded session and shows `VIEW`, else the view named `index`, else the first view. Typed at a prompt it takes over that pane; run by an agent (anything between the pane's shell and the command) it splits beside it. `--here` always uses the current terminal and `--split` always splits. Without a `.pathlight/pathlight.activity.json` it still opens, but cannot follow an agent. The hook needs the Claude plugin; `/pathlight:open` is not installed by `pathlight init`.
 
-Then, in tmux, run `/pathlight:map` in Claude Code (or `/pathlight:map VIEW_ID`). The viewer opens beside the conversation and
+Then run `/pathlight:map` in Claude Code (or `/pathlight:map VIEW_ID`). The viewer opens beside the conversation and
 follows the most recently active recorded session with `--follow`, so you need no pane or session IDs. You can also run it yourself:
 
 ```sh
@@ -172,7 +172,7 @@ It never rewrites a LikeC4 model you wrote: if the workspace has one, use `--out
 
 ## Inside Claude Code
 
-With the Claude plugin installed, `/pathlight:open [VIEW]` splits a tmux viewer beside the conversation, bound to it, as `pathlight show` does (it needs tmux, as `pathlight show` and OpenCode do). The plugin answers the command itself, so the model is never called.
+With the Claude plugin installed, `/pathlight:open [VIEW]` splits a tmux viewer beside the conversation, bound to it, as `pathlight show` does (outside tmux there is no pane to split, so it opens the map in a [browser window](#outside-tmux) instead, as `pathlight show` and OpenCode's `/pathlight-open` do). The plugin answers the command itself, so the model is never called.
 
 **Experimental: the viewer in Claude Code's own pane.** Claude Code 2.1.287 or later can draw Pathlight in a pane of its own, with no tmux: `/pathlight:open pane [VIEW]` does it for one command, and `pathlight config set claude pane` makes it your default, saved as `"claude": "pane"` in Pathlight's own settings file, `~/.config/pathlight/config.json` beside the theme (nothing about any workspace is kept there; `pathlight config set claude tmux` puts the tmux pane back, `pathlight config get claude` prints the choice, and the word in the command, `pane` or `tmux`, wins over the file). It is off by default because Claude Code gives a docked pane at most 45% of the terminal's width and offers no way to resize or place it, which is not an effective viewport for a diagram; the work is kept for when that changes. With the pane chosen, where it goes is Claude Code's layout (`/tui` switches it):
 
@@ -204,6 +204,8 @@ What the browser has today: the map, selection, the inspector, the views list, B
 `pathlight see VIEW --workspace . --cols 120 --rows 36` prints what the viewer would show, as text. It runs the viewer in a private tmux server at that size, so it never touches your panes, and it prints once the picture has stopped changing. `--select ELEMENT` opens with that element selected (`pathlight view` takes it too), and `--keys Tab,i` sends tmux key names first; `--ansi` keeps the colors. An agent cannot look at the viewer, so this is how it checks the diagram it just wrote; the tests keep screens at several sizes as snapshots (`tests/golden/`).
 
 ## Outside tmux
+
+Nothing needs tmux. Where there is no pane to split (a plain terminal, an editor's terminal), `/pathlight:open` in Claude Code, `/pathlight-open` in OpenCode and the agent's own `pathlight show` or `pathlight open` open the map in the browser window, following the same conversation, and `pathlight open` typed at a shell prompt draws the viewer in that terminal. `/pathlight:open tmux` and `pathlight open --split` ask for the pane by name and say so when there is none.
 
 Use `--pane %ID` to choose the parent pane explicitly (run `tmux display-message -p '#{pane_id}'` in it), and `--socket PATH` for a non-default tmux server.
 Use `--project NAME` when multiple projects have the same view ID.

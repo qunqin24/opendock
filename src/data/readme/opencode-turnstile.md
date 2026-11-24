@@ -136,7 +136,7 @@ hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 | Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                     |
 | Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` blocks; a repeat attempt forces the interactive human ask                                                                                                                                                      |
 | Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                     |
-| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors                                                                                                                                                                                           |
+| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors, per-session token/cost usage                                                                                                                                                             |
 | Journal concurrency    | Concurrent OpenCode instances share one journal safely: chained appends and the approval sidecar write under a per-file lock with an in-lock re-read; lock contention degrades to an unlocked write with a journaled `journal-lock:` warning, never blocking enforcement |
 | Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                              |
 | Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                                                                                                         |
@@ -221,6 +221,9 @@ When both markers appear in one prompt, the later one wins. Config:
 `suspendMarker` / `resumeMarker` rename the literals, and
 `allowSuspend: false` disables both. Inspect the live state with
 `node bin/cli.mjs status` (in-repo) or `npx opencode-turnstile status`.
+When the journal has token-usage rows, `status` appends a per-task token/cost
+rollup with a total line (`--json` carries it in a `tokenUsage` key); `log`
+renders each `token-usage` row and a totals line.
 
 ### `opencode-turnstile log`
 
@@ -331,24 +334,25 @@ exception: the example writes `agents.bareOutput: []` because JSON cannot
 express the "unset" sentinel; the loader re-derives the list either way.)
 The knobs most people touch:
 
-| Key                          | Default                | Meaning                                                                                                           |
-| ---------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `alwaysEnforce`              | `false`                | dormant-until-engaged; `true` restores always-armed from the first prompt                                         |
-| `gateEvidence`               | `enforce`              | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                             |
-| `escalation`                 | `block`                | repeat-attempt escalation mode; the plan-gate escalation is mode-gated (`block` blocks, `ask` prompts)            |
-| `gitGates.commitMessages`    | `true`                 | validate `git commit -m` subjects as conventional commits                                                         |
-| `gitGates.landingGate`       | `true`                 | gate `git push` on a credited reviewer `VERDICT: APPROVE`                                                         |
-| `reviewEnsemble`             | `enforce`              | `advise` credits a single-reviewer APPROVE unconditionally                                                        |
-| `planUserReview`             | `false`                | pause the pipeline after the planner until you accept or reject; see [User plan review](#user-plan-review-opt-in) |
-| `requirementsPhase`          | `false`                | dispatch the requirements subagent before the planner; see [Requirements phase](#requirements-phase-opt-in)       |
-| `sessionSummary`             | `quiet`                | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables)     |
-| `toolPolicy.bashDeny`        | `[]`                   | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops)                                                |
-| `toolPolicy.bashWriteGate`   | `true`                 | gate confident file-writing bash commands through the hands-on ladder                                             |
-| `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 2 / 16 | per-leg (incl. requirements) and total dispatch caps per task                                                     |
-| `agents.*`                   | stage names            | rename recognition when you bring your own agents                                                                 |
-| `plansDir`                   | `.opencode/plans`      | where the decomposition scan looks                                                                                |
-| `decisionLedger.enabled`     | `true`                 | observe-only decision ledger (`opencode-turnstile prov`)                                                          |
-| `tamperEvidence.enabled`     | `false`                | per-record SHA-256 hash chain over every journal row + Merkle epoch commits                                       |
+| Key                          | Default                | Meaning                                                                                                                                                            |
+| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `alwaysEnforce`              | `false`                | dormant-until-engaged; `true` restores always-armed from the first prompt                                                                                          |
+| `gateEvidence`               | `enforce`              | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                              |
+| `escalation`                 | `block`                | repeat-attempt escalation mode; the plan-gate escalation is mode-gated (`block` blocks, `ask` prompts)                                                             |
+| `gitGates.commitMessages`    | `true`                 | validate `git commit -m` subjects as conventional commits                                                                                                          |
+| `gitGates.landingGate`       | `true`                 | gate `git push` on a credited reviewer `VERDICT: APPROVE`                                                                                                          |
+| `reviewEnsemble`             | `enforce`              | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                         |
+| `planUserReview`             | `false`                | pause the pipeline after the planner until you accept or reject; see [User plan review](#user-plan-review-opt-in)                                                  |
+| `requirementsPhase`          | `false`                | dispatch the requirements subagent before the planner; see [Requirements phase](#requirements-phase-opt-in)                                                        |
+| `sessionSummary`             | `quiet`                | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables)                                                      |
+| `tokenUsage`                 | `summary`              | token-usage journaling: `summary` journals one rollup row per session at session.idle; `per-message` journals one row per completed assistant turn; `off` disables |
+| `toolPolicy.bashDeny`        | `[]`                   | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops)                                                                                                 |
+| `toolPolicy.bashWriteGate`   | `true`                 | gate confident file-writing bash commands through the hands-on ladder                                                                                              |
+| `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 2 / 16 | per-leg (incl. requirements) and total dispatch caps per task                                                                                                      |
+| `agents.*`                   | stage names            | rename recognition when you bring your own agents                                                                                                                  |
+| `plansDir`                   | `.opencode/plans`      | where the decomposition scan looks                                                                                                                                 |
+| `decisionLedger.enabled`     | `true`                 | observe-only decision ledger (`opencode-turnstile prov`)                                                                                                           |
+| `tamperEvidence.enabled`     | `false`                | per-record SHA-256 hash chain over every journal row + Merkle epoch commits                                                                                        |
 
 Invalid keys are ignored, journaled, and summarized once into the session
 context; a malformed config file never breaks the host. The full table —

@@ -36,6 +36,7 @@ plugins/opencode-teamwork/tools.ts           # engine tools + hooks (V2 API)
 plugins/opencode-teamwork/document-review.ts # Document Review route classifier, PDF/MD ingestion, RSA bounds
 plugins/opencode-teamwork/lemma.ts           # LEMMA (Lean 4) probe, classifier, verifier
 plugins/opencode-teamwork/tournament.ts      # bounded massive-proof tournament & opt-in router
+plugins/opencode-teamwork/safe-fs.mjs        # shared bounded read + pinned/detective write containment (ADR 0004/0010/0013)
 agents/team/*.md                  # 15 team agents (markdown, V2 frontmatter)
 docs/ARTIFACTS.md                 # canonical artifact layout, topologies, schemas
 lib/team.mjs                      # installer core (config dir, model map, agent files)
@@ -44,10 +45,12 @@ lib/runs.mjs                      # run inspection, DAG visualization, worktree 
 lib/doctor.mjs                    # environment diagnostic health checks
 lib/timeline.mjs                  # chronological run lifecycle builder & renderer
 lib/export.mjs                    # read-only run report builder (HTML / Markdown export)
-bin/opencode-teamwork.mjs         # CLI: init / models / install / status / doctor / runs / inspect / timeline / export / prune
+lib/approve.mjs                   # authenticated prompt-approval producer/verifier (`approve …`)
+bin/opencode-teamwork.mjs         # CLI: init / models / install / status / doctor / runs / inspect / timeline / export / prune / approve
 scripts/lint-prompts.mjs          # prompt linter (run in CI)
 scripts/test-cost.mjs             # session tree consumption tests
 scripts/test-engine.mjs           # DAG engine, security gate & worktree tests
+scripts/test-approval.mjs         # authenticated prompt-approval parity (print + TUI)
 scripts/test-doctor.mjs           # hermetic environment & CLI doctor tests
 scripts/test-timeline.mjs         # timeline hermetic unit tests
 postinstall.mjs                   # asks for models during npm install
@@ -71,8 +74,9 @@ tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission
 | `teamwork_resume` | tasks still open, for a restart |
 | `teamwork_cost` | read real budget spend across OpenCode session tree (sentinel + workers + verifiers); snapshot updates are digest-idempotent |
 | `teamwork_pitfall` | append to the pitfall registry (dynamically injected into workers) |
-| `teamwork_next` | evaluates DAG dependencies, lifecycle states, and ready tasks; atomically leases each ready task (15 min) so concurrent resumes cannot dispatch duplicates; strict runs stop at `NEEDS_STRICT_WAVE` until both wave verdicts exist |
-| `teamwork_task_update` | deterministic task state machine transitions (`pending` → `worker_active` → `worker_done` → `verifier_active` → `verified_pass` / `verified_fail` / `blocked`); `worker_active` needs a live `teamwork_next` claim (recorded Sentinel override) |
+| `teamwork_next` | evaluates DAG dependencies, lifecycle states, and ready tasks; atomically leases each ready task (5 min + 5 min grace on claim protocol 2) with a monotonic fence so concurrent resumes cannot dispatch duplicates; a stale claim is reclaimed only when the side-effect fingerprint is unchanged, otherwise `needs-inspection`; strict runs stop at `NEEDS_STRICT_WAVE` until both wave verdicts exist |
+| `teamwork_task_update` | deterministic task state machine transitions (`pending` → `worker_active` → `worker_done` → `verifier_active` → `verified_pass` / `verified_fail` / `blocked`); every protocol-2 transition enforces the claim fence/ownership (`STALE_FENCE`, `CLAIM_OWNED_BY_OTHER`, `CLAIM_EXPIRED`), a reasoned Sentinel override is recorded, and terminal states release the claim |
+| `teamwork_recover` | explicit crash recovery for a claim: `heartbeat`, `inspect` (single-use hashed 10-minute token), `release`, `block`, `requeue`, `adopt` (clean committed branch → `worker_done`, no new commit), `discard` (force+confirm); never auto-commits |
 | `teamwork_handoff` | trusted five-section handoff writer (`handoffs/<taskId\|_run>-<role>.md` + bounded `handoffs/index.json`); continuity evidence required by `final_verify`/`next` when `requireHandoffs: "required"`, never a gate verdict |
 | `teamwork_report` | trusted writer for a signed `verify/report-<taskId>.json`: caller must be `team/verifier`, descend from the run root, and name an existing task; a `PASS` needs a summary or check |
 | `teamwork_security_audit` | mandatory pre-merge security gate (`verify/security-audit.json`; signed on a signed run) |
@@ -83,7 +87,7 @@ tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission
 | `teamwork_lemma_formalize` | LEMMA Phase 0 `problem_draft.lean` / `review_pre` → `problem.lean` and `review_final` faithfulness gate |
 | `teamwork_lemma_node` | bounded lemma decomposition tree (`create`, `update`, `blueprint`, `attempt`) |
 | `teamwork_lemma_verify` | execute real `lean`/`lake` verification with `sorry`/admit/axiom rejection, stamping `verify-<r>.json` |
-| `teamwork_worktree` | out-of-repo git worktree provisioning, diff, merge, resolve & cleanup |
+| `teamwork_worktree` | out-of-repo git worktree provisioning, diff, merge, resolve & cleanup; `setup` records the claim baseline and renews it, `diff` returns HEAD/baseSha/diffHash, `merge` refuses `BRANCH_MOVED`, `cleanup` refuses a live claim, and a foreign run host refuses destructive actions unless explicitly allowed |
 
 **Tool authorization.** Plugin tools are not mediated by the permission hook,
 so every run-mutating `teamwork_*` tool checks the caller itself
@@ -141,7 +145,7 @@ topologies, and the JSON schemas (`spec.json`, `plan.dag.json`, `state.json`,
 
 - `verified_pass` requires a legal lifecycle transition and PASS evidence (an inline PASS verdict or a `PASS` per-task report).
 - A plan writes a signed `run.manifest.json` (the default). Verifier reports, security audit, strict-wave verdicts, victory verdict, and final verdict carry an `_auth` envelope and a `ctx.storage` digest-index entry. `final_verify`/`next` fail as `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_UNKNOWN_KEY`, `AUTH_INDEX_MISSING`, or `AUTH_STALE` when an artifact is forged, copied, edited, or the signed plan/requirements/policy baseline drifts. See [`docs/adr/0005-artifact-authenticity.md`](docs/adr/0005-artifact-authenticity.md).
-- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). See [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
+- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). `human-approved`/`ci-attested` require an Ed25519 approval from `OPENCODE_TEAMWORK_APPROVAL_DIR`, signed by a key distinct from the run key and bound to the **exact bytes of `prompt_draft.md`** plus the run id and a one-use nonce (0.11.0; manifest version 3). The plan verifies it before any `mkdir`, `final_verify` re-hashes the draft, and a re-plan cannot change the binding. The plugin/command signer refuses `approvals/` paths (`AUTH_APPROVAL_SCOPE`). See [`docs/adr/0011-authenticated-prompt-approval.md`](docs/adr/0011-authenticated-prompt-approval.md), [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
 - A run completes only with a `PASS` `verify/final.json` stamped by `teamwork_final_verify`; an unstamped report needs the recorded `allowUnstamped` bypass. An unsigned legacy run returns `AUTH_LEGACY` until the recorded `allowUnsignedLegacy` bypass is passed at the completion gate; `benchmark` refuses that bypass, `victoryAudit: "skip"`, and `requireHandoffs: "skip"`.
 - `teamwork_victory_audit`, `teamwork_wave_record`, and `teamwork_report` require the caller session to descend from the plan-time `rootSessionId`, so a top-level `opencode run --agent team/victory-auditor` cannot self-authorize.
 - That PASS also needs a `verify/victory.json` from the independent `team/victory-auditor` reporting `VICTORY CONFIRMED` for every requirement and the current `ORIGINAL_REQUEST.md` hash, unless the plan explicitly recorded `victoryAudit: "skip"` with a non-empty `victorySkipReason` (then `final_verify` records `victory: "SKIPPED (explicit): <reason>"`). A skip without a reason is refused; the legacy no-baseline default is labelled `SKIPPED (legacy default: no requirements baseline)`.
@@ -149,7 +153,8 @@ topologies, and the JSON schemas (`spec.json`, `plan.dag.json`, `state.json`,
 - Opt-in `verification: "strict"` adds exactly one `team/falsifier` challenge (`PASS`) and one `team/security-auditor` audit (`CLEAN`) per task after its verifier report. Missing, stale, or non-PASS/CLEAN verdicts block `teamwork_next` (`NEEDS_STRICT_WAVE`) and `teamwork_final_verify`; a strict PASS writes `GATE_STATUS.md` with worker/verifier/challenger/auditor rows and a `## Continuity` handoff table. The default `standard` mode is unchanged, and the wave reuses the existing agents rather than adding roles.
 - `requireHandoffs: "required"` (the default for a new run with a request or requirements baseline) makes `final_verify` and `next` demand continuity handoffs derived from the plan: the assigned worker and `team/verifier` per task, `team/falsifier` + `team/security-auditor` per task in strict mode, one `team/sentinel`/`team/orchestrator` run-level handoff, and the `team/victory-auditor` run-level handoff after a confirmed victory audit. Each entry must match `handoffs/index.json` (regular non-symlink file, sha256/byte length) and cite the current report/wave/audit/victory; a changed cited artifact makes it stale. Missing pairs return `NEEDS_HANDOFFS`, stale/duplicate/unknown/tampered evidence returns `BLOCKED_BY_HANDOFFS`, and a passing gate records `handoffs` plus `evidence.handoffs` in `verify/final.json`. An explicit `requireHandoffs: "skip"` is recorded as `handoffs: "SKIPPED (explicit)"` and never reads the index; handoff prose is never a verdict.
 - Planning refuses to start when blocking inputs are missing or unreachable unless `allowMissingInputs` is recorded.
-- `state.json`, `costs.json`, `events.jsonl`, and `handoffs/index.json` are read-modify-written under a cross-process `<artifact>.lock` plus the in-process queue. `teamwork_next` stamps a 15-minute claim (`claim.by/at/leaseUntil`) and skips a different live claimant, so two resumed Sentinels cannot dispatch the same ready task; an expired claim is reclaimed with `previousClaimant` recorded. `worker_active` requires a live claim (a Sentinel override is recorded), and terminal states clear it. See [docs/ARTIFACTS.md](docs/ARTIFACTS.md#cross-process-lock-files-artifactlock) for the lock protocol and the NFS caveat.
+- Run-artifact writes are contained on Linux by a pinned directory descriptor ([ADR 0010](docs/adr/0010-pinned-fd-write-containment.md)): the target parent is opened once and every create, mkdir, rename, lstat and append is relative to `/proc/self/fd/<dirfd>`, so a directory swapped for a symlink cannot redirect bytes outside the run. Each write uses a random `O_EXCL` temp, `fsync`, a rename under the pin, and a post-rename inode check; appends refuse `nlink !== 1` (a hard link at `events.jsonl` cannot modify outside bytes); the lock file is created inside the same pinned directory. Linux without `/proc/self/fd` fails closed for writes. **macOS and Windows are detective-only** (path-based atomic write plus a post-write check; a transient reverted swap can be missed): 0.13.0 pins the run root and every existing ancestor `(dev, ino)`, re-checks them before the mutation and in the post-check (`identity-changed`), and records the run-root identity in the signed manifest. A detected write is a report about an event that already happened, not a prevented one, and it is not rolled back. `OPENCODE_TEAMWORK_REQUIRE_PINNED_WRITES=1` (or plan `requirePinnedWrites`) refuses control-plane writes on a non-pinned host (`containment-mode`). The run-root `mkdir` is still path-based, and a same-UID ptrace is outside the boundary. See [ADR 0013](docs/adr/0013-containment-parity-and-the-detective-boundary.md).
+- `state.json`, `costs.json`, `events.jsonl`, and `handoffs/index.json` are read-modify-written under a cross-process `<artifact>.lock` plus the in-process queue. Locks publish atomically (unique `wx` temp + hard link, cached `mkdir` fallback), age from the filesystem mtime, and reclaim via a single-winner quarantine rename; a lock from another host is never guessed at. Claim protocol 2 (new runs; absent = 0.9.0 legacy) stamps a 5-minute lease + 5-minute grace, a monotonic fence, a heartbeat and a side-effect baseline. `teamwork_next` returns the fence and never silently reclaims a stale claim whose worktree/artifact fingerprint changed or is unknown; that task becomes `needs-inspection` and requires `teamwork_recover` (inspect → adopt/requeue/block/release). Every `teamwork_task_update` transition enforces the fence and claim ownership, and a reason is required for a Sentinel override. Verifier reports are bound to the round/fence/branch head, so a moved branch refuses `verified_pass`/merge with `BRANCH_MOVED`. See [docs/ARTIFACTS.md](docs/ARTIFACTS.md#cross-process-lock-files-artifactlock) and [ADR 0009](docs/adr/0009-claim-protocol-and-crash-recovery.md).
 - `teamwork_cost` is digest-idempotent: `costs.json` stores `appliedSnapshotDigest` plus per-session `snapshotCursors`, so applying the same usage observation twice (including a retry after a crash between the costs and snapshots writes) adds the delta once and preserves budget/bucket totals.
 - Legacy topology aliases are normalised on write; an unknown topology is refused before anything is written.
 
@@ -193,6 +198,9 @@ npx @heretek-ai/opencode-teamwork-v2 inspect   # inspect latest run DAG, tasks, 
 npx @heretek-ai/opencode-teamwork-v2 timeline  # chronological run timeline, task durations & cost
 npx @heretek-ai/opencode-teamwork-v2 export    # export a run report (HTML by default, or --markdown)
 npx @heretek-ai/opencode-teamwork-v2 prune     # prune completed git worktrees
+npx @heretek-ai/opencode-teamwork-v2 approve request --session <id>  # show the draft binding
+npx @heretek-ai/opencode-teamwork-v2 approve sign --request <file> --draft <path> --key <path>
+npx @heretek-ai/opencode-teamwork-v2 approve verify --session <id>   # re-run the plan-time checks
 ```
 
 `opencode-teamwork` and `opencode-teamwork-v2` are aliases for the same CLI. If
@@ -281,6 +289,30 @@ defaults without touching files that already exist.
    `specGate: "bypassed"`. Presence is not proof of user approval:
    `skipInterview` / `requireSpec: false` are caller-controlled and recorded,
    not an approval signature.
+
+   For `trustLevel: "human-approved"` / `"ci-attested"`, produce an
+   authenticated approval **before** the plan, from a process that holds the
+   approver key and writes outside the repo/run:
+
+   ```sh
+   # inspect what will be signed (writes nothing trusted)
+   opencode-teamwork approve request --session <session-id> --approver uid:alice
+
+   # sign the exact draft bytes with the Ed25519 approver key
+   opencode-teamwork approve sign --request request.json \
+     --draft .opencode/teamwork/<session-id>/prompt_draft.md \
+     --key ~/.config/opencode/approver.pem --approver uid:alice --ttl 24h
+
+   # re-run the plan-time checks at any time
+   opencode-teamwork approve verify --session <session-id>
+   ```
+
+   `approve sign` refuses a draft that still contains `[OPEN:` unless
+   `--allow-open` records the gaps (the plan then refuses that approval), and
+   asks the operator to retype the first 8 hex characters of the draft digest
+   and the word `approve`. The approval binds the draft, the run id, and a
+   one-use nonce; it does **not** prove a human read the draft (see
+   [`SECURITY.md`](SECURITY.md)).
 
 5. The run directory `.opencode/teamwork/<session-id>/` holds `plan.dag.json`
    (the task DAG), per-task `verify/report-<task>.json` reports, and
@@ -471,6 +503,30 @@ LEMMA is an explicit opt-in capability-gated route (`topology: "proof"`, `lemmaM
 - **Bounded verification:** Phase 0 formalization (`problem_draft.lean` → `team/formalization-reviewer` `APPROVE` → `problem.lean`), bounded lemma tree (`maxDepth <= 3`, `maxWidth <= 4`, `maxNodes <= 24`, `maxRetries <= 4`), real `lean`/`lake` execution via `teamwork_lemma_verify` rejecting `sorry`/`admit`/unauthorized `axiom` even on exit `0`, and final `FAITHFUL` check before `teamwork_final_verify`.
 - **Declaration and axiom binding:** each node records its Lean `declaration` and `statement`. Before a node becomes `proved`/`disproved`, the attempt must declare that name and type (comments, strings, and syntax quotations are masked; duplicate/namespaced/`private`/`protected` declarations fail closed). The verifier then runs `#print axioms <declaration>` and records `declaration`, `declarationType`, `axiomDependencies`, and `unauthorizedAxioms`, accepting only `Classical.choice`, `propext`, `Quot.sound`, plus axioms approved once at plan time via `lemmaPolicy.allowedAxioms` (persisted in `lemma/manifest.json`). `sorryAx` is always rejected, and `#`/`logInfo`/`dbg_trace`/`trace`/`run_cmd`/`println`/`IO.`/`set_option trace` probe-hijacking attempts fail closed. Node statement/declaration metadata is immutable after a PASS; `teamwork_final_verify` re-checks stamped metadata before accepting a run.
 - **Known limits:** binding compares the elaborated type text lexically (binder/negation spellings normalized), not semantic equality; the transitive-axiom allowlist is approved at plan time (`lemmaPolicy.allowedAxioms`) and persisted in `lemma/manifest.json`, never caller-supplied at verify time; and the live Lean path is not exercised on hosts without `lean`/`lake`/`leap` (the E2E test skips loudly, while stub tests cover the control flow). CI installs core Lean + the LEAP CLI (no Mathlib) so the live E2E runs on every relevant pull request.
+
+## High-assurance deployment
+
+The default package is tamper-evident against a writer limited to the run
+directory; it is not a boundary against a shell running as the same UID as
+OpenCode. If you need a real privilege boundary, the administrator-only path is
+documented separately:
+
+- [`docs/ADMIN-HARDENING.md`](docs/ADMIN-HARDENING.md) — a Linux runbook for a
+  separate signer UID, a `0700` key directory, a root-owned signer, a systemd
+  socket service, audit rules and SELinux labels. Every step has a proof, a
+  rollback and an honest limit.
+- [`docs/SIGNER-PROTOCOL.md`](docs/SIGNER-PROTOCOL.md) — the v2 signer contract
+  that turns a command signer from an oracle into a policy-enforcing signer.
+  It requires a plugin change; the 0.13.0 plugin sends v1 and cannot use a
+  v2-only signer.
+- [`scripts/hardening-check.sh`](scripts/hardening-check.sh) — a read-only
+  Linux verifier that prints `PASS`/`FAIL`/`UNKNOWN` per probe. It never
+  modifies the host; `UNKNOWN` is not a pass.
+
+These are deployment changes, not plugin features. They do not make the plugin,
+the prompts or the model trustworthy, and none of the steps is executed
+automatically. `opencode-teamwork doctor --security --require-hardened` remains
+the plugin-side posture check.
 
 ## Notes
 

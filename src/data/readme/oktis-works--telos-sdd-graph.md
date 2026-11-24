@@ -28,7 +28,7 @@ A **Spec-Driven Development (SDD)** plugin for [OpenCode](https://github.com/ano
 - **Shell hooks**: installs Git hooks for SDD integration
 - **Brownfield scanning**: analyzes existing projects for integration
 - **Brownfield SDD findings**: documentation mode preserves AS-IS defects as persistent findings and remediation tasks; reverse-engineering mode converts them into target requirements with source evidence and readiness gates
-- **Reverse engineering**: `sdd.reverse_engineer` turns an existing codebase into a graph — `purpose=documentation` documents the system as-is (spec nodes auto-approved), `purpose=reverse_engineering` produces a technology-agnostic spec to rebuild with another stack; `depth=structure|full` and `focus_dirs` scope the scan
+- **Reverse engineering**: `sdd.reverse_engineer` turns an existing codebase into a graph — `purpose=documentation` documents the system as-is (spec nodes auto-approved, no synthetic implementation backlog), `purpose=reverse_engineering` produces a technology-agnostic spec to rebuild with another stack and marks its target backlog with `execution_scope=target`; `depth=structure|full` and `focus_dirs` scope the scan
 - **Release milestones**: `sdd.milestone` manages release scope (`create/list/add/remove/assign/close/report`) and reports traceability gaps per release
 - **Acceptance lifecycle**: criteria are versioned nodes with SHA-256 hash, audit events (CLI, tool, dashboard and MCP share one service) and **final delivery acceptance** (`final_accept`/`final_reject`) on the Change
 - **Node guidance**: any node can receive a human instruction; impact is analyzed, a structured proposal is stored, and applying it is version-checked and audited
@@ -169,15 +169,22 @@ depending on the LLM to perform the action):
 | `/sdd cache_reset` | `cache_reset` | Clears caches without killing the session |
 
 `/sdd-viz` and `/sdd:viz` are accepted as the same command as `/sdd viz`.
+Commands return a short inline confirmation (`/sdd on` and `/sdd off` include
+the consequence of the toggle); the complete operational detail remains
+available through `/sdd status` and the command output used in model context.
 The dashboard listens on `127.0.0.1:7331` (override with `SDD_DASHBOARD_PORT`),
 falls back to a free port when 7331 is taken, and is stopped when the OpenCode
-process exits — it is an in-process server, not a detached daemon.
+process exits — it is an in-process server, not a detached daemon. The 3D graph
+asset is served locally by the dashboard, so the page and the Kanban do not
+depend on a CDN.
 
 > **Note:** because slash `/` commands in OpenCode are *prompt commands* by
-> definition, invoking them may make OpenCode **also trigger an LLM turn**.
-> The deterministic action itself is performed by the plugin command handler
-> without depending on the model; on hosts that support synthetic messages the
-> result is delivered without any model turn.
+> definition, invoking them may make OpenCode **also trigger an LLM turn** on
+> some hosts. The deterministic action itself is performed by the plugin
+> command handler without depending on the model; hosts that support synthetic
+> messages deliver the short result without any model turn. If the host lacks
+> synthetic support, the fallback asks the model for a one-line confirmation
+> only and does not re-execute the command.
 
 **Recommended way (no LLM turn):** the same operations are available as
 **tools/MCP**, called by the agent deterministically:
@@ -472,12 +479,66 @@ Every integrated/approved task writes:
 
 `README.md` and `traceability.md` link to the per-node Markdown in
 `.sdd/docs/v<N>/`. `sdd.sync_markdown` regenerates the node docs and all task
-dossiers.
+dossiers. The brownfield scan also generates dossiers for every task it creates.
+
+### Brownfield output contracts
+
+- **`purpose=documentation`** produces the AS-IS graph and remediation tasks for
+  open findings. It does not synthesize `Implement ...` tasks from requirements
+  or features; documentation is not implementation backlog.
+- **`purpose=reverse_engineering`** produces target requirements and a planning
+  backlog tagged `metadata.execution_scope=target`. Those tasks have no files in
+  the source project and cannot be approved there until target files are
+  declared. This keeps the source repository protected while the target stack is
+  still being chosen.
+- A task from either mode still follows the 3.3.0 gate: approval is the human
+  authorization for exactly the declared files. Change records are used only for
+  evolution/audit, never as a replacement for task approval.
+- Findings from documentation can be resolved by an approved task (`task_id`) or
+  by a Change (`change_id`) with evidence. Findings from reverse engineering are
+  resolved into target requirements and keep the `derived_from` traceability.
+
+### Export the target backlog
+
+After the stack is chosen, the reverse-engineering backlog can seed a fresh
+project instead of being approved in the source repository:
+
+```text
+sdd.integrate_tasks(
+  action="export_target",
+  target_dir="../target-app",
+  project_name="Target App",
+  tech_stack='{"frontend":"React","backend":"NestJS","database":"PostgreSQL"}',
+  dry_run=true
+)
+```
+
+Or use the deterministic command hub, which uses the graph `techStack` when
+`--stack` is omitted:
+
+```text
+/sdd export ../target-app --dry-run
+/sdd export ../target-app --name TargetApp
+/sdd export ../target-app --stack frontend=React,backend=NestJS,database=PostgreSQL
+```
+
+`dry_run`/`--dry-run` validates the scope and prints the nodes by type and the
+tasks that would be copied without creating a directory or writing any file.
+
+The export requires `purpose=reverse_engineering`, a new (or empty) directory
+outside the source project and a chosen stack — passed explicitly or read from
+the graph `techStack`. It clones the specification
+and the target tasks, rewrites task scope to `execution_scope=source`, records
+the new stack on the target project, writes a dossier per task, finalizes the
+target baseline and creates `TARGET_BACKLOG.md`. The source graph is not
+modified. `target backlog` cards are marked in the Kanban so they are not
+confused with executable tasks from the source project; the Kanban **Scope**
+filter can show only target tasks or only source tasks.
 
 | Tool | Description |
 |---|---|
 | `sdd.finalize_baseline` | Closes the documentation baseline and moves the project to delivery (`confirm=true`) |
-| `sdd.integrate_tasks` | Kanban bridge: `list`, `create`/`update`/`remove`, `mark_integrated`, `approve_task`, `reject_task`, `dossier`; `open_change`/`approve_change` remain for evolution |
+| `sdd.integrate_tasks` | Kanban bridge: `list`, `create`/`update`/`remove`, `mark_integrated`, `approve_task`, `reject_task`, `dossier`, `export_target` (with `dry_run`); `open_change`/`approve_change` remain for evolution |
 
 ## Dashboard HTTP API
 
@@ -505,6 +566,12 @@ requests and non-loopback `Host` headers.
 | `GET/POST /api/guidance`, `POST /api/guidance/:id/:action` | Guidance create/list + `analyze`, `propose`, `apply`, `reject` |
 | `GET /api/impact/:nodeId?depth=` | Node impact analysis |
 | `GET /api/events` | Server-sent event stream (live dashboard updates) |
+| `GET /ui/3d-force-graph.min.js` | Local 3D graph asset served by the dashboard |
+
+The Kanban supports drag-and-drop, but the task modal's **Column** select is the
+keyboard-accessible alternative: changing the column and saving moves the task
+without a pointer. Cards and nodes are also reachable with `Tab` and open with
+`Enter` or `Space`.
 
 ## Available tools
 
@@ -544,7 +611,7 @@ never sees a name that is not registered.
 | `sdd.auto_link_tests` | Links orphan tests to requirements by name/import analysis (`tested_by`), optionally as a dry run |
 | `sdd.infer_relationships` | Rebuilds graph traceability: infers the missing semantic edges (`requirement --specifies--> feature`, `endpoint/file --implements--> feature`, `endpoint --operates_on--> entity`, `task/change --belongs_to--> milestone`), normalizes redundant inverse pairs and creates milestone nodes. Idempotent; `dry_run` previews the edges |
 | `sdd.milestone` | Manages release milestones and reports traceability per release: `create`, `list`, `add`, `remove`, `assign`, `close`, `report`. The report shows the release scope, task progress and gaps (requirements without tests, features without implementation, endpoints/files without a feature) |
-| `sdd.findings` | Brownfield findings lifecycle: `scan`, `list`, `report`, `readiness`, `transition`, `resolve`, `create_task`. Documentation findings remain open until a Change verifies the fix; reverse-engineering findings become target requirements/decisions instead of old-code remediation tasks |
+| `sdd.findings` | Brownfield findings lifecycle: `scan`, `list`, `report`, `readiness`, `transition`, `resolve`, `create_task`. Documentation findings remain open until an approved task or Change verifies the fix; reverse-engineering findings become target requirements/decisions instead of old-code remediation tasks |
 
 ### Acceptance and human guidance
 
@@ -612,7 +679,7 @@ Encapsulated multi-step workflows executed as a single tool call (each step uses
 | `sdd.workflow_hotfix` | emergency hotfix (no enforcement) + retrospective documentation |
 | `sdd.workflow_refactor` | enforce → validate → analyze impact → complete |
 | `sdd.workflow_full_cycle` | full cycle via `sdd.full_cycle` |
-| `sdd.workflow_reverse_engineer` | reverse_engineer → validate → inspect |
+| `sdd.workflow_reverse_engineer` | discover → reverse_engineer (explicit `purpose`) → validate → inspect |
 
 ### Discovery and briefing
 
@@ -1323,7 +1390,7 @@ bun run typecheck
 # Compile (generates dist/)
 bun run build
 
-# Lint (noUnusedLocals/noUnusedParameters)
+# Lint with oxlint (fast Rust-based ESLint-compatible checks)
 bun run lint
 
 # Run tests

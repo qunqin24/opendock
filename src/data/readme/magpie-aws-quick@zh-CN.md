@@ -6,6 +6,13 @@
 这样经 magpie 路由的 Claude Code、Codex、Gemini CLI、OpenCode 等 Agent 都能用上 Quick 背后的模型
 （以 `magpie models | grep aws-quick` 列出的为准）。
 
+> **推荐客户端：Claude Code 或 pi（pi-agent）。** 插件主要针对这两个客户端开发。在 Claude Code 里，
+> 工具调用、跨轮复用 Quick 会话、中断和大文件写入都做过端到端测试；pi 发的会话亲和头会用来持续复用同一个
+> Quick 会话。其他客户端也能用，只是测得少一些。
+
+> **想直接用 Quick 原生桌面端？** 推荐 [aws-quick-manager](https://github.com/httpdone/aws-quick-manager)：
+> 在官方 Quick 客户端里一键切换账号，通过 Quick 的云端接口在账号之间转移会话，不需要反向代理。
+
 > ⚠️ 仅供个人使用自己的账号。这是驱动 Amazon Quick 桌面客户端的内部双向 WebSocket 协议
 > （非公开 API），很可能违反 AWS 服务条款，账号存在被限制/封禁的风险，后果自负。
 
@@ -37,7 +44,7 @@ Python 后端（`quickwork-agent`，打包在 `resources/agent.zip` 里），以
    二进制帧；下行是 AWS event-stream 帧（`:event-type=rawOutputEvent`，body 里同样是
    base64 包的 inner JSON）。每 25s 发 `ping`。
 4. **协议翻译**：OpenAI 的 `messages` 渲染成 Quick 的 `text`（见下）——
-   例外是 system prompt，它走独立的 `user_message.system_prompt` 字段
+   例外是 system prompt，它走独立的 `user_message.custom_prompt` 字段
    （已实测生效）；下行的 `text_delta`/`thinking_delta`/`turn_usage`/
    `message_complete` 转成 OpenAI 的 `content`/`reasoning_content`/`usage`。
    一个 user turn 以 `message_complete`（`continuation_expected !== true`）
@@ -71,10 +78,15 @@ Quick 在服务端按 `thread_id` 保存会话历史，而 OpenAI 客户端每�
 
 层级顺序很重要：内容匹配命中永远优先，会话键只在前两级都失败时启用。
 
-- **scope 隔离** —— 哈希链按 `H(账号, agent_mode, thinking_effort,
-  system prompt, 工具名集合)` 命名空间隔离：换账号、换模型、换推理强度、
-  改 system prompt 或工具集，都会透明地新建 thread，而不是续接到一个
-  不匹配的旧会话。
+- **scope 隔离** —— 哈希链按 `H(账号, agent_mode, system prompt)` 命名空间
+  隔离：换账号、换模型或改 system prompt，都会透明地新建 thread，而不是续接到
+  一个不匹配的旧会话。思考强度是逐轮字段，不会拆分 thread；工具按 thread 记录，
+  会话中途新增工具（Claude Code 的 ToolSearch、skill）时继续用原 thread，只补发
+  新工具的说明。
+- **失败不丢 thread** —— 复用的这一轮出错或被取消（499、内容过滤、空闲超时）时，
+  原 thread 会放回缓存，下一次请求照样续接。会话键兜底只在新的工具结果对应的是
+  这个 thread 发出的调用时才续接，共用同一个会话 ID 的并行子代理不会串到彼此的
+  thread 上。
 - **编辑/分叉检测** —— 更早消息的任何改动都会改变哈希，所以被编辑或
   分叉的历史永远不会误续接；只有纯追加的尾部才合格。缓存条目使用即
   销毁（single-use），客户端重试也不会重放一个 turn。
@@ -176,6 +188,12 @@ magpie login aws-quick              # 按提示选择登录方式
 - `stableDeviceId`（默认 `true`）：直连会话把按账号固定的设备 ID 作为
   `outpostId` 发送（见上文"设备 ID"）；`false` 改发空值。
 
+## 常见问题
+
+**登录第二个账号后，第一个账号失效了。**
+多半是在同一个浏览器里先退出了第一个账号，再登录第二个。退出登录会吊销第一个账号的凭证，插件就无法再刷新它。
+请换一个浏览器，或者用无痕窗口登录另一个账号，不要在浏览器里退出已经添加的账号。
+
 ## 已知限制
 
 - **工具调用是文本约定模拟**：Quick 的 agent 在服务端自带工具链（浏览器、本地文件、MCP 等），
@@ -196,16 +214,19 @@ magpie login aws-quick              # 按提示选择登录方式
   内联数据）会通过 Quick 自己的附件上传流程传到账号的云端会话工作区——
   和 Quick 应用里附加文件是同一个位置。远程 URL 和非图片文件
   （`file`/`input_file`）仍不支持；上传失败时会在消息里注明图片缺失。
-  云端上传需要直连会话（OAuth / 凭据管理器登录）；本地 outpost 回退路径
-  仍只支持内联。
+  云端上传在直连会话（OAuth / 凭据管理器登录）和本地 outpost 回退路径上
+  都可用：outpost 的 `sncs-session` 同样提供上传所需的 `id_token` /
+  `ws_host`（已实测）。
 - **采样参数**：`temperature` 等不在协议内，传了也会被服务端忽略（`capabilities.temperature:false`）。
 - **会话与账号绑定**：thread 复用的 scope 里包含账号身份哈希；换号后旧 thread 自动失效重建。
 - **多窗口/并发**：同一 QuickSocket 上不同 thread 可并行 turn；同一 thread 的并发请求会被拒绝（`busy`）。
 - **消息体积**：整个 `user_message` 帧服务端上限 64KB（`text` 与
-  `system_prompt` 共享）。超大 system prompt / 工具 schema / 会话历史会自动
+  指令及附件共享）。超大 system prompt / 工具 schema / 会话历史会自动
   压缩（schema 去注解、工具规格 lite→仅名字降级、历史从旧到新裁、
   tool_result 封顶），
-  截断时回复里会带 `> [quick] …已截断` 提示。
+  普通对话的系统指令与本轮消息编码后若能放进同一帧，就会完整发送。
+  Claude Code 的 Auto 权限审核要求策略和待审记录完整放进同一帧，超限时在请求
+  Quick 前返回 HTTP 413。可使用 Claude Code 的 Manual 模式自行确认工具请求。
 - **OAuth 登录仅限 consumer/social 通道**：重放的是桌面端 `quick.aws.com/sn`
   的 `social` provider 流程。走企业 IdP 的租户如果 issuer 不是 Amazon 社交 IdP
   可能无法完成——这种情况请改用本地凭据方式。OAuth 路径会发送固定的生成设备 ID，

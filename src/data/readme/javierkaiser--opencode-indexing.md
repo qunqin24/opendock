@@ -182,6 +182,11 @@ writes your settings file:
 }
 ```
 
+Since OpenCode 2.4.0, a plugin added as `@latest` — as both installers do — is
+checked on startup and every 24 hours, and a newer match is installed and
+reloaded. `opencode plugin update` remains the manual path for an exact version
+or a pinned tag.
+
 The other six tools only read. OpenCode's base policy already allows everything
 (`{ "action": "*", "resource": "*", "effect": "allow" }`), so they need no rule;
 write them out only if you want to tighten the set.
@@ -612,11 +617,13 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 
 - **OpenCode 2.2.7 or newer.** The consumer peers are `@opencode/plugin >=2.2.7`
   and `solid-js >=1.9.0`, both optional. The repository pins `@opencode/plugin`
-  and `@opencode/theme` to exactly 2.2.7 in devDependencies. The floor is real:
-  the Desktop page is built from the settings components OpenCode 2.2.6 added,
-  so an older host has nothing to render it with. The pins are exact because the
-  page depends on that component set — the SDK the typecheck sees has to be the
-  one its components come from.
+  and `@opencode/theme` to exactly 2.4.1 in devDependencies, and
+  `@opentui/core`/`@opentui/solid` to exactly 0.9.4. The floor is real: the
+  Desktop page is built from the settings components OpenCode 2.2.6 added, so an
+  older host has nothing to render it with. The 2.4.1 pins keep the typecheck on
+  the SDK the current host (CLI 2.4.1) ships; `@opencode/theme` 2.4.1 pins
+  `@opentui/core` 0.9.4 exactly, so a range there would resolve a newer OpenTUI
+  and leave npm with an invalid peer.
 - **For the terminal UI (prompt-footer indicator and `/indexing` page):** the
   `solid-js` runtime that the host provides. The plugin installs no copy of it:
   the TUI imports the host's singletons through virtual module ids

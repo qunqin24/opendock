@@ -17,7 +17,7 @@ The plugin is plain JavaScript. It bundles no Node runtime or Plaud software, do
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.8
+opencode plugin add github:joe-broadhead/opencode-plaud#v0.0.9
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/plaud-status`: it shows `sign-in required` until you sign in.
@@ -27,7 +27,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.8" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.9" }] }
 ```
 
 ## Sign in
@@ -112,7 +112,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/s
    | `"read-only"` | the reads and `plaud_recent` | nothing: exports and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.8", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.9", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -210,7 +210,7 @@ Every option is optional. To add a second Plaud account, give it an alias in `ac
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-plaud#v0.0.8",
+      "package": "github:joe-broadhead/opencode-plaud#v0.0.9",
       "options": { "accounts": ["work"], "exportRoots": ["~/Plaud", "~/Documents/Meetings"] }
     }
   ]
@@ -227,7 +227,7 @@ OpenCode registers itself with Plaud's server automatically, so there is no clie
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.8", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-plaud#v0.0.9", "options": { "exportRoots": ["~/Documents/Plaud"] } }],
   "permissions": [{ "action": "plaud_export", "resource": "*:audio", "effect": "deny" }]
 }
 ```
@@ -291,7 +291,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 
 1. Sign out of each account: `opencode mcp logout plaud`, and `opencode mcp logout plaud-<alias>` for each account in `accounts`. If one answers `MCP server not found` while the plugin is still installed, OpenCode is still loading the plugin for that folder: wait a few seconds and run it again.
 2. Check: `opencode auth list` lists no **Plaud** entry.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.8`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-plaud#v0.0.9`, then `opencode reload`.
 4. Your exports stay in your export roots (`~/Plaud` by default); delete them if you no longer want them. The plugin keeps no other data.
 5. Remove any Plaud rules you copied into your agents' own `permissions`.
 
@@ -306,10 +306,10 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. A later 2.2 or 2.3 release starts, and `/plaud-status` marks it untested.
 - **Other accounts in Jelly.** Jelly's declaration names another account's reads as patterns (`plaud-*.get_file` and the rest), so they keep their read-only rules in Jelly. In a Jelly that does not yet write a pattern's rules, those tools follow the plugin's namespace and are denied at Read only, reads included.
 - **Jelly.** The settings declare their choices and bounds, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
-- **The recordings source.** `plaud.recordings` names the owner the account's last `probe` named, so every listing of an account, with a cursor or without, needs a probe of it since OpenCode started (`UNAVAILABLE` otherwise). A cursor issued for another Plaud user than the one the probe names is refused (`CURSOR_INVALID`). The source contract `v0.2.0` can let a page read who is signed in itself (`permission.readsIdentity`), but a consumer on `v0.1.x` refuses that key, so the plugin declares it only once Memory and Jelly read `v0.2.0`.
+- **The recordings source.** `plaud.recordings` names the owner the account's last `probe` named, so every listing of an account, with a cursor or without, needs a probe of it since OpenCode started (`UNAVAILABLE` otherwise). A cursor issued for another Plaud user than the one the probe names is refused (`CURSOR_INVALID`). The plugin does not declare `permission.readsIdentity`: a page does not read who is signed in itself.
 - **Other accounts through the source contract.** `plaud.recordings` declares `accounts.server` as `plaud-{account}`. A consumer's session rules for the default account allow `plaud_list_files` and `plaud_get_current_user`. For any other account they allow that account's server, `plaud-<alias>_list_files` and `plaud-<alias>_get_current_user`, which is what the plugin calls. A consumer still on source-contract `v0.1.x` refuses the `accounts.server` key and will not load this descriptor. Scripts and the model are unaffected.
 - **Late uploads.** A device keeps its recordings until the Plaud app connects to it. A `recordings` page lists a recording that reached Plaud after the cursor passed its start if it started within the 14 days before the cursor (fewer when more recordings started then than the cursor can remember). One found in the 7 days before those with a `created_at` after the last page answers an `expired` gap, so a consumer lists again from its start; one that started earlier is not seen. Contract 1's `plaud` listing never lists a recording behind its cursor.
-- **Deleted recordings.** A recording deleted in Plaud before a listing reaches it is not listed: it no longer exists, so no history is lost. A recording deleted after it was listed is not announced until Memory and Jelly read source-contract `v0.2.0`; then the plugin will send it in `removals[]`.
+- **Deleted recordings.** A recording deleted in Plaud before a listing reaches it is not listed: it no longer exists, so no history is lost. A recording deleted after it was listed is not announced: the source does not send `removals[]`.
 - **A day's query spans three days.** Plaud's date filter takes whole days (`YYYY-MM-DD`) in a time zone its docs do not name, so the plugin's narrowest query asks for a day and one either side. While Plaud ignores `page` under a date filter, three days that hold more recordings than one page of Plaud's answer keep failing with `PLAUD_READ_FAILED` (the cursor stays put, so nothing is lost) until Plaud honours `page`, or until such a listing is started after those days.
 - **Plaud's limits.** Plaud publishes no request limit for its server, and its docs say `list_files` ignores `page` and `page_size` under a date filter, which `events_list` always sets. So when a page that is not empty repeats the one before, whatever its length, the plugin cannot tell whether Plaud sent every recording, and lists the week again one day at a time; when a day's query still repeats, it fails with `PLAUD_READ_FAILED` before the cursor moves, rather than skip a recording ([Plaud MCP](https://docs.plaud.ai/plaud-mcp-cli/mcp), "Filtering recordings with `list_files`"). The source's answers in the conformance test are invented in the shapes those docs give, not recorded from a live account.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

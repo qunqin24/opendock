@@ -15,7 +15,7 @@ Google is a trademark of Google LLC; this unofficial plugin is not endorsed by t
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.12
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.13
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
@@ -25,7 +25,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.12" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.13" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -56,7 +56,7 @@ Ask the agent for what you need. It works in four steps:
 
 `gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
 
-`gws_events_list` is for Memory's collector, not for answering questions: it lists the Gmail messages that arrived, or the primary calendar's meetings up to seven days ahead, since a cursor as normalised events (people, subject or title, a link, labels, and the text, at most 4,096 characters), oldest first, leaving out spam, trash, drafts, Promotions and Social, and anything holding a secret. A Calendar recurring series deleted whole is not retracted: the source sees no instance for it, so the meetings already listed age out by Memory's retention. It only reads and never asks. The plugin declares its sources in `package.json` `sources` under the shared [source contract](https://github.com/we-the-rebel-alliance/source-contract) (Gmail and Calendar events, today's calendar and a picture), and passes its conformance kit ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#sources)).
+`gws_events_list` is for Memory's collector, not for answering questions: it lists the Gmail messages that arrived, or the primary calendar's meetings up to seven days ahead, since a cursor as normalised events (people, subject or title, a link, labels, and the text, at most 4,096 characters), oldest first, leaving out spam, trash, drafts, Promotions and Social, and anything holding a secret. Calendar collection is best effort: edits during paging can be missed. A Calendar recurring series deleted whole is not retracted: the source sees no instance for it, so the meetings already listed age out by Memory's retention. The default rules allow these reads; later agent or session rules still apply. The plugin declares its sources in `package.json` `sources` under the shared [source contract](https://github.com/we-the-rebel-alliance/source-contract) (Gmail and Calendar events, today's calendar, a picture and a bounded spreadsheet range), and passes its conformance kit ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#sources)).
 
 In Jelly, you sign in once, and an agent given the account works with Jelly's copy of that sign-in: its token, scopes and email, without your client secret or refresh token. The plugin reads the copy as it reads any sign-in, never renews it, and asks for a new sign-in instead of calling Google if it is ever asked to ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#signing-in)).
 
@@ -93,7 +93,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.12", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.13", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -134,6 +134,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.probe` | `*` | `allow` |
 | `gws.calendar_today` | `*` | `allow` |
 | `gws.images_read` | `*` | `allow` |
+| `gws.sheets_read` | `*` | `allow` |
 | `gws.write` | `*` | `allow` |
 | `gws.export` | `*` | `allow` |
 | `gws.send` | `*` | `allow` |
@@ -159,6 +160,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.probe` | `*` | `allow` |
 | `gws.calendar_today` | `*` | `allow` |
 | `gws.images_read` | `*` | `allow` |
+| `gws.sheets_read` | `*` | `allow` |
 | `gws.write` | `*` | `ask` |
 | `gws.export` | `*` | `ask` |
 | `gws.send` | `*` | `ask` |
@@ -184,6 +186,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.probe` | `*` | `allow` |
 | `gws.calendar_today` | `*` | `allow` |
 | `gws.images_read` | `*` | `allow` |
+| `gws.sheets_read` | `*` | `allow` |
 | `gws.write` | `*` | `deny` |
 | `gws.export` | `*` | `deny` |
 | `gws.send` | `*` | `deny` |
@@ -217,7 +220,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.12",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.13",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
@@ -247,9 +250,9 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
 | `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this source, account and scope: another account's, source's or calendar's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
-| `INPUT_INVALID` | A source read refused its input: events_list, probe, calendar_today or images_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, or a calendar other than the primary one. Nothing ran. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
-| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today or image for probe. |
-| `TOO_LARGE` | A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture). Nothing is cut short. | Read a smaller picture, such as the file's thumbnail. |
+| `INPUT_INVALID` | A source read refused its input, or Google could not find the spreadsheet or read the named range for sheets_read. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
+| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today, image or sheets for probe. |
+| `TOO_LARGE` | A source read's answer exceeds its size limit: 1 MiB for the Sheets snapshot, or 1 MiB less 4 KiB for a picture's data URI. Nothing is cut short. | Read a smaller range or picture, such as the file's thumbnail. |
 | `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
 | `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
 | `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
@@ -261,7 +264,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `CATEGORY_MISMATCH` | The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool. | Call the tool the message names. |
 | `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
 | `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
-| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
+| `PERMISSION_DENIED` | The session's permission rules denied the call or require an approval a script cannot give. For sheets_read, Google may instead have refused the selected account's access. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
 | `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code. | Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices. |
@@ -271,7 +274,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `AUTH_REDIRECT_MISMATCH` | Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser. | Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client. |
 | `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
 | `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
-| `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
+| `GWS_API_ERROR` | Google returned an error or an unexpected response. The message may include Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
 | `CALENDAR_UNAVAILABLE` | The read Jelly's calendar makes, calendar.today, has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
 | `IMAGE_HOST_REFUSED` | The picture Jelly asked images.read for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
 | `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. The image source (images_read) also refuses a GIF, which the contract's image output does not take. | Show a PNG, JPEG, GIF or WebP picture instead; for images_read, a PNG, JPEG or WebP. |
@@ -320,7 +323,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.12
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.13
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.

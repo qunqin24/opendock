@@ -122,6 +122,7 @@ Revenue figures in every skill are Fledly estimates from chart positions, and th
 | `.mcp.json` | Project MCP config for clients that read it from the repo root |
 | `index.js`, `package.json` | The `opencode-fledly` npm package for OpenCode |
 | `gemini-extension.json` | Gemini CLI extension (skill + hosted MCP server) |
+| `GEMINI.md` | Context for Gemini CLI (how to use the Fledly tools) |
 
 Tools, data coverage and privacy: https://fledly.app/docs/mcp/. Support: hello@fledly.app.
 

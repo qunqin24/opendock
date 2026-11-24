@@ -26,13 +26,14 @@ Rules include:
 - Lists and headings over walls of text, conclusion first.
 - A "Next:" line at the end of documentation (READMEs, docs, PR descriptions) that gives the reader's next step as runnable commands.
 - No em dashes as punctuation, no "please" in instructions, no "etc.".
+- One paragraph per line: no wrapping prose at a fixed column.
 
 Because the injection happens per request, the rules survive context compaction.
 AGENTS.md instructions, by contrast, get summarized away during compaction.
 
 ## The rules, by example
 
-Five of the nineteen rules, before and after.
+Five of the twenty rules, before and after.
 Full rulebook: [.opencode/plugins/plain-style.md](.opencode/plugins/plain-style.md).
 
 ```text
@@ -61,7 +62,7 @@ The pattern: every "before" hides a fact or an action. Every "after" states it.
 
 ## Rule decisions
 
-Every rule in the rulebook earned its place through an A/B benchmark.
+Every wording rule in the rulebook earned its place through an A/B benchmark.
 Rules enter only if their compliance lift beats the measured dilution cost
 (~2.2 points per added rule) and they leave only if the model stays at ≥86.7%
 fully compliant without them. Ablations on two models found no rule cuttable.
@@ -75,6 +76,12 @@ Decisions from the English Language proposal (2026-08-02):
 | Avoid passive voice                                        | Kept     | Already covered by Rule 1                      |
 | American English, title case, no Oxford commas,            | Not      | Not checkable by the scorer, and each injected |
 | gender-neutral pronouns, contractions allowed              | injected | rule costs ~2.2 points of dilution             |
+
+2026-11-23: rule 19 is a layout rule, adopted without a benchmark. It changes
+how prose is written to a file, not which words are chosen, so it cannot dilute
+compliance on wording. It lives in the rulebook rather than in an AGENTS.md
+because instructions get summarized away during compaction, and a wrapped line
+is exactly the kind of habit that comes back after a compaction.
 
 2026-11-03: rule 16 now applies to documentation only. The "Next:" line no
 longer applies to chat replies. In chat it made agents hand back commands they

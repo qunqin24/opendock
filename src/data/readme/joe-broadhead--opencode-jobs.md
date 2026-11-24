@@ -16,7 +16,7 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.4
+opencode plugin add github:joe-broadhead/opencode-jobs#v0.0.5
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/jobs-status`.
@@ -219,7 +219,7 @@ Set options with the object form of the plugin entry. Every option is optional.
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-jobs#v0.0.4",
+      "package": "github:joe-broadhead/opencode-jobs#v0.0.5",
       "options": { "enabled": true, "concurrency": 2, "keepAliveMinutes": 20 }
     }
   ]
@@ -239,7 +239,7 @@ Put the plugin entry in the system config: `/Library/Application Support/opencod
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.4", "options": { "concurrency": 2 } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-jobs#v0.0.5", "options": { "concurrency": 2 } }],
   "experimental": { "location_idle_timeout": "60 minutes" }
 }
 ```
@@ -306,7 +306,7 @@ Run `/jobs-status` first. Its last line is the next step.
 ## Uninstall
 
 1. Pause first if a job is mid-run: `/jobs-pause`.
-2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.4`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-jobs#v0.0.5`, then `opencode reload`.
 3. Remove the agent block you copied into `opencode.json`, or the job agent's Markdown file.
 
 The plugin's storage stays in OpenCode's own database; removing the plugin does not delete it.

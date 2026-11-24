@@ -9,6 +9,9 @@
 
 **在把程式碼、文件、資料丟給 AI 服務之前，先掃描敏感內容的守門員。**
 
+> **設計原則：** 預設無感、按需可觀測、在模型邊界：安全檢查失敗即阻斷。
+> 後續 adapter 工作依這三條開發與驗收（[ADR 0008](docs/adr/0008-transparent-protection-and-native-ux.md)）。這是 adapter 工作的契約，不代表所有宿主目前都已做到；各宿主現況見[宿主能力矩陣](docs/host-capabilities.md)。
+
 支援四種使用模式：
 - **OpenCode Plugin**：OpenCode 的強制入口檢查；OpenCode 要把內容送往模型時使用。
 - **pi adapter**：行程內的 pi extension，用共用 wire core 守住 agent 的 provider 請求。
@@ -20,7 +23,7 @@ MCP Server 模式已移除。它依賴模型在已收到相關 context 後自行
 | 模式 | 啟動方式 | 適用情境 |
 |------|----------|----------|
 | OpenCode Plugin | 在 `opencode.json` 加入 `leakshield` 套件或 `dist` 目錄（OpenCode v2） | 自動且 fail-closed 地保護 OpenCode 模型輸入與工具輸出 |
-| pi adapter | `pi -e node_modules/leakshield/dist/adapters/pi/extension.js`（或放在 pi `settings.extensions` 第一項） | 遮罩 pi 的 provider 請求並還原 read/write/edit/bash 參數 |
+| pi adapter | `pi install npm:leakshield`（0.4.0 起；本機建置可用 `pi install /absolute/path/to/built/leakshield`；[安裝說明](docs/pi.zh-TW.md)） | 遮罩 pi 的 provider 請求並還原 read/write/edit/bash 參數 |
 | CLI | `npm run scan -- --file ./path`（全域安裝或 `npm link` 後可用 `leakshield --file ./path`） | 明確的本機或 CI 掃描；不會把內容送到模型 |
 | Web UI | `npm run web` | 在 `http://localhost:3000` 手動以瀏覽器掃描 |
 
@@ -270,8 +273,10 @@ LeakShield 只支援 OpenCode v2：v2 載入套件的 `id` + `setup(ctx)` 定義
 
 | 狀態 | 設定 | 意思 |
 |------|------|------|
-| `PROTECTED` | `block` 或 `redact`，或 transparent 且 `wireProtection` 省略或為 `true`（v2 預設） | 安裝層檢查通過。transparent 模式下也會驗證最終的 HTTP body 或支援的 WS frame |
-| `PARTIAL` | Transparent 且 `wireProtection: false`（[hook-first 範本](config/opencode.hook-first.example.json)） | 不檢查最終出站 HTTP body |
+| `PROTECTED` | `block` 或 `redact`，或 transparent 且 `wireProtection` 省略或為 `true`（v2 預設），且每個已宣告的 capability 列都被覆蓋 | 安裝層檢查通過。transparent 模式下也會驗證最終的 HTTP body 或支援的 WS frame |
+| `PARTIAL` | Transparent 且 `wireProtection: false`（[hook-first 範本](config/opencode.hook-first.example.json)），或該 host 的[已宣告 capability 列](docs/host-capabilities.md)包含 `unknown` 或 `outside` | 不檢查最終出站 HTTP body，或某條已宣告的出口沒有覆蓋；doctor 會指名該列與關閉它的 issue |
+
+Doctor 會分開印出 `Configuration status`、`Wire protection` 與宿主整體的 `Coverage`。`Wire protection: enabled` 代表已驗證的設定，不是執行中 session 已成功攔截的證明；block 模式顯示 `not-applicable`，設定尚不明確時顯示 `unknown`。`PARTIAL` 會分別列出設定與宿主覆蓋的原因，兩者同時存在時都會印出。宿主覆蓋不依目前選擇的 provider／model 篩選。每個宿主區段也會印出宣告的憑證處理方式、映射持久化政策與完整 residuals；`opt-in` 表示支援選用持久化，不代表本次安裝已啟用。
 
 `PARTIAL` 時：
 
@@ -288,6 +293,7 @@ LeakShield 只支援 OpenCode v2：v2 載入套件的 `id` + `setup(ctx)` 定義
 - [映射持久化](docs/plugin/persistence.zh-TW.md): 選擇性開啟的加密儲存、金鑰保管、清除
 - [容量與生命週期](docs/plugin/capacity.zh-TW.md): 預算、session 上限、保留
 - [唯讀 env 查詢](docs/plugin/env-queries.zh-TW.md): 選擇性開啟、不回傳 value 的設定查詢工具
+- [Agent hook 對照](docs/hooks.zh-TW.md): OpenCode、pi、Claude Code 的 hook 設計與 API，以及可用於遮罩／還原的攔截點
 
 #### 持久化風險須知（開啟前必讀）
 
@@ -339,7 +345,7 @@ rm -rf "$SMOKE_DIR"
 leakshield --doctor     # 全域安裝或 npm link 後；在 repo 內可用 npm run scan -- --doctor
 ```
 
-Doctor 不會把任何內容送出去。它會檢查 OpenCode host 版本、讀取 OpenCode 會套用的 `opencode.json` 或 `opencode.jsonc`（`.opencode/`、專案根目錄和一個全域目錄）、依 host 的方式合併其中的 `plugins` 陣列、確認 LeakShield 已用 plugin 本身接受的選項註冊、確認本機 `dist` 進入點真的存在（缺少時 OpenCode 會靜默記錄並跳過 plugin：session 看起來正常但沒有保護）、載入 guard 設定，並在本機跑合成 canary 的 smoke scan。Exit code 0 代表 `PROTECTED` 或 `PARTIAL`（`wireProtection: false`：不檢查最終出站 HTTP body）；v1 host 會回報 `BROKEN`，修正方式是升級到 OpenCode v2；其他狀態會印出失敗的檢查項與具體修正方式，plugin 未註冊時還會附上可直接複製的註冊片段。另有 `Claude Code:` 區段檢查 [Claude Code proxy](docs/claude-code.zh-TW.md) 的設定；即使沒有 OpenCode，只要 Claude Code 經過執行中的 LeakShield proxy，結束碼也是 0。
+Doctor 不會把任何內容送出去。它會檢查 OpenCode host 版本、讀取 OpenCode 會套用的 `opencode.json` 或 `opencode.jsonc`（`.opencode/`、專案根目錄和一個全域目錄）、依 host 的方式合併其中的 `plugins` 陣列、確認 LeakShield 已用 plugin 本身接受的選項註冊、確認本機 `dist` 進入點真的存在（缺少時 OpenCode 會靜默記錄並跳過 plugin：session 看起來正常但沒有保護）、載入 guard 設定，並在本機跑合成 canary 的 smoke scan。每個 host 區段後面會印出該 host 宣告的 capability 列（[總表](docs/host-capabilities.md)）；`unknown` 或 `outside` 會讓該 host 停在 `PARTIAL`，並指名關閉它的 issue。Exit code 0 代表 `PROTECTED` 或 `PARTIAL`（`wireProtection: false`：不檢查最終出站 HTTP body）；v1 host 會回報 `BROKEN`，修正方式是升級到 OpenCode v2；其他狀態會印出失敗的檢查項與具體修正方式，plugin 未註冊時還會附上可直接複製的註冊片段。另有 `Claude Code:` 區段檢查 [Claude Code proxy](docs/claude-code.zh-TW.md) 的設定；即使沒有 OpenCode，只要 Claude Code 經過執行中的 LeakShield proxy，結束碼也是 0。
 
 Doctor 是在 host 之外執行的安裝層檢查，看不到執行中的 session。執行期的證明來自上面的 smoke test 或 `scripts/e2e/run-boundary.mjs`。
 

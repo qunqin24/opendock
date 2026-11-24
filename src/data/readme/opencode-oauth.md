@@ -17,7 +17,7 @@ bearer. Nothing in the plugin is specific to one identity provider.
 
 ## Requirements
 
-- **OpenCode 2.0.32 or later.** OpenCode 1.x does not load the plugin.
+- **OpenCode 2.2.1 or later.** The plugin refuses to load on an older version.
 - **An authorization server** (identity provider) that your browser and OpenCode
   can both reach. It need not be on the internet: a LAN or a VPN is enough, since
   the server never connects to your machine. It needs a client that:
@@ -57,7 +57,11 @@ Add the plugin and the provider to your OpenCode config
     "my-llm": {
       "name": "My LLM",
       "package": "@opencode/ai/providers/openai-compatible",
-      "settings": { "baseURL": "https://llm.example.com/v1" }
+      "settings": { "baseURL": "https://llm.example.com/v1" },
+      // Optional: a model, by its ID, for what its server doesn't report.
+      "models": {
+        "qwen3": { "name": "Qwen3", "settings": { "reasoningEffort": "high" } }
+      }
     }
   }
 }
@@ -67,13 +71,14 @@ Then sign in once, with `/connect` in the TUI or `opencode auth login my-llm`.
 The browser opens your identity provider, and after you sign in the tab says so.
 OpenCode renews the token on its own from then on.
 
-The plugin then adds the models that the provider's `/models` lists, named by
-their IDs, with no reasoning-effort variants. Each has OpenCode's default
-limits, except the context size where vLLM, SGLang or llama.cpp reports one
-there. To change any of this for a model, list it under the provider's
-`models`: what the entry sets wins over what the server reports, and an entry
-that renames a model with `modelID` starts from OpenCode's defaults. Set `model`
-to make one your default.
+The plugin adds the models that the provider's `/models` lists, named by their
+IDs, with the context size vLLM, SGLang or llama.cpp reports and OpenCode's
+defaults otherwise. A model you list under `models` keeps that context unless
+its entry sets a `limit`, and also gets OpenCode's reasoning-effort variants; an
+entry under another key that sets `modelID` starts from OpenCode's defaults.
+Set `model` to `"my-llm/<model ID>"` to make one your default. The plugin reads
+the `baseURL` as OpenCode does, filling `${NAME}` variables, and logs why when
+it can't.
 
 Each plugin entry signs in to one provider, and replaces that provider's API key
 method with the sign-in.
@@ -95,7 +100,7 @@ Pinning a version (`opencode-oauth@<version>`) turns update checks off.
 | `clientID` | yes | The client ID registered with the authorization server. |
 | `issuer` | yes, or both endpoints | The authorization server's issuer, such as `https://auth.example.com/realms/example`. The plugin reads the endpoints from the server's metadata (OpenID Connect Discovery or RFC 8414). |
 | `authorizationEndpoint`, `tokenEndpoint` | instead of `issuer` | The endpoints themselves, for a server that publishes no metadata, or whose metadata names a different issuer. |
-| `scope` | yes | The scopes to request, space-separated. Include what gets you a refresh token. |
+| `scope` | no | The scopes to request, space-separated, such as `openid offline_access`. Include what gets you a refresh token. Unset, the plugin requests no scope of its own, which leaves the choice to the server; set, it replaces the server's default. |
 | `resource` | no | The API the access token is for, such as `https://llm.example.com`, for a server that issues tokens per resource (RFC 8707). It is sent with the sign-in and every token request, so sign in again after changing it. |
 | `port` | no | The loopback redirect's port. Unset or `0` lets the OS pick one. |
 | `authorizationParams` | no | Extra parameters for the authorization request, such as `{ "audience": "https://llm.example.com" }` for a server that picks the access token's audience from one. It cannot set `resource`, or replace the parameters the grant sets itself. |
@@ -134,6 +139,11 @@ The SearXNG instance must allow JSON output (`json` in `search.formats` in its
 - **Sign in again** when the refresh token lapses or the server revokes it. A
   failed renewal does not open the browser: run `/connect` or
   `opencode auth login <provider>` again.
+- **Renewal goes to the server you signed in with,** for the same `resource`,
+  as the credential records them. Setting or changing `issuer`, `tokenEndpoint`
+  or `resource` makes renewal fail until you sign in again, and a removed
+  `resource` is still sent until then. A credential from an earlier release
+  renews once from whatever the options name at that moment, and records it.
 - **During a sign-in only**, the plugin listens on `127.0.0.1` for the redirect,
   and closes the listener as soon as the attempt ends. The listener runs in
   OpenCode's server, so sign in where the browser is: an OpenCode server on
@@ -158,6 +168,9 @@ The SearXNG instance must allow JSON output (`json` in `search.formats` in its
   sign-in (RFC 6749 section 3.1), so a planted value can't hide the real one.
 - Concurrent renewals of one refresh token share a single request, so a server
   that revokes a reused rotated refresh token does not sign you out.
+- A JSON response is refused past 4 MiB, counted as it arrives and, if it
+  comes compressed, as it decodes, so no server can make OpenCode hold a huge
+  body.
 - Error messages carry an HTTP status and, only when it is short plain text, an
   OAuth error code, the authorization response's error description, a refused
   token type or a metadata issuer, always quoted after where it came from; never

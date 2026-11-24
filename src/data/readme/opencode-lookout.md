@@ -10,7 +10,7 @@ existing sidebar. It does not replace Context or MCP status.
 Use OpenCode's native MCP section or `/mcps` for MCP inventory and controls.
 
 Lookout is an independent community extension, not an official OpenCode product.
-It uses the public OpenCode **2.2.5** API contract. Use Node.js **26.4.0+** for a full development install;
+It uses the public OpenCode **2.4.1** API contract. Use Node.js **26.4.0+** for a full development install;
 the offline CLI retains **Node.js 22+** support with production dependencies.
 The repository is public under the MIT license. npm publication is a separate,
 manually approved release operation. See the support profiles below before using

@@ -5,7 +5,7 @@
 **LitOpenCode는 OpenCode에 붙여 쓰는 추가 기능입니다. 에이전트가 "다 됐어요"라고 말하기 전에 자기 작업을 직접 확인하게 하고, 다음 세션이 이번 세션이 멈춘 곳에서 바로 시작하도록 기록을 남깁니다.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.50" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.53" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="월간 npm 다운로드 수" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT 라이선스" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub 스타" /></a>
@@ -21,7 +21,7 @@ OpenCode에 기능 하나를 부탁하면 코드를 쓰고 끝났다고 말합�
 
 ## 두 가지 사용법
 
-**간단하게.** 설치한 뒤 OpenCode를 다시 시작하면 `lit-loop` 에이전트로 열립니다. 다른 에이전트가 떠 있으면 Tab으로 바꾸면 됩니다. 평소처럼 요청을 쓰고 앞이나 끝에 `lit`을 붙이세요. 예: `src/dates.js의 날짜 파싱 버그 고쳐줘 lit`. `🔥 LIT IGNITED` 알림이 뜨고, 에이전트가 버그를 고치고 테스트를 돌린 뒤 확인한 내용을 알려 줍니다. `lit-plan` 에이전트에서는 같은 문장을 계획 요청으로 받으니, 무언가를 만들 때는 `lit-loop`에 두세요.
+**간단하게.** 설치한 뒤 OpenCode를 다시 시작하면 `lit-loop` 에이전트로 열립니다. 다른 에이전트가 떠 있으면 Tab으로 바꾸면 됩니다. 평소처럼 요청을 쓰고 앞이나 끝에 `lit`을 붙이세요. 예: `src/dates.js의 날짜 파싱 버그 고쳐줘 lit`. `🔥 LIT IGNITED` 알림이 뜨고, 에이전트가 버그를 고치고 테스트를 돌린 뒤 확인한 내용을 알려 줍니다. `lit`을 끝에 붙여도 앞에 붙인 것과 똑같이 동작합니다. 프로젝트에 테스트 명령이 있으면 LitOpenCode가 목표를 정할지 한 번 묻고, `lit` 앞에 쓴 말을 목표로 삼습니다. `로그인 버튼 고쳐줘 lit`이라고 보내면 `로그인 버튼 고쳐줘`를 목표로 제안하고, `yes`라고 답하면 목표가 정해집니다. `lit loop`, `lit-loop`, `litwork`도 앞뒤 어디에 붙여도 되고, `/lit-loop <작업>`과 `/litwork <작업>`도 같은 질문을 합니다. `lit-plan` 에이전트에서는 같은 문장을 계획 요청으로 받으니, 무언가를 만들 때는 `lit-loop`에 두세요.
 
 **본격적으로.** 큰 작업은 한 단계씩 나아갑니다. 각 단계의 결과를 다음 단계가 이어받고, 필요 없는 단계는 건너뛰면 됩니다.
 
@@ -53,7 +53,7 @@ Node.js와 npm, 그리고 모델 제공자를 설정해 둔 [OpenCode](https://o
 npm exec --package @litfamily/litopencode@latest -- litopencode install
 ```
 
-설치 도중 어떤 모델을 쓸지, 에이전트에게 권한을 얼마나 줄지 묻습니다. 권한은 무언가 하기 전에 OpenCode가 먼저 물어보는 `safe`에서 시작합니다. OpenAI 제공자로 새로 설치하면 계획과 검토는 GPT-6 Astra가, 만들기는 GPT-6 Luna가 맡으며, 다른 모델은 설치 중에 고를 수 있습니다.
+설치 도중 어떤 모델을 쓸지, 에이전트에게 권한을 얼마나 줄지 묻습니다. 권한은 무언가 하기 전에 OpenCode가 먼저 물어보는 `safe`에서 시작합니다. OpenAI 제공자로 새로 설치하면 계획과 검토는 GPT-6 Astra가, 만들기는 GPT-6 Luna가 맡으며, 다른 모델은 설치 중에 고를 수 있습니다. 모델 메뉴에는 OpenAI와 xAI만 있는 게 아닙니다. OpenCode가 아는 제공자가 모두 나오고, `opencode.json`에 직접 추가한 제공자도 함께 나옵니다. 회사 게이트웨이나 OpenAI API 방식으로 응답하는 로컬 서버가 그런 예입니다. 먼저 OpenCode에 제공자를 등록하고(`opencode models`에 보이면 됩니다), 설치 프로그램에서 번호로 고르거나 `provider/model` 이름을 직접 적으면 됩니다. 나중에 바꿀 때는 채팅에 `/lit-model`을 입력합니다. 같은 번호 목록이 나오고, `/lit-model 7`은 7번 모델을 리드와 헬퍼 모두로 정합니다. 하나만 바꾸려면 `/lit-model lead 7`이나 `/lit-model helper 7`을 씁니다. 고른 값은 `litopencode.json`에 저장되므로, OpenCode를 다시 켜면 새 터미널에서도 그대로 쓰입니다. 스크립트에서는 `--model my-gateway/deepseek-chat`이 같은 일을 하고, OpenCode 목록에 없는 이름은 설치 프로그램이 받지 않습니다.
 
 OpenCode는 세션을 시작할 때마다 전역 `AGENTS.md` 하나를 읽습니다. 설치 프로그램은 거기에 `lit`이 무슨 뜻인지, 허락 없이는 push나 배포를 하지 않는다는 것을 적은 짧은 표시 블록을 넣자고 제안하며, 한 번만 묻습니다.
 
@@ -184,7 +184,7 @@ LitOpenCode를 설치하면 OpenCode 세션 화면 맨 아래에 작은 카드�
 | `{ "band": { "card": true } }` | 목표, 다음 할 일, 경고를 담은 카드를 하나 더 아래에 붙입니다 |
 | `{ "notify": true }` | 미션이 끝나면 데스크톱 알림과 소리로 알려 줍니다 |
 
-`notify`는 직접 넣기 전에는 꺼져 있고, OpenCode 자체 설정 `"attention": { "enabled": true }`도 켜져 있어야 동작합니다. 지도와 스킬 칩이 어떻게 세는지는 [사용 안내](./docs/guide-Ko-KR.md#lit-상태-카드)에, 카드의 각 부분은 [레퍼런스](./docs/reference-Ko-KR.md#tui-미션-패널)에 자세히 있습니다.
+`notify`는 직접 넣기 전에는 꺼져 있고, OpenCode 자체 설정 `"attention": { "enabled": true }`도 켜져 있어야 동작합니다. 지도와 스킬 칩이 어떻게 세는지는 [사용 안내](./docs/guide-Ko-KR.md#lit-상태-카드)에, 카드의 각 부분은 [레퍼런스](./docs/reference-Ko-KR.md#tui-미션-패널)에 자세히 있습니다. 설치 프로그램, `litopencode doctor`, `litopencode --help`는 신스웨이브 LIT 마크로 시작합니다. 어두운 테마에 트루컬러 터미널이면 카드 제목에도 같은 색의 작은 그라데이션 ` 🔥 LIT ` 배지가 붙습니다. 그림이 제대로 보이기 어려운 환경에서는 더 단순하게 나옵니다. 색을 끄면 마크가 한 가지 색으로 그려지고, 파이프로 넘기거나 창이 좁거나 UTF-8을 쓰지 않는 터미널에서는 `LIT · opencode` 한 줄만 찍힙니다. 배지를 그릴 수 없을 때 카드는 원래 제목을 그대로 씁니다.
 
 ## OpenCode 2의 목표
 
@@ -238,7 +238,7 @@ OpenCode 1과 OpenCode 2는 한 컴퓨터에 같이 있을 수 있고, 플러그
 
 ## 점검, 업데이트, 제거
 
-설치 직후나 무언가 이상할 때 `litopencode doctor`를 실행하세요. 플러그인과 스킬이 제대로 연결됐는지 알려 주고, 읽기만 할 뿐 아무것도 바꾸지 않습니다.
+설치 직후나 무언가 이상할 때 `litopencode doctor`를 실행하세요. 플러그인과 스킬이 제대로 연결됐는지 알려 주고, 읽기만 할 뿐 아무것도 바꾸지 않습니다. LitOpenCode는 실행 상태를 `.litopencode/` 아래의 작은 잠금 폴더로 지킵니다. 잠금을 쥔 프로세스가 중간에 죽어도, 주인 기록이 없거나 주인 프로세스가 죽은 채로 30초가 지나면, 또는 잠금을 10분 넘게 쥐고 있으면 다음에 쓰려는 쪽이 알아서 넘겨받습니다. `lit cancel`도 이런 잠금에 막히지 않습니다. 그래도 잠금 때문에 막히면 오류에 잠금 폴더 경로와 그 잠금을 쥔 쪽(pid와 경과 시간, 또는 `no owner record`)이 나옵니다. 그 프로젝트의 OpenCode 세션을 모두 닫고 그 폴더를 지운 뒤 다시 시도하세요. 잠금 폴더 목록은 [사용 안내](./docs/guide-Ko-KR.md#문제-해결)에 있습니다.
 
 ```sh
 npm exec --package @litfamily/litopencode@latest -- litopencode doctor

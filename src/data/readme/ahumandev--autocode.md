@@ -2,6 +2,8 @@
 
 ![Autocode](docs/logo.webp)
 
+# AutoCode
+
 AutoCode is an OpenCode plugin that turns rough concepts into durable designs and completed solutions.
 
 Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, or receive guided tutorials with **Advise mode**.

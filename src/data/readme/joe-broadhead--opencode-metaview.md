@@ -110,36 +110,21 @@ the plugin is not loaded there.
 
 See [Scripting](https://github.com/joe-broadhead/opencode-metaview/blob/HEAD/docs/scripting.md).
 
-### Shared-data source
+### Standalone build: no conversations source
 
-The plugin declares one [source-contract](https://github.com/we-the-rebel-alliance/source-contract) source in
-`package.json`'s `sources`, so Memory, Artifacts and other consumers can read Metaview through the shared contract with
-no code of their own:
+This build does not declare a `metaview.conversations` source in `package.json`, and it offers no source to Jelly.
+Memory, Artifacts and other consumers therefore see no source to bind or collect. The native Metaview tools and the
+general tools RPC are unchanged.
 
-| Source | Kind | What it lists | Methods |
-| --- | --- | --- | --- |
-| `metaview.conversations` | events (`meeting`) | your own recorded conversations in Metaview (the ones where you are an interviewer, not every one you can see), oldest first, once they started 3 hours ago, within the last 30 days | `events_list` and `probe` on `metaview.workspace.tools` |
+The old `events_list` and `probe` methods are not registered either. They are absent from `describe`, are not tools in
+the `metaview` namespace, and an old script's call fails as an unknown RPC method before any Metaview or identity read:
+there is no page, event, cursor or probe answer, and no empty success.
 
-**Only your own:** the source lists a conversation only when you are one of its interviewers. It asks Metaview for
-those with its `"$self"` interviewer filter, and checks each conversation's interviewers against your own participant
-id (the `participant_id` that `get_user_context` names) again, so a conversation where someone else is the interviewer
-is never listed, even for an admin who can see the whole organization. Each conversation is one event: its id, start, title, Metaview link and conversation type, and its candidates and
-interviewers by the name Metaview shows. **Candidate data is personal data, so an event carries metadata only:** no
-transcript, summary, note, score, feedback, email or phone number, and its `text` is always empty. A conversation whose
-title holds a secret is refused for good, and an email address or phone number in a title is masked. Metaview keeps
-conversations only as long as your organization's retention setting says, which no tool names, so the source vouches
-for the last 30 days: an older cursor or start answers a `gap` and reads on from inside them. One Metaview adds up to 7
-days behind the cursor, such as an upload, is still listed once (see Known limits). The account is `<organization id>/<user id>`, which `probe` names from
-`get_user_context` and a consumer binds; `probe` refuses another account. `events_list` needs no `probe` before it: on
-a session that has not probed, a listing reads `get_user_context` itself, once, and reuses what a `probe` in that
-session read, so it works after a restart of OpenCode and makes no repeat call there; a credential update or switch
-clears it, and a read that was out when it happened is not kept. A listing for another account
-than the signed-in one is `ACCOUNT_MISMATCH` before anything is searched. The declaration names no `readsIdentity`: a
-consumer on source-contract 0.1 refuses that key. The reads are
-Metaview's own `get_user_context` (`probe` and `events_list`) and `search_conversations` (`events_list`), through OpenCode's own sign-in and under the
-same rules as any Metaview call, and the `rationale` Metaview receives with each is fixed text with no candidate detail.
-`npm run conformance` runs the contract's conformance kit on fixtures; see
-[Scripting](https://github.com/joe-broadhead/opencode-metaview/blob/HEAD/docs/scripting.md#the-conversations-source).
+An old collection caller has **no supported replacement in this standalone build**. Ordinary explicit native searches
+remain available, but they are not a migration path: they do not inherit the collection's identity binding, cursor,
+metadata-only event shape or privacy guarantees. Older pinned installs are unchanged, and data already collected by a
+consumer is not deleted or reset by this build. Whether a future build declares the collection source is a separate
+owner decision; this candidate does not offer one.
 
 ## Permissions
 
@@ -231,8 +216,6 @@ The plugin inserts this block directly after each agent's base rule that allows 
   { "action": "metaview_search_conversations", "resource": "*", "effect": "allow" },
   { "action": "metaview_search_reports", "resource": "*", "effect": "allow" },
   { "action": "metaview_search_snippets", "resource": "*", "effect": "allow" },
-  { "action": "metaview_events_list", "resource": "*", "effect": "allow" },
-  { "action": "metaview_probe", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_ai_field", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_job_post_check", "resource": "*", "effect": "allow" },
   { "action": "metaview_create_report", "resource": "*", "effect": "allow" },
@@ -377,24 +360,12 @@ credential store.
 
 ## Known limits
 
-- **Whose conversations is Metaview's call, and the plugin's second check.** The source lists a conversation only when
-  your own participant id (the `participant_id` that `get_user_context` names) is one of its interviewers. Metaview
-  documents that `participant_id` is your contact UUID and that `"$self"` stands for it in a filter, and each
-  interviewer of a conversation is read as a participant UUID; no live listing has confirmed that the two ids are the
-  same value for your conversations. If they were not, the source would list nothing rather than someone else's. A
-  conversation you recorded but are not an interviewer on is not listed.
-- **The conversations source lists by start time.** Metaview's search orders and filters conversations by their start
-  only, with no time Metaview received them, and an uploaded recording is listed at the start its uploader gave.
-  - **Late arrivals:** one that appears after the source read past its start (an upload, a conversation shared with you
-    later) is listed once if it started within 7 days of the cursor; one later than that is not listed, and no gap says so.
-  - **Busy accounts:** the cursor de-duplicates about 200 conversations (about 28 a day over the 7 days). With more,
-    the lookback is shorter, and a `window-truncated` gap says so once per shortening. A de-dup key is 25 bits of a
-    hash of the id, so about 1 late arrival in 168,000 can be taken for one already listed and not listed.
-  - **Retention:** the source vouches for the last 30 days, since Metaview's retention is your organization's own
-    setting and no tool names it. A workspace retention shorter than 30 days can delete recordings before the source
-    reads them, with no gap.
-  - **Deleted or no longer yours:** one deleted, or that you lose access to (unshared, or hidden by a role change),
-    before a read reaches it is not listed and is not a gap; one already listed is not retracted.
+- **No conversations source or collection methods in this build.** `package.json` declares no `sources`, so Memory,
+  Artifacts and other consumers cannot bind or collect Metaview conversations from this build. `events_list` and
+  `probe` are not registered methods: they are absent from `describe`, and an old call fails as an unknown RPC method
+  before any Metaview or identity read. An old collection caller has no supported replacement here; ordinary explicit
+  native searches do not inherit the collection's identity, cursor, metadata or privacy guarantees. Older pinned
+  installs remain unchanged, and already collected data is not deleted or reset by this build.
 - **Some changes reach people.** A screening or sequence message, an application-review decision that can reject a candidate and sync to your ATS, and feedback to the Metaview team (a hiring decision can email the candidate) all reach people or systems outside OpenCode. At the default `access`, an agent can make them without a prompt.
 - **Metaview's server decides the tools.** The plugin classifies the tools it knows. A tool Metaview adds later is not classed by the plugin: the `access` option decides whether it runs, asks or is denied, and `/metaview-status` counts it as unknown.
 - **Role and plan limits.** What you can read follows your Metaview role, and reports, AI fields and full transcripts may need a paid plan. The plugin does not change either.

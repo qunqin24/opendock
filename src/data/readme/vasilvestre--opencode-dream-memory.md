@@ -18,7 +18,7 @@ memory it just read.
 ## Install
 
 Requirements: `opencode` and `jq` on `PATH`, `curl` or `wget` to download, and
-systemd for the timer.
+systemd for the timer. `dream discover` also needs the `sqlite3` command.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vasilvestre/opencode-dream-memory/main/install.sh | sh
@@ -57,7 +57,9 @@ symlinks its own copy keeps working.
 
 The deep pass leaves an audit trail: `dreaming/deep/<date>.md` lists each
 promoted fact with the light-report line that supports it, so a fact stays
-checkable after the corpus is gone.
+checkable after the corpus is gone. A reverted pass puts the report and the
+diary entry back as they were and adds one `Reverted` line, so the audit trail
+only describes facts that are still in memory.
 
 If `opencode` is not on the systemd default `PATH`, write its directory to
 `~/.config/dream.env`, which the unit reads when present:
@@ -107,9 +109,14 @@ Two files, read fresh on every request:
 
 `<name>` is the base name of the project directory: `~/homelab` reads
 `projects/homelab/MEMORY.md`. The corpus uses the same tag, so a candidate
-lands in the file of the project it came from. OpenCode creates one plugin
-instance per project location, so the hook knows which project it serves; a
-worktree uses the name of its main repository.
+lands there by default; the deep pass may move a fact to the file of another
+project it is about, but only when that project is already tracked (listed in
+`dream-projects`). `dream` restores shared memory, the diary entry, the deep
+report and every project file from before the run as soon as the deep pass
+writes outside that list, whatever the pass exit code. The run then exits
+non-zero, so the timer reports the night as failed.
+OpenCode creates one plugin instance per project location, so the hook knows
+which project it serves; a worktree uses the name of its main repository.
 
 The block opens with a header saying the content comes from a nightly pass and
 may be stale. Top-level titles are dropped. A part that is missing, empty or
@@ -186,6 +193,7 @@ and that flag beats the agent's pinned model. Override the file path with
 | `dream` | builds the corpus, then the light and deep passes |
 | `dream corpus` | only the corpus, no model, no cost |
 | `dream status` | one screen of state, read-only |
+| `dream discover` | lists the git repositories opencode saw but the project list omits |
 | `dream reset` | deletes memory, diary, staging and corpus under `DREAM_HOME` |
 
 `dream reset` asks for confirmation; add `--yes` to skip it. It never touches

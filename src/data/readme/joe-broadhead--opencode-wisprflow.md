@@ -26,7 +26,7 @@ is allowed like every other tool by default: see [Permissions](#permissions).
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.7
+opencode plugin add github:joe-broadhead/opencode-wisprflow#v0.0.8
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/wisprflow-status`: it shows `sign-in required` until you sign
@@ -41,7 +41,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.7" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.8" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -121,7 +121,7 @@ other people's words and contact details. Restrict it in any of these three ways
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.7", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.8", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -188,7 +188,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.7", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-wisprflow#v0.0.8", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -207,7 +207,7 @@ plugin entry in the system config: `/Library/Application Support/opencode/openco
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.7"]
+  "plugins": ["github:joe-broadhead/opencode-wisprflow#v0.0.8"]
 }
 ```
 
@@ -220,8 +220,8 @@ all, and Scratchpad through it, is set in Wispr Flow's admin portal.
 - **Meetings need Cloud Sync.** A meeting recorded while Dictation cloud storage is off never appears, even after you turn it on.
 - **Some Wispr Flow data is out of reach.** No tool reads dictation history, the dictionary, snippets, styles, usage stats or Notetaker chat, and no tool takes audio.
 - **The tool list depends on the account.** An active HIPAA agreement or an organisation policy can turn Wispr Flow's MCP off, and a tool the plugin has not classified runs at the `access` value you set.
-- **The meetings source sees what Wispr Flow's MCP sees.** Wispr Flow's MCP needs Notetaker and MCP access, Cloud Sync, no active HIPAA agreement and no organisation policy that turns MCP off; it answers "Too many requests" when queries come too fast, publishes no number for that limit, and asks you to wait about a minute ([Wispr Flow](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)). A listing reads `search_meetings` once per page of 200 meetings of each week, from up to a week behind its cursor, to find a meeting that reached Wispr Flow late. Wispr Flow names no account, so the source's owner is unverified (OpenCode's sign-in, not a Wispr Flow identity): its id is the sign-in's credential id and its label is for display only, so after any new sign-in an old cursor is refused with `ACCOUNT_MISMATCH`, and a consumer starts again. On Wispr Flow's free plan, meetings older than 30 days are locked, and Wispr Flow names no plan, so a listing reaches back at most 29 days on every plan, a day inside the lock: one that starts earlier answers a `gap` (`expired`) once and lists from 29 days ago. A minute Wispr Flow caps (more than 1000 meetings) answers a `gap` (`window-truncated`) and the listing moves past it. A meeting that reaches Wispr Flow after the cursor passed its start (processed late, uploaded from a Mac that was offline, or shared later) is listed on a later read, once, while it started at most a week, or 48 meetings (more when they share a start), behind the cursor. A meeting you delete before it is listed is never listed, and one already listed is not withdrawn.
-- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Wispr Flow whose answers follow the JSON shape Wispr Flow's live `search_meetings` returned when last checked; their content is made up, not live-verified. Its report is complete: the expired-cursor and gap checks run on a cursor older than the 30-day window, and only the check on `failed[]` is not applicable, with its reason in the report: every meeting comes whole from a `search_meetings` listing and a failed call fails the whole read, so no single meeting fails on its own.
+- **The meetings source sees what Wispr Flow's MCP sees.** Wispr Flow's MCP needs Notetaker and MCP access, Cloud Sync, no active HIPAA agreement and no organisation policy that turns MCP off; it answers "Too many requests" when queries come too fast, publishes no number for that limit, and asks you to wait about a minute ([Wispr Flow](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)). A listing reads `search_meetings` once per page of 200 meetings of each week, from up to a week behind its cursor, to find a meeting that reached Wispr Flow late. Wispr Flow names no account, so the source's owner is unverified (OpenCode's sign-in, not a Wispr Flow identity): its id is the sign-in's credential id and its label is for display only, so after any new sign-in an old cursor is refused with `ACCOUNT_MISMATCH`, and a consumer starts again. The owner today carries no `verified: false` field, so a consumer reading only the page cannot see that it is unverified and must not treat the owner as a verified provider identity. On Wispr Flow's free plan, meetings older than 30 days are locked, and Wispr Flow names no plan, so a listing reaches back at most 29 days on every plan, a day inside the lock: one that starts earlier answers a `gap` (`expired`) once and lists from 29 days ago. A minute Wispr Flow caps (more than 1000 meetings) answers a `gap` (`window-truncated`) and the listing moves past it. A meeting that reaches Wispr Flow after the cursor passed its start (processed late, uploaded from a Mac that was offline, or shared later) is listed on a later read, once, while it started at most a week, or 48 meetings (more when they share a start), behind the cursor. A meeting you delete before it is listed is never listed, and one already listed is not withdrawn.
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Wispr Flow whose answers follow the JSON shape Wispr Flow's live `search_meetings` returned when last checked; their content is made up, not live-verified. Its report is complete: every check that applies ran. The 13 checks that do not apply to `wisprflow.meetings` (18 to `wisprflow.meetings.list`) are listed in the report; only `failed-holds-cursor` carries a reason: every meeting comes whole from a `search_meetings` listing, and a failed call fails the whole read, so no single meeting fails on its own. `event-within-max-bytes` runs on the events source.
 - **Attendee contacts are readable at every `access` value.** `get_participant_contacts` is a read, so it is allowed unless you add a rule for it.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2.** Other releases inside `>=2.2.3 <2.4.0` start, and status reports them as untested.
 - **Jelly.** The `access` setting declares its choices, which a Jelly needs app#1301 to read; an older Jelly turns the declaration down.
@@ -278,7 +278,7 @@ credential store.
 1. Sign out: `opencode mcp logout wisprflow`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: wisprflow` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Wispr Flow**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.7`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-wisprflow#v0.0.8`, then `opencode reload`.
    `opencode mcp list` no longer lists `wisprflow`.
 4. Remove any Wispr Flow rules you copied into your agents' own `permissions`.
 

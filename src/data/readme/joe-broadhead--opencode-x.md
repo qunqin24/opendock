@@ -137,9 +137,10 @@ X bills every call, and the plugin's cost line sits on some answers. On the mode
 only for `x_search_posts_all`, `x_get_posts_by_id`, `x_get_posts_by_ids`, `x_get_posts_counts_recent`,
 `x_get_users_mentions`, `x_get_users_timeline`, `x_get_users_posts`, `x_get_users_bookmarks`,
 `x_get_users_bookmarks_by_folder_id`, `x_get_users_liked_posts`, `x_search_users`, `x_get_users_by_id`,
-`x_get_users_by_username`, `x_get_users_by_usernames`, `x_get_users_me_followers`, `x_get_users_me_following`,
-`x_get_users_list_memberships` and `x_get_users_blocking`; every other read, and every write, ends without one. A
-script's result carries a cost line on every method X prices, and says the price is unknown for a method X does not.
+`x_get_users_by_username`, `x_get_users_by_usernames`, `x_get_users_me`, `x_get_users_me_followers`,
+`x_get_users_me_following`, `x_get_users_list_memberships` and `x_get_users_blocking`; every other read, and every
+write, ends without one. A script's result carries a cost line on every method X prices, and says the price is unknown
+for a method X does not.
 
 ### Sources
 
@@ -149,7 +150,8 @@ for their collectors, not for answering questions: it lists, since a cursor, one
 `events.feeds` names) as normalised events, oldest first, each with its author's handle and link. The tools RPC's
 `probe` says who is signed in. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default,
 an account lookup included, besides a feed source's small reach check) and says there is more when it stops early; a collector picks up the rest on its next
-call. A feed's page counts the posts, authors and users X returned, and refuses for good a post holding a secret.
+call. A single-feed page counts the posts, authors and users X returned and refuses for good a post holding a secret; the
+combined source `x` counts what it reads, including its one identity read, but does not screen posts.
 Leaving a feed out of `events.feeds` turns its source off
 ([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#sources)).
 

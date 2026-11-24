@@ -6,6 +6,7 @@
 [![listed in awesome-dsh-plugin](https://img.shields.io/badge/awesome--dsh--plugin-listed-3964fe)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 [![HOL Trust Score](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3D27painter%252Fmoli%26metric%3Dtrust%26style%3Dfor-the-badge)](https://hol.org/registry/plugins/27painter%2Fmoli)
 [![listed in Awesome Codex Plugins](https://img.shields.io/badge/Awesome_Codex_Plugins-listed-3964fe)](https://github.com/hashgraph-online/awesome-codex-plugins)
+[![listed in Awesome Moli](https://img.shields.io/badge/Awesome_Moli-listed-3964fe)](https://github.com/lexmount/awesome-moli)
 
 A local browser bridge for **DeepSeek Harness (DSH)**, **Codex**, and **OpenCode**.
 It wraps [Moli](https://github.com/lexmount/moli), a Rust headless browser for AI agents, to fetch

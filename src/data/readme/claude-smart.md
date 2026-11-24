@@ -410,6 +410,15 @@ equivalent action.
 
 ## Configuration
 
+The bundled SDK uses one canonical HTTP quota policy. If you set inherited
+`RATELIMIT_HEADER_*`, `RATELIMIT_HEADERS_ENABLED`, or
+`RATELIMIT_IN_MEMORY_FALLBACK_ENABLED` assignments, remove them **including blank
+assignments** before upgrading. Select fallback through
+`RATELIMIT_IN_MEMORY_FALLBACK` (unset, `inherit`, or custom rules). Quota rejection
+uses standard `Retry-After`; optional successful-response quota metadata is
+retired. See the [SDK quota upgrade guide](https://github.com/ReflexioAI/reflexio/blob/main/developer.md#http-quota-ownership).
+
+
 Advanced users can tune claude-smart via environment variables — see [DEVELOPER.md](./DEVELOPER.md#environment-variables) for the full list.
 
 ### Where data lives
@@ -417,7 +426,7 @@ Advanced users can tune claude-smart via environment variables — see [DEVELOPE
 | Path | What |
 | --- | --- |
 | `~/.reflexio/data/reflexio_claude-smart.db` | SQLite data for fresh local installations, including learned preferences, skills, interactions, and search indexes. Existing installations keep the database path saved in `~/.reflexio/configs/config_claude-smart.json`, which may point to `reflexio.db` or a custom file. |
-| `~/.claude-smart/.env` | claude-smart config read by the hooks, backend, installer, and `npx claude-smart setup` — connection and learning policy (`REFLEXIO_URL` / `REFLEXIO_API_KEY`, `REFLEXIO_NATIVE_CLI_MODEL`), plus execution overrides. `CLAUDE_SMART_HOST` identifies the coding integration; it does not select learning execution. Confirmed setup converts obsolete selectors and preserves the original file for recovery. |
+| `~/.claude-smart/.env` | claude-smart config read by the hooks, backend, installer, and `npx claude-smart setup` — connection and learning policy (`REFLEXIO_URL` / `REFLEXIO_API_KEY`, `REFLEXIO_NATIVE_CLI_MODEL`), plus execution overrides. The hook dispatcher supplies coding-host identity; saved or exported `CLAUDE_SMART_HOST` no longer selects attribution, response format, or learning execution. Confirmed setup converts obsolete selectors and preserves the original file for recovery. |
 | `~/.claude-smart/claude-code/claude-smart/` | Claude Code's stable local copy of the active npm package, registered as the `reflexioai` marketplace. Claude Code runs the plugin in place from its `plugin/` dir. |
 | `.claude/settings.local.json` or `~/.claude/settings.json` | Claude Code hook environment, such as `CLAUDE_SMART_CITATIONS`; use project-local settings for one repo or user settings for all projects. |
 | `~/.codex/config.toml` | Codex plugin state, hook feature flags, and per-hook trust entries after `claude-smart install --host codex`. |
@@ -479,6 +488,11 @@ share a cross-process file lock on Linux, macOS, and native Windows.
 
 
 ### Short sessions and completion
+
+Backend and dashboard services are shared across coding sessions and hosts.
+Ending a session or disposing an OpenCode integration publishes its remaining
+work without stopping those services. Explicit service stop, restart and
+uninstall continue to own their lifetime.
 
 Automatic session completion keeps Reflexio's usefulness judge enabled. Claude
 Code's SessionEnd publishes an unsaved tail, then sends a completion hint even if

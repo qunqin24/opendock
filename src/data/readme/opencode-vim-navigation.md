@@ -20,6 +20,11 @@ submit an answer. Ctrl+Q or `i` returns to the question and follows the latest
 output; Escape or Ctrl+C returns without following or cancelling the question.
 The form resumes its normal input handling after leaving NAV.
 
+The sub-agent tray also supports Ctrl+Q. The shell and terminal pickers share
+the same OpenCode composer mode, so they support it too. NAV protects the
+picker from selection and other input; Ctrl+Q or `i` returns and follows the
+latest output, while Escape or Ctrl+C returns without closing the picker.
+
 ## Compatibility
 
 Tested with **OpenCode 2.1.4**. This uses OpenCode V2's TUI plugin API, not the
@@ -92,16 +97,16 @@ discovery. Use **one installation method**, not both. Restart OpenCode.
 | **PageUp / PageDown** | OpenCode default | Half a viewport up/down |
 | **Ctrl+Home / Ctrl+End** | OpenCode default | Jump to beginning/end |
 | **i** | Type normally | Return to INPUT, follow latest output, preserve draft |
-| **Escape / Ctrl+C** | OpenCode default | Leave NAV without moving the viewport, then perform OpenCode's normal interrupt/clear action |
+| **Escape / Ctrl+C** | OpenCode default | Leave NAV without moving the viewport; question forms and pickers stay open, otherwise OpenCode handles the key normally |
 
 Only Ctrl+Q is intercepted in INPUT, when the actual normal prompt is focused
-or an eligible question or plan-review form owns input. Ctrl+U/D keep their
+or an eligible question, plan-review form, or composer picker owns input. Ctrl+U/D keep their
 default prompt-editing/exit behavior until NAV.
 In NAV, other keys, Enter, and pasted text are ignored to protect the draft
 and avoid accidental submissions. This is transcript navigation, not Vim
 editing, selection, or visual mode.
 
-Dialogs and other non-base modes keep their own keyboard handling. NAV is
+Dialogs and other non-base modes outside the supported forms and pickers keep their own keyboard handling. NAV is
 not entered from shell mode, autocomplete, unrelated textareas, or permission
 rejection editors. Pending permissions and unrelated forms prevent NAV entry;
 incoming blocking requests exit NAV. Only the first displayed native question

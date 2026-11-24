@@ -76,14 +76,17 @@ The verifier is benchmarked, not asserted. Its checked-in results are on-disk, r
 | PASS scoring fixtures (5 disciplines) | 5/5 parser/scorer fixtures; these are not independent verifier runs | [control cases](tasks/benchmark/controls/cases) |
 | Benchmark integrity | Missing, malformed, duplicate, and unknown result files fail closed | [benchmark scorer](scripts/benchmark-scoring.mjs) |
 | Integrity under persuasion (5 pressure cases: authority, sunk cost, time, reframe, pedantry) | Latest artifact: 4/5 held with one false approval; no false-block guarantee is claimed | [pressure suite](tasks/benchmark/pressure/README.md) |
-| Skill routing (22 labeled prompts, 27 skills) | 18/22 rank-1, 0 collisions | [routing evals](tests/routing/eval-routing.mjs) |
+| Skill routing (28 baseline prompts, 4 E1 positives, 4 owner-negatives, 10 must-not-fire) | 28/28 rank-1, 4/4 top-k, 4/4 owner-negative, 10/10 must-not-fire | [routing evals](tests/routing/eval-routing.mjs) |
 | E1 evaluation pilot | 4 fixture-backed priority skills; positive top-k 4/4 and owner-negative 4/4; full 27-skill coverage remains open | [evals/catalog.json](evals/catalog.json) |
 | C1 fixed-case pilot | 3 local-only cases, 3 fresh subagent runs, independent review 3/3; host model cost unavailable | [evals/results/manifest.json](evals/results/manifest.json) |
 | GC1 GOAL-CHECK contract | deterministic positive/omitted-ask/repeated-gap fixtures; valid `NOT-DONE` is not promotable | [goal-check-contract.mjs](scripts/goal-check-contract.mjs) |
 | PR1 artifact closure | nested final/provenance, stale-byte, orphan, and path-escape fixtures | [artifact-closure.mjs](scripts/artifact-closure.mjs) |
 | V1 field-pilot contract | format and refusal tests only; no real external-source result claimed | [field-pilot README](evals/field-pilot/README.md) |
-| Baseline comparison (Vitruvius vs plain prompt, 10 cases) | fail-closed contract + deterministic scorer, proven by fixtures; 1-case pilot recorded and flagged `shared-harness` — a procedure check, not a comparison result | [baseline README](evals/baseline/README.md) |
+| Baseline comparison (Vitruvius vs plain prompt, 10 cases) | fail-closed contract, deterministic scorer, and an isolated prompt/isolation runner; 1-case pilot flagged `shared-harness`; the 10 cases remain unmeasured | [baseline README](evals/baseline/README.md) |
+| Content trust | instruction-like source text is flagged; the isolated baseline runner refuses a contaminated directory | [content-trust.mjs](scripts/content-trust.mjs) |
 | Problem-anchor contract | anchors resolve to non-blank lines on disk; unanchored `repo` claims, uncited anchors, decisions with no finding, and empty negative coverage all fail closed | [problem-anchor-contract.mjs](scripts/problem-anchor-contract.mjs) |
+| Read-depth contract | `metadata`/`snippet` sources cannot support a `verified` claim; claims are capped by the section/page actually read; an unread portion makes an absence check `unverified` | [evidence-ledger.mjs](skills/engineering-research/scripts/evidence-ledger.mjs) |
+| Scholarly synthesis | consensus, disagreements, trajectories, records/reports/studies, and publication/retraction status are part of the output, not an optional appendix | [scholarly-synthesis.md](references/scholarly-synthesis.md) |
 | Structural contract (27 skills) | enforced in CI | [validate-contract.mjs](scripts/validate-contract.mjs) |
 | Provenance schema (selected sidecars, `inferred` derivation traces) | selected root/plan/draft checks plus deterministic generic closure fixtures; legacy local closure remains opt-in | [validate-artifacts.mjs](scripts/validate-artifacts.mjs) |
 | External comparison yardstick (into-the-unknown, 15 research tasks) | Referenced by pinned commit; no local run executed — requires model credentials (agent runs plus a GPT-6-Astra judge) | [into-the-unknown](https://github.com/prometheus-eval/into-the-unknown) (pinned commit) + Recording comparison work note below |
@@ -174,7 +177,7 @@ Named engineering jobs over the shared loop:
 | `/fmea-brainstorm` | FMEA-style failure mode brainstorming with S/O/D ratings and RPN ranking |
 | `/hypothesis-generation` | Freeze rival hypotheses with dated evidence boundaries and discriminating tests |
 | `/peer-review` | Severity-graded adversarial peer review with a revision plan |
-| `/engineering-research` | Shared research method: discover → read → synthesize → verify → review |
+| `/engineering-research` | Shared research method: discover → read → synthesize → verify → review, with a read-depth contract and a craft pass that removes template prose and tests whether the report could be about any system |
 | `/verifier` | Blind subagent verdict on a claim with evidence trail (8 adversarial checks) |
 | `/compare` | Standards/designs/products into a source-grounded comparison matrix |
 | `/review` | Severity-graded adversarial review of an artifact |
@@ -184,7 +187,7 @@ Named engineering jobs over the shared loop:
 | `/eli5` | Plain-language engineering explanation |
 | `/simplified-technical-english` | Write, rewrite, and check technical text in Simplified Technical English (ASD-STE100) |
 | `/artifact-reading` | Anchored extraction from PDFs, drawings, specs |
-| `/scholarly-research` | Academic literature evidence layer (OpenAlex, arXiv, Semantic Scholar) with need-based routing modes, code prior-art search, and page-anchored open-access PDF reading; synthesis goes to `/engineering-research` |
+| `/scholarly-research` | Academic literature evidence layer (OpenAlex, arXiv, Semantic Scholar) with need-based routing modes, code prior-art search, page-anchored open-access PDF reading, a read-depth contract, and consensus/disagreement/trajectory synthesis with source status; synthesis goes to `/engineering-research` |
 | `/standards-lookup` | Engineering standards: AISC, ACI, ASCE, IEEE, Eurocode |
 | `/habit` | Extract explicit research preferences, validate them, and activate only human-approved rules in a project-local store |
 

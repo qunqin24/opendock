@@ -16,15 +16,23 @@ block appears in the right sidebar:
 
 ```
 OpenRouter
-Session $0.1832 · 3 req
-Last: z-ai/glm-5.3 · $0.0581
+Session total $0.1832 · 3 req
+OpenRouter $0.0000 + BYOK $0.1832
+Last: z-ai/glm-5.3 · total $0.0581
 $70.31 key left (weekly)
 Global: $392.08 left
 ```
 
-- `Session` — real charged cost of this session (cache discounts included)
+- `Session total` — what this session cost, OpenRouter and BYOK together
+  (cache discounts included)
+- `OpenRouter + BYOK` — the two parts of that total. **OpenRouter** is what
+  OpenRouter charged you (`usage.cost`). **BYOK** is what the upstream
+  provider charged on your own key (`usage.cost_details.upstream_inference_cost`),
+  counted only when OpenRouter flags the request as `is_byok`. Requests
+  recorded before BYOK tracking, or without that flag, show as `unknown`
+  instead of being counted as zero.
 - `Last` — the model the Auto Router actually picked for the last request,
-  with what it cost
+  with what it cost in total
 - `key left` — the key's remaining budget and its reset period, from
   [`GET /api/v1/key`](https://openrouter.ai/docs/limits)
   (`limit_remaining`, `limit_reset`)
@@ -35,9 +43,12 @@ The block is hidden entirely when the session is not talking to OpenRouter,
 and shows `waiting for first request…` until the first response completes.
 
 **`/openrouter-budget` command** — a dialog with the full picture: every captured request
-(time, kind, routed model, in/out tokens, cost, generation ID), the session
-total, and the wallet block — key label, key budget, account credits, and
-fetch time. Press `r` to refresh the wallet, `Esc` to close.
+(time, kind, routed model, in/out tokens, OpenRouter and BYOK cost, generation
+ID), the session total, and the wallet block — key label, key budget, account
+credits, and fetch time. The wallet block also says whether BYOK spend counts
+toward the key's own credit limit (`include_byok_in_limit`) and toward the
+budget that blocks requests first (`effective_budget.include_byok`); these are
+separate OpenRouter settings. Press `r` to refresh the wallet, `Esc` to close.
 
 ## Install
 
@@ -95,6 +106,9 @@ machine; the plugin collects no telemetry and reports nothing anywhere else.
 
 - The ledger starts when the plugin is first installed; spend from before
   installation is not reconstructed.
+- The BYOK amount is the cost OpenRouter reports for the request, which can
+  differ from what your provider invoices. The session total adds it to
+  OpenRouter's own charge, so treat it as a reported total, not an invoice.
 - Only requests made through this OpenCode instance are counted.
 - Auxiliary requests (title generation, compaction) are counted too, and
   labeled by kind in the `/openrouter-budget` dialog.

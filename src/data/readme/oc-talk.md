@@ -16,7 +16,7 @@ Open [`packages/`](packages), or take a row from the table below. Each package i
 | oc-harness-setup | CLI | `1.0.2` | Installs a Windows OpenCode starter, behind a doctor gate. | `npx --yes oc-harness-setup setup` |
 | oc-plugin-view | plugin | `0.2.0` | Lists every loaded server plugin in the sidebar. | `opencode plugin add oc-plugin-view` |
 | oc-talk | plugin | `0.6.2` | Sends addressed synthetic notes between sessions and reads the replies. | Add `oc-talk` to `plugins`. |
-| rea-shim | MCP | `0.2.3` | Launches the upstream `rea` reverse-engineering MCP and can bootstrap its JDK and Ghidra. | `npx -y rea-shim@latest --doctor` |
+| rea-shim | CLI | `0.3.0` | Installs and launches the pinned Craft Anything desktop app on Windows x64 in one command. | `npx -y rea-shim@latest` |
 | oc-collections | repo | — | This index and the npm-workspaces monorepo behind it. | — |
 
 An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once. `oc-graphify` is private, so it loads from this repo instead of the registry, by GitHub specifier such as `github:nathwn12/oc-collections#main::path:packages/oc-graphify`. It carries no version row.
@@ -25,8 +25,8 @@ An MCP goes into your client's server list, a plugin into `plugins` in your `ope
 
 - Node 22 or newer. `janua` and `rea-shim` narrow that to `^22.23.4`, `^24.22.1` or `>=26.12.1`; `oc-flight-deck` and `oc-plugin-view` also run under Bun 1.4 or newer.
 - OpenCode 2 for the plugins and the starter. The floors differ per package: `2.1.1` for `oc-flight-deck`, `2.2.0` for `oc-harness-setup`, `2.2.6` for `oc-bifrost` and `oc-plugin-view`. Each package README states its own.
-- Windows 10 or 11 for `oc-harness-setup`, and Windows x64 plus a JDK and Ghidra, or `--bootstrap`, for `rea-shim`. `janua` runs on Windows, Linux and macOS.
-- An MCP client for `janua` and `rea-shim`.
+- Windows 10 or 11 x64 for `oc-harness-setup` and `rea-shim`. `janua` runs on Windows, Linux and macOS.
+- An MCP client for `janua`.
 
 ## Development
 

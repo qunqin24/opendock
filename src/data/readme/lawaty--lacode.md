@@ -77,9 +77,11 @@ opencode agent list | grep -E '^(explore|implement|context)'
 You should see `explore`, `implement` and `context`, each with hidden `-1`..`-4`
 pool variants alongside. That is the whole install, and you are done.
 
-Each pool slot controls the rate-limit-reset desktop notice: it is on by
-default for `opencode` and `opencode-go` slots, and other providers need
-`notify:on` in `pool.txt` or `"notify": true` in `pool.json` to opt in.
+Each pool slot controls the rate-limit-reset desktop notice. The default is on
+for `opencode` and `opencode-go` slots, configurable with `notifyProviders`
+(`["opencode","opencode-go"]` by default, `"all"`, `"none"`, or a provider-id
+array); per-slot `notify:on`/`notify:off` (or JSON `notify: true/false`) still
+overrides that default.
 
 **If that prints nothing, the plugin did not load** — and opencode will not tell
 you: it starts normally, logs nothing, and the agents are simply absent. A
@@ -294,6 +296,13 @@ must never be the thing that extends the wait. A model the provider does not
 serve at all is benched for the quota cap and named in the report.
 A change is reported as a toast and a log line; a pass that finds nothing changed says
 nothing at all.
+
+The pool works with any opencode provider: put any `provider/model-id` slots in
+`pool.txt`/`pool.json`. The bundled preset is only an example; if it or the
+built-in fallback resolves and none of its providers is configured, LaCode logs
+one warning (naming the configured providers and pointing at
+`~/.config/lacode/pool.txt` or the `models` option) instead of silently routing
+to models you did not choose.
 
 Ten commands: `/context-init`, `/context-update`, `/context-review`,
 `/lacode-doctor`, `/agent-instructions`, `/pool`, `/pool-recheck`,

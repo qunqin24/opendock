@@ -19,7 +19,7 @@ Granola is a trademark of Granola, Inc.; this unofficial plugin is not endorsed 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.7
+opencode plugin add github:joe-broadhead/opencode-granola#v0.0.10
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -30,7 +30,7 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.7" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.10" }] }
 ```
 
 ### Update
@@ -62,11 +62,13 @@ account gets. On the free plan:
 - meeting history covers the last 30 days;
 - transcripts and folders are paid features, so the transcript and folder tools fail with Granola's own message.
 
-The plugin adds one tool, `export_markdown` (`granola_export_markdown`). It saves the notes, transcripts or both of 1
-to 20 meetings to one Markdown file in your export folder, without passing the text through the conversation, and asks
-before it writes. Its inputs are `meeting_ids`, `content` (`notes`, `transcript` or `both`), an optional `path` inside
-the export folder, and `overwrite`. When your plan has no transcripts, the file holds the notes and says that
-transcripts are not available on your Granola plan.
+The plugin adds one export tool, `export_markdown` (`granola_export_markdown`). It saves the notes, transcripts or both of 1
+to 20 meetings to one Markdown file in your export folder, without passing the text through the conversation. At the
+default `access: "all"` the `granola_export_markdown` action is allowed; `"ask-changes"` makes it ask, and `"read-only"`
+denies it. A destination outside the project may also prompt for OpenCode's separate `external_directory` permission;
+that is a path check, not an extra tool-action allow. Its inputs are `meeting_ids`, `content` (`notes`, `transcript` or
+`both`), an optional `path` inside the export folder, and `overwrite`. When your plan has no transcripts, the file holds
+the notes and says that transcripts are not available on your Granola plan.
 
 It also declares sources under the source contract (`package.json`'s `sources`). `granola.meetings` is for Memory's
 collector and other scripts, not for answering questions: `events_list` (`granola_events_list`) lists the meetings you
@@ -86,9 +88,13 @@ only. Until then, status says the workspace is unknown; ask the agent to check y
 ### Scripts
 
 A script or a cron job can call Granola's tools with no model, through `opencode api`. It runs as a session and its
-agent, under that agent's permission rules and the session's own. Every known tool is a method; a write, a send or an
-export needs a prior explicit `allow` in the session's or the agent's rules, because an `ask` is refused when no one can
-answer it. `sign_out` is not a method: the plugin removes it, and `opencode mcp logout granola` revokes the grant.
+agent, under that agent's permission rules and the session's own. Every known tool is a method. A call runs only when
+the resolved rule is `allow`: at the default `access: "all"` the plugin's block allows every method, so a script needs
+no extra tool-action rule to read, write, send or export. An unattended export outside the project still needs
+`external_directory` to resolve to `allow`. At `"ask-changes"` a write, send or export resolves to `ask`, and a script
+refuses an ask because no one can answer it, so that method needs a prior explicit `allow`. At `"read-only"` those
+methods are denied. `sign_out` is not a method: the plugin removes it, and `opencode mcp logout granola` revokes the
+grant.
 
 ```sh
 opencode api post /api/rpc/granola.meetings.tools/search_meetings \
@@ -117,7 +123,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.7", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.10", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -203,7 +209,7 @@ plugin in the system config, which outranks each member's own config: `/etc/open
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.7",
+      "package": "github:joe-broadhead/opencode-granola#v0.0.10",
       "options": { "exportDirectory": "<an absolute path>/Granola" }
     }
   ]
@@ -286,7 +292,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.7`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.10`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 
@@ -300,7 +306,7 @@ Files you exported stay in your export folder.
 - **`give_feedback` reaches Granola's team.** It is allowed by default, and the skill tells the model to send it only when the user asks.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
 - **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, but the free plan's history does: `probe` records the plan `get_account_info` names, for a day, and on the free plan, or with no plan recorded in the last day, a listing whose cursor or `since` is more than 29 days old answers a `window-truncated` gap once and lists from there, so a consumer knows to resync; later pages of that read neither repeat the gap nor skip a meeting the plan still shows. A paid plan has no window and no gap. A move to the free plan within a day of `probe`, with a cursor more than 29 days behind, is still listed without a gap: re-probe after a plan change. The v0.0.3 and v0.0.4 sources listed only what the plan still showed, with no gap. Switching the active workspace changes what a listing reads under the same account.
-- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. The synthetic account is on the free plan and the first listing starts before its 30 days, so the kit checks the `window-truncated` gap is answered once per read. Its report is complete and ok: two checks do not apply, each with its reason in the report, because no meeting fails on its own (a failed read fails the whole listing) and no cursor is ever refused as expired (the source never answers `CURSOR_EXPIRED`; the free plan's lost history is the window gap).
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. The synthetic account is on the free plan and the first listing starts before its 30 days, so the kit checks the `window-truncated` gap is answered once per read. Its report is complete and ok: every check that applies ran. It marks 14 checks not applicable for `granola.meetings` and 18 for `granola.meetings.list`; the two reasons the source states are for `failed-holds-cursor` (no meeting fails on its own; a failed read fails the whole listing) and `gap-and-cursor-expired` (no cursor is ever refused as expired; the source never answers `CURSOR_EXPIRED`, and the free plan's lost history is the window gap). The report gives no reason for the other checks that do not apply.
 - **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
 - In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
   older Jelly refuses the plugin's whole declaration.

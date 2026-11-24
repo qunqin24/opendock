@@ -73,7 +73,7 @@ QQ_SANDBOX=false
 ### 启动
 
 - **插件形态**：无需手动启动——装好插件 + 配好凭据后，插件巡检自动拉起 bot；opencode 服务重启也会自动恢复。
-- **独立部署形态**：`openqq` 前台运行；常驻按 OS 自选（Windows 用 `deploy/` 任务计划脚本；Linux `systemd --user`；macOS launchd 或 `nohup`）。
+- **独立部署形态**：`openqq` 前台运行；常驻按 OS 自选（Windows：`openqq service install` 注册计划任务；Linux `systemd --user`；macOS launchd 或 `nohup`）。
 
 <details>
 <summary>Linux：systemd --user 单元（复制即用）</summary>

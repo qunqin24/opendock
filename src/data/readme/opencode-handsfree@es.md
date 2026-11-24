@@ -121,15 +121,13 @@ Con `autoSend` desactivado, el texto se inserta en el compositor para revisarlo.
 
 ## Settings > Voice
 
-La página tiene tres pestañas.
+La página tiene tres pestañas y también fija los valores por defecto de los interruptores por chat.
+
+Las claves de API manuales se cifran en reposo con el llavero del sistema operativo (`safeStorage`, DPAPI en Windows) y nunca se escriben en `opencode.json` ni en los logs. Si el llavero no está disponible, la clave se guarda como texto plano y se avisa en el log.
+
+### Entrada
 
 ![Ajustes de entrada](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-input.png)
-
-![Ajustes de salida](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-output.png)
-
-![Ajustes experimentales](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-experimental.png)
-
-**Entrada**
 
 - Motor: `Local` o `Nube`.
 - Micrófono: cualquier dispositivo de entrada o el predeterminado del sistema.
@@ -137,7 +135,11 @@ La página tiene tres pestañas.
 - Los modelos se cargan solo después de configurar el proveedor o la URL y la clave. Al cambiar de proveedor se deselecciona el modelo. El selector es un diálogo con buscador que lista todos los modelos (los de audio primero); si el proveedor devuelve modelos hay que elegir uno, y el campo de texto queda solo como respaldo cuando no se carga ninguno.
 - Motor local: ruta o comando del ejecutable de voz a texto, fichero de modelo e idioma.
 
-**Salida**
+* * *
+
+### Salida
+
+![Ajustes de salida](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-output.png)
 
 - Motor: `Local` o `Nube`.
 - Dispositivo de salida: cualquier salida o el predeterminado del sistema.
@@ -145,15 +147,15 @@ La página tiene tres pestañas.
 - Local: hay que activar explícitamente la voz del sistema antes de que se puedan leer respuestas; las voces se listan del sistema operativo y la velocidad es ajustable.
 - **Probar** reproduce una muestra corta con los ajustes de salida actuales.
 
-**Experimental**
+* * *
+
+### Experimental
+
+![Ajustes experimentales](https://raw.githubusercontent.com/antmarpen/OpenCode-HandsFree/main/docs/screenshots/settings-experimental.png)
 
 - Empezar los chats nuevos en modo conversación.
 - Silencio tras la voz que cierra el turno (1200 ms por defecto).
 - Cerrar el micrófono cuando la ventana no tiene el foco.
-
-La página también fija los valores por defecto de los interruptores por chat.
-
-Las claves de API manuales se cifran en reposo con el llavero del sistema operativo (`safeStorage`, DPAPI en Windows) y nunca se escriben en `opencode.json` ni en los logs. Si el llavero no está disponible, la clave se guarda como texto plano y se avisa en el log.
 
 ## Desarrollo
 

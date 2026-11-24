@@ -53,6 +53,8 @@ codex plugin add wellactually@wellactually
 
 Then open Codex, type `/hooks` and press `t` to trust the plugin's hooks, then type `$wellactually:login`.
 Codex does not run a new plugin's hooks until you trust them, so no principle reaches the agent before that.
+Codex asks again after every update of the plugin: the CLI when it starts, the app under Settings > Hooks.
+Until you trust them, the Review Inbox shows a banner and the agent is asked to tell you.
 
 OpenCode:
 

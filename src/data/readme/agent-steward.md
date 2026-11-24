@@ -49,7 +49,7 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 30 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 32 agent tools, built-in agent skill |
 
 ### Language
 
@@ -61,9 +61,11 @@ panel header (🌐 Auto / Русский / English / 中文) and is also availab
 `locale: "auto"` (the "Auto" option, used by default) follows the OpenCode interface language: the panel
 reacts to language changes immediately, and the resolved locale is sent to the server so
 notifications, digests and the dashboard use the same language. The switch applies
-without a restart. Dashboard localization is still being rolled out: some client-side
-strings remain Russian for now. Agent tool descriptions and schemas stay English by
-design, and diagnostics printed to the console stay Russian.
+without a restart. The dashboard follows the resolved locale: Russian and English are
+fully localized (its screenshot in `docs/dashboard.png` is the English variant);
+Chinese currently falls back to English for dashboard chrome until its catalog is ready.
+Agent tool descriptions and schemas stay English by design, and diagnostics printed
+to the console stay Russian.
 
 Catalogs live in `locales/ru.json`, `locales/en.json` and `locales/zh.json`; every key
 must exist in all three, otherwise CI fails.
@@ -125,13 +127,15 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 30 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 32 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
 | `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType` (`cron`/`file`/`git`/`mcp-event`/`once`), `mcpEvent`, `watchPath`, `watchGlobs`, `watchIgnore`, `gitBranch`, `gitPaths`, `gitIgnore`, `gitPollSeconds`, `activeDays`, `windowPolicy` (`skip`/`postpone`/`run`), `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `legacyShell`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file, git or MCP-event trigger) |
+| `schedule_advanced` | full `schedule_task` schema: matrix, DAG, retry, launch windows and all trigger types | Advanced scheduling in the admin profile |
 | `list_tasks` | — | Returns jobs with schedule, status, next run, chains, workspace and matrix summary |
 | `update_task` | `name` + any field to change | Partial update; omitted fields keep their values, empty values clear them, `matrix: null` removes the matrix |
+| `update_advanced` | full `update_task` schema | Advanced task updates in the admin profile |
 | `delete_task` | `name` | Deletes a job (a matrix parent deletes clones and aggregator) |
 | `run_task_now` | `name` | Runs a job immediately (matrix parent starts the fan-out) |
 | `pause_task` | `name` | Pauses a job (matrix parent pauses every clone) |
@@ -172,7 +176,7 @@ Agent jobs run with `opencode run --auto`, so their tool policy must be explicit
 | `secure` | read, glob, grep, skill | edit, shell, question, webfetch, websearch, subagent |
 | `legacy` | all ten actions | — |
 
-`deniedTools` always wins. A non-empty `allowedTools` is an allowlist: it denies every action that is not listed, and can explicitly re-enable an action denied by the policy (for example `shell`). `legacyShell: true` re-enables `shell` only under `hybrid`, for tasks migrated from older versions.
+`deniedTools` always wins. A non-empty `allowedTools` is an allowlist for non-read-only actions: read, glob, grep and skill are added automatically (PL-133), so to forbid them you must list them explicitly in `deniedTools`. It can also explicitly re-enable an action denied by the policy (for example `shell`). `legacyShell: true` re-enables `shell` only under `hybrid`, for tasks migrated from older versions.
 
 Blocked actions are written to the audit journal as `tool.blocked` with `reason: "default-policy"` and a `hint`, and each run logs the active policy.
 
@@ -280,12 +284,12 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 115 test suites, 600+ checks
+npm test             # 116 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
 `npm run test:chaos` runs `test-chaos-dag.mjs` separately; `test-prod-install.mjs`
-is likewise invoked through its own script. The **115** in `npm test` counts
+is likewise invoked through its own script. The **116** in `npm test` counts
 exactly the suites listed in that script; every `test-*.mjs` file on disk is
 reachable through at least one npm script.
 
@@ -304,6 +308,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [docs/PIPELINE.md](docs/PIPELINE.md) — pipeline-as-code: file format, CLI, idempotent apply.
 - [docs/SAVINGS.md](docs/SAVINGS.md) — how the "Saved $" estimate is calculated.
 - [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
+- [Documentation site (GitHub Pages runbook)](docs/FEATURES.md#documentation-site-github-pages) — how the docs are built and published.
 
 Translations: [Русский](docs/README.ru.md) · [中文](docs/README.zh.md).
 

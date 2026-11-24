@@ -67,6 +67,20 @@ npx @tscgoods/effort-discovery-core probe --provider ts-dpsk --json
 
 各宿主的能力边界不同（有的能直接改菜单，有的只能报告），以各包 README 为准。
 
+## 兼容性与能力边界
+
+以下版本上实际跑过（2026-11-23）：
+
+| harness | 测试版本 | 插件能做到 | 做不到 |
+|---|---|---|---|
+| OpenCode | 2.4.0 | 直接把 model variant 改成实测档位 | — |
+| DeepSeek Harness | 0.2.2-rc.5 | 配置变换收窄 Effort 菜单 | 用了内部 `internal/config` 事件，升级需复核 |
+| Codex CLI | 0.171.0 | 生成/同步 `model_catalog_json`，菜单随之变化 | 不能改固定枚举；catalog 只在启动时读 |
+| Claude Code | 2.1.330 | 别名映射 + 会话注入实测档位提醒 | 客户端枚举固定为前缀，删不掉中间档位 |
+| Antigravity CLI | 1.5.14 | 报告内置模型实测档位 + 提醒 | 改不了档位枚举，也无法把网关模型加进 `/model` |
+
+共同限制：探测靠上游错误回显；网关"接受一切"时会诚实标记为 `no-validation`，不编造档位。
+
 ## 开发
 
 ```bash
@@ -78,6 +92,10 @@ node packages/core/src/cli.js probe --provider <id> --json
 ## 发布
 
 见 [RELEASING.md](./RELEASING.md)：推 `vX.Y.Z` tag，CI 发布同版本的所有包并创建 GitHub Release。npm 包都发布在 `@tscgoods` scope。
+
+## 友链
+
+- [Linux.do](https://linux.do)
 
 ## 许可
 

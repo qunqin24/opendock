@@ -175,18 +175,19 @@ Router 的 system prompt 只保留**字节稳定**的 `ROUTER_PROMPT`（prompt c
 | `sleep({ seconds? })` | 暂停 Router 指定秒数（默认 30，范围 1..3600 的整数），每 250ms 检查 Worker 终态与新 trigger，变化即提前返回；Goal 模式下 dispatch 后给 Worker 执行时间；真实定时器，不忙等。 |
 | `ticket_create({ threadID, title, objective, acceptance, directory, priority?, parentTicketID?, dedupeKey? })` | 建工单：`objective`/`acceptance`(1-10 条)/`directory` 必填，同 thread 同 dedupeKey 自动复用（`reused=true`）。 |
 | `ticket_list({ threadID?, status?, since?, limit? })` | 按 thread/状态/更新时间列工单（默认 20 条，上限 100），含 id/state/title/priority/更新时间/worker。 |
-| `ticket_update({ ticketID, status?, note? })` | 按状态机推进工单（open→in_progress→blocked/done/failed/cancelled/superseded），非法迁移报错。 |
+| `ticket_update({ ticketID, status?, note? })` | 按状态机推进工单（open→in_progress→blocked/done/failed/cancelled/superseded），已关闭的单可用 `status=in_progress` 重开（清除原关闭时间/结论），非法迁移报错。 |
 | `ticket_close({ ticketID, outcome, summary })` | 结单：写 `closeReason`/`closedAt` 与 history。 |
-| `status({ includeFinished? })` | Router/pending/Worker/工单计数的紧凑摘要：默认只列活跃 Worker、不带 lastReport，整体 ≤2000 字符；`includeFinished=true` 附最近 20 条已结束 Worker（报告截断）。 |
+| `status({ includeFinished? })` | Router/pending/Worker/工单计数的紧凑摘要：默认只列活跃 Worker、不带 lastReport，整体 ≤2000 字符；`includeFinished=true` 附最近 20 条已结束 Worker（报告截断）。Worker 行可能带 `ctx=<token 数>`（机械读取的上下文占用）。 |
 | `thread_detail({ threadID, limit? })` | 该 thread 的 trigger 列表（时间+作者+截断 300 字/条，默认 20 条）+ 订阅 workers 及其 state/lastReport。 |
-| `worker_detail({ sessionID, messages? })` | Worker 的标题/threads/state/lastReport + 最近 N 条（默认 5，上限 10）assistant 消息文本（默认截断 1500 字/条）。 |
+| `worker_detail({ sessionID, messages? })` | Worker 的标题/threads/state/context usage/lastReport + 最近 N 条（默认 5，上限 10）assistant 消息文本（默认截断 1500 字/条）。`context usage` 来自宿主 token 计数（运行时实时取），不是 Worker 自报。 |
 | `report_read({ sessionID, offset?, limit? })` | 按字符区间读取 Worker 结束报告的**完整全文**（默认 4000 字/页，上限 20000），返回总长度与 nextOffset。 |
-| `worker_prompt({ sessionID, text, delivery?, interrupt? })` | 给已跟踪的 Worker 追加 `[router:follow-up]` 提示词：`delivery` 默认 `queue`，可选 `steer`；`interrupt=true` 先 steer 入队再 `interrupt({ resume: true })`。工单已结单（done/failed/cancelled/superseded）或找不到工单一律拒绝，不会唤醒 Worker。 |
+| `file_read({ path, offset?, limit? })` | 分页读取**工作区/已知目录**内的文本文件（绝对路径或相对网关 cwd；默认 8000 字/页，上限 20000），返回字符范围与 next offset。仅允许工作区与已知目录（thread 绑定、目录别名、Router 分区目录）；`.env`/`credentials`/密钥证书及 `.ssh`/`.aws`/`.git`/`.gnupg` 等敏感路径、越界符号链接与超过 2MB 的文件一律拒绝。只读，写改仍派 Worker。 |
+| `worker_prompt({ sessionID, text, delivery?, interrupt? })` | 给已跟踪的 Worker 追加 `[router:follow-up]` 提示词：`delivery` 默认 `queue`，可选 `steer`；`interrupt=true` 先 steer 入队再 `interrupt({ resume: true })`。可恢复 `running`/`idle`/`done` 的 Worker（done 会话会恢复执行、复用上下文）；工单已关闭仍可投递，但会提示先用 `ticket_update` 重开；无工单或 failed/aborted 的 Worker 拒绝。 |
 | `abort_session({ sessionID?, reason?, all?, stale? })` | 终止/清理 Worker：中断、等待终态、标记 `aborted`、解除 thread 亲和（见[终止会话](#终止会话-abort_session)）。 |
 
-- 只有 Router 能调这些工具（`dispatch`、`sleep`、`ticket_*`、`thread_detail`/`worker_detail`/`report_read`/`worker_prompt`/`abort_session` 复用 `status` 的权限位，Router 会话已放行；其他会话直调会被拒绝）。
+- 只有 Router 能调这些工具（`dispatch`、`sleep`、`ticket_*`、`thread_detail`/`worker_detail`/`report_read`/`file_read`/`worker_prompt`/`abort_session` 复用 `status` 的权限位，Router 会话已放行；其他会话直调会被拒绝）。`file_read` 是 Router 专用的受限读文件工具，不会放开宿主的通用 `read` 给 Router（那会绕过敏感文件边界，也会让 Worker 失去读文件能力）。
 - `dispatch` 的 `effort` 是 **模型 variant**：在 `sessions.create` 时写进 `model.variant`（`sessions.prompt` 没有档位字段，不能逐条改）。合法值以 `ctx.model.list()` 里该模型的 `variants` 为准——服务端对未知 variant 不报错、会存成坏值，所以由插件侧白名单校验：不在列表时报 `dispatch: effort <档位> is not available for <provider>/<model>; available: ...; omit effort to inherit the router's current effort`，不建会话。`effort` 不能和 `agent` 覆盖同用（agent 保留自己的模型）；`model.list` 不可用或模型探测失败时降级为继承 Router 档位并记日志，派发不中断，工单历史写作 `effort=<档位> (unverified: inherited)`。派发时记一条 `effort=<档位>`，`/ticket <id>` 详情里显示「档位：」。
-- `worker_prompt` 只接受 `store.workers` 中 `running`/`idle` 的 Worker：Router 自身、未知 session、failed/aborted/done 记录都会被拒绝；工单已结单时错误形如 `worker <id> ticket <id> is closed (<state>); start a new worker instead`，且不会发出任何 prompt/interrupt。
+- `worker_prompt` 接受 `store.workers` 中 `running`/`idle`/`done` 的 Worker（done 可被恢复以沿用已积累的上下文）；Router 自身、未知 session、failed/aborted 记录、无关联工单的 Worker 仍被拒绝。工单已关闭（done/failed/cancelled/superseded）不再拒绝：照常投递并在回复里提醒 `ticket <id> is closed (<state>) — reopen it with ticket_update({ status: "in_progress" })`。一张工单会累计所有关联过的 Worker（`workerSessionIDs` 列表），门禁会检查列表里所有存活 Worker。
 - 何时用哪个档位：`low` 只读查询、跑命令看结果、单文件小改、文案/格式调整、路径已知的机械修改、验证类任务；`medium`（默认）常规实现、多文件小改、补测试、排查单个已明确的失败；`high` 并发/状态机/协议设计、跨模块重构、难复现的 bug、需要在多个方案间权衡。不要因为「保险」一律用 high；不传 `effort` = 继承 Router 当前档位。Worker 失败或被中断后重派升一档（low→medium→high），并在任务描述里写一句升档原因；每次 dispatch 的 `task` 首行写 `effort=<档位>：<理由>`，便于事后核对。
 - `sleep` 是 Goal 模式的节流阀：dispatch 之后暂停 Router（默认 30 秒，范围 1..3600 的整数，非法值直接报错），用 `Effect.sleep` 真实定时器等待，期间其他任务照常推进，不会忙等。等待期间每 250ms 轮询插件内存状态：Worker 进入终态或新 trigger 入队会立即提前返回，text 形如 `slept 3s of 30s (woken: worker completed)` / `slept 3s of 30s (woken: 2 new event(s))`，output 带 `woken` 字段；被新 trigger 唤醒时以 `delivery: "steer"` flush pending 队列，下一步即可看到，Worker 完成通知由 watcher 投递、不重复。sleep 开始时已存在的终态/pending 不触发虚假唤醒。它是 Router-only 工具：Worker 会话的工具列表里没有它，直调也会被 `guard` 拒绝。
 - 唤醒基线比较的是**身份**而不是计数器：终态 Worker 按 `sessionID + state/updatedAt` 快照，pending 按 trigger id 快照。这样「一个终态 Worker 被唤起、同时另一个完成」（终态数不变）或「空闲钩子冲掉队列、同时新 trigger 到达」（队列长度不变）都不会被静默吞掉。
@@ -202,14 +203,14 @@ Router 的 system prompt 只保留**字节稳定**的 `ROUTER_PROMPT`（prompt c
 - 只有全新 thread（该 thread 没有 Worker 记录）或上一个 Worker 失败了，消息才进 Router → `dispatch` 建新 Worker。
 - 事件入口通过 RPC 注入（任何调用 `trigger` 的客户端）；`trigger` 的 `source` 可用插件选项 `sources` 过滤，未配置则全部放行。
 - 插件选项 `worker_detail_message_limit` 控制 `worker_detail` 单条消息截断字数（默认 1500，夹在 200–4000 之间）。
-- Worker 结束（`succeeded`/`failed`/`interrupted`）时，`watcher.ts` 把结论写回 Router：完整报告先写入 `report:<sessionID>`（KV，全文，上限 20 万字），Worker 记录只留 2000 字摘要 `lastReport` 供 `status`/`worker_detail` 使用；注入 Router 的事件带上「全文长度 N，可用 report_read 读取」句柄，用 `report_read({ sessionID, offset?, limit? })` 翻页读全文。
+- Worker 结束（`succeeded`/`failed`/`interrupted`）时，`watcher.ts` 把结论写回 Router：完整报告先写入 `report:<sessionID>`（KV，全文，上限 20 万字），Worker 记录只留 2000 字摘要 `lastReport` 供 `status`/`worker_detail` 使用；注入 Router 的事件带上「全文长度 N，可用 report_read 读取」句柄，用 `report_read({ sessionID, offset?, limit? })` 翻页读全文。同一事件末尾还附一行机械读取的 `context <N> tokens (in/out/reason/cache …) [session|step]`：来自 `session.get().tokens`（优先）或 `session.context()` 里最后一条 assistant step，**不需要 Worker 在报告里自报**，压缩后也不会丢。运行中由 `session.usage.updated` 事件刷新内存里的 `ctx=`，重启恢复与结束时都落 `worker:<id>.lastUsage`。
 - 终态通知按 `worker sessionID + 执行轮次 + 终态` 去重：Worker 记录里的 `notified`（随 `worker:<sessionID>` 落 KV）在通知前写入，同一执行的重复投递（watcher 抖动、host 重投 durable 事件、`hydrate` 重放）不会再注入第二条；`execution` 记录当前执行的 `session.execution.started` 序号，真正的续聊（新执行）会清空 `notified` 并再次通知。注入使用由该身份派生的稳定 `msg_` id，作为 host 侧重投时的最后一道防线。
 
 ### 工单 Ticket
 
 工单是「用户要什么 + 怎么算完成」的持久记录。Router 先建单再派活，Worker 的终态自动回写。核心原则：**先建单登记意图，再决定并行或串行；工单是账本，不是派发的副产品**——拆子任务先建全部子单（`parentTicketID`），完成后逐张结单。
 
-- 状态机：`open → in_progress → blocked/done/failed/cancelled/superseded`；`blocked → in_progress` 可回；`done/failed/cancelled/superseded` 为终态，任何非法迁移都报错。`open` 也可直接 `done/failed/cancelled`（派活前就完成/放弃的情况）。
+- 状态机：`open → in_progress → blocked/done/failed/cancelled/superseded`；`blocked → in_progress` 可回；`done/failed/cancelled/superseded` 为关闭态，可用 `ticket_update(status=in_progress)` 重开（清除原关闭时间/结论），其他非法迁移报错。`open` 也可直接 `done/failed/cancelled`（派活前就完成/放弃的情况）。
 - 必填：`objective`、`acceptance`（1-10 条）、`directory`（绝对路径）；`acceptance` 为空直接拒绝建单，避免占位单。
 - 去重：`dedupeKey` 缺省为 `sha1(source + threadID + 归一化 objective)`，建单前在同 thread 找 `open/in_progress` 的同键单，命中则返回原单并标 `reused=true`。
 - authorization：自动取 Router 最近一次被投递的 trigger（`triggerID` + 原文摘要 ≤300 字），所以每张单都能追溯「用户当时怎么说的」。
@@ -217,7 +218,7 @@ Router 的 system prompt 只保留**字节稳定**的 `ROUTER_PROMPT`（prompt c
 - 内存与 KV 的一致性：内存只保留最近 500 张（`MEMORY_LIMIT`），查询未命中时**回源 KV 读一次**（`loadTicket`，不扫全表），所以被裁剪掉的老单不会显示成「没有找到工单」；`ticket_list` 在内存页不足时才补扫 KV。KV 写失败不吞：内存已改，写失败的记录进 dirty 队列，下次任意写入/读取时重试（`flushTicketWrites`），否则重启会让旧状态复活。索引写失败同样单独排队重试。
 - 长度与截断按**码点**计数（`src/format.ts` 的 `clipCodePoints`/`codePointLength`）：40 个 emoji 的标题是 40 个字符而不是 80，截断也不会把代理对切成半个字符。
 - 强制：`dispatch` 的 `ticketID` 必填，工单门禁只作用于 **Router 的工具调用**——工具拿得到宿主的 `context.sessionID`，能证明调用方就是 Router。RPC 的 `dispatch` / `stop` 属于 fail-closed：RPC 上下文里没有调用方身份，伪造 `caller`/`routerID` 也没用，所以两者一律以 `dispatch.rejected` / `stop.rejected` 拒绝（`dispatch` 不会建会话、`stop` 不会中断 Worker），见[RPC 接口](#rpc-接口)。工具路径上的拒绝规则：缺失单据、单据不存在、单据已关闭（非 `open/in_progress`）、`threadID` 与单据不符、或单据已绑定运行中的 Worker，都会给出可操作提示。
-- 联动：派发成功即原子绑定——写入 `workerSessionID`、`attempts` 追加一条、`state → in_progress`；绑定失败会回滚新建的 Worker 会话（不会出现「Worker 起来了但单没绑上」）。Worker prompt 头部附「工单 + objective + acceptance」；Worker `done/failed` 由 watcher 结单，`abort_session` 关闭为 `failed`；watchdog 只告警，不改状态也不结单。
+- 联动：派发成功即原子绑定——更新 `workerSessionID` 为本次会话并追加到 `workerSessionIDs` 列表、`attempts` 追加一条、`state → in_progress`；绑定失败会回滚新建的 Worker 会话（不会出现「Worker 起来了但单没绑上」）。重开同一张单后继续用的 Worker 也留在列表里。Worker prompt 头部附「工单 + objective + acceptance」；Worker `done/failed` 由 watcher 结单，`abort_session` 关闭为 `failed`；watchdog 只告警，不改状态也不结单。
 - 中断 → `blocked`，可直接重派：Worker 被中断（watcher 收到 `idle`）时，进行中的工单落到 `blocked` 并记一条 `interrupted: <reason>` 的 history，不再原地停在 `in_progress`。`blocked` 是诚实的中间态（任务没完成、这次尝试也不算失败），Router 用 `ticket_update({ status: "in_progress" })` 重开即可**接着派发**——门禁看到「工单在该 Worker 之后被 park 过」就放行那个 `idle` Worker，不需要先 `abort_session` 再建新单。重启路径同理：`hydrate` 把遗留在 `running` 的记录按会话终态回放，`interrupted` 的分支调用同一个 `blockTicketsForWorker`（`src/state.ts`），否则重启后工单会卡在 `in_progress` 而被 idle 门永久拦住。
 
 ### 侧栏工单面板
@@ -393,7 +394,7 @@ context.ui.slot({ append: "sidebar.content", render: () => <SidebarTickets conte
 TUI 侧只依赖 `src/protocol.ts` 导出的 `Definition`（`id: "opencode.superagent"`）与 `src/tools.ts` 的工具目录（`/tools` 直接渲染它，不发 RPC）。服务端注册的就是同一个 `Definition` 对象（`server.ts` 的 `ServerDefinition = Definition`），所以方法、入参/出参和声明错误两边不会漂移。TUI 实际调用六个方法：
 
 - `router({ directory? }) -> { sessionID }`：创建或返回 Router 会话。带 `directory` 时打开/复用该目录分区的 Router（`perDirectoryRouter` 打开时创建在该目录）；关闭开关时仍落到唯一的默认 Router。
-- `status({ directory? }) -> { version?, router?, pending, workers, partitions?, dirKey?, directory? }`：`version` 是当前网关加载的插件版本（启动日志里也有），演示命令用它等待 `T-1` 的 Worker 就绪。Router 尚未创建时返回 `{ version, pending, workers }`，省略 `router` 键（显式 `undefined` 会导致输出校验失败）。不传 `directory` 是聚合视图；`perDirectoryRouter` 打开且存在两个以上活跃分区时额外返回 `partitions`（每区的 `dirKey`/`directory`/`router`/`pending`/`workers`/`running`，空分区省略），只有一个分区时不出现该字段（与阶段 2b 逐字节一致）；传了 `directory` 只返回该分区并回显 `dirKey`/`directory`，不返回 `partitions`。
+- `status({ directory? }) -> { version?, router?, pending, workers, partitions?, dirKey?, directory? }`（`workers[]` 每项可带可选 `usage: "ctx=... "`，来自机械读取的 `lastUsage`）：`version` 是当前网关加载的插件版本（启动日志里也有），演示命令用它等待 `T-1` 的 Worker 就绪。Router 尚未创建时返回 `{ version, pending, workers }`，省略 `router` 键（显式 `undefined` 会导致输出校验失败）。不传 `directory` 是聚合视图；`perDirectoryRouter` 打开且存在两个以上活跃分区时额外返回 `partitions`（每区的 `dirKey`/`directory`/`router`/`pending`/`workers`/`running`，空分区省略），只有一个分区时不出现该字段（与阶段 2b 逐字节一致）；传了 `directory` 只返回该分区并回显 `dirKey`/`directory`，不返回 `partitions`。
 - `trigger({ source, threadID, author?, text, title?, createdAt?, id? }) -> { route, sessionID? }`：注入一条事件，`route` 为 `router` / `worker` / `dropped`。
 - `abort({ sessionID?, reason?, all?, stale? }) -> { text }`：终止/清理 Worker，被拒绝时抛 `abort.rejected`（带可读 message）。TUI 的 `/abort`（或命令面板「Superagent abort worker」）会列出 Worker 供选择，首项是「清理全部已结束 worker」。
 - `tickets({ threadID?, status?, limit?, directory?, all? }) -> { text }`：渲染工单列表（按状态分组，窄终端友好），对应侧栏面板与 `/tickets` 的列表页。传 `directory` 只列该目录分区（TUI 会传当前会话目录）；不传仍是进程级列表。`all: true` 是**聚合视图**：列出**所有分区**的工单并按目录分组，文本开头是「共 N 条，K 个目录」，每组前有一行「目录 <路径> · <分区 key> · <n> 条」（该分区可能还有更多工单时写作「<n>+ 条」）；只有一个分区时输出与不传 `all` 逐字节相同（单分区不添噪音）。`limit` 在聚合视图下是**每分区**的上限。`all` 与 `directory` 同时给时以 `all` 为准（聚合视图不看单个目录）。内存页不足时回源 KV 补齐，被裁剪的老单不会显示成缺失。`status` 是闭合枚举，传非法值（如 `DONE`、拼写错误）会直接被协议校验拒绝，不会退化成「不过滤的完整列表」；服务端另有 `tickets.invalid_status` 作为第二道防线。
@@ -459,7 +460,7 @@ npm pack --dry-run     # 预览 tarball（prepack/prepare 会各跑一次 build�
   - `tui.d.ts` 只声明默认导出的 `Plugin.Definition`，不描述 `setup` 内部类型；TUI 插件是动态加载的，消费方通常只需要包名。
   - `dist/tui.js` 约 102 KB（未压缩，Solid JSX 编译结果 + 内联的 `src/` 纯函数 + 自绘选择器），不包含 `solid-js`/`@opentui/solid`，那部分由宿主提供。
   - `@opencode/schema` 会带上自己的一份 `effect`（其 manifest 的 dependency）。运行时所有 `effect` 导入都被宿主接管，这份副本不会被求值，只是多占几 MB 磁盘。
-  - 包版本 `0.6.0` 与主仓 `2.2.5` 解耦，发版需要单独 bump。
+  - 包版本 `0.7.0` 与主仓 `2.2.5` 解耦，发版需要单独 bump。
 
 ## 已知限制与路线图
 

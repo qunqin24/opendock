@@ -353,6 +353,7 @@ use a model is a separate question.
 | GPT-6 Luna | `gpt-6-luna` | Responses | none–max | medium | No |
 | GPT-6 Sol | `gpt-6-sol` | Responses | none–max | medium | No |
 | GPT-6.1 Sol | `gpt-6.1-sol` | Responses | low–max | medium | No |
+| GPT-6.2 Sol | `gpt-6.2-sol` | Responses | low–max | medium | No |
 | Claude Fable 5.1 | `claude-fable-5-1` | Messages | low–max | high | Yes |
 | Claude Mythos 5.1 | `claude-mythos-5-1` | Messages | low–max | high | No (Pi 1.0.4) |
 | Claude Opus 5.5 | `claude-opus-5-5` | Messages | low–max | medium | Yes |

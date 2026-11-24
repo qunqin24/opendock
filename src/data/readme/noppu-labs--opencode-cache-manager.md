@@ -5,6 +5,8 @@
 [![ci](https://github.com/noppu-labs/opencode-cache-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/noppu-labs/opencode-cache-manager/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/@noppu-labs/opencode-cache-manager)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/noppu-labs/opencode-cache-manager/badge)](https://scorecard.dev/viewer/?uri=github.com/noppu-labs/opencode-cache-manager)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16186/badge)](https://www.bestpractices.dev/projects/16186)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/16186/baseline)](https://www.bestpractices.dev/projects/16186/baseline-2)
 
 <p align="center">
   <img src="docs/images/social-preview.png" alt="Cache Manager, an OpenCode plugin: take control of your prompt cache. Pick a 5m, 1h or hybrid TTL per session, and keep idle caches warm with pings. A chart: after stepping away for 15 minutes, the default 5m cache has expired and the next prompt rewrites it at 1.25x; with keepalive, three pings keep it warm and the next prompt reads it at about 0.1x." width="800">
@@ -330,7 +332,9 @@ Turn the rows off with `savings` in the plugin options, in the picker, or with `
 
 ## Contributing
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the local setup, the checks CI runs and how releases are cut.
+Found a bug or want a feature? Open an issue in the [issue tracker](https://github.com/noppu-labs/opencode-cache-manager/issues). Report security problems privately, as [SECURITY.md](SECURITY.md) describes. Changes come in as pull requests.
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the local setup, the checks CI runs and how releases are cut. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes how the plugin works and its interfaces, [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md) the risks it guards against, and [docs/GOVERNANCE.md](docs/GOVERNANCE.md) who maintains it.
 
 ---
 

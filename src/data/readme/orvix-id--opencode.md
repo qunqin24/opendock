@@ -1,213 +1,158 @@
 # @orvix-id/opencode
 
-[OpenCode](https://opencode.ai) plugin for **Orvix**, supporting OpenCode **1.18.29+** and **2.0.21+**.
-One installation registers two independent providers:
+Official [OpenCode](https://opencode.ai) plugin for **Orvix**, for OpenCode **1.18.29+** and **2.0.21+**.
+One installation registers two providers:
 
-| Provider | Endpoint | Environment variable | Required scope |
+| Provider in `/models` | Pays with | Endpoint | Key scope |
 | --- | --- | --- | --- |
-| `orvix` | `https://api.orvix.id/v1` | `ORVIX_API_KEY` | `ai:invoke` |
-| `orvix-coding` | `https://api.orvix.id/coding/v1` | `ORVIX_CODING_API_KEY` | `coding:invoke` |
+| **Orvix Coding** (`orvix-coding/*`) | Coding Plan, AI Plan, campaigns | `https://api.orvix.id/coding/v1` | `coding:invoke` |
+| **Orvix** (`orvix/*`) | Orvix Credits, Token Plans | `https://api.orvix.id/v1` | `ai:invoke` |
 
-Choose the route explicitly. The plugin never switches endpoints on an error. Orvix determines
-funding from your eligible plan, campaign, or other applicable balance; the Coding endpoint is not
-exclusive to Coding Plan subscribers. General discovery preserves managed and BYOK model IDs.
+**Bought a Coding Plan? Pick models from Orvix Coding.** The same model under the Orvix provider
+bills Orvix Credits, and with an empty balance it fails with `insufficient Orvix Credits` even
+though your plan has tokens left. Model names in the picker end in `(Orvix Coding)` or `(Orvix)` so
+you can tell them apart. The plugin never switches between the two on an error.
 
-## Installation
+## Quick start (Coding Plan)
 
-### OpenCode v1 vs v2: which installation should I use?
+1. **Create a key.** In [platform.orvix.id/api-keys](https://platform.orvix.id/api-keys), create a key
+   and tick **Orvix Coding** (`coding:invoke`). Tick **AI Router** (`ai:invoke`) too if you also
+   want the Orvix provider.
+2. **Install the plugin.** Check `opencode --version`:
 
-**The npm package is the same. The plugin configuration and authentication setup differ.**
-Run `opencode --version`, then follow the matching column:
+   | OpenCode | Install |
+   | --- | --- |
+   | 2.x | `opencode plugin add @orvix-id/opencode@0.3.0` |
+   | 1.x | add `"plugin": ["@orvix-id/opencode@0.3.0"]` to `~/.config/opencode/opencode.json` |
 
-#### OpenCode v1 (≥1.18.29)
+3. **Set the key** in the terminal you start OpenCode from:
 
-Copy this into `~/.config/opencode/opencode.json` (merge with existing settings):
+   ```bash
+   export ORVIX_CODING_API_KEY="orv-sk_live_..."
+   ```
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@orvix-id/opencode@0.2.0"]
-}
-```
+   Put it in your shell profile (`~/.zshrc`, `~/.bashrc`) or secret manager so new terminals have it.
+   On OpenCode 2.x, `/connect orvix-coding` stores the key instead.
+4. **Restart OpenCode** and pick a model:
 
-#### OpenCode v2 (≥2.0.21)
+   ```bash
+   opencode -m orvix-coding/deepseek-v4.1-flash
+   ```
 
-Run this in your terminal:
+   or `/models` → a model ending in **(Orvix Coding)**. Send a short message to check access.
 
-```bash
-opencode plugin add @orvix-id/opencode@0.2.0
-```
+You do not need a `provider` block in `opencode.json`: the plugin registers both providers. A hand
+written `provider.orvix` block from an older guide overrides the plugin's settings for that provider,
+so remove it when you install the plugin.
 
-Or copy this into `~/.config/opencode/opencode.json` (merge with existing settings):
+## Installation in detail
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@orvix-id/opencode@0.2.0"]
-}
-```
-
-For either version, set your key in the terminal before starting OpenCode:
-
-```bash
-export ORVIX_API_KEY="your-key"
-opencode
-```
-
-Both versions use `~/.config/opencode/opencode.json` for global settings, or `opencode.json`
-in your project for project-only settings. **Choose only the config key for your version**;
-do not add both `plugin` and `plugins`. Restart OpenCode after installation.
-
-The steps below include complete configuration examples for each version.
-
-### 1. Check your OpenCode version
+### OpenCode 2.x (≥ 2.0.21)
 
 ```bash
-opencode --version
+opencode plugin add @orvix-id/opencode@0.3.0
 ```
 
-Use OpenCode **1.18.29 or newer in the 1.x series**, or **2.0.21 or newer in the 2.x series**.
-The configuration key differs: v1 uses `plugin` (singular), v2 uses `plugins` (plural).
-
-### 2. Create an Orvix API key
-
-Open [API Keys](https://platform.orvix.id/api-keys) and create a key with:
-
-- **AI Router** (`ai:invoke`) for the `orvix` provider.
-- **Orvix Coding** (`coding:invoke`) for the `orvix-coding` provider.
-
-Enable both scopes to use one key for both providers. Scopes grant endpoint access; your account
-still needs the appropriate model entitlement or funding.
-
-### 3. Set the key
-
-If your key has both `ai:invoke` and `coding:invoke`, only set:
-
-```bash
-export ORVIX_API_KEY="your-key"
-```
-
-Replace `your-key` with your actual key. This command applies to the current terminal and processes
-started from it. For future terminals, set it through your secret manager or shell profile
-(`~/.zshrc` for zsh, `~/.bashrc` for bash). Do not put your key in a committed project file.
-
-For a separate Coding key, additionally set:
-
-```bash
-export ORVIX_CODING_API_KEY="your-coding-key"
-```
-
-Coding falls back to this shared key. Set `ORVIX_CODING_API_KEY` to override it with a separate
-Coding key. In v2, a key stored through the provider's `/connect` takes precedence over environment
-variables. The general provider never borrows the Coding key. A rejected key is not retried with
-another credential: 401/403 produces a provider-specific diagnostic and no discovered models for
-that provider, while the other provider continues loading. Explicit user model overrides remain.
-
-### 4. Install for your OpenCode version
-
-#### OpenCode v1
-
-Add the following to `~/.config/opencode/opencode.json` (global), or `opencode.json` in your
-project (project-only). Merge it into existing settings rather than replacing the whole file.
-OpenCode installs the package when it starts; you do not need `npm install -g`.
+or in `~/.config/opencode/opencode.json` (global) or `opencode.json` in a project:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@orvix-id/opencode@0.2.0"],
-  "model": "orvix-coding/deepseek-v4-flash"
+  "plugins": ["@orvix-id/opencode@0.3.0"],
+  "model": "orvix-coding/deepseek-v4.1-flash"
 }
 ```
 
-Set `ORVIX_API_KEY` and/or `ORVIX_CODING_API_KEY` for the providers you use. V1 uses the
-OpenAI-compatible AI SDK driver. Coding requests carry session identity through a request-local
-header that the plugin's fetch adapter removes and translates into `session_id` in the JSON body.
-No process-global session state is used. Custom fetch implementations are wrapped, not discarded.
+V2 uses OpenCode's native OpenAI-compatible driver. Keys can come from `/connect orvix`,
+`/connect orvix-coding`, or the environment variables below. A key stored with `/connect` takes
+precedence over the environment, and each provider stores its own: connecting `orvix` does not
+connect `orvix-coding`.
 
-#### OpenCode v2
-
-Install using the CLI:
-
-```bash
-opencode plugin add @orvix-id/opencode@0.2.0
-```
-
-Alternatively, add it to `~/.config/opencode/opencode.json` or your project's `opencode.json`:
+### OpenCode 1.x (≥ 1.18.29)
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@orvix-id/opencode@0.2.0"],
-  "model": "orvix/deepseek-v4-flash"
+  "plugin": ["@orvix-id/opencode@0.3.0"],
+  "model": "orvix-coding/deepseek-v4.1-flash"
 }
 ```
 
-Use `/connect orvix` or `/connect orvix-coding`, or the environment variables above. V2 uses
-OpenCode's native OpenAI-compatible driver. Existing `orvix-coding/*` configuration remains valid.
+OpenCode installs the package when it starts; `npm install -g` is not needed. V1 uses the
+`@ai-sdk/openai-compatible` driver. Coding requests carry the session through a request-local
+header that the plugin's fetch adapter turns into `session_id` in the JSON body. Custom fetch
+implementations are wrapped, not discarded.
 
-Stored credentials are separate per provider: connecting `orvix` does not also connect
-`orvix-coding`. To share one key with minimal setup, use `ORVIX_API_KEY` as shown above.
+**v1 uses `plugin` (singular), v2 uses `plugins` (plural).** Use only the one for your version.
 
-### 5. Restart and choose a model
+### Keys
 
-Quit any running OpenCode session, then start it from the terminal where the key is available:
+| Variable | Used by |
+| --- | --- |
+| `ORVIX_CODING_API_KEY` | Orvix Coding. Falls back to `ORVIX_API_KEY` when unset. |
+| `ORVIX_API_KEY` | Orvix. Never borrows the Coding key. |
 
-```bash
-# General API: managed models and project BYOK models
-opencode -m orvix/deepseek-v4-flash
-
-# Coding API
-opencode -m orvix-coding/deepseek-v4-flash
-```
-
-These are example models; choose one returned by your account's catalog if it differs.
-Models with reasoning variants can be selected with a suffix such as
-`orvix-coding/glm-5.2#high`. Send a short message to verify access.
-
-## Updating or migrating
-
-For v2, run the installation command with the desired version. For v1, update the version in
-the `plugin` array. Replace the existing entry rather than adding the plugin a second time.
-The examples above pin `0.2.0` so the installed release is explicit.
-
-Replace `opencode-provider-orvix` in your plugin list when migrating from the community plugin;
-both register `orvix`. Keep your existing `orvix/*` model selections and `ORVIX_API_KEY`.
-Do not load both plugins for the same provider. Restart OpenCode after installation or configuration
-changes. Discovery runs at startup; restart after changing keys or plan entitlements as well.
-
-For local endpoints, set `ORVIX_BASE_URL` and/or `ORVIX_CODING_BASE_URL`. V1 also respects
-`provider.<id>.options.baseURL`. An authenticated empty catalog stays empty.
-
-Using Pi or Oh My Pi instead? See [@orvix-id/pi](https://github.com/Orvix-id/pi-plugin) and
-[@orvix-id/omp](https://github.com/Orvix-id/omp-plugin).
+One key with both scopes can be shared by setting only `ORVIX_API_KEY`. Scopes grant endpoint
+access; the account still needs a plan or balance that pays for the request. A rejected key is not
+retried with another credential: 401/403 logs a provider-specific message and that provider lists
+no models, while the other provider keeps loading.
 
 ## Models
 
-With a key available, each provider discovers models from its own endpoint: `GET /v1/models` for
-`orvix`, and `GET /coding/v1/models` for `orvix-coding`.
-Without network access the plugin falls back to the lineup it shipped with. Model ids drop the `orvix/` prefix:
-`orvix-coding/glm-5.2` calls `orvix/glm-5.2`.
+Each provider reads its own catalogue at startup: `GET /coding/v1/models` for Orvix Coding (your
+plan's lineup) and `GET /v1/models` for Orvix (managed models plus your project's BYOK models).
+Rate limits and gateway errors are retried twice. Without a key or network the plugin falls back to
+the lineup it shipped with. Image, video, embedding and rerank routes are left out of the picker.
+
+Model ids drop the `orvix/` prefix: `orvix-coding/glm-5.2` calls `orvix/glm-5.2`. Models with a
+verified reasoning profile expose it as variants, e.g. `orvix-coding/glm-5.2#high`; only efforts the
+model accepts are offered, because Orvix passes `reasoning_effort` to the upstream unchanged.
 
 ## What the plugin does
 
 | Piece | Why |
 | --- | --- |
-| Provider `orvix-coding` on OpenCode's built-in OpenAI-compatible driver | Streaming, tool calls, and usage accounting stay OpenCode's own. |
-| `session_id` added to every agent and compaction request | Orvix keeps a session on the same upstream route and prompt cache only when the request body carries `session_id`. OpenCode's session id is reused, so follow-up requests hit the cache. |
+| Two providers on OpenCode's OpenAI-compatible driver | Streaming, tool calls and usage accounting stay OpenCode's own. |
+| `session_id` added to agent and compaction requests (Coding) | Orvix keeps a session on the same upstream route and prompt cache only when the body carries `session_id`. Title requests are sent without it. |
 | `prompt_cache_key` enabled for every model | Lets cache-aware upstreams group the session as well. |
-| `x-orvix-coding-client` header | Reports the client name and plugin version. Used for diagnostics only. |
-
-Session title requests are sent without `session_id`; they use a different, very small prompt.
+| `x-orvix-coding-client` headers | Client name and plugin version, for diagnostics only. |
 
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
-| `Model unavailable: orvix/...` or `orvix-coding/...` | Check `plugin` (v1) or `plugins` (v2), restart, and inspect `opencode --print-logs`. The model may also be absent from your account's catalog. |
-| Key is set but access still uses another account | In v2, the provider's stored `/connect` credential takes precedence over environment variables. Check that connection. |
+| `insufficient Orvix Credits` while the Coding Plan has tokens | The model was picked from the **Orvix** provider (`/v1`). Switch to the same model under **Orvix Coding**. |
+| `Unsupported package for orvix/...` | A hand-written `provider.orvix` block uses fields from the other OpenCode version. Remove it and let the plugin register the provider. |
+| `Model unavailable: orvix-coding/...` | Check `plugin` (v1) or `plugins` (v2), restart, and read `opencode --print-logs`. The model may also be missing from your plan's lineup. |
+| No Orvix Coding models | The key is not in OpenCode's environment, or it lacks the **Orvix Coding** scope. |
+| Key is set but another account is used | On v2 a key stored with `/connect` wins over the environment. Check that connection. |
 | `401 coding:invoke scope required` | The key was created without the **Orvix Coding** scope. |
-| `429 coding_concurrency_exceeded` | Too many Coding requests in flight at once. OpenCode retries automatically; `retry_after` is a few seconds. |
-| `429 coding_quota_exceeded` | A 5-hour, weekly, or monthly window is used up. `resets_at` says when. |
+| `403 coding_not_entitled` | The account has no active Coding Plan (or AI Plan) that covers the request. |
+| `429 coding_concurrency_exceeded` | Too many Coding requests in flight. OpenCode retries; `retry_after` is a few seconds. |
+| `429 coding_quota_exceeded` | A 5-hour, weekly or monthly window is used up. `resets_at` says when. |
+
+## Updating and migrating
+
+Run the install command again with the new version (v2), or change the version in the `plugin`
+array (v1). Replace the existing entry rather than adding a second one, then restart OpenCode.
+Restart after changing keys or plans too: discovery runs at startup.
+
+**From `opencode-provider-orvix`.** That community plugin is now part of this one. Its model
+catalogue, verified reasoning profiles, transient-error retry and non-chat filtering live here, and
+it registers the same `orvix` provider. Replace `opencode-provider-orvix` with
+`@orvix-id/opencode@0.3.0` in your plugin list and keep your `ORVIX_API_KEY` and `orvix/*` model
+selections. Do not load both plugins. Thanks to [Griko Nibras](https://github.com/grikomsn) for
+building it.
+
+**From a hand-written config.** Delete the `provider.orvix` (v1) or `providers.orvix` (v2) block
+you copied from an older guide, then install the plugin as above.
+
+For local endpoints, set `ORVIX_BASE_URL` and/or `ORVIX_CODING_BASE_URL`. V1 also respects
+`provider.<id>.options.baseURL`. An authenticated empty catalogue stays empty.
+
+Using Pi or Oh My Pi instead? See [@orvix-id/pi](https://github.com/Orvix-id/pi-plugin) and
+[@orvix-id/omp](https://github.com/Orvix-id/omp-plugin). Full guide:
+[docs.orvix.id/coding-plan](https://docs.orvix.id/coding-plan).
 
 ## Development
 
@@ -216,6 +161,8 @@ bun install
 bun run check        # tsc + bun test
 bun run probe        # 3 real OpenCode turns against a local mock, reports prefix reuse per request
 ```
+
+Releases are published from CI when a `v*` tag matching `package.json` is pushed.
 
 ## License
 

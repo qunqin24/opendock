@@ -1,8 +1,8 @@
+<p align="center"><img src="https://raw.githubusercontent.com/DaBinBinah/cloudbase-bridge/main/docs/images/logo.png" width="110" alt="CloudBase Bridge logo"></p>
+
 # CloudBase Bridge
 
-[English](README.md) | [简体中文](README.zh-CN.md)
-
-**GitHub**: [github.com/DaBinBinah/cloudbase-bridge](https://github.com/DaBinBinah/cloudbase-bridge)
+<p align="center">[English](README.md) | [简体中文](README.zh-CN.md) · **GitHub**: [DaBinBinah/cloudbase-bridge](https://github.com/DaBinBinah/cloudbase-bridge)</p>
 
 Bring the AI quota of Tencent CloudBase's "小程序成长计划" (mini-program growth plan) into [Magpie](https://usemagpie.ai) as an ordinary OpenAI-compatible provider, through an `aiProxy` cloud function you deploy yourself. Once set up, it's just another provider on your account that any agent can use.
 
@@ -24,13 +24,14 @@ The function returns one complete result; the plugin reshapes it into OpenAI Cha
 
 | Model ID | Context |
 | --- | --- |
-| `hy3` | 256K |
+| `hy4-flash` | 1M |
 | `hy4` | 1M |
 | `hy4-preview` | 1M |
+| `hy3` | 256K |
 | `deepseek-v4.1-flash` | 1M |
 | `deepseek-v4.1-flash-1017` | 1M |
 
-No console opt-in needed; usage is deducted from the gift pack automatically. Availability can vary per environment — if CloudBase answers `AI_MODEL_NOT_SUPPORTED`, go by what your environment actually supports.
+No console opt-in needed; usage is deducted from the gift pack automatically. Availability can vary per environment — if CloudBase answers `AI_MODEL_NOT_SUPPORTED`, go by what your environment actually supports. The image-generation model `hy-image-v3.5-preview` is out of scope for this plugin: the bridge only carries text chat.
 
 ## What you need
 
@@ -100,7 +101,8 @@ Errors come back as OpenAI-style `{ error: { message, code } }`, and the message
 ## Known limitations
 
 - No true streaming: the upstream reply is one-shot, SSE is synthesized locally, so the first token only arrives when generation finishes;
-- no tool calling, no image input, and `max_tokens` is ignored (the SDK channel takes `{ model, messages, temperature, topP }` only);
+- tool calling needs aiProxy 1.1.0 or later — redeploy the function (`tcb fn deploy aiProxy --force`) after upgrading the plugin from 0.2.4 or earlier;
+- no image input;
 - very long outputs can hit the function's 120 s timeout;
 - no quota reporting (no official API for it); the gift quota itself expires (6 months).
 

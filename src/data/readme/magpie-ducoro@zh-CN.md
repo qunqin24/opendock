@@ -1,163 +1,183 @@
-# magpie-ducoro 0.4.10
+<a href="https://opc.fish"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/YE4IM/readme/main/assets/opc-fish-project-signature-web-dark.svg"><img src="https://raw.githubusercontent.com/YE4IM/readme/main/assets/opc-fish-project-signature.svg" alt="OPC.FISH 项目署名" width="720"></picture></a>
 
-[English](https://github.com/YE4IM/magpie-ducoro/blob/main/README.md) | **简体中文**
+# magpie-ducoro
 
-0.4.10 完善 npm 安装说明、首次使用步骤与兼容性说明，同步行为和管理记录格式与 0.4.9 一致。npm 包名为 [`magpie-ducoro`](https://www.npmjs.com/package/magpie-ducoro)。
+[English](./README.md) | [**中文**](./README.zh-CN.md)
 
-把 Magpie 的模型、连接器、技能、指令与显式选择的子代理同步到 Ducoro，并在插件页面内按 Bot 管理分配。同步带变更预览与保存前确认；失败按类别记录并支持按项重试；配置核验区分保存、写入、读回与会话加载四个阶段。
+把 Magpie 的模型、连接器、技能、指令和显式选择的子代理同步到 Ducoro，并在插件页面里按 Bot 分配。
 
-完整版本历史见 [CHANGELOG.md](docs/CHANGELOG.md)，本次升级说明见 [RELEASE-NOTES.md](docs/RELEASE-NOTES.md)。
+[![npm version 0.4.10](https://img.shields.io/npm/v/magpie-ducoro)](https://www.npmjs.com/package/magpie-ducoro) [![MIT license](https://img.shields.io/github/license/YE4IM/magpie-ducoro)](./LICENSE)
 
-## 运行前提
+[快速开始](#快速开始)
 
-- 安装支持插件 Agent 与页面服务的 [Magpie](https://usemagpie.ai)（`magpie.agent`、`magpie.page.service`）。
-- 安装并登录 [Ducoro](https://ducoro.ai)，启动其后台服务；安装 [CLI](https://ducoro.ai/download/cli)，确保启动 Magpie 时的 PATH 能找到 `ducoro-cli`。
-- 当前账户能够访问要管理的本地 Ducoro 设备与 Bot。插件页面服务默认使用 `127.0.0.1:3487`；端口被占用时修改 `servicePort`。
+```text
+Usage: node diagnostics-cli.mjs [--lang en|zh] [--json] [--state-dir <directory>] [--port <port>] [--doctor] [--cli <path>]
+Read-only live report. --doctor checks daemon status without changing configuration.
+```
 
-本插件不会自动安装 Ducoro 或 CLI。目前未确定 Magpie 与 Ducoro 的精确最低版本。本次文档发布不新增端到端同步验收结论，也不声明已验证 Windows/Linux 兼容性；使用前请确认当前平台的 CLI 与页面服务支持情况。
+上面这段文字来自 2026-11-24 实际执行的 `npm exec --package=magpie-ducoro@0.4.10 -- magpie-ducoro-status --help`。即使通过 `magpie-ducoro-status` 启动，脚本仍打印这一行用法说明。这是诊断命令的帮助。本环境没有完成一次同步。
+
+## 目录
+
+- [概述](#概述)
+- [环境要求](#环境要求)
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [功能](#功能)
+- [用法](#用法)
+- [配置](#配置)
+- [文档](#文档)
+- [故障排除](#故障排除)
+- [开发](#开发)
+- [变更日志](#变更日志)
+- [贡献](#贡献)
+- [许可证](#许可证)
+
+## 概述
+
+`magpie-ducoro` 0.4.10 是一个 Magpie 插件。它把 Ducoro 接到 Magpie 模型上，并同步你分配的 Magpie 资源。保存前会先预览。插件页面只监听本机回环地址。
+
+> [!NOTE]
+> 仓库没有写明 Magpie 或 Ducoro 的最低版本，也没有写明已验证的 Windows 或 Linux 兼容性。Ducoro 和 `ducoro-cli` 需要单独安装。本插件的安装步骤不包含这两项。
+
+## 环境要求
+
+- 带插件 Agent 和页面服务的 Magpie。仓库现有说明点名 `magpie.agent` 与 `magpie.page.service`。
+- 已安装并登录 Ducoro，后台服务在运行，且当前账户能访问要管理的本地设备与 Bot。
+- 启动 Magpie 时的 `PATH` 里能找到 `ducoro-cli`。项目给出的入口是 [CLI 下载](https://ducoro.ai/download/cli)。
+
+`package.json` 没有 `engines` 字段。本机执行诊断命令时用的是 Node.js v26.13.1。这是本次检查所用版本，仓库没有把它写成最低版本。
 
 ## 安装
 
-在 Magpie 的「插件 → 添加插件」中输入 `magpie-ducoro@0.4.10`。也可使用 Magpie 命令行：
+在 Magpie 里注册插件。下面这条命令写在 0.4.10 的说明里。本机的 `magpie plugin --help` 列出了 `magpie plugin add`。添加本身没有执行，因此这里没有核实注册结果。
 
-```sh
+```bash
 magpie plugin add magpie-ducoro@0.4.10
 ```
 
-`npm install magpie-ducoro` 只会把包下载到 npm 项目中，不会自动将插件注册到 Magpie。正常使用请通过上面的 Magpie 命令或插件对话框安装。
+也可以在 Magpie 的「插件 → 添加插件」中输入 `magpie-ducoro@0.4.10`。
 
-源码安装：从 [GitHub Releases](https://github.com/YE4IM/magpie-ducoro/releases) 下载某个版本，解压后在 Magpie 中添加文件夹的绝对路径。也可添加 GitHub 版本 `github:YE4IM/magpie-ducoro#v0.4.10`。
+`npm install magpie-ducoro` 只会下载包，不会把插件注册进 Magpie。npm 包是 [`magpie-ducoro`](https://www.npmjs.com/package/magpie-ducoro)。
 
-### 首次使用
+<details>
+<summary>从文件夹或 Git 标签安装</summary>
 
-1. 从 Magpie 侧边栏打开 **Ducoro**。页面不可用时，检查 `ducoro-cli`、后台服务与页面服务端口。
-2. 在「同步设置」核对连接标识、启用的资源类型与目标 Bot；将要交给 Ducoro 的 Magpie 资源库资源分配给它，按需设置各 Bot 的单独分配。
-3. 点击「预览变化」核对新增与撤销，再点击「保存设置」查看预览并确认。保存会重载插件宿主并开始同步。
-4. 打开「同步诊断」，检查保存、写入、读回与会话加载的结果；处理待核实项。CLI 命令成功不代表运行中的 Bot 已加载变化。
+从 [GitHub Releases](https://github.com/YE4IM/magpie-ducoro/releases) 下载发行包，解压后在 Magpie 里添加该文件夹的绝对路径。也可以添加 GitHub 引用 `github:YE4IM/magpie-ducoro#v0.4.10`。
 
-只读检查 Ducoro 后台服务可执行：
+</details>
 
-```sh
-npm exec --package=magpie-ducoro@0.4.10 -- magpie-ducoro-status --doctor
+## 快速开始
+
+1. 从 Magpie 侧边栏打开 **Ducoro**。页面打不开时，检查 `ducoro-cli`、Ducoro 后台服务，以及页面服务端口（默认 `127.0.0.1:3487`）。
+2. 在「同步设置」里核对连接标识、启用的资源类型和目标 Bot。
+3. 先点「预览变化」，再点「预览并保存」，确认预览。保存会重载插件宿主并开始同步。
+4. 打开「同步状态」，查看已保存、已写入、已读回和会话加载的结果。命令成功之后，正在运行的会话有没有加载这次变更，以这份报告为准。
+
+这四步是仓库里的首次使用路径，这里没有实际走通。保存按钮按当前页面 `ui/index.html` 的文案写成「预览并保存」。仓库中文 README 仍写着「保存设置」，这句旧文案还留在语言表里。
+
+下面这条命令对 npm 包 0.4.10 执行过，退出码 0：
+
+```bash
+npm exec --package=magpie-ducoro@0.4.10 -- magpie-ducoro-status --help
 ```
 
-升级：停止旧版宿主，更新安装包或替换插件路径后再加载新版本，避免两个版本同时写入共享管理状态。已有设置和兼容的 v1/v2 管理记录自动沿用，无需重新配置。
+这里也跑过 `magpie-ducoro-status --doctor`，退出码 2。Ducoro 的只读 `info` 检查成功。报告写明尚未完成同步，插件的实时诊断服务连不上。它给出的下一步是：在 Magpie 里启用 Ducoro 插件，重新打开页面，或检查服务端口。
 
-回退：先停止当前版本宿主，再在本包目录执行 `npm run state:compact -- /管理记录的绝对路径/state.json`，在共用锁内合并增量日志；异常中断后先由当前版本恢复记录再回退。不要手动删除尚未合并的日志。
+## 功能
 
-## 功能总览
+- 模型、Magpie 资源库连接器和技能可以全局分配，也可以按 Bot 分配。某个 Bot 的列表为空，表示本插件不给它分配这一类资源。其他全局配置和用户自己的配置仍保留。
+- 指令追加在插件自己的区块里。子代理只同步你明确选中的那些。
+- 写入前可以预览新增和撤销。保存时会要求确认。
+- 每一项分别跟踪已保存、已写入、已读回和会话加载。证据不够的项目保持未核实。
+- 每次保存前建立配置检查点。从管理记录备份恢复后，自动同步会暂停，直到你预览并继续。
+- 在终端读取实时诊断报告。这条命令不写报告文件。
 
-### 同步与分配
+## 用法
 
-- **模型**：全局跟随 Magpie 默认模型，或按 Bot 单独指定/继承；不可用模型保留原设置并报告待处理。能力参考自动匹配 Ducoro 官方目录，可手动指定或禁用映射。
-- **连接器**：两种来源——Magpie 资源库连接器（全局或按 Bot 分配）与 Ducoro 账户连接器（在 Bot 的账户抽屉中连接服务，并逐 Bot 勾选允许工具）。撤销优先于新增，故障按项隔离；首次显式分配会记录此前策略，撤销时恢复；外部编辑产生冲突提示而非覆盖。当前 CLI 无法清空非空 args/env/headers 或安全变更 transport 时，保留原定义并报告冲突。
-- **技能**：从 Magpie 已分配给 Ducoro 的资源中按 Bot 勾选；相同名称与内容摘要的技能产物全局复用一份。单技能最多 5,000 个文件、1,000 个目录、深度 64、10,000 个条目及 32 MiB 源内容；扫描默认限时 10 秒，并受预览整体 25 秒预算约束。取消会中止字节读取；不可读来源保留原有托管内容并等待核实。
-- **指令与子代理**：指令追加在插件拥有的区块内，撤销保留用户原有 profile；子代理按目标显式选择。
-- **配置方案**：在「Bot 配置方案」中定义名称、模型、连接器、技能与追加指令，多个 Bot 持续继承，单项选择优先；可一键「清除单项覆盖，跟随方案」（同时清除指令覆盖）。方案 ID 仅接受 1–64 位字母、数字、下划线及短横线，删除方案前先取消继承。
-- **目标范围**：`targetAgents` 影响模型、指令与子代理；连接器和技能使用按 Bot 分配时，也受此范围限制，范围外 Bot 的对应托管库资源会撤销。账户连接器仍按各 Bot 单独配置。
+在检出的仓库里：
 
-### 预览与核验
-
-- 「预览变化」读取草稿不写入；「保存设置」先展示预览并要求确认。预览列出全局与 Bot 层新增/撤销、全局资源改为按 Bot 分配时其他 Pi Agent 预计失去的资源；标注每项配置来源（全局设置、继承方案或单项覆盖），并对照「上次同步 · Ducoro 当前 · Magpie 期望」。
-- 切换目标、关闭同步或取消选择时，明确列出将撤销的托管区块和文件。
-- 保存后逐项核验，区分已保存、已写入、已读回、会话生效四个阶段；证据不足的条目明确显示待核实，不把命令成功等同于运行中会话已加载。子代理核验对照当前期望正文。核验超过 35 秒转入后台继续跟踪，连接中断自动恢复，重新打开页面可接续。
-- 漂移处理：模型提供「采用当前值」「重新应用期望值」或暂停该 Bot 的模型管理；写前携带配置摘要再次读取，发现变化则保留现状。
-
-### 任务与恢复
-
-- 任务中心按 Bot 和资源汇总执行状态、失败类别（临时、权限、冲突、不支持、数据损坏、待核实）、尝试次数与最早重试时间，支持单项重试、暂停与恢复；临时失败自动退避重试，其余等待人工处理。
-- 命令按进程组管理：超时、取消与输出超限都会收尾整个进程树；响应丢失的写入先做只读回查，再参与对账。
-- 首次创建 MCP 连接器或技能前先写入恢复意图：响应丢失后，只有身份与完整内容读回一致才恢复管理归属。
-
-### 草稿与批量操作
-
-- 未提交的设置与方案草稿通过鉴权本地服务完整自动保存，恢复前核对设置基线；多页面冲突提示恢复最新草稿，不静默覆盖；草稿损坏保留原件并给出处理指引。
-- 方案草稿完整保留模型及资源的分配模式，隐藏的输入值不会改变已选模式。旧草稿缺失模式时，参考已保存方案推导；过去已丢失的编辑意图无法完全还原，恢复后请核对预览。
-- 草稿锁会恢复已确认退出进程的占用，并保留活跃进程的锁。旧版匿名锁或归属不明的锁不会自动删除：出现对应提示时，停止所有插件宿主，备份并移走状态目录内的 `page-draft.lock` 和 `page-draft-locks` 后重新打开页面；保留 `page-draft.json`。
-- 批量复制按来源 Bot 的有效配置（含继承方案）进入草稿；最近一次批量修改可撤销。账户权限不参与批量复制。
-
-### 备份与回退
-
-- 「备份管理」集中管理记录备份与配置检查点：执行备份、打开备份目录、导入外部文件（8 MiB 上限；管理记录导入需完整 v1/v2 快照，检查点导入接受 version 1 记录）、JSON 导出、按类清空。备份支持名称、备注与保留标记；保留项不受自动裁剪、批量清空或本地记录清理影响。
-- 保存前自动创建配置检查点（文件权限 0600，自动保留最近 20 份未标记保留记录）；检查点可按字段与 Bot 选择性回退，相关方案定义、继承关系与作用域变更自动关联，恢复先进入草稿再预览保存。
-- 恢复管理记录备份后自动暂停同步，需先预览再手动继续；重启宿主不会解除该暂停。
-- 恢复前校验失败不会新增暂停；进入状态写入阶段后失败则保持暂停，避免在结果未确认时继续自动同步。
-- 「清理本地记录」先预览数量与空间再确认：清理已完成操作历史（最多 500 条）、历史状态备份（保留最近 5 份未标记保留）与超过 7 天未使用的技能缓存，并合并增量记录；保留当前归属、权限恢复数据、未完成操作与使用中的技能。
-
-
-## 页面与分配
-
-- **同步设置**：模型连接、模型、连接器、技能、指令及子代理同步开关；断开连接处理与三类资源作用域使用开关，关闭即全局同步，开启即按 Bot 分配。
-- **Bot 资源**：模型、连接器、技能三个独立作用域；下方自动展示全部 Bot（名称与 ID 只读，刷新列表更新）。支持按名称/ID 搜索、状态筛选与未保存修改计数。
-- **同步诊断**：每次查看按需生成实时报告，显示查看时间与最近同步时间，同步进行中或结果过期会明确提示；查看报告不会触发同步，需对账时先「重试同步」。展示当前步骤与耗时、CLI 与合并读取计数及最近 20 轮内存记录（重启后清空）；问题可直接跳转到对应处理区域。
-
-模型下拉为单选，仅管理绑定当前插件连接的 Pi Agent；页面不会自动改变其他运行方式或连接绑定。刷新保留未保存的选择，读取失败不会当作空列表撤销分配。连接器与技能支持继承、单独选择和不分配；空列表表示本插件不分配该类资源，不屏蔽其他全局或用户配置。资源范围以插件管理记录为基线，不把用户自行安装的资源算作插件拥有。
-
-## 服务与保存
-
-页面服务默认监听 `127.0.0.1:3487`，可在插件选项 `servicePort` 修改；插件重载时自动等待旧宿主释放端口，Magpie 网页模式使用其页面服务代理。保存使用 Magpie 正式页面消息通道，保存会重载插件宿主并触发同步。接口检查 Host、Origin 与页面令牌；页面只接收资源名称与状态，不接收连接凭据。分项能力检查按功能独立：命令存在不代表服务端权限或执行成功。
-
-## 界面语言
-
-界面跟随 Magpie 语言设置：简体和繁体中文使用中文，其他及未知语言回退英文。切换语言保留草稿、搜索、勾选与打开的弹窗；Bot、模型、资源名称与技术键保持原名。
-
-## 模型能力目录
-
-自动匹配使用当前 Ducoro 版本提供的官方目录。「同步上游模型列表」绕过五分钟缓存重新读取 `ducoro-cli connections catalog` 并请求重新匹配；可按模型或供应商搜索，查看参考 ID、匹配来源、原因与上下文长度。上游新增模型按完整 ID 精确匹配；路由组要求成员身份兼容，不强行映射混合版本。手动映射优先并可固定或禁用，移除后恢复自动匹配；目录读取失败保留此前有效目录与参考。
-
-## 诊断与命令行
-
-```sh
-node diagnostics-cli.mjs              # 实时报告（默认英文）
-node diagnostics-cli.mjs --lang zh    # 中文输出
+```bash
+node diagnostics-cli.mjs
+node diagnostics-cli.mjs --lang zh
 node diagnostics-cli.mjs --json
-node diagnostics-cli.mjs --port 3488  # 自定义页面端口
-node diagnostics-cli.mjs --doctor     # 只读守护进程信息
+node diagnostics-cli.mjs --port 3488
+node diagnostics-cli.mjs --doctor
 ```
 
-CLI 按需读取实时服务，直接输出终端，不生成报告文件；插件未运行时明确提示。启动时自动清理旧版 `sync-status.json`、`total-status.json`、`model-capabilities.json` 及其临时文件；归属记录、页面令牌与技能恢复备份保留。
+包安装之后，同一入口是 `magpie-ducoro-status`，标志相同。`--doctor` 只读取守护进程信息，配置保持原样。
 
-## 管理记录与恢复
+页面跟随 Magpie 的语言。简体和繁体使用中文，其他语言和未知语言使用英文。
 
-默认管理文件 `~/.config/magpie/ducoro-bridge/state.json`，可用 `XDG_CONFIG_HOME` 或 `DUCORO_BRIDGE_STATE_DIR` 改变位置。细粒度变化追加到 `state.json.journal`（含序号与校验和），每 128 条或 1 MiB 合并快照。
+加载另一个版本之前先停掉原来的插件宿主，让共享管理状态只由一份程序写入。兼容的 v1 和 v2 记录会保留。
 
-记录不可读、损坏或版本未知时暂停同步并保留原件；检查权限与存储，或在「同步诊断 → 异常排查」预览恢复有效备份。恢复的是管理记录而非 Bot 配置，恢复后需手动同步。不要删除、清空或用空对象覆盖该文件——其中包含撤销分配时需要恢复的原权限。
+回退前先停止当前宿主，再在本包里合并增量日志：
 
-残留锁恢复前必须停止全部插件宿主，重新检查持锁信息并使用最新恢复令牌：
-
-```sh
-npm run lock:inspect -- /absolute/path/to/ducoro-bridge
-# 停止全部宿主并重新检查后：
-npm run lock:inspect -- /absolute/path/to/ducoro-bridge TOKEN --all-hosts-stopped
+```bash
+npm run state:compact -- /absolute/path/to/state.json
 ```
 
-## 主要选项
+## 配置
+
+页面服务默认监听 `127.0.0.1:3487`，可用 `servicePort` 更改。请求会检查 `Host`、`Origin` 和页面令牌。页面收到资源名称和状态，连接凭据留在页面之外。
+
+默认管理文件是 `~/.config/magpie/ducoro-bridge/state.json`。`XDG_CONFIG_HOME` 和 `DUCORO_BRIDGE_STATE_DIR` 可以改这个目录。小变更追加到 `state.json.journal`，满 128 条或 1 MiB 后合并。
 
 | 选项 | 默认值 | 含义 |
 | --- | --- | --- |
-| `modelScope` | `global` | 模型全局同步或 `agents` 按 Bot 分配 |
-| `botModels` | `{}` | Bot ID → 模型 ID，省略则跟随全局 |
-| `mcpScope` | `global` | Magpie 来源连接器的全局或 Bot 分配 |
-| `skillsScope` | `global` | 技能全局或 Bot 分配 |
-| `resourceAssignments` | `{}` | Bot ID → 资源库连接器与技能名称列表（内部键 `mcp`、`skills`） |
-| `accountConnectors` | `{}` | Bot ID → 账户连接器标识 → `{allow, deny}` 工具策略 |
-| `servicePort` | `3487` | 页面服务端口 |
+| `modelScope` | `global` | `global`，或用 `agents` 按 Bot 分配模型 |
+| `botModels` | `{}` | Bot ID 到模型 ID。省略的项跟随继承 |
+| `mcpScope` | `global` | Magpie 资源库连接器的全局或按 Bot 分配 |
+| `skillsScope` | `global` | 技能的全局或按 Bot 分配 |
+| `resourceAssignments` | `{}` | Bot ID 到 `mcp` 与 `skills` 名称列表 |
+| `accountConnectors` | `{}` | Bot ID 到连接器标识，再到 `{allow, deny}` |
+| `servicePort` | `3487` | 本机回环上的页面服务端口 |
 | `connectionSlug` | `magpie-ducoro` | 插件模型连接标识 |
-| `modelCapabilityRefs` | `{}` | 模型到官方能力参考的手动映射 |
+| `modelCapabilityRefs` | `{}` | 手动指定的模型能力参考 |
 
-方案相关配置键：`botPlansCatalog`、`botPlans`、`botInstructions`、`pausedModels`、`modelGuards`。网关连接、完整技能包、指令区块及显式子代理沿用现有同步模块；钩子和 RTK 不同步。技术配置键保持原名，界面统一使用「连接器」。
+同一份默认对象里还有 `botPlansCatalog`、`botPlans`、`botInstructions`、`pausedModels` 和 `modelGuards`。钩子和 RTK 留在同步之外。
 
+## 文档
 
-## 源码目录
+- [变更日志](docs/CHANGELOG.md)
+- [版本说明](docs/RELEASE-NOTES.md)
 
-- `bridge.mjs`：插件入口。
-- `ducoro.agent.js`：Magpie 代理定义。
-- `diagnostics-cli.mjs`：诊断命令入口。
-- `lib/`：同步、状态管理、诊断和页面服务等内部模块。
-- `ui/`、`assets/`：页面文件与图标。
-- `scripts/`：维护命令。
-- `docs/`：更新记录与版本说明。
+## 故障排除
+
+> [!WARNING]
+> 保留 `state.json`。用空对象替换它会丢掉撤销分配时要用的原权限。
+
+记录不可读、损坏或版本不受支持时，同步会暂停，原文件保留。在「同步状态 → 异常排查」里预览备份，然后手动同步。恢复备份恢复的是管理记录。Bot 配置要等之后的同步才会变。当前页面标签是「同步状态」。仓库 README 仍把这一区叫作同步诊断。
+
+清理残留锁之前，先停止每一个插件宿主，重新查看持锁信息，并使用最新的恢复令牌：
+
+```bash
+npm run lock:inspect -- /absolute/path/to/ducoro-bridge
+npm run lock:inspect -- /absolute/path/to/ducoro-bridge TOKEN --all-hosts-stopped
+```
+
+第二条只在全部宿主都已停止、并且重新检查过之后再执行。`TOKEN` 是上一条检查命令给出的恢复令牌。
+
+草稿锁仍在时，停止全部插件宿主，备份 `page-draft.lock` 和 `page-draft-locks`，把它们移出状态目录，再重新打开页面。保留 `page-draft.json`。
+
+## 开发
+
+`bridge.mjs` 是插件入口。`ducoro.agent.js` 是 Magpie 的代理定义。`diagnostics-cli.mjs` 是诊断命令。`lib/` 放同步、状态和页面服务代码。`ui/` 与 `assets/` 是页面。`scripts/` 是维护命令。`docs/` 是变更日志和版本说明。
+
+```bash
+npm run diagnostics
+npm run state:compact -- /absolute/path/to/state.json
+npm run lock:inspect -- /absolute/path/to/ducoro-bridge
+```
+
+## 变更日志
+
+[docs/CHANGELOG.md](docs/CHANGELOG.md)。当前发布：[v0.4.10](https://github.com/YE4IM/magpie-ducoro/releases/tag/v0.4.10)。
+
+## 贡献
+
+问题请开到 <https://github.com/YE4IM/magpie-ducoro/issues>。
 
 ## 许可证
 
-MIT
+MIT。详见 [LICENSE](./LICENSE)。

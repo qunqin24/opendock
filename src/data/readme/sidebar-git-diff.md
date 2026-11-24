@@ -2,7 +2,7 @@
 
 **OpenCode V2**
 
-The sidebar groups uncommitted changes by OpenCode session name, links each filename to `/diff`, and shows the worktree, branch, and number of commits ahead of the tracked remote branch.
+The sidebar groups uncommitted changes by Git worktree and OpenCode session. Each filename opens that file’s diff in the correct worktree.
 
 ![OpenCode Git changes sidebar showing an expanded session, its worktree and branch status, and clickable changed files](https://raw.githubusercontent.com/timrichardson/sidebar-git-diff/main/docs/sidebar-screenshot.png)
 
@@ -63,20 +63,24 @@ After the update, open a fresh OpenCode terminal UI to load the new package. In 
 Open a session. If its sidebar is hidden, use the **Toggle sidebar** command.
 
 - Click a session heading to collapse or reopen it. Groups start expanded.
-- Under each session heading, `worktree · branch (+3)` shows the worktree folder, checked-out branch, and commits ahead of the locally stored upstream. `(-)` means there is no usable remote tracking branch. `(?)` means the count is unavailable, including when using `--server`.
+- In each heading, `📁` marks the worktree path and `⑂` marks the checked-out branch. The number after the branch shows commits ahead of the locally stored upstream. `(-)` means there is no usable remote tracking branch. `(?)` means the count is unavailable, including when using `--server`.
 - Click **Collapse all** or **Expand all** next to **Git changes** to update every listed session group. The same action is available in the command palette (`Ctrl+P` by default). **Unassigned** stays visible.
-- Click a filename to open OpenCode’s full-screen **Uncommitted** diff viewer. The white `[A]`, `[M]`, and `[D]` badges are not links.
-- Files without a reliable match stay under **Unassigned**. A match identifies a recent recorded edit, not ownership of every line in the patch.
+- Click a filename to open its **Uncommitted** diff. Press `Esc` to return to the same session, or `r` to refresh it. The white `[A]`, `[M]`, and `[D]` badges are not links.
+- Files without a match stay under **Unassigned**. A match identifies the latest recorded edit the plugin found. It does not prove that the edit is part of the current diff.
 
 If the sidebar contents do not fit vertically, OpenCode adds a scrollbar. Use the mouse wheel over the sidebar or drag the scrollbar to see the rest of the list.
 
 ## Attribution and diff behavior
 
-The plugin reads Git status from the connected OpenCode server. It checks up to 30 open session tabs and up to 100 recent messages per session. It uses completed `write`, `edit`, and `patch` calls in the same worktree. Shell edits, external changes, edits outside the scanned history, and ties can remain unassigned. The sidebar indicates when history is partial.
+The plugin indexes completed `write`, `edit`, and `patch` calls from up to 30 open session tabs in the active project. It reads Git status for up to 30 worktrees: the active worktree, the tabs’ assigned worktrees, and saved project worktrees that contain a recorded edit. It does not scan other repositories or check out branches. An edit to a different worktree can appear under the session that made it without moving that session.
 
-The filename opens the native diff viewer, not a separate preview. OpenCode 2.3.2 does not expose initial file selection to plugins. Select the file in the viewer’s file tree. The viewer uses the session’s working directory, so open it from the worktree root to review files outside that directory. `Esc` returns to the session.
+The first scan can take several refreshes: each reads up to four pages of 50 messages per session and saves its progress. Later scans resume from the saved position, even after the TUI restarts.
 
-The plugin is read-only. It uses the connected OpenCode server for file status and attribution. With a local OpenCode server, it reads the ahead count with `git for-each-ref`. It never fetches, pushes, or changes Git state. The count reflects the remote tracking ref as of the last fetch.
+The sidebar indicates when history is partial. Shell edits, external changes, edits from tabs that are not scanned, and ties can remain unassigned. The local index stores session identifiers, paths, edit times, and scan positions, not file contents or message text.
+
+The file view requests an uncommitted diff from the connected server for the selected worktree and shows only the selected file. It does not change the session directory or the settings for OpenCode’s separate `/diff` viewer.
+
+The plugin does not change Git or OpenCode sessions. With a local OpenCode server, it reads the ahead count with `git for-each-ref`. It never fetches or pushes. The count reflects the remote tracking ref as of the last fetch.
 
 ## Develop
 

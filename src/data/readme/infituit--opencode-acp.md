@@ -9,15 +9,15 @@ ACP 是 [OpenCode](https://opencode.ai) 的上下文管理插件。它向模型�
 需要 OpenCode **>=2.1.4 且 <3**。通过 npm 包全局安装（已包含预构建代码，无需从 Git 构建）：
 
 ```bash
-opencode plugin add @infituit/opencode-acp@2.0.0-beta.1
+opencode plugin add @infituit/opencode-acp@2.0.0-alpha.15
 ```
 
-也可使用 `opencode plugin add @infituit/opencode-acp@beta` 跟随 Beta 渠道，或者在 `opencode.json(c)` 中添加固定版本：
+也可使用 `opencode plugin add @infituit/opencode-acp@alpha` 跟随 Alpha 渠道，或者在 `opencode.json(c)` 中添加固定版本：
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["@infituit/opencode-acp@2.0.0-beta.1"]
+    "plugins": ["@infituit/opencode-acp@2.0.0-alpha.15"]
 }
 ```
 

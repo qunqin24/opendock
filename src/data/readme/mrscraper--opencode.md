@@ -152,9 +152,9 @@ OpenCode 2 reaches MCP tools through Code Mode by default.
 | Tool | Description |
 | --- | --- |
 | `status` | Return the raw account status API response without summarizing, redacting body fields, or adding calculated fields. |
-| `scrapeHtml` | Retrieve the raw HTML of a page. Browser rendering is optional. |
-| `scrapeMarkdown` | Retrieve a page as Markdown. Including HTML also enables browser rendering and returns both outputs as JSON. |
-| `getScreenshot` | Capture a base64 screenshot of the full page or top viewport. Browser rendering is always enabled. |
+| `scrapeHtml` | Retrieve the raw HTML of a page. Browser rendering and a screenshot are optional. |
+| `scrapeMarkdown` | Retrieve a page as Markdown. Browser rendering is optional. |
+| `getScreenshot` | Capture a base64 PNG screenshot of the full page, the top viewport, or a custom viewport size. Browser rendering is always enabled. |
 | `scrapeBrand` | Extract a website's colors, typography, logos, and social links as JSON. |
 | `scrapeJson` | Extract structured JSON from a page using a natural-language prompt. Append Json Schema: and a JSON schema to shape the output. |
 | `webSearch` | Search the web and return ranked results with titles, URLs, descriptions, and sources. |
@@ -198,7 +198,7 @@ To control updates, pin a version and change it when you upgrade:
 
 ```json
 {
-  "plugin": ["@mrscraper/opencode@0.5.0"]
+  "plugin": ["@mrscraper/opencode@0.6.0"]
 }
 ```
 

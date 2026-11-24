@@ -58,8 +58,9 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 也可通过 `manage_settings` 工具切换（`action: "update"`，`locale: "zh"` 等）。
 `locale: "auto"`（「自动」，默认）跟随 OpenCode 界面语言：面板会立即响应语言切换，
 并将解析后的语言发送到服务器，使通知、摘要和仪表盘保持一致。切换无需重启。
-仪表盘的本地化仍在推进：部分客户端字符串目前仍为俄语。按设计，agent 工具描述
-与 schema 保持英语，输出到控制台的诊断信息保持俄语。
+仪表盘跟随解析后的语言：俄语和英语已完整本地化（`docs/dashboard.png` 中的截图为英文版）；
+中文目前回退到英文界面文案。按设计，agent 工具描述与 schema 保持英语，
+输出到控制台的诊断信息保持俄语。
 
 字符串目录位于 `locales/ru.json`、`locales/en.json` 和 `locales/zh.json`；
 每个键必须同时存在于三者中，否则 CI 会失败。
@@ -116,13 +117,15 @@ npm run build && npm run build:gui
 
 ## Agent 工具
 
-agent 可获得完整功能 —— 30 个工具，覆盖调度、流水线、运维、可观测性与管理：
+agent 可获得完整功能 —— 32 个工具，覆盖调度、流水线、运维、可观测性与管理：
 
 | 工具 | 参数 | 作用 |
 |---|---|---|
 | `schedule_task` | `name`；cron 用 `schedule`，一次性用 `runAt` / `delaySeconds`；可选 `session` / `sessionMaxRuns`、`timeoutSeconds`、`model`、`priority`、`beforeScript`、`afterScript`、`qualityGate`、`dependsOn`、`retryCount`、`retryDelay`、`nextTaskOnSuccess`、`nextTaskOnError`、`triggerType`（`cron`/`file`/`git`/`mcp-event`/`once`）、`mcpEvent`、`watchPath`、`watchGlobs`、`watchIgnore`、`gitBranch`、`gitPaths`、`gitIgnore`、`gitPollSeconds`、`activeDays`、`windowPolicy`（`skip`/`postpone`/`run`）、`workingDirectory`、`workspaceId`、`allowedTools`、`deniedTools`、`legacyShell`、`matrix` | 在操作系统调度器中注册任务（cron、一次性、文件、git 或 MCP 事件触发器） |
+| `schedule_advanced` | `schedule_task` 完整参数 | admin 配置下的高级调度 |
 | `list_tasks` | — | 返回任务及其 schedule、状态、下次运行、链路、workspace 和矩阵摘要 |
 | `update_task` | `name` + 要修改的字段 | 部分更新；省略的字段保留原值，空值表示清空，`matrix: null` 移除矩阵 |
+| `update_advanced` | `update_task` 完整参数 | admin 配置下的高级更新 |
 | `delete_task` | `name` | 删除任务（矩阵父任务会一并删除克隆和聚合器） |
 | `run_task_now` | `name` | 立即运行任务（矩阵父任务会启动扇出） |
 | `pause_task` | `name` | 暂停任务（矩阵父任务会暂停每个克隆） |
@@ -162,7 +165,7 @@ Agent 任务以 `opencode run --auto` 运行，因此其工具策略必须显式
 | `secure` | read、glob、grep、skill | edit、shell、question、webfetch、websearch、subagent |
 | `legacy` | 全部十个动作 | — |
 
-`deniedTools` 始终优先。非空的 `allowedTools` 会变成 allowlist：未列出的动作一律禁止，也可以显式恢复被策略禁止的动作（例如 `shell`）。`legacyShell: true` 仅在 `hybrid` 下恢复 `shell`，用于从旧版本迁移的任务。
+`deniedTools` 始终优先。非空的 `allowedTools` 是针对非只读动作的 allowlist：read、glob、grep 和 skill 会自动加入（PL-133），因此要禁止它们必须在 `deniedTools` 中显式列出。它也可以显式恢复被策略禁止的动作（例如 `shell`）。`legacyShell: true` 仅在 `hybrid` 下恢复 `shell`，用于从旧版本迁移的任务。
 
 被阻止的动作会以 `tool.blocked` 写入审计日志，带 `reason: "default-policy"` 和 `hint`；每次运行还会记录当前生效的策略。
 
@@ -270,7 +273,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 115 test suites, 600+ checks
+npm test             # 116 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
@@ -289,6 +292,7 @@ npm run test:en      # same suites with the English locale
 - [docs/PIPELINE.md](PIPELINE.md) —— 流水线即代码：文件格式、CLI、幂等 apply。
 - [docs/SAVINGS.md](SAVINGS.md) —— "Saved $" 估算如何计算。
 - [CROSS_PLATFORM.md](../CROSS_PLATFORM.md) —— Windows / macOS / Linux 的差异与后端。
+- [文档站点（GitHub Pages 操作手册）](FEATURES.md#documentation-site-github-pages) —— 文档如何构建与发布。
 
 ## FAQ
 

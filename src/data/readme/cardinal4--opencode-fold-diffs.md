@@ -15,9 +15,9 @@ The plugin can fold four kinds of content — three file-changing tool blocks pl
 | `write` | `# Wrote 35 lines · click to expand` | The complete contents of a written file. |
 | `edit` | `← Edit +12 −3 · click to expand` | A unified diff for an existing file. |
 | `apply_patch` | `← Patched +8 −2 · click to expand` (plus `# Created`, `# Deleted` and `# Moved` for add/delete/move patches) | One or more patches, often across several files. |
-| `bash` (optional) | The `$ command` line | Only the command folds, and only with `bash: true`; the output is left to OpenCode. |
+| `bash` (optional) | The `$ command` line | The command folds with `bash: true`; set `bash_output: true` to fold its output too. |
 
-The line/diff count and “click to expand” suffix are added by this plugin, so they disappear when `stats: false`. For Bash there is no stats suffix: only the command can fold, and the Bash output is never touched.
+The line/diff count and “click to expand” suffix are added by this plugin, so they disappear when `stats: false`. For Bash there is no stats suffix: the command folds, and with `bash_output` its output folds too.
 
 Click the header to open the block. Set the optional `key` option to add a shortcut that folds or unfolds every block at once.
 
@@ -72,14 +72,16 @@ Put options on the same plugin entry that lists the package:
 | `folded` | `true` | Whether new blocks start folded. `false` gives you only the toggle. |
 | `key` | `""` | Optional shortcut for fold/unfold-all. Empty by default so no OpenCode shortcut is overridden. |
 | `bash` | `false` | Also fold long bash commands. Off by default because OpenCode already trims them. |
-| `bash_lines` | `1` | Rows of the command left visible when bash folding is on. Does not affect the output. |
+| `bash_lines` | `1` | Rows of the command left visible when bash folding is on. Does not affect the output unless `bash_output` is set. |
+| `bash_min_lines` | `min_lines` | Commands occupying fewer rows than this are left alone. `0` folds every finished command. |
+| `bash_output` | `false` | With `bash: true`, fold the command's output and the host's “Click to expand” hint, and tighten the padding, so a finished command is one row. Errors stay visible. |
 
 ## What stays untouched
 
 - **Small changes.** Blocks below `min_lines` stay expanded on purpose; a two-line edit is already its own summary.
 - **Permission dialogs and diagnostics.** The diff you approve renders in full, and errors from an edit stay visible while the block is folded.
 - **Other tools.** `read`, `glob`, `grep`, todos, questions and the generic fallback keep OpenCode's behaviour.
-- **Bash output.** Only the command can fold when `bash` is enabled; the output and its “earlier lines” summary are untouched.
+- **Bash output.** Folded only when `bash_output` is enabled; otherwise the output and its “earlier lines” summary are left to OpenCode. A failed command's error line stays visible either way.
 
 ## Troubleshooting
 

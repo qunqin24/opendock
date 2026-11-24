@@ -77,7 +77,7 @@ Requires OpenCode **1.19.0** or later.
 ### 3.1 Install for yourself
 
 ```bash
-opencode plugin opencode-agent-supervisor@2.14.0 --global
+opencode plugin opencode-agent-supervisor@2.14.1 --global
 ```
 
 OpenCode downloads the package and adds it to the `plugin` array of
@@ -93,7 +93,7 @@ the repository runs the same supervisor version:
 
 ```json
 {
-  "plugin": ["opencode-agent-supervisor@2.14.0"]
+  "plugin": ["opencode-agent-supervisor@2.14.1"]
 }
 ```
 
@@ -874,13 +874,23 @@ malformed approvals file blocks the gated call carrying the error,
 while an absent file simply means "not approved". Agent calls
 touching the supervisor's engineer-authored state are blocked by
 default: any path whose final segment is `approvals.json` (lookalike
-names like `stale-approvals.json` are not blocked), the supervisor
+names like `stale-approvals.json` are not blocked; a glob final
+segment such as `*.json` counts only when the folders before it
+could be `.opencode/supervisor`, so `opsx/*` in prose does not), the supervisor
 config files, the directives directory, and the whole
 `.opencode/supervisor` directory run — ancestor spellings like
 `rm -rf .opencode/supervisor` included. Traversal (`..`) collapses
 and slash-free `cd` spellings are caught by a raw scan of the bash
-command string, and the block reason names the protected object, so
-the agent cannot self-approve a gate or defang its own supervisor.
+command string, so the agent cannot self-approve a gate or defang its
+own supervisor. For custom and MCP tools, a string argument holding
+whitespace is prose: it is checked as one whole path, not split into
+tokens, so a sentence mentioning supervisor state is not a touch.
+Shell-style keys (`command`, `cmd`, `script`, `args`, ...), bash, and
+the builtin tools keep the token scan. The block reason names the
+protected object and the argument that held it, says no approval
+unblocks the call, and tells the agent to remove the path and retry;
+it never prints a supervisor path, which agents echoed into their
+retries. No approvals entry can lift this block.
 Agent-console tools are exempt from both gate kinds.
 
 ---

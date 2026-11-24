@@ -10,15 +10,15 @@ This plugin removes the model from that step. Port of [`dsh-compaction-vcc`](htt
 directly against `@opencode/plugin/effect` (canonical runtime), so no
 convert-to-Effect task ever arises.
 
-On each `compaction` hook the plugin compiles history with a deterministic region compiler and, when a keepID can be picked, sets `event.result = { summary, metadata: { keepID, vccRev, vccConfigHash } }`. The host takes its `fromHook` short-circuit: the summary persists verbatim, the tail rebuilds from `keepID`, and **no model call is made** on the compaction path — proven live on host v2.3.2 (see [`docs/research/vcc-plugin-live-verdict.md`](https://github.com/jwitmann/opencode-vcc-compaction/blob/main/docs/research/vcc-plugin-live-verdict.md)).
+On each `compaction` hook the plugin compiles history with a deterministic region compiler and, when a keepID can be picked, sets `event.result = { summary, native: { messages }, metadata: { keepID, vccRev, vccConfigHash } }`. The host takes its `fromHook` short-circuit: the one-line summary persists as the row label, the full checkpoint replays from `native.messages` instead of the summary, the tail rebuilds from `keepID`, and **no model call is made** on the compaction path — proven live on host v2.3.2 (see [`docs/research/vcc-plugin-live-verdict.md`](https://github.com/jwitmann/opencode-vcc-compaction/blob/main/docs/research/vcc-plugin-live-verdict.md)).
 
 Why verbatim: a model asked to summarize fills what it cannot quite recall with plausible wording — invented, fluent, and then treated as factual premise. This engine only moves original text, never rewriting a character: every elision carries a `(seq N)` pointer back to its source event. The model sees original tokens or explicitly marked pointers. Nothing else.
 
 - **LLM-free** — no summarizer prompt, no inference latency, no model token spend.
 - **Verbatim** — prior checkpoints carried over word for word, never re-summarized.
-- **Deterministic** — same messages + config → byte-identical summary.
+- **Deterministic** — same messages + config → byte-identical checkpoint.
 - **Measured** — full sweep in [Performance](#performance).
-- **Fail-safe** — when no keepID can be picked, or the compiled outcome fails validation (blank summary, missing keepID — nothing a retry could fix, the compiler is deterministic), the hook abstains and the host falls back to model compaction. Never a broken summary.
+- **Fail-safe** — when no keepID can be picked, or the compiled outcome fails validation (blank summary, blank checkpoint, missing keepID — nothing a retry could fix, the compiler is deterministic), the hook abstains and the host falls back to model compaction. Never a broken summary.
 
 ## How it works
 
@@ -27,12 +27,16 @@ compile nodes, runs the deterministic reference compiler (`engine/`),
 and sets:
 
 ```js
-event.result = { summary, metadata: { keepID, vccRev, vccConfigHash } }
+event.result = {
+  summary, // one-line label — the TUI renders only this, so the row stays collapsed
+  native: { messages: [{ role: "user", content: [{ type: "text", text: checkpoint }] }] },
+  metadata: { keepID, vccRev, vccConfigHash },
+}
 ```
 
 `keepID` is the id of the first message the host must keep: the last
 `keepMessages` request messages stay verbatim, everything older compiles
-into the summary. `vccRev` (engine revision) and `vccConfigHash` (stable
+into the checkpoint. `vccRev` (engine revision) and `vccConfigHash` (stable
 hash of the resolved config) stamp which compiler and knobs produced the
 checkpoint. When no message id exists at/after the keep cut, the
 adapter abstains — `result` stays unset and the host falls back to model
@@ -41,12 +45,19 @@ compaction. Never a broken summary.
 ## Example
 
 Seven messages (user request, assistant text + two tool calls, results,
-follow-ups) compile to this — verbatim, the real output:
+follow-ups) compile to a one-line summary plus the full checkpoint — the
+summary is what the TUI renders (one collapsed row), the checkpoint is what
+replays as context via `native.messages`. Verbatim, the real output:
+
+Summary:
 
 ```text
-<details>
-<summary>compaction checkpoint: 7 messages -> 8 entries</summary>
+compaction checkpoint: 7 messages -> 8 entries
+```
 
+Checkpoint (single `native.messages` user message):
+
+```text
 This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Continue the task directly from the messages that follow, without acknowledging this checkpoint.
 
 <compacted-checkpoint>
@@ -79,8 +90,6 @@ fixed — TTL is now one hour. Want me to check the logout path too?
 yes, and also verify refresh tokens still work
 
 </compacted-checkpoint>
-
-</details>
 ```
 
 Every tool call is one line — `* name "key argument" (seq N -> result M)`.
@@ -114,8 +123,8 @@ information.
 - **Verbatim** — output contains only original tokens. Prior checkpoints
   are copied word for word instead of being re-summarized.
 - **Deterministic** — the same messages + config always compile to the
-  byte-identical summary (proven by double-run selftests).
-- **Measured** — 4,998 mixed messages compile to a ~28k-character summary
+  byte-identical checkpoint (proven by double-run selftests).
+- **Measured** — 4,998 mixed messages compile to a ~28k-character checkpoint
   in ~0.4 s on the dev machine, byte-identical across runs (see
   Performance).
 - **Fail-safe** — no keepID (or a failed outcome validation), no result:
@@ -129,7 +138,7 @@ assistant text + tool-call + tool-result, default config), best of 3 runs.
 Input sizes are request-payload characters with ÷4 token estimates
 (reproduce: `node scripts/bench.mjs`):
 
-| History | Input | Summary | Time |
+| History | Input | Checkpoint | Time |
 | --- | --- | --- | --- |
 | 999 messages | ~585k chars (~146k tokens) | 27,901 chars | 71 ms |
 | 4,998 messages | ~2.9M chars (~0.7M tokens) | 28,105 chars | 395 ms |
@@ -140,7 +149,7 @@ Two things to read off this table:
 
 - Compile time scales roughly linearly with history size — the pass is a
   single deterministic walk, and every run above was byte-identical.
-- Summary size stays flat because the default `maxTokens` cap (8192 entry
+- Checkpoint size stays flat because the default `maxTokens` cap (8192 entry
   tokens) binds: bigger histories elide more rows, they don't emit more
   text. Raise the cap if you want larger checkpoints, at the cost of more
   context per compaction.
@@ -258,7 +267,8 @@ How the budgets behave:
   `[checkpoint @ seq N]` line (the seq-fallback form — this path supplies
   no checkpoint ordinals).
 - `keepMessages` counts request messages, not entries: the host rebuilds
-  the verbatim tail from `keepID`, the summary covers everything older.
+  the verbatim tail from `keepID`, the checkpoint covers everything older
+  (the summary is only the one-line row label).
 
 ## Seq pointers, recall, and search
 
@@ -330,8 +340,10 @@ name-only); tool-result → single text block via projection (json →
 compact `JSON.stringify`, text → as-is, error → `[error] ...`, content →
 `TextContent` joined / `[file name]` / `[type]`); media → image iff
 `mediaType` starts with `image/`, else document; `compaction` part with
-text → synthesized checkpoint node (prior summaries carry over verbatim);
-`compaction` with null text and system-role messages →
+text → synthesized checkpoint node, as does a replayed native window
+(plain user message carrying the `<compacted-checkpoint>` tags) — prior
+checkpoints carry over verbatim either way; `compaction` with null text
+and system-role messages →
 skipped; `effort` parts are dropped but the message shell is kept with
 empty content, so seqs still align.
 
@@ -348,7 +360,8 @@ and control bytes are stripped deterministically before counting.
 
 - `index.ts` — thin Effect wiring only (`Plugin.define` + `Effect.fn` +
   `session.hook` + `command.transform`). No logic beyond config →
-  `compileCompaction` → assign, growth-guarded snapshot remember, RPC
+  `compileCompaction` → assign (one-line summary plus the single-message
+  native window), growth-guarded snapshot remember, RPC
   reply emit with prompt fallback, and the four `/vcc-*` command
   registrations.
 - `adapter.mjs` — pure mapping + compile (unit-tested, no host). See its

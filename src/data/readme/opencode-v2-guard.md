@@ -95,6 +95,19 @@ Corporate machines often have an email-shaped login, so absolute paths contain a
 - `piiEmailAllowDomains` treats listed domains as public identifiers — such emails are never masked (exact domain only, no subdomains).
 - Skips of PII in critical env vars are not audited (by design — otherwise every shell would spam the log); in enforce mode such PII reaches child processes with no trace.
 
+## Wire-level secret scrubbing (v1.2.2, GUARD-9)
+
+Incident (2026-11-17, see `docs/guard-9-investigation.md`): a credential reached the model while the audit said "redacted". The masked copy was persisted — the user saw only `<REDACTED:credential>` — but the provider request was built from a pre-mask in-memory copy, and a bare key line (no `key=` context) matches no pattern at all.
+
+Since v1.2.2 the guard closes this class with two layers on `session.http.request` — the last checkpoint every model call passes before bytes leave the process:
+
+1. **Pattern scrub** — the actual provider request body is deep-redacted by the same patterns as the admission paths.
+2. **Remembered-value scrub** — every admission hook (prompt, context, tool results, shell) remembers the raw values it has masked (per-session, in-memory, TTL 6h, cap 64 values/session; never persisted, never logged — audit records categories and counts only). The wire hook then replaces those values **literally**, independent of any pattern: bare occurrences, pre-mask copies, and JSON-escaped forms inside nested JSON strings. Whatever copy the request was built from, if the guard ever masked that value in the session, it cannot reach the provider.
+
+Since v1.2.3 the outbound **context scrub is the universal content interceptor**: it masks secrets in every message part that carries text — `text`, assistant `reasoning` (replayed to thinking-capable providers), and the raw instruction copies in system `metadata.experimental.instructions` — plus literal value-scrub of remembered values, so DB-restored history with bare occurrences is masked at context-build time, before the wire.
+
+> ⚠ **v1.2.1 and earlier are NOT reliable protection against this class** — patterns miss context-free values, and nothing scans the actual provider request. Update to ≥1.2.2.
+
 ## Known limitations
 
 - `~`, `$VAR` and shell globs are not expanded in static command checks — a command is neutralized only if a token literally matches a blocked path
@@ -102,12 +115,14 @@ Corporate machines often have an email-shaped login, so absolute paths contain a
 - ФИО <REDACTED:pii-name> requires an explicit marker (too many false positives otherwise)
 - The shell hook cannot throw a veto (API limitation) — the command is replaced with `echo … && exit 1`
 - pre-v1.2.1: the pii-email regex could stall ~19s on ≥100K-char runs of its character class (base64 dumps) — fixed in v1.2.1 via RFC-length bounds (64/255)
+- v1.2.2 wire scrub: a value is scrubbed on the wire only after the guard masked it at least once in the session (the registry is admission-driven); a value that never matched any pattern anywhere is not known to the wire layer
+- v1.2.2 persistence: a bare value without context is masked on the wire but stays raw in the local DB — patterns need context to mask at rest (see `docs/guard-9-investigation.md`)
 
 ## Development
 
 ```bash
 npm install
-npm test          # node --test (175 tests)
+npm test          # node --test (186 tests)
 npm run typecheck # tsc --noEmit
 ```
 
