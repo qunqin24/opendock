@@ -42,13 +42,49 @@ Global: $392.08 left
 The block is hidden entirely when the session is not talking to OpenRouter,
 and shows `waiting for first request…` until the first response completes.
 
-**`/openrouter-budget` command** — a dialog with the full picture: every captured request
-(time, kind, routed model, in/out tokens, OpenRouter and BYOK cost, generation
-ID), the session total, and the wallet block — key label, key budget, account
-credits, and fetch time. The wallet block also says whether BYOK spend counts
-toward the key's own credit limit (`include_byok_in_limit`) and toward the
-budget that blocks requests first (`effective_budget.include_byok`); these are
-separate OpenRouter settings. Press `r` to refresh the wallet, `Esc` to close.
+**`/openrouter-budget` command** — a dialog with the full picture:
+
+```
+OpenRouter budget                                  esc
+
+Spend
+Session total       $4.0761 · 155 requests
+  OpenRouter        $4.0761
+  BYOK upstream     $0.0000 · 132 unknown
+
+Limits
+Key limit (weekly)  $78.42 left · BYOK counted: no
+Account credits     $114.11 left of $200.00
+
+Requests · 155 · newest first
+Time   Model                     Role            Cost
+── Today ────────────────────────────────────────────
+10:52  claude-haiku-5.5          compaction  $0.0890
+── Yesterday ────────────────────────────────────────
+14:36  google/gemini-4-hydrogen              $0.0131
+14:35  google/gemini-4-hydrogen              $0.0164?
+```
+
+- **Spend** is the session total and its OpenRouter and BYOK parts.
+- **Limits** shows:
+  - the key's budget;
+  - the effective budget (the one that blocks requests first);
+  - account credits;
+  - the key's label and lifetime usage.
+
+  Both budgets say whether BYOK spend counts toward them (`include_byok_in_limit` and
+  `effective_budget.include_byok`, which are separate OpenRouter settings).
+
+- **Requests** lists every captured request, newest first, one line each, with
+  day headings when the list spans several days.
+  - In a wide dialog the columns are time, routed model, kind, OpenRouter cost,
+    BYOK cost, and input and output tokens.
+  - In a narrow one the columns are time, model, kind, and the combined cost,
+    with `?` when the BYOK part is unknown.
+  - The kind is left blank for ordinary requests.
+
+The request list scrolls with ↑↓, PgUp/PgDn, Home/End or the mouse wheel. Press
+`r` to refresh the wallet and `Esc` to close.
 
 ## Install
 

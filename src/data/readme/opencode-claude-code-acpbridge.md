@@ -252,6 +252,7 @@ the provider.
 | `agents` | `false \| Record` | — | one per mode | `false` injects no agents. A `Record` **replaces** the default `claude-<mode>` definitions entirely, including their native toolset ([details](#agents-and-subagents)). |
 | `agentModel` | `string` | — | `"default"` | Model of the injected agents. |
 | `pairModels` | `boolean` | — | `true` | Reserve the provider's models for the injected agents, and those agents for the provider's models ([details](#models-are-paired-with-the-claude-code-agents)). `false` lets any agent use any model. |
+| `memoryAccess` | `boolean` | — | `true` | Let the Claude Code agents read and write Claude Code's auto memory (`<configDir>/projects/<project>/memory/`, `~/.claude` by default) without an `external_directory` prompt. A deny you configure for that path still wins. `false` asks as before. |
 | `titleFromModel` | `boolean` | — | `false` | Let the model title sessions. By default the plugin titles them from the first user message, with no model call. |
 | `npm` | `string` | — | auto | Package spec the provider is loaded from. Only needed in unusual setups. |
 | `claudeCode` | `object` | — | "clean brain" | How Claude Code runs: the table below. |

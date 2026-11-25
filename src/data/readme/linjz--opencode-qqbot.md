@@ -20,11 +20,13 @@ Built for production, not just message bridging: a self-healing watchdog, an aud
 |---|---|
 | Two-way chat | QQ messages reach the OpenCode session; AI replies are pushed back to QQ (markdown rendering, long answers auto-split with table atoms intact and code-fence repair) |
 | Desktop session mirror | 📋 Digest card: the latest Q&A round of a desktop session is mirrored to QQ in real time (full text by default) |
-| Progress watching | `/watch` subscribes to tool-call milestones (🔧 command summary / exit code), throttled and merged |
+| Status cockpit | `/status` is the single dashboard — server/session/model/agent/observation/mirror/queue/logs in one view; `/status watch on|off` and `/status mirror on|off` are the only switches (tool-call milestones 🔧 + desktop digest mirror) |
 | **Permission approval** | OpenCode permission requests arrive as 🔐 four-button cards (allow once / always allow / reject / ignore). Taps take effect silently (the tapped button shows ✓/✗ via native visited state). The card also shows exactly which rule "always allow" will save. Text replies ("允许/总是/拒绝") work too |
 | **Form prompt bridge** | OpenCode Forms (single-choice / multi-choice / boolean / text) render as 📝 QQ cards — answer by tapping buttons or replying with a letter (A/B/C). Requests and forms from desktop-side turns are pushed as well (always-on watcher, 12s poll) |
 | Remote commands | `/new /cancel /status /sessions /history /models /agents /rename /progress /queue /ledger /send /undo /amend /goal /compact /redo /btw` |
-| Rich media | Receive images (native attachments go to the AI for vision); **receive voice** (QQ's built-in ASR transcribes to text into the prompt for free); **send images/files** (AI replies containing `QQ_SEND_FILE: <path>` or the `/send <path>` command; 20MB limit) |
+| Busy-time steer | New messages while a turn is running merge into the current turn (official steer semantics — the default); enqueue explicitly with `/queue <text>`; classic FIFO via `QQ_BUSY_DEFAULT=queue` |
+| Goal mode | `/goal <objective>` passes through to the engine's goal mode with status-change notifications and kickoff attribution; `/goal` shows status, `pause|resume|clear` to control |
+| Rich media | Receive images (native attachments go to the AI for vision); **receive voice** (QQ's built-in ASR transcribes to text into the prompt for free); **send images/files** — the AI calls the native `qq_send_file` tool (path allowlist + idempotent dedupe + precise errors; `QQ_SEND_FILE:` marker retained as fallback) or you run `/send <path>`; 20MB limit |
 | Quote context | Long-press quote a message and ask — the AI sees the quoted content (our own replies are indexed too) |
 | Long tasks never lost | 30-min foreground timeout falls back to a background wait (SSE + polling, up to 24h); a 30-min stall triggers a proactive notice with status (stalled / unknown / finished-but-lost), the latest tool action, and how long there's been no progress |
 | Duplicate-proof delivery | Two-layer dedup: cross-process atomic msgId claim + same-content in-flight fingerprint; long identical replies deduped outbound for 24h; "received" ack bubble off by default (`QQ_ACK_RECEIPT=1` to enable) |
@@ -33,6 +35,16 @@ Built for production, not just message bridging: a self-healing watchdog, an aud
 | Self-healing | Startup race backoff, port-drift auto-discovery with hot base-swap, patrol alerts (QQ proactive messages), a production watchdog (OTP-style restart intensity, dual-signal liveness, 10s post-spawn re-spawn), single-instance lock with heartbeat + 60s self-check |
 | Auditability | Every watchdog kill decision lands in a dedicated JSONL audit log (`~/.openqq/kills.log`): the rationale (health snapshot), the action (pid + TERM/KILL escalation), and the consequence (new pid + restart counter) |
 | Security | fail-closed allowlist admission (non-listed users always rejected), download-domain allowlist, secret masking in logs, push content redaction, dangerous-command approval driven by OpenCode's permission rules (four-button cards) |
+
+### What's new in v0.3.18
+
+- **v0.3.19 hotfix** — `bin/openqq.js` TDZ (temporal dead zone) broke every `openqq` subcommand on 0.3.16-0.3.18 with a module-eval `ReferenceError`; declaration order fixed and a bin smoke suite added to the test chain. Also fixes the supervisor lease `--once` self-deferral that diluted 5-min patrols to 10-min (channel-priority + timestamp lease, pid is diagnostics only).
+- **`qq_send_file` first-class tool** — the AI sends local files/images to QQ via a native tool with JSON-Schema contract and precise structured errors (allowlist roots on failure); the old `QQ_SEND_FILE:` text marker survives as a fallback. No more syntax guessing.
+- **System-level channel instructions** — QQ rendering/format rules are injected as session instructions (`<context key="qq">`), not appended to your prompt text. Session history stays clean on the desktop side.
+- **Status cockpit** — `/status` becomes the single dashboard and the only switch entry for observation (`watch`) and digest mirror (`mirror`); standalone `/watch` `/mirror` commands retired.
+- **Honest dead-turn resumption** — a dead background turn is judged by three signals (last-activity threshold + running-tool grace window + turn-unterminated), aborted with the outcome recorded, and resumed with a targeted dedupe hint naming the in-flight tool; if the abort is unconfirmed the model must verify processes/side effects before redoing any write.
+- **Busy-time steer by default** — messages arriving mid-turn merge into the running turn (official steer semantics); `/queue <text>` enqueues explicitly.
+- Engineering: 69 test suites on a parallel runner, state-store hardening, `deploy/` retired, design-doc reconciliation batch. Full details in the [v0.3.18 release notes](https://github.com/linjz3376/opencode-qqbot/releases/tag/v0.3.18).
 
 Why QQ instead of the official mobile app: the official OpenCode Mobile (TestFlight / Google Play) is a remote for the desktop app — install required, out-of-region store accounts needed in China, and pairing through tunnels. This bot closes the loop natively in QQ: no app, no QR pairing, approval cards delivered straight to your chat.
 

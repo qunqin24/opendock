@@ -63,10 +63,11 @@ npx opencode-agent-harness init --target . --dry-run
 | `.agents/skills/*/SKILL.md` | persona instruction skills (V2 also discovers `.agents/skills/` as skills) | harness (overwrite) |
 | `.agents/features/INDEX.md` | pointer to `BACKLOG.md` (per-feature doc tree root) | **project** (create-if-missing) |
 | `opencode.json` | main model + `agents` defaults (small-model on `title`, opportunistic `explore`) + the `permissions` baseline | harness (**merged**, see below) |
-| `scripts/qa/*` | `test:dispatch` / `test:governance` / `test:qa-plan` / `test:prefix` gates + QA-script wiring check | harness (overwrite) |
+| `scripts/qa/*` | dispatch preflight/tier/log tooling plus `test:dispatch` / `test:governance` / `test:qa-plan` / `test:prefix` gates + QA-script wiring check | harness (overwrite) |
 | `scripts/backlog.js` | deterministic `BACKLOG.md` editor (list/add/take/archive/freeze) | harness (overwrite) |
 | `.opencode/plugins/backlog.ts` | `backlog_*` custom tools the LLM calls (V2 plugin registering the tools; shells out to the CLI) | harness (overwrite) |
 | `.opencode/plugins/backlog-notify.ts` | structured log whenever an agent mutates the board | harness (overwrite) |
+| `.opencode/plugins/dispatch.ts` | `dispatch_persona` tool — preflights persona/model/scope/tree and assembles the task spec | harness (overwrite) |
 | `.opencode/plugins/context-guard.ts` | mid-session checkpoint/loop nudges read from `orchestration.md` (core: `scripts/qa/context-guard-core.js`) | harness (overwrite) |
 | `.opencode/plugins/session.ts` | `session_info` tool — reports the primary orchestrator session id (the handoff `session:` join key) + observed cost/tokens/turns | harness (overwrite) |
 | `.opencode/plugins/checkpoint.ts` | `checkpoint_write` / `checkpoint_resume` tools (shell out to `scripts/checkpoint.js`) | harness (overwrite) |

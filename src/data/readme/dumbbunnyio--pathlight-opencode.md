@@ -90,7 +90,7 @@ To reopen the viewer yourself, with no agent involved:
 | --- | --- | --- | --- |
 | A shell prompt (in tmux or not) | `pathlight open [VIEW]` | That terminal becomes the viewer | none |
 | Inside Claude Code | `/pathlight:open [tmux\|pane] [VIEW]` | A viewer pane is split beside the conversation, bound to it (outside tmux, the map opens in a browser window); with `pane`, or a saved `pane` choice, Pathlight is drawn in Claude Code's own pane instead, which is experimental ([Inside Claude Code](#inside-claude-code)) | none (the plugin answers the command itself, so the model is never called) |
-| Inside OpenCode | `/pathlight-open [VIEW]` | A viewer pane is split beside the conversation; outside tmux, the map opens in a browser window | none (the CLI plugin handles it) |
+| Inside OpenCode | `/pathlight:open [VIEW]` | A viewer pane is split beside the conversation; outside tmux, the map opens in a browser window | none (the CLI plugin handles it) |
 | Inside Claude Code or OpenCode | `! pathlight open [VIEW]` | The same split; outside tmux, the browser window | none (a shell escape) |
 
 `open` follows the most recent recorded session and shows `VIEW`, else the view named `index`, else the first view. Typed at a prompt it takes over that pane; run by an agent (anything between the pane's shell and the command) it splits beside it. `--here` always uses the current terminal and `--split` always splits. Without a `.pathlight/pathlight.activity.json` it still opens, but cannot follow an agent. The hook needs the Claude plugin; `/pathlight:open` is not installed by `pathlight init`.
@@ -172,7 +172,7 @@ It never rewrites a LikeC4 model you wrote: if the workspace has one, use `--out
 
 ## Inside Claude Code
 
-With the Claude plugin installed, `/pathlight:open [VIEW]` splits a tmux viewer beside the conversation, bound to it, as `pathlight show` does (outside tmux there is no pane to split, so it opens the map in a [browser window](#outside-tmux) instead, as `pathlight show` and OpenCode's `/pathlight-open` do). The plugin answers the command itself, so the model is never called.
+With the Claude plugin installed, `/pathlight:open [VIEW]` splits a tmux viewer beside the conversation, bound to it, as `pathlight show` does (outside tmux there is no pane to split, so it opens the map in a [browser window](#outside-tmux) instead, as `pathlight show` and OpenCode's `/pathlight:open` do). The plugin answers the command itself, so the model is never called.
 
 **Experimental: the viewer in Claude Code's own pane.** Claude Code 2.1.287 or later can draw Pathlight in a pane of its own, with no tmux: `/pathlight:open pane [VIEW]` does it for one command, and `pathlight config set claude pane` makes it your default, saved as `"claude": "pane"` in Pathlight's own settings file, `~/.config/pathlight/config.json` beside the theme (nothing about any workspace is kept there; `pathlight config set claude tmux` puts the tmux pane back, `pathlight config get claude` prints the choice, and the word in the command, `pane` or `tmux`, wins over the file). It is off by default because Claude Code gives a docked pane at most 45% of the terminal's width and offers no way to resize or place it, which is not an effective viewport for a diagram; the work is kept for when that changes. With the pane chosen, where it goes is Claude Code's layout (`/tui` switches it):
 
@@ -205,7 +205,7 @@ What the browser has today: the map, selection, the inspector, the views list, B
 
 ## Outside tmux
 
-Nothing needs tmux. Where there is no pane to split (a plain terminal, an editor's terminal), `/pathlight:open` in Claude Code, `/pathlight-open` in OpenCode and the agent's own `pathlight show` or `pathlight open` open the map in the browser window, following the same conversation, and `pathlight open` typed at a shell prompt draws the viewer in that terminal. `/pathlight:open tmux` and `pathlight open --split` ask for the pane by name and say so when there is none.
+Nothing needs tmux. Where there is no pane to split (a plain terminal, an editor's terminal), `/pathlight:open` in Claude Code or OpenCode and the agent's own `pathlight show` or `pathlight open` open the map in the browser window, following the same conversation, and `pathlight open` typed at a shell prompt draws the viewer in that terminal. `/pathlight:open tmux` and `pathlight open --split` ask for the pane by name and say so when there is none.
 
 Use `--pane %ID` to choose the parent pane explicitly (run `tmux display-message -p '#{pane_id}'` in it), and `--socket PATH` for a non-default tmux server.
 Use `--project NAME` when multiple projects have the same view ID.
@@ -221,7 +221,7 @@ The plugin has two halves, both loaded from that one entry:
 
 | In OpenCode (inside tmux) | Claude Code equivalent | What it does |
 | --- | --- | --- |
-| `/pathlight-open [VIEW]` (also `/pathlight:open`) | `/pathlight:open [VIEW]` | Splits the viewer beside the conversation and follows the newest recorded session. No model turn. |
+| `/pathlight:open [VIEW]` | `/pathlight:open [VIEW]` | Splits the viewer beside the conversation and follows the newest recorded session. No model turn. |
 | `/pathlight [VIEW]` | `/pathlight:map [VIEW]` | Asks the agent to use the pathlight map skill (draft, check, show), telling it your pane and tmux socket so it passes `--pane`. |
 | `! pathlight open [VIEW]` | the same | Shell escape. |
 
@@ -231,7 +231,7 @@ Recording: with `record: true` every root session in a workspace with a mapping 
 Each tool requests permission before loading a workspace or opening a pane. `pathlight_show` needs an explicit pane (`%2`) because OpenCode's background service may not share your terminal's environment; the slash commands supply it for you.
 It uses the plugin location as the workspace and passes only identifiers to the CLI, not diagram geometry through model context. A new `show` request reuses the owned viewer pane and resets the view, selection, and scroll position.
 
-OpenCode status: `tests/opencode-live.test.ts` runs the real OpenCode binary (`--standalone`, isolated config) against a fake OpenAI-compatible model: its hooks record a plain session, `/pathlight-open` opens a viewer bound to it, and the skill reaches the model. `tests/opencode-plugin.test.ts` covers the permission, `live`, `record` and `stop` rules against a stubbed context. The `/pathlight` (`/pathlight:map`) command's model turn (that an agent follows the skill with a real model) is not covered, and tool names and arguments from providers other than the built-in ones are unverified.
+OpenCode status: `tests/opencode-live.test.ts` runs the real OpenCode binary (`--standalone`, isolated config) against a fake OpenAI-compatible model: its hooks record a plain session, `/pathlight:open` opens a viewer bound to it, and the skill reaches the model. `tests/opencode-plugin.test.ts` covers the permission, `live`, `record` and `stop` rules against a stubbed context. The `/pathlight` (`/pathlight:map`) command's model turn (that an agent follows the skill with a real model) is not covered, and tool names and arguments from providers other than the built-in ones are unverified.
 
 ## Observe live activity
 
@@ -250,7 +250,7 @@ Mappings use workspace-relative path globs and exact LikeC4 element IDs:
 
 `ignore` lists files deliberately outside the model (the viewer leaves their activity out too), and `shared` lists elements anything may import (so `pathlight check` expects no relationship to them). `planned` lists elements designed but not built yet (their mappings may match no files without being a mistake; `check` reports how much of the plan exists and the viewer draws them dashed with a `[planned]` tag until they have files). `entries` lists views meant to be opened directly (not linked from another), which `check` does not count as a second entry point. `resources` lists the elements that are what the code talks to, each with the packages that lead to it (`{ "element": "postgresql", "packages": ["pg"] }`); `check` judges a relationship to one by those imports. `check` reads these; the viewer also reads `ignore` and `planned`.
 
-In OpenCode with `record: true`, just run `/pathlight-open live`. Without it, ask the agent to show the `pathlight` project's `live` view with `live: true` and your current pane ID.
+In OpenCode with `record: true`, just run `/pathlight:open live`. Without it, ask the agent to show the `pathlight` project's `live` view with `live: true` and your current pane ID.
 The plugin binds the panel to the session. It records that session's subsequent tool starts, completions, and failures automatically.
 Call `pathlight_stop` to stop recording. Closing the viewer alone does not stop recording.
 Plugin reloads stop recording; call `show` with `live: true` again to resume.

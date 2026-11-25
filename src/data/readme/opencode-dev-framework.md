@@ -162,7 +162,8 @@ semantics, block budgeting, `protect_off` scope, and all eight
   synthetic continuation, bounded by `gate.max_blocks` (fewer when
   the failure repeats with no new edits — the gate stands down early on
   zero progress). On DSH the same verdict runs pre-terminal in the same
-  turn — no re-prompt round-trip.
+  turn — no re-prompt round-trip. Scratch and generated files can skip
+  evaluation via `gate.ignore` or `/df-ignore`.
 - **Verified goals (`/df-goal`).** Wraps a task in native `/goal` with a
   verification contract the reviewer weighs as evidence.
 - **Pre-flight gate (optional).** Denies edits until the agent records
@@ -267,13 +268,14 @@ How each layer is enforced, and what it honestly cannot do:
 | `/df-help` | Instant modal: lists the dev-framework commands. |
 | `/df-profile` | Instant modal picker (or `/df-profile <name>`): switches profile now, written to config. |
 | `/df-verify` | Runs the verification suite manually; pass/fail summary in a modal. |
+| `/df-ignore` | Server-side command: marks scratch files so the gate skips them — globs ignored for this session (`-s` stores to `gate.ignore`, `-l` lists, `-r` removes). See the [scratch pitfall](docs/user/troubleshooting.md). |
 | `/df-init` | Server-side command: scaffolds templates, writes the detected config, trial-runs it, hands the brief to the agent. |
 | `/df-update` | Server-side command: diffs installed templates against shipped, refresh/add each with user approval (detection only, never writes). Drift is also mentioned once at session startup. |
 | `/df-goal <objective>` | Server-side command: starts a **verified** native goal (requires native `/goal`, a blocking profile, and at least one real check). |
 
 The TUI commands open instantly and never feed the LLM; `/df-init`,
 `/df-update`, and `/df-goal` are server-side and drive the session. Same
-eight names on DSH, where they run as host commands returning text instead
+nine names on DSH, where they run as host commands returning text instead
 of modals. Full reference:
 [`docs/user/commands.md`](docs/user/commands.md).
 
@@ -288,6 +290,8 @@ of modals. Full reference:
   from the bounded completion mechanisms below.
 - A cached pass never survives a restart — after a restart the gate
   always re-verifies the final tree from scratch.
+- Session ignore patterns (`/df-ignore` without `-s`) also live in server
+  memory — a restart clears them. Store what must survive with `-s`.
 - Formatting and linting use your project tooling — the framework never
   reimplements them. On OpenCode the host runs the formatter; on DSH the
   adapter runs your configured formatter command before linting. Want

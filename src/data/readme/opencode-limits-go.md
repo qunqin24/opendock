@@ -45,7 +45,7 @@ TUI is intentionally one line in the sidebar:
 - **Reset-aligned cold start**: persists the last valid snapshot for 0 ms startup, refreshes 3 seconds after any window resets, respects `Retry-After` on `429`/`503`, and slows background polling 3× when minimized.
 
 ### Alerts that reach you
-- Threshold toasts (`70%` / `80%` / `90%` / `100%`), quota-reset recovery toasts, fast-burn spike alerts, and **"won't survive until reset"** warnings.
+- Threshold toasts (`50%` / `70%` / `80%` / `90%` / `100%`), quota-reset recovery toasts, fast-burn spike alerts, and **"won't survive until reset"** warnings.
 - **System notifications** when the app is not focused — **off by default**, opt-in, and only for 100% quota (max once per 10 minutes). In-app toasts remain separate.
 - Alerts are deduplicated per account/window/reset, persisted in TUI storage across `/reload`, and never fire on stale disk-cache data.
 
@@ -57,13 +57,13 @@ TUI is intentionally one line in the sidebar:
 ### Credentials and updates
 - Works with OpenCode Console **OAuth** (`opencode`), saved **API keys** (`opencode-go` / `opencode`), env vars (`OPENCODE_GO_API_KEY`, `OPENCODE_API_KEY`, `OPENCODE_ZEN_API_KEY`), plugin options, `opencode auth export`, and legacy `auth.json`.
 - Tokens never leave the server process — never sent over RPC, never shown in the UI, and redacted from logs.
-- **Dev installs (`git clone` or `local-plugins`) are never overwritten** by the updater. Release installs update only from a release that ships `SHA256SUMS`, with a version check, process lock, and `package.json` written last.
+- **Dev installs (`git clone` or `local-plugins`) are never overwritten** by the updater. Release installs update only from a release that ships `SHA256SUMS`, with a version check, fail-closed archive-listing preflight, an owner-token process lock, size caps, and `package.json` written last. The update check cache is still honored for dev and package-manager installs (they are never auto-installed).
 
 ---
 
 ## Installation
 
-Requires **OpenCode v2.3.0+** and an active OpenCode Go credential (`opencode auth login` or `OPENCODE_API_KEY`).
+Requires **OpenCode v2.3.0+**, an active OpenCode Go credential (`opencode auth login` or `OPENCODE_API_KEY`), and **Node.js >= 20** for the server and Desktop GUI. The optional TUI entrypoint depends on `@opentui/core` and inherits its engines: **Node >= 26.4 or Bun >= 1.3.14**. CI runs on Node 24 to typecheck, test, and build, and does not execute the TUI runtime.
 
 ### Option 1: OpenCode CLI (recommended)
 
@@ -89,7 +89,7 @@ git clone https://github.com/cusvv/opencode-limits-go.git "$env:USERPROFILE\.con
 cd "$env:USERPROFILE\.config\opencode\local-plugins\opencode-limits-go"; npm install
 ```
 
-`npm install` is required for the TUI entrypoint (`solid-js` and `@opentui/solid`). The Desktop GUI bundle is prebuilt.
+`npm install` is required for the TUI entrypoint (`solid-js` and `@opentui/solid`). The Desktop GUI bundle is prebuilt. Server and Desktop need Node >= 20; the TUI runtime additionally requires `@opentui/core` engines (Node >= 26.4 or Bun >= 1.3.14).
 
 ### Option 3: Release archive
 
@@ -178,7 +178,11 @@ opencode plugin list
 opencode api post /api/rpc/opencode-limits-go/status --data '{"input":{"force":true}}'
 ```
 
-A healthy response has `"ok": true` and a non-empty `rows` array. `"ok": false` includes an actionable `error` (`NO_TOKEN`, expired token, rate limit, or network failure).
+A healthy response has `"ok": true` and a non-empty `rows` array with language-neutral values (`label`: `5h`/`1w`/`1m`, `resetsIn`: `""` or `"?"`). A failure has `"ok": false` and an authoritative machine-readable `errorCode` (`NO_TOKEN`, `AUTH`, `RATE_LIMIT`, `OFFLINE`, `BAD_RESPONSE`, `CREDENTIALS_CHANGED`, `INTERNAL`); the legacy `error` field repeats that code. `lang` is deprecated and ignored — the UI localizes the card on render. Example:
+
+```json
+{ "ok": false, "errorCode": "AUTH", "error": "AUTH", "errorDetail": "HTTP 401: invalid token", "tight": "" }
+```
 
 ---
 
@@ -208,8 +212,8 @@ A healthy response has `"ok": true` and a non-empty `rows` array. `"ok": false` 
 
 - No telemetry. Network access is limited to the OpenCode Go usage endpoint and GitHub releases.
 - Tokens are read server-side and never cross RPC. Credential lookup is time-bounded, and Windows CLI fallback blocks current-directory executable hijacking.
-- Logs are created in a private directory with `0600` permissions and redact bearer tokens, JWTs, and common API-key formats.
-- Updates require HTTPS GitHub hosts, `SHA256SUMS`, a matching `package.json` version, and a stale-aware process lock. Dev/git installs are excluded.
+- Logs are created in a private directory (`0700`) with `0600` files and redact bearer/basic tokens, JWTs, JSON secret values, auth headers, and common API-key formats.
+- Updates require HTTPS GitHub hosts, `SHA256SUMS`, a matching `package.json` version, a fail-closed archive listing check, and a stale-aware process lock with an owner token. Dev/git installs are excluded.
 
 ---
 
@@ -223,36 +227,34 @@ Follows your OpenCode UI language (**English** / **Russian**), or can be overrid
 
 ```sh
 npm install
-npm test          # core + server unit tests
+npm test          # core + server + ui-state + present tests (contract, parity, alerts)
 npm run build     # typecheck server/TUI/GUI and rebuild dist/gui-experimental.cjs
 ```
+
+CI uses Node 24 on Linux, Windows, and macOS. It typechecks/tests/builds the plugin but does not launch the TUI runtime; local TUI use must satisfy `@opentui/core` engines (Node >= 26.4 or Bun >= 1.3.14).
 
 ### Project architecture
 
 ```text
 src/
-  index.ts              Server plugin: RPC endpoints, disk/memory cache, reset-aligned timers
-  rpc.ts                Portable RPC contract (status, getPrefs/setPrefs, updates, events)
-  gui.tsx               Desktop GUI entrypoint (SolidJS + OpenCode GUI SDK)
-  tui.tsx               TUI entrypoint
+  index.ts              Wiring: plugin setup, RPC handlers, timers
+  rpc.ts / rpc/         Portable RPC contract (status, prefs, updates, diagnostics, events)
+  gui.tsx, tui.tsx      Desktop/TUI entrypoints
+  gui/, tui/            Presentation only (Solid GUI modules, terminal UI modules)
 
-  core/                 Pure domain logic
-    types.ts            Types, window risk ranking, error text
-    format.ts           Dates, durations, usage parsing, error labels
-    pace.ts             Snapshot ring buffer, pace, verdicts, sparkline data
-    alerts.ts           Threshold, reset recovery, fast-burn detectors
-    stats.ts            Provider spend & top-model aggregation
-    summary.ts          TUI sidebar & detail formatter
-    utils.ts            Secret redaction, retry, semver
+  core/                 Domain: types, parsing, window risk, pace, alert detection, stats
+  present/              Copy/format: labels, durations, errors, alerts, verdicts, TUI text
+  i18n/                 EN/RU dictionaries, typed keys, parity
+  ui-state/             Single-flight poller, alert reducer, shared-pref application
+  settings/             Shared prefs schema, defaults, sanitize, merge
 
-  server/               Node / IO layer
+  server/
     api.ts              OpenCode Go HTTP client with Retry-After
-    auth.ts             Multi-source credential discovery
-    updater.ts          Checksum-verified GitHub updater with dev-install guard
     log.ts              Private rotating JSON logger
-
-  gui/                  Desktop GUI modules
-  tui/                  Terminal UI modules
+    platform.ts         Platform helpers (signals, paths)
+    service/            Cache, history, identity, prefs, status, events, storage
+    credentials/        auth facade + identity/resolver/sources
+    updater/            Checksum-verified GitHub release check, install, rollback
 
 dist/
   gui-experimental.cjs  Prebuilt CommonJS Desktop GUI bundle

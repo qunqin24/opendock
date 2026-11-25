@@ -58,13 +58,13 @@ It works with React apps on a Vite dev server and with Astro sites, and with [Cl
 
    With OpenCode instead, run `opencode plugin add design-in-browser`, then `/design-in-browser` in OpenCode.
 
-5. Start your dev server, open the app, and click the round button in the bottom-right corner (or press **Alt+Shift+D**) to open the dock. It opens beside your app and moves the page aside, so all of it stays in reach.
+5. Start your dev server, open the app, and click the round button in the bottom-right corner (or press **Alt+Shift+D**) to open the dock. Drag the button elsewhere if it covers something; it keeps that spot. The dock opens beside your app and moves the page aside, so all of it stays in reach.
 
 ## Comment on your app
 
 Click **Comment** in the dock (or press **Alt+Shift+C**), click anything on the page, type what should change, and press Enter. It goes to the agent right away, and a pin stays where you clicked.
 
-The agent replies to each comment: done, a question, or skipped with a reason. Answer a question right under it, in the dock or in the pin, or dismiss it. Pins go away once a comment is done; the eye button in the dock's header hides the rest while you look at the page.
+The agent replies to each comment: done, a question, or skipped with a reason. Answer a question right under it, in the dock or in the pin, or dismiss it. Pins go away once a comment is done; the eye button in the dock's header (or **Alt+Shift+H**) hides the rest, and the switchers, while you look at the page. A card in the way can be dragged aside: the comment card by its surface, a pin's thread by its top edge or a name line. Double-click there to put a thread back.
 
 ![A pin's thread with the agent's question and an answer field, next to the dock's replies](https://raw.githubusercontent.com/formstep/design-in-browser/main/docs/images/replies.png)
 
@@ -85,6 +85,8 @@ Switch the comment card to **Alternatives**, choose how many (1 to 4), and send.
 - With one alternative, it's a **Before / After** toggle.
 - With more, you get **Before** plus arrows through the alternatives.
 
+If the switcher covers something you want to see, drag it by its bar (outside the buttons) and it stays there, following that part of the page as you scroll; its tweaks card comes along. Double-click the bar to put it back.
+
 **Tweaks** shows the knobs the agent added to an alternative, such as an optional badge, a padding slider or a choice of alignment. Changes show on the page as you make them.
 
 ![The switcher on a hero section, with its tweaks card open](https://raw.githubusercontent.com/formstep/design-in-browser/main/docs/images/alternatives.png)
@@ -99,6 +101,7 @@ Alternatives use a `<Variants>` wrapper from `design-in-browser/react` while you
 | --- | --- |
 | Alt+Shift+D | Open or close the dock |
 | Alt+Shift+C | Start or stop picking elements |
+| Alt+Shift+H | Hide or show everything on the page (pins, drawings, switchers), to see the page as it is |
 | Enter | Add the comment (Shift+Enter for a new line) |
 | Esc | Close the card, then stop picking |
 

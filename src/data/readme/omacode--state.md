@@ -35,28 +35,34 @@ and research [docs/plan.md](docs/plan.md). Development happens on the branch `om
   cloud URL; in `cloud` without a key, every decision goes to you.
 - For the sandbox: on Linux `bubblewrap`, `socat` and `ripgrep`; on macOS nothing extra (Seatbelt). Without them
   commands run unwrapped, and the plugin says so.
-- Optional: the local embedding service for the memory (`./install.sh --embedding`, a systemd user unit), and `uv`
+- Optional: the local embedding service for the memory (the Coding profile, or `./install.sh --embedding`), and `uv`
   for the GLiNER decision server in `decider/` and for the evolver in `packages/micromanager/evolver/` (`evolve_task`; `uv` sets up its
   environment, OpenEvolve pinned, on the first run).
 
 ## Install
 
-As an OpenCode plugin, from npm:
+As an OpenCode plugin, from npm (Node 22.18 or newer):
 
 ```bash
-opencode plugin add @omacode/micromanager
+opencode plugin add @omacode/full
 ```
 
-That installs the orchestrator and its library dependencies (`@omacode/core`, `state`, `guard`, `sandbox`, `context`).
-The TUI is a separate CLI plugin:
+One package brings the server plugin (guard, sandbox, context and the micromanager) and the TUI: OpenCode loads a
+package's `.` export as the server plugin and its `./tui` export as the TUI. On the first start the TUI asks what you
+want to make and offers the parts that goal needs; `/setup` lists and installs them later. Upgrade with
+`opencode plugin update`, remove with `opencode plugin remove @omacode/full`.
+
+The command line (`doctor`, `preflight`, `services install`, `uninstall`, `tools`) is the `omacode` command of
+`@omacode/micromanager`:
 
 ```bash
-opencode plugin add @omacode/tui
+npx -p @omacode/micromanager omacode doctor     # once
+npm install -g @omacode/micromanager            # or keep it on PATH
 ```
 
-and `opencode plugin add` puts it into `~/.config/opencode/cli.json` (its `./tui` entry; the package has no server
-part, so the server never loads it). `./install.sh --all` does both from a checkout.
-To upgrade: `opencode plugin update`; to remove: `opencode plugin remove @omacode/micromanager`.
+The packages ship JavaScript built from the TypeScript sources at pack time (`scripts/pack-js.mjs`): Node runs no
+TypeScript from `node_modules`. The decider's sources come along; its model is downloaded on the services' first
+start.
 
 From a checkout, for development (the symlink means the running server reads your working tree):
 
@@ -64,16 +70,108 @@ From a checkout, for development (the symlink means the running server reads you
 git clone git@github.com:RentschlerTobias/Micromanager.git micromanager
 cd micromanager
 npm install                    # the sandbox runtime
-./install.sh                   # links packages/micromanager/src/plugin.ts into ~/.config/opencode/plugins/micromanager.ts
-./install.sh --embedding 4b    # optional: the memory's embedding service (0.6b, 4b or 8b), see "Context and memory"
-./install.sh --remove
+./install.sh                   # install what is missing, link the plugin and the TUI, ask about each optional part
+./install.sh --profile coding  # the optional answers given up front (minimal | coding | creator | full)
+./install.sh --doctor          # the installed state, each finding with its fix
+./install.sh --remove          # remove it again; --dry-run says what would go, --purge also removes tools and services
 ```
+
+**What install.sh installs.** What omacode cannot run without: Node 22.18 or newer, OpenCode, git and (on Linux)
+bubblewrap. A missing one is named with the command that installs it (pacman, apt, dnf or brew; OpenCode with its own
+installer) and installed after one question. Then it asks about the optional system packages, which need sudo and so a
+terminal: Chromium (the deck and site checks open a real browser) and ffmpeg (videos).
+
+**Everything else is installed from inside OpenCode**, none of it needs sudo:
+
+- On the first start the TUI asks what you want to make (decks, videos, websites, images, code) and offers the parts that goal
+  needs, each with what it is for, its size and its licence; decks then lead to a first deck.
+- `/setup` lists every part, whether it is there, and installs one when you pick it.
+- An agent that needs a missing part asks you and installs it with the `install_feature` tool, after a permission
+  question (`make_artifact` names what a deck or a video lacks; `image_models` names ComfyUI). A system package is
+  named with the command for your terminal instead.
+
+| Part | For | Downloads |
+|---|---|---|
+| Local services | the decider answers the guards' questions; memory searches by meaning | about 2 GB, models on first use |
+| HyperFrames | decks and videos | about 300 MB |
+| ComfyUI, comfy-mcp | images from local models; agents running ComfyUI | 4–8 GB |
+| Manim | math animations | about 200 MB |
+| Modern Web Guidance 1.0.0 | Google Chrome's guides to modern HTML, CSS and JS, searched offline by agents building sites (Apache-2.0; pinned, sha512-checked, telemetry off) | about 17 MB |
+
+`./install.sh --tools` asks about all of them in the terminal instead; `--with <parts>` and
+`--profile coding|creator|full` give the answers up front (coding: the services; creator: + Chromium, ffmpeg,
+HyperFrames, ComfyUI, comfy-mcp; full: + Manim); `--yes` installs what is needed and nothing optional.
+`./install.sh --remove` removes the plugin link, the TUI package and omacode-services and lists what it keeps: your
+journal, memory, model registry and settings always; the tools and the services' models unless `--purge`.
+
+**Licences.** [THIRD_PARTY.md](THIRD_PARTY.md) lists everything omacode installs, downloads or relies on: the licence
+of each, where it may be used, and whether what you make with it may be used commercially (`npm run licenses`
+regenerates it from `licenses/components.json`). Image models you add are checked by the model registry instead.
+
+**Creative tools.** `./install.sh --tools` asks the optional questions again later. Each tool is installed at a pinned
+version under the data directory
+(`~/.local/share/omacode/tools/`), never as a new folder in your home:
+
+| Tool | For | Installed as |
+|---|---|---|
+| HyperFrames 0.9.54 | decks and videos | npm into `tools/hyperframes`, linked into `~/.local/bin` |
+| Manim 0.22.1 | math animations (LaTeX is not installed) | `uv tool install manim` |
+| ComfyUI 0.44.2 | images | comfy-cli 1.25.0 into `tools/comfyui` (or `COMFYUI_WORKSPACE`), no model downloaded |
+| comfy-mcp 0.10.0 (AGPL-3.0) | agents running ComfyUI workflows | `uv tool install comfy-mcp`, added to `opencode.json` as `mcp.servers.comfy` |
+
+A ComfyUI already on the machine (`~/Apps/ComfyUI`, `~/ComfyUI`) is found and offered to omacode-services instead of a
+second install. For ComfyUI it lists where it could run: an NVIDIA GPU, an AMD GPU ROCm can reach (`/dev/kfd`), an integrated
+Radeon (a ROCm preview; after the install it checks whether PyTorch sees it, also as its discrete family through
+`HSA_OVERRIDE_GFX_VERSION`), or the CPU, and prints the line that starts it. `./install.sh --with
+hyperframes,manim,comfyui,comfy-mcp [--gpu nvidia|amd|amd-igpu|cpu]` installs without asking. The same from npm: `npm run tools -- status | gpus | install <names>`.
+With omacode-services installed, ComfyUI joins it as a third service on its usual port 8188: started by its first
+request only (it holds GB of GPU memory), stopped after the idle time, reachable without the token (its own page in a
+browser talks to it directly), and switched in `/services` like the others, on its GPU or the CPU. For a ComfyUI
+already there: `npm run tools -- register comfyui [--gpu <id>] [--workspace <dir>]`.
+
+**Building artifacts from a session (`make_artifact`).** Every agent that may write has a plugin tool that builds a
+deck, video, site or image set from the spec file it wrote (`deck.json`, `video.json`, `site.json`, `images.json`; the
+skills of the same names describe them). The spec's directory is the artifact's directory; the adapter's programs run
+through the host runner, kept inside it; the answer is the checks' report (passed, failed with the reason, skipped with
+the reason) and the files. `present: yes` starts a deck's presenter after every check passed and opens it in your
+browser, or gives the address when there is no desktop. Specs inside the plugin's state directory are refused.
+Journal: `artifact.build`.
+
+**ComfyUI from the agents (comfy-mcp).** Comfy-Org's MCP server lets any agent run workflows on that ComfyUI. Set it
+up once: `uv tool install comfy-mcp==0.10.0` (AGPL-3.0, a separate process), `comfy set-default <the ComfyUI workspace>`
+so comfy-cli targets the one omacode-services runs, and in `~/.config/opencode/opencode.json` under `mcp.servers`:
+`"comfy": { "type": "local", "command": ["comfy-mcp"] }`. The plugin then watches its tools in every session
+(`packages/micromanager/src/comfy-gate.ts`):
+
+- Paid partner models, Comfy Cloud sign-in, downloads, node installs and starting or stopping ComfyUI are denied with
+  the reason (omacode-services does the starting and stopping). OpenCode's plan agent may not generate.
+- Among the micromanager's workers only the designer may use `comfy_*`.
+- Before a run, every model file the workflow names is found in ComfyUI's model folders (including
+  `extra_model_paths.yaml`), hashed (cached in `~/.local/state/omacode/model-hashes.json`) and checked against the model
+  registry. All known and permitted for the territory: it runs. Otherwise you are asked, and the chat says which model
+  lacks what; approving runs it and records those models as approved by you, licence unverified, so they are not asked
+  about again. A blocked model is asked about too, with the reason, and never recorded.
+- Every run goes into the journal (`comfy.run`) with its models, hashes, licences and who allowed it.
+- `image_models`, a plugin tool every agent has, lists the image models ready on this ComfyUI in your order (default
+  Z-Image-Turbo, FLUX.2-klein, Qwen-Image; change it with `"images": { "prefer": ["flux2-klein", …] }` in
+  `omacode.jsonc`), what each is good at, its licence and any limit on its use (Qwen-Image-2.1: non-commercial only,
+  so the agent asks first), the files to load and the settings. A family is listed as ready only when its diffusion
+  model, text encoder and VAE are on disk and permitted by the registry.
+- `npm run models -- status` lists every model file ComfyUI can load with its hash and its standing in the registry;
+  `npm run models -- register <file> --license <SPDX or LicenseRef-…> --territory <EU,world,…> [--use <text>]`
+  records one with the licence you state (it replaces an earlier entry for the same file, such as one approved
+  without a checked licence).
+- OpenCode's own `experimental_image_generate` (a cloud image model of a connected provider: no registry, possibly
+  paid) is the fallback, not the first choice. While ComfyUI is available (the comfy MCP server configured, ComfyUI in
+  omacode-services and not switched off or failed) it is refused with a pointer to the comfy tools; after a ComfyUI run
+  failed for a technical reason in the session, or when ComfyUI is not available, it runs. A run you turned down at
+  the licence question does not count as a failure. Workers other than the designer get neither. Journal: `image.cloud`.
 
 The worker skills need no step in either case: the plugin registers them itself (see "Skills" under "Use").
 
 Restart the OpenCode server afterwards: plugins load when it starts, so restart the server your TUI attaches to,
 not only the background service `opencode run` uses. The `plugin` record in the journal and the header of
-`job_status` name the plugin commit a server runs. Settings go into `~/.config/opencode/micromanager.jsonc`; none are
+`job_status` name the plugin commit a server runs. Settings go into `~/.config/opencode/omacode.jsonc`; none are
 needed to start (see the optional settings under "Use").
 
 ## Use
@@ -86,7 +184,7 @@ the decision client and the plugin securing every task:
    `explorer`, …), a short title, and a prompt that ends with `Files:` (what it may change) and `Checks:` (e.g.
    `npm test`) for a worker that writes. The call returns at once; the workers show up in OpenCode as the
    micromanager's child sessions, and the micromanager stays free to talk with you.
-2. **Each writer works in its own git worktree** under `.jev-micromanager/worktrees/`, branched off the session's
+2. **Each writer works in its own git worktree** under `.opencode/omacode/worktrees/`, branched off the session's
    branch `jev/<job>`: OpenCode starts the child in your checkout, and the plugin moves it into the worktree before
    its first step. Your checkout is never touched. Readers work on the session branch and change nothing.
 
@@ -117,12 +215,13 @@ the decision client and the plugin securing every task:
      summarizer's and the decision client's — has its private data swapped for placeholders first: keys and tokens
      (some twenty formats, private keys, URL passwords, secret-looking assignments, and the actual values of the
      server's secret variables, the project's `.env` files and the cloud client's key), e-mail addresses, phone numbers,
-     IBANs and card numbers (checked by checksum), and, with `"redact": { "names": true }`, people's names and street
-     addresses found by the local GLiNER server (`/v1/entities`; code is read for its comments and strings only). One
+     IBANs and card numbers (checked by checksum), and people's names and street addresses found by the local decider
+     (`/v1/entities`; code is read for its comments and strings only; on by default since the tuned decider, off with
+     `"redact": { "names": false }`; about 0.2 s per 1 000 characters of new text on the CPU). One
      value always gets the same placeholder (`PERSON_1`, `SECRET_2`, `email3@redacted.invalid`), so a model can still
      reason about it and the prompt cache holds. The model's tool calls get the real values back: files all of them, so
      an edit keeps a file's key; commands everything but secrets; web tools nothing. The vault lives in
-     `~/.local/state/micromanager/vault.json` (mode 600, out of every sandbox); OpenCode's database and the TUI keep the
+     `~/.local/state/omacode/vault.json` (mode 600, out of every sandbox); OpenCode's database and the TUI keep the
      real text, so a model's reply to you can show a placeholder. Your git name and e-mail and the values in
      `"redact": { "allow": [...] }` are never replaced. With the GLiNER server down, names go unchecked and the
      journal says so (`redact.names-unavailable`); `redact.new` records each new placeholder, never its value.
@@ -257,7 +356,7 @@ the decision client and the plugin securing every task:
    | `contract` | draft what "better" means for a task with no fixed end; the baseline is measured at once |
    | `contract_round` | work a draft contract out with you (preferences, red team, loopholes, baseline) and freeze it |
    | `evolve_task` | improve one function by evolution (OpenEvolve) against a frozen contract, in the sandbox; the plugin offers it by itself where it fits ("Evolver / Trial / One worker", your choice in a form) |
-   | `backlog` | list, show, add or change the project's waiting jobs in `.micromanager/backlog/` |
+   | `backlog` | list, show, add or change the project's waiting jobs in `.opencode/omacode/backlog/` |
    | `decide_change` | accept or refuse a writer's request to change a check or a frozen test |
 
 6. **Checkpoints and rewind.** Every merged task is a commit `Tn: title` on `jev/<job>`, authored with your git
@@ -292,7 +391,7 @@ the decision client and the plugin securing every task:
    first decides, the next break ties inside a noise band), guards that may not get worse than today, the corpus,
    repeats (the median counts), a stop rule (`evaluations`, `seconds`) and, for a slow evaluator, a `quick` stage on
    small instances that the evolver runs first. The plugin measures the baseline on the job
-   branch at once and keeps the contract in the job and in `.micromanager/contracts/<job>/C1.json`. A writer started
+   branch at once and keeps the contract in the job and in `.opencode/omacode/contracts/<job>/C1.json`. A writer started
    with a line `Contract: C1` (or `"contract"` in its todo) is measured after its checks pass: an invalid result (a
    non-zero exit, a timeout, no `MM_SCORE` line, a missing score) or a broken guard is a fix round like a failing
    check, and after a rebase it is measured again. Its score, the contract's version and the reward (the first
@@ -304,8 +403,8 @@ the decision client and the plugin securing every task:
    many of them passed. Any ordinary check may print
    `MM_SCORE {"cases":{"passed":7,"total":8}}` too; that grades a build task in the outcome log without deciding it.
 
-8. **The backlog.** Jobs that wait live in `.micromanager/backlog/<slug>.md` (front matter plus Markdown), and you commit
-   them: the plugin's exclude lines leave that directory and `.micromanager/contracts/` to git and keep the rest out.
+8. **The backlog.** Jobs that wait live in `.opencode/omacode/backlog/<slug>.md` (front matter plus Markdown), and you commit
+   them: the plugin's exclude lines leave that directory and `.opencode/omacode/contracts/` to git and keep the rest out.
    When a job is merged or discarded, the follow-ups its workers reported that no task took up, and a trial whose
    attempts all failed, become drafts there. `plan_job` with the goal `backlog:<slug>` starts an item; the `backlog`
    tool lists and edits them. With the project's repository in `"githubBacklog"` (e.g. `["owner/name"]`), its issues
@@ -315,9 +414,23 @@ the decision client and the plugin securing every task:
 9. **Large or unclear jobs.** `plan_job` lets a planner write a full plan with acceptance points, optionally
    after a planning session with you. You approve it, and `run_job` runs it.
 
-Jobs and task notes live in `.micromanager/` (`.jev-micromanager/` in older projects), kept out of git through the repository's `.git/info/exclude` — found
-with `git rev-parse --git-common-dir`, so it works when the project is a subdirectory of a larger repository and when
-it is itself a worktree.
+Jobs, task notes and worktrees live in `.opencode/omacode/`, kept out of git through the repository's
+`.git/info/exclude` — found with `git rev-parse --git-common-dir`, so it works when the project is a subdirectory of a
+larger repository and when it is itself a worktree. OpenCode loads nothing from there as config, but it watches
+`.opencode/` recursively, so each directory of a worktree holds one inotify watch (`node_modules`, `.git`, `.venv` and
+`__pycache__` excepted); worktrees go away when their task is merged.
+
+A project from before keeps its state where it was, `.micromanager/` or `.jev-micromanager/`, and the micromanager
+mentions once per session that it can move. In the plugin's checkout, `npm run migrate -- --project <dir>` says what
+would move and `--apply` moves it: one rename of the whole directory, then every path a job keeps is rewritten and
+git's worktree links are repaired. It refuses while a task is at work, or when state exists in two places. Renaming or
+moving the project folder itself needs nothing: jobs and worktrees are relinked when the jobs are next read.
+
+The user's own files moved the same way on 2026-11-21: `~/.local/state/micromanager` → `~/.local/state/omacode`,
+`~/.local/share/micromanager` (the memory) → `~/.local/share/omacode`, and beside OpenCode's config
+`micromanager.jsonc` → `omacode.jsonc`, `micromanager-models.json` → `omacode-models.json`. While only the old name
+exists it is used; `npm run migrate -- --user` shows what would move and `--apply` moves it (quit OpenCode first). Two
+places at once are not merged: the command stops and names both.
 
 **Overview.** `job_status` shows an ASCII board of the job: each task with its state, role, model, what it does or
 waits for and what it cost so far (its worker and helpers, or the evolver's model calls), plus the job's tokens,
@@ -376,15 +489,27 @@ below.
 the vision model; a click on a role, or `/pools`, opens a popup like `/model` with every model the host runs, the
 pool's members checked. ↵ checks or unchecks a model, "clear all" unchecks the whole pool to pick a new one from
 nothing, "back to the default" drops the pick, a pool never becomes empty (esc right after "clear all" keeps the old
-one). The picks go to `~/.config/opencode/micromanager-models.json`, which the server reads at each delegation, so
-they hold from the next task on without a restart; they win over `models` in `micromanager.jsonc`, and the journal's
+one). The picks go to `~/.config/opencode/omacode-models.json`, which the server reads at each delegation, so
+they hold from the next task on without a restart; they win over `models` in `omacode.jsonc`, and the journal's
 `routing` record says `picked: true`. The micromanager itself runs on the session's model: change that with `/model`.
+
+**Switching the local services.** With `omacode-services` installed (`npm run services -- install`), `/services` in
+the TUI, or the sidebar's SERVICES section below MODELS (click to unfold, click a line to change it), lists the decider and the embedding service with their mode and state; pick one to set it **on** (started and
+kept running), **auto** (started on demand, stopped after the idle time) or **off** (stopped: decisions fall back to
+the rules, memory search to keywords). For the embedding service the same step offers where it runs: the CPU or any
+GPU llama.cpp lists (`--list-devices`), such as a discrete and an integrated one; a running service restarts on the new
+device. Measured on an RTX 4060 laptop with a Radeon 890M, Qwen3-Embedding-4B, about 600 tokens per text: CPU 3.7 s,
+iGPU 0.6 s, dGPU 0.5 s. The decider runs on the CPU only (CPU-only PyTorch; a decision takes about 40 ms). The popup
+also sets the idle time. From a shell: `npm run services -- mode <decider|embedding> <on|auto|off>`,
+`npm run services -- device embedding <cpu|Vulkan0|…>`, `npm run services -- idle <minutes>`,
+`npm run services -- status`. Both write the supervisor's control file beside its config
+(`~/.local/share/omacode/services/control.json`, so the picks survive a reboot), which it applies within a second.
 
 Permission requests go to the decision client first and to you when it is not sure (`src/decide.ts`). Some phases of the
 design
 are still to come: see docs/plan.md.
 
-Optional settings in `~/.config/opencode/micromanager.jsonc`:
+Optional settings in `~/.config/opencode/omacode.jsonc`:
 
 ```jsonc
 {
@@ -412,7 +537,7 @@ Optional settings in `~/.config/opencode/micromanager.jsonc`:
   "network": ["api.example.com", "*.example.com"], // hosts every job's commands may reach beyond the registries
   // private data in requests to models: secrets and e-mail/phone/IBAN/card on by default; names and addresses
   // through the local GLiNER server only when switched on; false turns it all off
-  "redact": { "names": false, "threshold": 0.5, "allow": ["ACME GmbH"] }
+  "redact": { "names": true, "threshold": 0.5, "allow": ["ACME GmbH"] }
 }
 ```
 
@@ -424,7 +549,7 @@ package, so a git install has them without a step; a skill of your own with the 
 never names that skill in a brief. The local GLiNER
 decision server (`decider/`, see its README) answers guard questions on the CPU, and `npm run bench-guards`
 measures them; the journal
-`~/.local/state/micromanager/decisions.jsonl` feeds `npm run eval` and `npm run export-dataset`.
+`~/.local/state/omacode/decisions.jsonl` feeds `npm run eval` and `npm run export-dataset`.
 
 Writers run one at a time by default: after a failed attempt, the next model gets a retry rather than two more
 worktrees starting speculatively. Set `"trials": 2`–`4`, or put `Method: trial` in the task, to run a hard writer task
@@ -437,7 +562,7 @@ as a **trial**: attempts at once, each in its own worktree on another model fami
   a review of the two best changes by a model of a third family, then by cost and size. The note says why the winner
   won.
 - **user** (designers by default): every attempt runs to its end, and those that pass are held with no deadline.
-  When the last one ends you get a desktop notification and a comparison page, `.micromanager/trials/<job>-<task>.html`,
+  When the last one ends you get a desktop notification and a comparison page, `.opencode/omacode/trials/<job>-<task>.html`,
   with each version's picture (the task's `Preview:` page, or its `index.html`), model, cost and size, and the
   micromanager asks you with a form: one version (merged), **combine** (the version your words name first is continued
   with the others' changes beside it, and merges when it passes), or **none** (the task is done again with your
@@ -446,7 +571,7 @@ as a **trial**: attempts at once, each in its own worktree on another model fami
 - **first**: the first attempt whose checks pass is merged and the others stop.
 
 When all attempts fail, the micromanager is told what each hit and splits the task. Every writer's end, with its model, difficulty, gate result,
-tokens and cost, goes to `~/.local/state/micromanager/outcomes.jsonl`, with how a trial's winner was chosen and which
+tokens and cost, goes to `~/.local/state/omacode/outcomes.jsonl`, with how a trial's winner was chosen and which
 attempts passed but lost; `npm run export-dataset -- --target router` turns it into one row per task, the training
 data for a router (docs/design.md §23).
 
@@ -475,7 +600,7 @@ the system prompt. `node bench/context-replay.ts` replays the recorded sessions 
 and reports the context and cost they would have had (on the sessions up to 2026-10-23: coders 24% less context with
 the rules alone). The journal records `context.epoch` and `context.summary`.
 
-**Memory.** One Markdown file per entry in a git repository, `~/.local/share/micromanager/memory/`, readable and editable
+**Memory.** One Markdown file per entry in a git repository, `~/.local/share/omacode/memory/`, readable and editable
 by hand; the SQLite index next to it is rebuilt from the files whenever it falls behind. Entries belong to the user
 (preferences), to every project (tool pitfalls) or to one project. Pinned entries are core memory: they stand in every
 session's system prompt, within a budget, and change there only at the session's next epoch.
@@ -483,14 +608,29 @@ session's system prompt, within a budget, and change there only at the session's
   entry, no two
   saying the same, within a budget per role. The micromanager gets the same at each user turn, for that request only,
   without what it got in its last three turns.
-- Workers end their report with `LEARNED:` lines. The micromanager has `memory_set`, `memory_replace`, `memory_list` and
-  `memory_get`; readers have `memory_search`. Every write is searched against the memory first, and the decision client
-  says whether it
-  is new, a duplicate, a refinement of an entry (which it replaces) or a contradiction (reported back to ask the user).
+- Who uses which tool is one table (`context/tools.ts` `MEMORY_ACCESS`), for the tool list and for refusing a call:
+
+  | | `memory_search` | `memory_list`, `memory_get` | `memory_set`, `memory_replace` |
+  |---|---|---|---|
+  | agents the user talks to (micromanager, OpenCode's build and plan, your own) | yes | yes | yes |
+  | reading workers (explorer, researcher, reviewer, …) | yes | yes | — |
+  | writing workers (coder, tester, debugger, …) | yes | — | yes |
+  | summarizer | — | — | — |
+
+  Workers also end their report with `LEARNED:` lines. Every write, by tool or by `LEARNED:`, is searched against the
+  memory first, and the decision client says whether it is new, a duplicate, a refinement of an entry (which it
+  replaces) or a contradiction (reported back to ask the user). Core memory is in every session's system prompt but
+  the summarizer's.
 - Vectors come from Qwen3-Embedding on the CPU (`./install.sh --embedding 4b`: downloads the model and runs
   `micromanager-embedding.service` on port 8093). Without the service the memory searches by keywords and fills in
-  the vectors later. `"memory": false` in `micromanager.jsonc` turns it off, `"memory": { "embedding": false }` keeps
+  the vectors later. `"memory": false` in `omacode.jsonc` turns it off, `"memory": { "embedding": false }` keeps
   keywords only, and a different size needs `"memory": { "embedding": { "model": "qwen3-embedding-8b" } }`.
+- A project's entries are keyed by its id in `<state dir>/project.json`, which moves with the folder, so a renamed,
+  moved or copied project keeps its memory; a session in one of its worktrees uses the project's memory. Memory kept
+  under old keys (before 2026-11-21 every rename started an empty one): in the plugin's checkout,
+  `npm run memory-adopt -- --project <dir>` lists the keys that look like the project's own (same folder name,
+  worktrees of its jobs) and asks before moving them; naming slugs after it takes in exactly those keys, `--yes` skips
+  the question.
 - The old per-project block `.opencode/memory/jev-project.md` moves into the memory once. The journal records
   `memory.write` and `recall` (what was found, what was picked).
 
@@ -498,7 +638,7 @@ session's system prompt, within a budget, and change there only at the session's
 into the session's context as a bar (`│` marks where a summary starts), what its epochs removed, a line per running
 worker with its own bar (`⚠` past the summary mark), the memory (entries, core size, whether vectors are on, today's
 writes, duplicates and conflicts) and the notes the last request got from it. The server writes the numbers to
-`~/.local/state/micromanager/context/`; the context is estimated from characters and leaves out the tool
+`~/.local/state/omacode/context/`; the context is estimated from characters and leaves out the tool
 descriptions, so it reads about 2k tokens low.
 
 ## Flow chart
@@ -506,7 +646,7 @@ descriptions, so it reads about 2k tokens low.
 `docs/flow.html` is a self-contained page (no server) that shows how the plugin decides: the model routing lane
 (role → needs → model) and the permission lane (hard rules → deleted paths → the decision client → the floors → allow /
 deny /
-user). Open it in a browser and load `~/.local/state/micromanager/decisions.jsonl` with the button or by dropping
+user). Open it in a browser and load `~/.local/state/omacode/decisions.jsonl` with the button or by dropping
 it on the page; over http a `decisions.jsonl` next to the page is picked up automatically. Each decision is
 listed, and selecting one highlights the exact path it took through the chart.
 
@@ -516,7 +656,7 @@ listed, and selecting one highlights the exact path it took through the chart.
 `opencode.log`. **The journal is the channel that persists**, and it is worth knowing what to look for:
 
 ```bash
-J=~/.local/state/micromanager/decisions.jsonl
+J=~/.local/state/omacode/decisions.jsonl
 grep '"kind":"plugin"' $J | tail -1 | jq     # one per server start
 ```
 

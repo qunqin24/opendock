@@ -49,26 +49,26 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
 | Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
 | Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 32 agent tools, built-in agent skill |
+| Interfaces | OpenCode GUI panel, web dashboard, 34 agent tools, built-in agent skill |
 
 ### Language
 
-The interface ships in Russian, English and Simplified Chinese. By default the language
+The interface ships in Russian, English, Simplified Chinese and Turkish. By default the language
 selector is set to **Auto** — like OpenCode, it follows the OpenCode interface language;
-Russian, English and Chinese can be chosen explicitly. The selector sits in the scheduler
-panel header (🌐 Auto / Русский / English / 中文) and is also available through the
+Russian, English, Chinese and Turkish can be chosen explicitly. The selector sits in the scheduler
+panel header (🌐 Auto / Русский / English / 中文 / Türkçe) and is also available through the
 `manage_settings` tool (`action: "update"`, `locale: "zh"`).
 `locale: "auto"` (the "Auto" option, used by default) follows the OpenCode interface language: the panel
 reacts to language changes immediately, and the resolved locale is sent to the server so
 notifications, digests and the dashboard use the same language. The switch applies
 without a restart. The dashboard follows the resolved locale: Russian and English are
 fully localized (its screenshot in `docs/dashboard.png` is the English variant);
-Chinese currently falls back to English for dashboard chrome until its catalog is ready.
+Chinese and Turkish currently fall back to English for dashboard chrome until their catalogs are ready.
 Agent tool descriptions and schemas stay English by design, and diagnostics printed
 to the console stay Russian.
 
-Catalogs live in `locales/ru.json`, `locales/en.json` and `locales/zh.json`; every key
-must exist in all three, otherwise CI fails.
+Catalogs live in `locales/ru.json`, `locales/en.json`, `locales/zh.json` and `locales/tr.json`; every key
+must exist in all four, otherwise CI fails.
 
 Documentation is separate from the interface locale: the English docs are the primary
 source, with Russian (`docs/README.ru.md`) and Simplified Chinese (`docs/README.zh.md`,
@@ -127,7 +127,7 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 32 tools covering scheduling, pipelines, operations, observability and administration:
+The agent gets the full feature set — 34 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
@@ -143,6 +143,8 @@ The agent gets the full feature set — 32 tools covering scheduling, pipelines,
 | `get_history` | `taskName?`, `status?`, `limit?` | Recent runs with duration, tokens, cost, model, quality gate and hooks |
 | `get_task_logs` | `name` or `taskName`, `lines?` | Tail of the run log |
 | `dry_run` | `name?` | Simulates a pipeline (or every task): order, DAG, matrix fan-out, estimates |
+| `backup_db` | `file?` | Online SQLite snapshot to `<db>.backup` with SHA-256 checksum and size |
+| `restore_db` | `file`, `sha256?` | Restores a verified snapshot in place without closing the dashboard connection |
 | `manage_workspaces` | `action`, `id?`, `name?`, `path?`, `color?` | Multi-repo workspaces: list, add, update, delete |
 | `matrix_control` | `action`, `name?` | Matrix results, cancel pending clones, clean up orphans, preview clones |
 | `get_metrics` | — | Aggregate runs, successes and failures |
@@ -237,6 +239,7 @@ steps:
 agent-steward pipeline validate opencode.pipeline.yaml
 agent-steward pipeline apply opencode.pipeline.yaml --dry-run
 agent-steward pipeline apply opencode.pipeline.yaml
+agent-steward apply -f opencode.pipeline.yaml          # GitOps-алиас
 agent-steward pipeline export --pipeline nightly-release --out opencode.pipeline.yaml
 ```
 
@@ -250,6 +253,8 @@ The OpenCode sidebar shows jobs, history, logs, dry-run, templates, import/expor
 
 ```bash
 npm run build:gui   # produces gui-experimental.cjs
+npm run build:debug # separate gui-experimental.debug.cjs + source map (release bundle untouched)
+agent-steward pipeline validate opencode.pipeline.yaml --debug  # verbose stderr logs, secrets redacted
 ```
 
 ## How it works
@@ -284,12 +289,12 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 116 test suites, 600+ checks
+npm test             # 128 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
 `npm run test:chaos` runs `test-chaos-dag.mjs` separately; `test-prod-install.mjs`
-is likewise invoked through its own script. The **116** in `npm test` counts
+is likewise invoked through its own script. The **121** in `npm test` counts
 exactly the suites listed in that script; every `test-*.mjs` file on disk is
 reachable through at least one npm script.
 
@@ -307,6 +312,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [docs/MIGRATION.md](docs/MIGRATION.md) — moving from cron, systemd, launchd or Task Scheduler.
 - [docs/PIPELINE.md](docs/PIPELINE.md) — pipeline-as-code: file format, CLI, idempotent apply.
 - [docs/SAVINGS.md](docs/SAVINGS.md) — how the "Saved $" estimate is calculated.
+- [docs/RELIABILITY.md](docs/RELIABILITY.md) — public scorecard of objective gates and saved tokens (S-3).
+- [docs/RECIPES.md](docs/RECIPES.md) — gate-passed recipe library with verifiable evidence (S-4).
+- [docs/VERIFIED-CHAT.md](docs/VERIFIED-CHAT.md) — answers only with objective gate/source proof (S-5).
+- [docs/SCAFFOLD.md](docs/SCAFFOLD.md) — one-command scaffolding from gate-passed recipes (S-6).
 - [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
 - [Documentation site (GitHub Pages runbook)](docs/FEATURES.md#documentation-site-github-pages) — how the docs are built and published.
 
@@ -347,7 +356,7 @@ No. Windows Toast (PowerShell/WinRT), macOS Notification Center (`osascript`) an
 Yes. Set `notifications.quietHours` (`enabled`, `from`, `to` in `HH:MM`). During the window successful and `partial` runs are suppressed, while failures and timeouts are always delivered.
 
 **How do I store secrets?**
-Use `manage_secrets` (or the **🔐 Secrets** panel in the sidebar) to create an encrypted secret. Secrets are stored in `<PLUGIN_DIR>/secrets.json` with AES-256-GCM and a key file (`secrets.key`; mode 0600 on POSIX, an ACL granting only the current Windows user on Windows). In task `env`, reference a secret as `${secret:NAME}` — the value is substituted at run time and masked in logs, history and audit. The secret name can also be set via `manage_settings` → `notifications.telegram.botToken` left empty and `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` env var instead.
+Use `manage_secrets` (or the **🔐 Secrets** panel in the sidebar) to create an encrypted secret. Secrets are stored in `<PLUGIN_DIR>/secrets.json` with AES-256-GCM and a key file (`secrets.key`; mode 0600 on POSIX, an ACL granting only the current Windows user on Windows). In task `env`, reference a secret as `${secret:NAME}` — the value is substituted at run time and masked in logs, history and audit. To keep the Telegram token out of `settings.json`, leave `notifications.telegram.botToken` empty and set `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` (and `OPENCODE_SCHEDULER_TELEGRAM_CHAT_ID`) as environment variables instead — see the Telegram question above.
 
 **Can I see who changed what?**
 Yes. The audit log (`get_audit_log` tool, **Audit log** panel, `GET /api/audit`) records every mutation — task create/update/delete/run, settings, templates, profiles, workspaces, secrets, import, history cleanup — with actor (mcp/gui/http), source, timestamp and redacted details. Retention defaults to 90 days / 10 000 records.

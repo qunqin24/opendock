@@ -86,6 +86,8 @@ OpenCode installs the npm package automatically on startup. Then `opencode servi
 | `piiEmailAllowDomains` | `[]` | email domains never masked (exact, case-insensitive; subdomains not included) |
 | `audit` | `{enabled:true, dir:~/.local/share/opencode/guard}` | audit log |
 
+False-positive workarounds (paths, variable names, config escape hatches): [docs/masking-guide.md](docs/masking-guide.md).
+
 ## Context-safe PII email masking (v1.2)
 
 Corporate machines often have an email-shaped login, so absolute paths contain an address (`/home/<login>@corp/...`). Blunt masking there breaks the command, and replacing a whole env value that merely *contains* a match breaks child shells (a masked `$HOME` breaks everything). Since v1.2:
@@ -244,6 +246,8 @@ OpenCode сам установит npm-пакет при старте. Зате�
 | `disabledPatterns` | `[]` | отключить паттерны по id |
 | `piiEmailAllowDomains` | `[]` | домены email, которые никогда не маскируются (точное совпадение, без поддоменов) |
 | `audit` | `{enabled:true, dir:~/.local/share/opencode/guard}` | аудит-лог |
+
+Обход ложных срабатываний (пути, имена переменных, конфиг): [docs/masking-guide.md](docs/masking-guide.md).
 
 ## Контекстно-безопасное маскирование email (v1.2)
 

@@ -196,6 +196,14 @@ magpie login aws-quick              # 按提示选择登录方式
 
 ## 已知限制
 
+- **用量超限转为 429，并快速故障转移。** Quick 同时执行滚动 session
+  桶（每个时间窗内的代理运行分钟数）和月度桶。账号用尽时，运行时有时
+  不报错，而是返回一条完整内容只有"You've reached your usage limit…"
+  的普通助手消息——插件会识别这种伪 200（仅整句精确匹配，引用该句的
+  正常回复不受影响），转成 `rate_limit_error`/429。随后查询该账号
+  `profile/usage` 里 session 桶的 `resume_in_minutes`，在窗口恢复前
+  直接快速返回 429，不再每次白烧一轮上游请求，magpie 会立即切到
+  其他账号。
 - **工具调用是文本约定模拟**：Quick 的 agent 在服务端自带工具链（浏览器、本地文件、MCP 等），
   `tool_start`/`tool_result` 等事件由它自己执行、客户端只观测，`message_complete.tool_calls`
   恒为空。客户端传入的 OpenAI `tools` 通过提示词注入为 `<tool_call>{json}</tool_call>`
@@ -225,8 +233,10 @@ magpie login aws-quick              # 按提示选择登录方式
   压缩（schema 去注解、工具规格 lite→仅名字降级、历史从旧到新裁、
   tool_result 封顶），
   普通对话的系统指令与本轮消息编码后若能放进同一帧，就会完整发送。
-  Claude Code 的 Auto 权限审核要求策略和待审记录完整放进同一帧，超限时在请求
-  Quick 前返回 HTTP 413。可使用 Claude Code 的 Manual 模式自行确认工具请求。
+  Claude Code 的 Auto 权限审核会保留完整策略：策略超过单帧上限时，会原样预热进
+  一个专用 Quick 线程（按策略哈希缓存、定期轮换），分类器仍能看到每一条规则；
+  只有超过约 400 KB 的策略或实在放不下的请求才返回 HTTP 413。策略变化后的第一次
+  审核要多花几秒预热，之后和普通一轮一样快。
 - **OAuth 登录仅限 consumer/social 通道**：重放的是桌面端 `quick.aws.com/sn`
   的 `social` provider 流程。走企业 IdP 的租户如果 issuer 不是 Amazon 社交 IdP
   可能无法完成——这种情况请改用本地凭据方式。OAuth 路径会发送固定的生成设备 ID，

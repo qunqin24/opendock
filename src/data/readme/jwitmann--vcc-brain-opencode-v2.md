@@ -6,6 +6,8 @@
 
 ### VCC Brain: The self-improving context engine for coding agents
 
+[![npm version](https://img.shields.io/npm/v/@jwitmann/vcc-brain-helper?color=8cdb9f)](https://www.npmjs.com/package/@jwitmann/vcc-brain-helper) [![Node.js 20+](https://img.shields.io/badge/Node.js-%3E%3D20-417e3f?logo=nodedotjs&logoColor=white)](https://nodejs.org/) [![BSD-3-Clause license](https://img.shields.io/badge/License-BSD--3--Clause-22C55E)](./LICENSE) [![CI](https://github.com/jwitmann/vcc-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/jwitmann/vcc-brain/actions)
+
 VCC Brain gives your agent a brain for documenting all their work. As the agent works, it automatically documents within this brain — specs, decisions, standards, research, lessons. Every new session starts knowing everything the last one learned.
 
 #### Origin
@@ -22,8 +24,11 @@ Originally forked from [aerovato/operator-memory](https://github.com/aerovato/op
 - **Deterministic Context Management** — Reduce what a session resends to the model through deterministic rules (never model judgment), with per-session receipts for everything it does — and compactions shaped so your rules survive them: summaries must reference Brain paths instead of paraphrasing them. Off by default and Brain-gated. [OpenCode](docs/harnesses/opencode-v2.md#context-management) · [DeepSeek](docs/harnesses/deepseek.md#context-management).
 - **Cache-Aware Preamble Refresh** — Re-render the preamble mid-session when the Brain changes, timed to cold prompt-cache moments so it costs nothing. [How it works](docs/harnesses/opencode-v2.md#preamble-refresh).
 - **Brain-Update Nudges** — A quiet reminder to record durable knowledge during long sessions; never an automatic writer. [How it works](docs/harnesses/opencode-v2.md#brain-updates).
+- **Cross-Session Recall** — Search past sessions by keyword and restore full turns, scoped to the current project plus mutual peers (declare peers in `.vcc-brain/config.json`; sharing applies only where both sides list each other). The index is local-only with 30-day retention; title a session `[no-recall]` to opt out. [OpenCode](docs/harnesses/opencode-v2.md#cross-session-recall) · [DeepSeek](docs/harnesses/deepseek.md#cross-session-recall).
 
 ### Installation
+
+#### Using npm (recommended)
 
 VCC Brain is managed via the VCC Brain Helper, which also provides setup and agent instructions. Install the Helper with npm:
 
@@ -37,16 +42,75 @@ Or Bun:
 bun add --global --minimum-release-age 0 @jwitmann/vcc-brain-helper@latest
 ```
 
+`vcc-brain-helper --help` lists the user and agent commands.
+
 Then install the VCC Brain adapter for your harness. Click each link for harness-specific information.
 
-| Harness                                                      | Status                  | Install                                |
-| ------------------------------------------------------------ | ----------------------- | -------------------------------------- |
-| [Claude Code (CLI + Desktop)](docs/harnesses/claude-code.md) | 🟢 Fully Supported      | `vcc-brain-helper install claude-code` |
-| [Codex (CLI + Desktop)](docs/harnesses/codex.md)             | 🟢 Fully Supported      | `vcc-brain-helper install codex`       |
-| [OpenCode](docs/harnesses/opencode-v2.md)                    | 🟢 Fully Supported (V2) | `vcc-brain-helper install opencode`    |
-| [Pi](docs/harnesses/pi.md)                                   | 🟢 Fully Supported      | `vcc-brain-helper install pi`          |
-| [DeepSeek Harness](docs/harnesses/deepseek.md)               | 🟢 Fully Supported      | `vcc-brain-helper install deepseek`    |
-| [Kiro](docs/harnesses/kiro.md)                               | 🟡 Supported            | `vcc-brain-helper install kiro`        |
+| Harness                                                      | Status                                             | Install                                |
+| ------------------------------------------------------------ | -------------------------------------------------- | -------------------------------------- |
+| [OpenCode](docs/harnesses/opencode-v2.md)                    | 🟢 Fully Supported (V2)                            | `vcc-brain-helper install opencode`    |
+| [DeepSeek Harness](docs/harnesses/deepseek.md)               | 🟢 Fully Supported                                 | `vcc-brain-helper install deepseek`    |
+| [Claude Code (CLI + Desktop)](docs/harnesses/claude-code.md) | 🟡 Memory only — no compaction, recall, or status  | `vcc-brain-helper install claude-code` |
+| [Codex (CLI + Desktop)](docs/harnesses/codex.md)             | 🟡 Memory only — no compaction, recall, or status  | `vcc-brain-helper install codex`       |
+| [Pi](docs/harnesses/pi.md)                                   | 🟡 Memory only — no compaction or recall             | `vcc-brain-helper install pi`          |
+
+- Tier 1 (🟢) is the full system: memory, deterministic compaction, cross-session recall, and status.
+- Tier 2 (🟡) injects memory plus the setup commands only — no deterministic compaction or cross-session recall (status UI varies by adapter: Pi has a footer, Codex and Claude Code have none).
+
+> **Note:** Tier 2 is not on a path to Tier 1. On Codex and Claude Code the ceiling is structural: compaction stays model-owned with no substitute seam, so deterministic compaction — the VCC proposition — cannot be built there; memory injection is all these adapters will ever do. On Pi the seams exist, but the maintainer does not run it, so no upgrade is planned.
+
+#### Direct harness installs (no Helper)
+
+##### OpenCode
+
+Requires `v2.x` (local install live-verified on `v2.4.1`):
+
+```sh
+opencode plugin add @jwitmann/vcc-brain-opencode-v2
+```
+
+Or declare it in `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@jwitmann/vcc-brain-opencode-v2"]
+}
+```
+
+String and object forms can mix in one `plugins` array.
+
+With options (all optional; per-project `.vcc-brain/config.json` overrides them):
+
+```jsonc
+// opencode.jsonc
+{
+  "plugins": [
+    {
+      "package": "@jwitmann/vcc-brain-opencode-v2",
+      "options": { "vcc-brain": { "contextManagement": { "enabled": true, "ratio": 0.8 } } }
+    }
+  ]
+}
+```
+
+From source instead: clone `https://github.com/jwitmann/vcc-brain`, build the plugin (`bun run build:opencode-v2`), and register the local path (`"package": "/abs/path/to/vcc-brain/packages/opencode-v2/dist"`) in the same object form.
+
+##### DeepSeek Harness
+
+Install into a profile with its native command:
+
+```sh
+dsh plugin --profile <profile-name> add @jwitmann/vcc-brain-deepseek
+```
+
+##### Pi
+
+```sh
+pi install npm:@jwitmann/vcc-brain-pi
+```
+
+#### Setup
 
 Setup is a conversation with your agent. Run each command in a new conversation.
 
@@ -68,6 +132,12 @@ dsh plugin --profile <profile-name> add dsh-compaction-vcc
 
 ```sh
 opencode plugin add opencode-vcc-compaction
+```
+
+- On Pi, pair VCC Brain with the third-party deterministic compactor [pi-tuck](https://github.com/galyavin/pi-tuck) — the same no-model-call idea (transcript-preserving cuts plus exact post-cut recall), maintained outside this project. No adapter wires the two together yet; someone with Pi needs to write it:
+
+```sh
+pi install npm:pi-tuck
 ```
 
 When starting cold on an existing project, expect a sparse brain at first; ask the agent to write the first specifications for the modules you work on. Once those documents exist, later sessions maintain them as part of ordinary work.
@@ -115,15 +185,11 @@ Sometimes agents hesitate to create, consolidate, or split documents. In that ca
 
 **VCC Brain is under active development.** More features are on the way. Each will come with an explicit on/off switch in case you prefer the vanilla VCC Brain experience.
 
-- **Observation Engine** — Learn durable user observations over time, kept separate from explicit User Instructions.
-
 ### VS Other Memory Plugins
 
 Snippet capture, RAG retrieval, and context compression all fail the same way.
 
 - [Read the comparison.](docs/comparison.md)
-- [Read the blog post.](https://liao.gg/blog/agents-dont-need-memory)
-- [Looking for benchmarks?](https://github.com/jwitmann/vcc-brain/issues/48#issuecomment-5979061413)
 
 ### Learn More
 

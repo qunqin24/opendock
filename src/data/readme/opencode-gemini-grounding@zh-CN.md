@@ -42,11 +42,12 @@
 - **🎯 智能防膨胀分句切片（全量卡片独立跳转）**：
   - 检索到的每个来源均在 UI 中呈现为独立可点击卡片，自动校验并过滤有效 `http(s)://` 链接确保前端卡片渲染器稳定生效；
   - 首张卡片携带完整无删减报告保证模型上下文完整；后续卡片按**单句粒度**自动提取包含对应引用角标的核心句子，**相较粗暴复制单次节省约 87.5% 重复 Token（省下 20,000+ 上下文）**。
-- **⚡ 多维持久化缓存（`ctx.storage`）与全信号并发合并（Singleflight）**：基于 `query + context + model + maxSources`（及非默认 `baseURL`）计算 SHA-256 缓存键（默认 10 分钟 TTL，自动清理过期缓存），同时支持带 `AbortSignal` 订阅引用计数的并发去重（单路取消不影响其他并发调用）。
-- **🔔 实时动态进度条（`context.progress`）**：在 TUI 终端与 Web 界面中动态显示“正在检索 Google...”、“已命中本地缓存”、“正在降级至下一模型...”等实时状态。
+- **⚡ 多维持久化缓存（`ctx.storage`）、过期自动清扫与全信号并发合并（Singleflight）**：基于 `query + context + model + maxSources`（及非默认 `baseURL`、显式 `thinkingLevel`）计算 SHA-256 缓存键（默认 10 分钟 TTL），在插件启动与周期写入时通过 `ctx.storage.scan` 自动清扫过期缓存与超限条目，并支持带 `AbortSignal` 订阅引用计数的并发去重。
+- **🌊 SSE 流式保活聚合（`:streamGenerateContent?alt=sse`）**：默认开启流式响应聚合，将首字节等待（TTFB）缩短约 38.5% 并持续推帧保活，防止深度多轮检索时遭遇 Cloudflare（524）或反代网关空闲断连（支持 `streaming: false` 回退普通 JSON）。
+- **🔔 实时动态进度条（`context.progress`）**：在 TUI 终端与 Web 界面中动态显示“正在检索 Google...”、“正在接收流式结果...”、“已命中本地缓存”、“正在降级至下一模型...”等实时状态。
 - **🗄️ 全面兼容 OpenCode V2.2.6+ `opencode.db` 与 `{file:...}`**：内置只读 SQLite 读取（WAL 感知缓存），自动识别 `~/.local/share/opencode/opencode.db` `credential` 表中的密钥/OAuth 凭据与表单 `metadata`，支持项目级 `opencode.json(c)` / `.opencode/opencode.json(c)`、传统 `auth.json` 以及 `{env:VAR}` / `{file:path/to/secret}` 占位符解析。
-- **⚡ 故障自动容灾降级链**：默认升级至 **`gemini-4-hydrogen`** 旗舰主模型，单模型请求超时设定为 **60 秒**，总超时 **180 秒**（3 分钟）。遇到限流（429）、网关波动或空响应 / `MAX_TOKENS` 截断 / 安全拦截时自动无感降级且严禁污染缓存；遇到鉴权无效（含非 JSON 401/403 响应）立即抛出 `FatalError` 终止。
-- **🧠 原生深度思考与 `#variant` 归一化**：默认不注入 `thinkingConfig`（保留 `gemini-4-hydrogen` 服务端原生 `HIGH` 深度思考），支持通过 `thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL` 按需调节（`LOW` / `MEDIUM` / `HIGH` / `XHIGH`）；自动剥离 `google/` 前缀与 `#variant` 后缀（如 `google/gemini-4-hydrogen#xhigh` → `gemini-4-hydrogen`）。
+- **⚡ 分层超时调度与防饿死容灾降级链**：默认采用 **`gemini-4-hydrogen` → `gemini-4-neon` → `gemini-3.8-flash` → `gemini-3.5-flash-lite`** 黄金梯队，单模型超时默认 **180 秒**（3 分钟），总超时 **360 秒**（6 分钟），降级位 Flash/Lite 自动封顶 **60 秒** 并预留 **45 秒** 高速兜底窗口，确保重量级模型绝不饿死后续极速兜底模型；内置同 URL 来源去重、高频引用优先精选与全链路失败原因聚合诊断。
+- **🧠 原生深度思考与降级能力钳位**：默认不注入 `thinkingConfig`（保留 Gemini 4 服务端原生思考深度），支持通过 `thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL` 按需调节（`MINIMAL` / `LOW` / `MEDIUM` / `HIGH` / `XHIGH`）并按模型能力自动钳位（如回退至 Flash 时自动将 `XHIGH` 钳位为 `HIGH`）；自动剥离 `google/` 前缀与 `#variant` 后缀。
 - **🔐 智能认证头分流与自定义网关**：在 Google 官方 `*.googleapis.com` 端点仅发送 `x-goog-api-key`（彻底避免双头冲突导致 `AQ.` 密钥或官方网关报错），OAuth 仅发送 `Authorization: Bearer`，第三方反代网关（OneAPI、NewAPI 等）默认发送双头，并支持 `authMode` 与自定义 `headers`。
 
 ---
@@ -74,7 +75,7 @@
          └───────────────┬───────────────┘
                          ▼
              进入同一个 Google Grounding 引擎
-       （共享 60s 超时、容灾降级链与 ctx.storage 缓存）
+    （共享 180s/360s 分层超时、SSE 流式、降级链与缓存）
 ```
 
 | 入口方式 | 调用方法 | 适用场景 | 优势特点 |
@@ -112,12 +113,14 @@
         "apiKey": "{env:GOOGLE_API_KEY}",       // 支持 {env:VAR} 与 {file:path/to/key}
         "fallbackModels": [                     // 可选：自定义容灾降级链
           "gemini-4-hydrogen",
+          "gemini-4-neon",
           "gemini-3.8-flash",
           "gemini-3.5-flash-lite"
         ],
         "cacheTtlMs": 600000,                   // 本地持久化缓存时间（毫秒，默认 10 分钟，设为 0 禁用）
-        "requestTimeoutMs": 60000,              // 单个模型请求超时时间（60 秒）
-        "timeoutMs": 180000,                    // 容灾降级总超时（3 分钟）
+        "requestTimeoutMs": 180000,             // 单模型超时（默认 180 秒；降级位 Flash 自动封顶 60 秒）
+        "timeoutMs": 360000,                    // 容灾降级总超时（默认 360 秒 / 6 分钟）
+        "streaming": true,                      // 默认开启 :streamGenerateContent?alt=sse 流式保活
         "authMode": "auto",                     // "auto" | "x-goog-api-key" | "bearer" | "both"
         "setDefaultWebsearch": true             // 自动设为 OpenCode 全局默认 WebSearch 源
       }
@@ -171,7 +174,7 @@ opencode plugin list
 | 参数名 | 类型 | 必填 | 说明 |
 | :--- | :--- | :---: | :--- |
 | `query` | `string` | **是** | 待检索的问题或自然语言搜索词。 |
-| `model` | `string` | 否 | 动态指定本次搜索采用的 Gemini 模型 ID（如 `gemini-4-hydrogen`、`gemini-3.8-flash`、`gemini-3.5-flash-lite`）。自动剥离 `google/` 前缀与 `#variant` 后缀。 |
+| `model` | `string` | 否 | 动态指定本次搜索采用的 Gemini 模型 ID（如 `gemini-4-hydrogen`、`gemini-4-neon`、`gemini-3.8-flash`、`gemini-3.5-flash-lite`）。自动剥离 `google/` 前缀与 `#variant` 后缀。 |
 | `context` | `string` | 否 | 可选的额外约束条件、背景事实或引导指令。 |
 | `max_sources` | `number` | 否 | 最大返回来源网页链接数（1 ~ 20，默认值为 `8`）。 |
 
@@ -188,9 +191,9 @@ opencode plugin list
 6. 默认回退值：`gemini-4-hydrogen`。
 
 > **容灾降级链机制**：
-> 若首选模型请求失败、触发频率限制或返回空响应 / `MAX_TOKENS` 截断，插件将按如下顺序自动降级重试：
-> `[请求模型] -> gemini-4-hydrogen -> gemini-3.8-flash -> gemini-3.5-flash-lite -> gemini-3.7-flash -> gemini-3.1-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`。
-> 可通过 `options.fallbackModels` 或逗号分隔环境变量 `OPENCODE_GOOGLE_FALLBACK_MODELS` 自定义降级链。
+> 若首选模型请求失败、触发频率限制或返回空响应 / `MAX_TOKENS` 截断 / 安全拦截，插件将按如下顺序自动降级重试：
+> `[请求模型] -> gemini-4-hydrogen -> gemini-4-neon -> gemini-3.8-flash -> gemini-3.5-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`。
+> 可通过 `options.fallbackModels`（传 `[]` 可禁用降级）或逗号分隔环境变量 `OPENCODE_GOOGLE_FALLBACK_MODELS` 自定义降级链。
 
 ### 2. 接口基础地址（Base URL）与请求头（Headers）
 1. 插件选项 `options.baseURL`；
@@ -209,8 +212,9 @@ opencode plugin list
 5. OpenCode 存储凭据（`opencode.db` 或旧版 `~/.local/share/opencode/auth.json`）中的 `"google"` / `"indor"` 凭据（兼容 API Key 与 OAuth `access` Token）；
 6. 实时 `ctx.provider`、项目级及全局 `opencode.json(c)` 中的 `providers.google.settings.apiKey`。
 
-### 4. 思考深度与认证模式
-- **`thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL`**：默认不注入，保持 `gemini-4-hydrogen` 服务端原生的 `HIGH` 深度思考；显式设为 `"LOW"` / `"MEDIUM"` / `"HIGH"` / `"XHIGH"` 时，将对 Gemini 3/4 系列模型（`/^gemini-[34]/i`）注入 `generationConfig.thinkingConfig.thinkingLevel`。
+### 4. 思考深度、流式保活与认证模式
+- **`thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL`**：默认不注入，保持 Gemini 4 服务端原生思考深度；显式设为 `"MINIMAL"` / `"LOW"` / `"MEDIUM"` / `"HIGH"` / `"XHIGH"` 时，将对 Gemini 3/4 系列模型（`/^gemini-[34]/i`）注入 `generationConfig.thinkingConfig.thinkingLevel`，并在降级时按目标模型能力自动钳位（如 `XHIGH` 在 Flash 模型上自动降为 `HIGH`）。
+- **`streaming` / `OPENCODE_GOOGLE_STREAMING`**：默认 `true`（走 `:streamGenerateContent?alt=sse` 流式聚合保活），可设为 `false` 切回非流式 `:generateContent`。
 - **`authMode` / `OPENCODE_GOOGLE_AUTH_MODE`**：默认 `"auto"`（Google 官方域名仅发 `x-goog-api-key`，OAuth 仅发 `Authorization: Bearer`，第三方反代网关发送双头）；也可显式指定 `"x-goog-api-key"`、`"bearer"` 或 `"both"`。
 
 ---

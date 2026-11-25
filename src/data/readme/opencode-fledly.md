@@ -8,6 +8,7 @@ Sign in with your Fledly account the first time a tool runs. A free account work
 
 | You use | Install |
 | --- | --- |
+| Antigravity (Google) | `agy plugin install https://github.com/synthentica/fledly` |
 | Claude.ai, Claude Desktop | Settings > Connectors: add Fledly from the directory, or add a custom connector with `https://fledly.app/mcp` |
 | Claude Code | `claude mcp add --transport http fledly https://fledly.app/mcp`, or the plugin: `/plugin marketplace add synthentica/fledly`, then `/plugin install fledly@fledly` |
 | Cursor | Install Fledly from the Cursor Marketplace, or add the server to `~/.cursor/mcp.json` (below) |
@@ -90,7 +91,7 @@ Restart OpenCode. The first Fledly tool call opens the sign-in page; you can als
 | `fledly` | Which Fledly tool answers which question (the umbrella skill) |
 | `fledly-aso-audit` | A scored review of your App Store listing and the fixes in order of impact |
 | `fledly-keyword-research` | Which searches to target, how crowded each is, where you rank |
-| `fledly-metadata-rewrite` | Title, subtitle and 100-byte keyword field within Apple's limits |
+| `fledly-metadata-rewrite` | Title, subtitle and 100-character keyword field within Apple's limits |
 | `fledly-competitor-watch` | What competitors changed, where they outrank you, words they use that you don't |
 | `fledly-app-idea-validation` | Build, consider or skip: young earners, prices, complaints and red flags for an idea |
 | `fledly-launch-plan` | First listing, target searches and a launch-week checklist for a new app |
@@ -99,7 +100,7 @@ Restart OpenCode. The first Fledly tool call opens the sign-in page; you can als
 | `fledly-subscription-pricing` | What the niche charges and which pricing model earns |
 | `fledly-market-pulse` | Top charts, new apps that earn and hot categories in one store |
 | `fledly-my-numbers` | Your own App Store Connect downloads and proceeds and RevenueCat MRR, next to your listing changes (Pro, Studio) |
-| `fledly-ai-visibility` | Whether ChatGPT, Claude and Gemini recommend your app, and which sources they cite (Pro, Studio) |
+| `fledly-ai-visibility` | Whether ChatGPT and Claude recommend your app, and which sources they cite (Pro, Studio) |
 
 Revenue figures in every skill are Fledly estimates from chart positions, and the skills tell the agent to say so.
 
@@ -116,6 +117,7 @@ Revenue figures in every skill are Fledly estimates from chart positions, and th
 | Path | For |
 | --- | --- |
 | `skills/` | The skills, shared by every client |
+| `.antigravity-plugin/plugin.json`, `mcp_config.json` | Google Antigravity plugin (skills + hosted MCP server) |
 | `plugin.json`, `mcp.json` | Agent Plugins v1 package (Hermes Agent) |
 | `.cursor-plugin/`, `cursor-mcp.json` | Cursor Marketplace plugin (skill + hosted MCP server) |
 | `claude/`, `.claude-plugin/marketplace.json` | Claude Code plugin (copy of the skills + hosted MCP server) and its marketplace |

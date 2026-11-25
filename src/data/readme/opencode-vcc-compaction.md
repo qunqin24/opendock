@@ -299,7 +299,9 @@ its age.
   Replies with `(seq N)` hits plus a recall call-to-action.
 - `/vcc-status` — engine revision, resolved config
   (`maxTokens`/`keepMessages`/reasoning/hide/noise counts), per-session
-  compaction switch state, and snapshot
+  compaction switch state, cut history (one line per recent cut: age,
+  message→entry ratio, cap/fail-open flags; stored under
+  `vcc-cuts/<sessionID>`, last 10 cuts), and snapshot
   freshness (version, message count, lastID, age).
 - `/vcc-compaction [on|off]` — per-session switch for deterministic
   compaction (stored under `vcc-switch/<sessionID>`, defaults on).
@@ -384,7 +386,8 @@ and control bytes are stripped deterministically before counting.
 - `examples/` — scratch project registering the repo root with a cheap
   `compaction.buffer` trigger for live runs (never run from a real project).
 - `scripts/` — release + changelog flow (tag-triggered publish) plus the
-  perf bench (`bench.mjs`, behind the Performance table).
+  perf bench (`bench.mjs`, behind the Performance table) and the
+  retention gate (`bench-retention.mjs`, behind Verify).
 - `docs/research/` — verdicts grounding the release claims.
 - `archive/` — frozen history, not maintained: the closed probe harness,
   the deciding spec, the reuse inventory, and the port plans. Do not extend.
@@ -395,10 +398,20 @@ and control bytes are stripped deterministically before counting.
 npm run typecheck   # node --check index.ts + tsc -p tsconfig.tui.json
 npm run test        # both selftests
 npm run lint:md     # markdown lint over the tree
+node scripts/bench-retention.mjs  # retention gate: planted probes must survive the cut
 ```
 
 Live compaction runs only with explicit approval + explicit `--model`,
 from the scratch project, never a real one.
+
+Cut-policy changes must keep the retention gate green:
+`scripts/bench-retention.mjs` plants unique probes (decisions, file
+paths, error signatures, a user correction) in the cut region of a
+synthetic history and rebuilds the post-cut context the way the host
+does (checkpoint + kept tail), under the default config and a tight
+`maxTokens=800` cap. Every probe must survive under the default
+config; error probes must survive whole under the cap with the
+fail-open path engaged (`keptErrorWhole > 0`).
 
 ## Status and limits
 

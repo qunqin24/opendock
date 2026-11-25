@@ -29,7 +29,7 @@ Implements the [Agent Progress Tool proposal](https://gist.github.com/jakedowns/
 for OpenCode 2, and is written as a portable reference implementation any
 harness can copy or adapt.
 
-**Versions:** MCP server `2.11.0` · OpenCode plugin `2.20.0`
+**Versions:** MCP server `2.11.0` · OpenCode plugin `2.21.2`
 
 > **Advanced docs:** [schema, relay internals, state store, architecture, all
 > options, file map →](./README-advanced.md)
@@ -140,8 +140,11 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
   progress-bar glyphs or the started line, with a single clamped detail line
   and a `40% · & N more` meta suffix. The composer pill capsule itself keeps
   its `barStyle` rendering. Use the **Progress: switch tree theme** palette
-  command to pick `Default` or `Compact`; the choice applies immediately and is
-  saved as `treeTheme` in the OpenCode config that declares the plugin.
+  command to pick **ASCII**, **Emoji**, or **Compact**; each option shows a
+  live preview of its bars. The choice applies immediately and is saved as
+  `treeTheme` plus `barStyle` in the OpenCode config that declares the plugin.
+  Expanded child rows use the same `└─` branch prefix as the TUI, placed before
+  the status dot.
 - **TUI:** compact tree above the composer, roots collapsed, capped at
   `tuiMaxRoots` (default 3) and scrollable inside `tuiMaxRows` (default 8) so
   long lists never push the prompt away. A `--- scroll to see N more ---` hint
@@ -154,7 +157,7 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
   placements at runtime.
 - Running and waiting tasks stay visible; errors stay until dismissed or
   updated; completed tasks stay unless dismissed (or `autoHideDone` is on).
-- Dismissal is view-plane, not a status change: a dismissed tree stays hidden
+- Dismissal works at any depth: every nested row has its own `✕`; dismissing a child hides its subtree and re-rolls the parent from the remaining children. A dismissed tree stays hidden
   through relay telemetry and sibling activity. An **agent update clears the
   dismissal** on that entry and its ancestors — except a terminal dismissal
   (dismissed while done/error), which later done/error re-reports do not revive;
@@ -178,8 +181,9 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
   at once. Dismissals delete the note from the shared ring buffer, so every
   client updates. Notes also auto-hide from every surface after
   `sayAutoHideTimeoutMs` (default 60s; `0` keeps them until dismissed). An
-  opt-in `sayNudge` reminds a silent agent after a long tool, without
-  deleting them. **Recommended note length: 20–80 characters** for terse
+  opt-in `sayNudge` reminds a silent agent after a long tool
+  (`"long-tool"`) or after a run of tool calls with no note (`"silent-run"`);
+  it only exists when `say: true`. **Recommended note length: 20–80 characters** for terse
   intent/status pings; set `sayMinChars: 20` and `sayMaxChars: 80`. The
   shipped defaults stay `180`/`260` for longer intent-plus-ETA notes. Notes
   survive clear-list, roll child sessions up to the parent, and are purged with
@@ -203,7 +207,7 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 | `guiLayout` | Desktop/web placement: `"composer"` pill (default) or pinned `"sidebar"` panel |
 | `guiSidebarWidth` | Desktop sidebar initial width in CSS pixels (default 360, clamp 240-800) |
 | `guiDetailLines` | Detail line cap in pill menu and sidebar: `-1` full, `0` hidden, `n` lines (default 1) |
-| `treeTheme` | Tree row theme: `"default"` or `"compact"` (no bars/started line, one detail line; pill capsule unaffected). **Progress: switch tree theme** picks it and writes it back to the config |
+| `treeTheme` | Tree row theme: `"default"` or `"compact"` (no bars/started line, one detail line; pill capsule unaffected). The **Progress: switch tree theme** preset picker writes this and `barStyle` back to the config |
 | `taskListFile` | Mirror tasks to a local Markdown checklist (default off) |
 | `taskListLocation` | `1` = project root (default), `0` = `.progress/`, `2` = `~/.opencode-progress/` |
 | `taskListView` | `"ui"` (hide dismissed + rolled-up status) or `"raw"` |
@@ -215,13 +219,14 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 | `staleEscalateAfter` | Entry reminders before one synthetic escalation (default 3; `0` disables) |
 | `idleReminder` | Turn-end nudge when tasks remain (default on) |
 | `demoSkills` | Register the demo skills (default off) |
-| `barStyle` | `"blocks"` or `"emoji"` |
+| `barStyle` | `"blocks"` (ASCII) or `"emoji"`; the **Progress: switch tree theme** presets set this with `treeTheme` |
 | `refreshMs` | View refresh interval (default 1000) |
 | `say` | Enable the opt-in narration tool and notes lane (default off) |
 | `sayModes` | Note surfaces: string or array of `"pill"`, `"toast"`, `"tree"` (default `["tree"]`; `sayMode` is a scalar alias; `[]` records without showing) |
 | `sayAutoHideTimeoutMs` | Hide notes older than this from every surface (default `60000`, clamp `0..86400000`; `0` keeps until dismissed; view-only) |
 | `sayToastScope` | Toast `"own"` notes (default), own + child `"warnings"`, or `"all"`; child notes still roll up in the tree/pill |
-| `sayNudge` | Opt-in long-tool reminder: `"long-tool"` or `true` (default off; context-only, never synthetic) |
+| `sayNudge` | Opt-in reminder, only with `say: true`: `"long-tool"`/`true`, `"silent-run"` (forgot-to-narrate call count), or `"both"` (default off; context-only, never synthetic) |
+| `sayNudgeMinCalls` | Tool calls with no note before a `"silent-run"` reminder (default `3`, clamp `1..50`) |
 | `retainDeletedSessionProgress` | Keep store entries when a session is deleted (default off) |
 
 The optional task-list mirror is always written as `tasklist-<session>.md`. Add `tasklist-*.md` (and `.progress/` if you use location `0`) to your `.gitignore` — it contains plaintext task titles and details. When enabled, the palette command **Progress: task-list mirror view** switches between the UI view and the raw store view.

@@ -72,6 +72,61 @@ Speed and context modifiers are separate families (`devin/claude-opus-5-5-fast`,
 `devin/glm-5-2-1m`). The per-effort UIDs are still accepted, so an existing
 `devin/claude-opus-5-5-high` keeps working; they are only hidden from the picker.
 
+### Uncensored mode
+
+By default (`"normal"`) the plugin streams the model's answer through
+unchanged. Setting `mode` to `"uncensored"` runs every request through the
+[devin-engine](https://www.npmjs.com/package/devin-engine) guarded-retry
+pipeline — the same machinery the standalone
+[devin-proxy](https://www.npmjs.com/package/devin-proxy) serves over HTTP:
+
+- an override system prompt tuned for direct, mechanism-level answers,
+- history sanitizing, so earlier refusals do not anchor later turns,
+- a refusal guard that holds back the first characters of every reply and
+  transparently resamples — escalating temperature, framing the request as
+  continuing work already agreed on — whenever the model opens a refusal.
+  Retries are invisible downstream; only the final attempt passes a refusal
+  through.
+
+```jsonc
+// opencode.json — object form of the plugins entry
+{
+  "plugins": [
+    {
+      "package": "opencode-devin",
+      "options": {
+        "mode": "uncensored"
+      }
+    }
+  ]
+}
+```
+
+All settings are optional:
+
+| Option | Default | What it controls |
+| --- | --- | --- |
+| `mode` | `"normal"` | `"uncensored"` enables the pipeline. |
+| `guardChars` | `700` | Head-window size the refusal guard scans before releasing text. |
+| `guardFull` | `false` | Buffer and scan the whole reply instead — catches comply-then-pivot refusals at the cost of streaming. |
+| `maxRetries` | `3` | Resample attempts after the first one. |
+| `retryTemps` | `"0.85,1.0,1.1"` | Comma-separated retry temperature ladder. |
+| `overrideFile` | bundled EN | Override prompt: a filesystem path, or a bundled language name — `"en"` / `"english"`, `"es"` / `"spanish"`. A file at `~/.devin-proxy/override-compact.txt` is picked up too, same as the standalone proxy. |
+| `keepClientSystem` | `false` | Keep OpenCode's own system prompt ahead of the override instead of replacing it. |
+| `planPreamble` | `false` | Have the model announce briefly what it is about to do before tool calls. |
+| `maxInputTokens` | unset | Estimated-input-token budget — older history turns are pruned past it (system head and newest turns stay). Useful ceiling for long agent sessions. |
+| `pruneKeepTurns` | `12` | Minimum history turns kept when pruning. |
+
+The plugin forwards these options into the published provider settings, so
+they can also be set — or overridden per-install — through a classic provider
+stanza, which wins over the plugin options in opencode's settings merge:
+
+```jsonc
+{ "provider": { "devin": { "options": { "mode": "uncensored" } } } }
+```
+
+The engine is imported dynamically: in normal mode it is never loaded.
+
 ## How it works
 
 ```mermaid
@@ -207,3 +262,16 @@ secret.
 ## License
 
 [MIT](LICENSE)
+
+## Ecosystem
+
+| Package | Role |
+| --- | --- |
+| `devin-core` | Cascade wire + PKCE auth + catalog — consumed here as `devin-core@^0.0.3` (replaces the old `src/protocol` + `src/auth`) |
+| `devin-engine` | guarded-retry pipeline (embeddable) |
+| `devin-proxy` | standalone OpenAI-compatible proxy |
+| `devin-proxy-py` | Python reference implementation |
+| **`opencode-devin`** (this) | OpenCode v2 plugin — `LanguageModelV3` adapter + `/connect` login |
+| `claude-devin` | Claude/Anthropic-compatible surface — same core |
+
+Topic `devin-ecosystem` groups the repos on GitHub.

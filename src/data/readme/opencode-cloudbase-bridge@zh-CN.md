@@ -26,16 +26,18 @@ Agent ─► magpie 网关 ─► 插件 ── POST /v1/functions/aiProxy ─�
 
 ## 模型
 
-| 模型 ID | 上下文长度 |
-| --- | --- |
-| `hy4-flash` | 1M |
-| `hy4` | 1M |
-| `hy4-preview` | 1M |
-| `hy3` | 256K |
-| `deepseek-v4.1-flash` | 1M |
-| `deepseek-v4.1-flash-1017` | 1M |
+| 模型 ID | 上下文长度 | 图片输入 |
+| --- | --- | --- |
+| `hy4-flash` | 1M | 支持 |
+| `hy4` | 1M | 支持 |
+| `hy4-preview` | 1M | 官方列表未注明，图片会照常转发（2026-12-07 下线，之后按 `hy4` 提供） |
+| `hy3` | 256K | 不支持 |
+| `deepseek-v4.1-flash` | 1M | 支持 |
+| `deepseek-v4.1-flash-1017` | 1M | 支持 |
 
-这些模型不用在控制台开启，用量会自动从赠送额度里扣。个别模型在部分环境不一定放开——如果 CloudBase 返回 `AI_MODEL_NOT_SUPPORTED`，以你环境的实际支持为准。生图模型 `hy-image-v3.5-preview` 不在本插件范围内：桥接只走文本对话通道。
+图片输入以[官方模型列表](https://docs.cloudbase.net/ai/available-models)为准，需要 aiProxy 1.3.0 及以上。图片放在 user 消息里，用 OpenAI 的 `image_url` 格式（`http(s)` 链接或 `data:image/...;base64` 地址），大小计入 6 MiB 的请求上限。
+
+这些模型不用在控制台开启，用量会自动从赠送额度里扣。个别模型在部分环境不一定放开——如果 CloudBase 返回 `AI_MODEL_NOT_SUPPORTED`，以你环境的实际支持为准。生图模型 `hy-image-v3.5-preview` 不在本插件范围内：桥接只走对话通道（输入文字和图片，输出文字）。
 
 ## 准备工作
 
@@ -106,7 +108,7 @@ m plugin options cloudbase-bridge '{"gatewayBaseUrl":"http://127.0.0.1:8787"}'
 
 - 没有真流式：上游是一次性返回，SSE 在本地合成，所以首 token 要等整段生成完；
 - 工具调用需要 aiProxy 1.1.0 及以上——插件从 0.2.4 或更早版本升级后，要重新部署一次云函数（`tcb fn deploy aiProxy --force`）；
-- 不支持图片输入；
+- 图片输入需要 aiProxy 1.3.0 及以上，且只能放在 user 消息里；`hy3` 只接受文字，视频和文件输入不转发；
 - 特别长的输出可能撞上云函数 120 秒超时；
 - 没有额度展示（官方没给查询 API）；赠送额度本身有期限（6 个月）。
 

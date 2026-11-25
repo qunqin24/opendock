@@ -10,6 +10,7 @@
   <a href="https://github.com/fcoouto/opencode-predictions/actions/workflows/check.yml"><img src="https://github.com/fcoouto/opencode-predictions/actions/workflows/check.yml/badge.svg" alt="Build and test status" /></a>
   <a href="#compatibility"><img src="https://img.shields.io/badge/OpenCode-V2-b9efcb?style=flat-square&amp;labelColor=27352d" alt="Requires OpenCode V2" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-b9efcb?style=flat-square&amp;labelColor=27352d" alt="MIT license" /></a>
+  <a href="#support-development"><img src="https://img.shields.io/badge/Tip%20jar-b9efcb?style=flat-square&amp;logo=githubsponsors&amp;logoColor=27352d" alt="Tip jar" /></a>
 </p>
 
 <p align="center">
@@ -22,10 +23,10 @@
 </p>
 
 <p align="center">
-  <img src="readme-demo.svg" width="800" alt="Illustrative interaction: the assistant finishes, then ghost text suggests “Review the diff for regressions.” Tab accepts it for editing, without sending." />
+  <img src="https://raw.githubusercontent.com/fcoouto/opencode-predictions/main/assets/predictions-desktop.gif" width="768" alt="OpenCode Desktop suggests “Run the targeted tests.” Tab accepts the suggestion, and the user adds “first, then show failures” without sending it." />
 </p>
 
-<p align="center"><sub>Illustrative interaction, not a screenshot. You decide what gets sent.</sub></p>
+<p align="center"><sub>Scripted demo in OpenCode Desktop. Tab accepts the suggestion for editing; Enter sends it.</sub></p>
 
 ## Keep the next step in sight
 
@@ -83,7 +84,7 @@ replacing the file.
 </details>
 
 OpenCode installs the package from [npm](https://www.npmjs.com/package/opencode-predictions).
-To pin a release, use `"opencode-predictions@0.4.1"`. To track the development
+To pin a release, use `"opencode-predictions@0.4.2"`. To track the development
 branch instead, use `"github:fcoouto/opencode-predictions#main"`.
 Configuration changes reload automatically; use `/reload` if needed.
 The global entry loads both Desktop and CLI support. Do not put it only in `cli.json`.
@@ -681,6 +682,11 @@ experimental Desktop API may need updates after OpenCode changes.
 OpenCode V1, Mini, browser-only clients, and noninteractive predictions are not supported.
 
 The package requires Node.js 22 or newer, the release lines that still receive security fixes. Run the latest patch release of your line. Developing this repository needs Node.js 26 (the tests use `await using`).
+
+## Support development
+
+OpenCode Predictions is free and always will be. If it’s saved you a few keystrokes,
+you can [leave a one-time tip](https://buy.stripe.com/fZu14pdh29pH4uScpifYY00) to help me maintain it.
 
 ## License
 

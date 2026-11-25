@@ -447,6 +447,7 @@ AMD Radeon integrated graphics, Windows 11 Pro build 26200, Python 3.13.15,
 RapidOCR 1.2.3 / ONNX Runtime 1.31.1 / OpenCV 5.0.0.93. CPU-only OCR;
 `low_resource` was off.
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/subadeepan-y-vi3ion-1yq70k?v=4c0eabd45d662225e5d1da48b074e16e)](https://m8ven.ai/mcp/subadeepan-y-vi3ion-1yq70k?s=readme)
 **Results will vary.** Speed scales with CPU, image resolution, text density
 and thermal throttling. A smaller laptop, a high-DPI 4K screen or a dense
 terminal screenshot will be slower and may use a different evidence tier.

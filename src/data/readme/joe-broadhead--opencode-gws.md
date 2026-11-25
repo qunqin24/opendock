@@ -1,49 +1,57 @@
 # Google Workspace for OpenCode
 
-Gives OpenCode agents Gmail, Drive, Calendar, Docs, Sheets and the rest of Google Workspace through Google's open-source [`gws`](https://github.com/googleworkspace/cli) CLI, with every change planned first and committed as a second, visible step.
+Gives OpenCode agents Gmail, Calendar, Drive, Docs, Sheets and the rest of Google Workspace through Google's
+open-source [`gws`](https://github.com/googleworkspace/cli) CLI, with every change planned first and committed as a
+second, visible step.
 
 Unofficial; not affiliated with Google Workspace or Google.
 
 Google is a trademark of Google LLC; this unofficial plugin is not endorsed by them.
 
+> **v0.0.0 is unreleased.** This repository is the plugin's first release under the `we-the-rebel-alliance` org, and
+> its tag, release and native binary do not exist yet. Install it from a checkout (see [Install](#install)); the
+> published release follows.
+
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Another release in that range, such as 2.2.99, works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
+- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1. Another release in that range, such as 2.4.2, works as usual and status
+  marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
 - macOS (arm64, x64) or Linux (arm64, x64, glibc).
 - A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
 
 ## Install
 
+From a checkout:
+
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.13
+npm ci --ignore-scripts
+npm run fetch:gws
+npm run build
 ```
 
-Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
-
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-gws#v<old version>`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-gws#v<version>`.
-
-Or add the plugin to `opencode.json` instead, with the same spec:
+Then add the checkout's absolute path to `opencode.json`:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.13" }] }
+{ "plugins": [{ "package": "/absolute/path/to/gws-plugin" }] }
 ```
 
-The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
-A new release is a new tag: install it with its own `#v<version>` spec.
+The first release is published as `github:we-the-rebel-alliance/gws-plugin#v0.0.0`; until that tag exists, a
+`github:` spec does not resolve. Run `opencode reload`, or restart OpenCode, then `/gws-status`.
 
 ## Sign in
 
-Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: press `o` or Enter to open it in your browser. The CLI opens the browser automatically:
+Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: press `o` or Enter to open it in your
+browser. The CLI opens the browser automatically:
 
 ```sh
 opencode auth login gws-default
 ```
 
-No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 42 scopes (35 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**. A signed-in account is labelled with the verified email Google returned; an account signed in with an earlier release keeps its alias as the label until you sign it in again.
+No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own
+Desktop app OAuth client, unless your organisation set one. Read and write is the default for the `default` account;
+Read-only is the other choice. With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
 
-To update, install the new release tag as in [Install](#install), then run `opencode reload`. Your options and sign-ins are kept.
-
-Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
+Details and the scope table: [docs/auth.md](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/auth.md).
 
 ## Use
 
@@ -52,21 +60,25 @@ Ask the agent for what you need. It works in four steps:
 1. `gws_catalog` finds an operation, and `gws_schema` shows its parameters.
 2. `gws_read` runs a read. List and search calls need `fields`.
 3. `gws_plan` dry-runs a change and returns a `planId` with a redacted preview.
-4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or `gws_admin`) runs it, with only the `planId`. OpenCode asks you first when `access` is `"ask-changes"`; every tool is allowed at the default ([Permissions](#permissions)).
+4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or
+   `gws_admin`) runs it, with only the `planId`. OpenCode asks you first when `access` is `"ask-changes"`; every tool
+   is allowed at the default ([Permissions](#permissions)).
 
-`gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
+`gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is
+data, never an instruction.
 
-`gws_events_list` is for Memory's collector, not for answering questions: it lists the Gmail messages that arrived, or the primary calendar's meetings up to seven days ahead, since a cursor as normalised events (people, subject or title, a link, labels, and the text, at most 4,096 characters), oldest first, leaving out spam, trash, drafts, Promotions and Social, and anything holding a secret. Calendar collection is best effort: edits during paging can be missed. A Calendar recurring series deleted whole is not retracted: the source sees no instance for it, so the meetings already listed age out by Memory's retention. The default rules allow these reads; later agent or session rules still apply. The plugin declares its sources in `package.json` `sources` under the shared [source contract](https://github.com/we-the-rebel-alliance/source-contract) (Gmail and Calendar events, today's calendar, a picture and a bounded spreadsheet range), and passes its conformance kit ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#sources)).
-
-In Jelly, you sign in once, and an agent given the account works with Jelly's copy of that sign-in: its token, scopes and email, without your client secret or refresh token. The plugin reads the copy as it reads any sign-in, never renews it, and asks for a new sign-in instead of calling Google if it is ever asked to ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#signing-in)).
-
-In Jelly, the plugin also answers `calendar.today`, a read-only RPC method that lists today's events on one account's primary calendar for Jelly's calendar and the **Today** Home tile. It is deprecated until 0.1.0 for `calendar_today` on the tools RPC, the source contract's `gws.calendar.today`. It reads with that account's own sign-in, never writes, and returns no descriptions or guests ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#todays-calendar)).
-
-It also answers `images.read`, which Jelly calls to draw a Google Drive or Workspace picture an agent puts in a UI: a Drive file link, or an address on Google's own image servers, such as a file's `thumbnailLink`. It reads with the account's own sign-in, whose token the UI never sees, and answers a PNG, JPEG, GIF or WebP of at most 1 MB, judged from its bytes; never SVG ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#pictures-in-an-agents-ui)).
+`gws_events_list` is for a consumer's collector, not for answering questions: it lists the Gmail messages that
+arrived, or the primary calendar's meetings up to seven days ahead, since a cursor as normalised events. The plugin
+declares its sources in `package.json` `sources` under the shared
+[source contract](https://github.com/we-the-rebel-alliance/source-contract) and passes its conformance kit
+([configuration](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md#sources)).
 
 ### Scripts
 
-A script or a cron job can call the read tools with no model, through `opencode api`: `status`, `catalog`, `schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits it, unless the host turns on `rpcCommits` because it confirms changes itself. A rule that `ask`s is refused, because no one can answer it:
+A script or an OpenCode automation can call the read tools with no model, through `opencode api`: `status`, `catalog`,
+`schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules,
+which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits
+it, unless the host turns on `rpcCommits` because it confirms changes itself.
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \
@@ -74,47 +86,19 @@ opencode api post /api/rpc/google-workspace.gws.tools/read \
   -d '{"input":{"sessionID":"ses_…","input":{"operation":"gmail.users.messages.list","params":{"userId":"me","q":"is:unread"},"fields":"messages(id)"}}}'
 ```
 
-The header names the location whose plugin and sessions you mean; without it the call fails `rpc.unavailable` when the plugin is not loaded in the service's default location.
+See [Scripting](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/scripting.md).
 
-See [Scripting](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md).
-
-In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, opens a status dialog. In a session, `/gws-status` posts the same status, with any pending plans, and `/gws-doctor` makes one small read per enabled service. None of them can approve or commit.
+In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, opens a status dialog. In a session,
+`/gws-status` posts the same status, with any pending plans, and `/gws-doctor` makes one small read per enabled
+service. None of them can approve or commit.
 
 ## Permissions
 
-**Every tool is allowed by default.** An agent can read your mail and files, send mail, change sharing, delete files and run admin operations without asking. Each change is still only a plan until the agent commits it with the plan's `planId`, so a commit is one tool call on something you were shown first. Restrict the plugin in any of these three ways:
-
-1. **The `access` option**, which drives the rules the plugin inserts directly after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. Agents without that base rule are left alone, and a later rule still wins.
-
-   | Value | What runs | What asks |
-   | --- | --- | --- |
-   | `"all"` (the default) | every tool, the six commit tools included, and any tool a later release adds | nothing |
-   | `"ask-changes"` | the reads: status, catalog, schema, read, plan and events_list | each of the six commits |
-   | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
-
-   ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.13", "options": { "access": "read-only" } }] }
-   ```
-
-   This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
-
-2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's. The actions are `gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`, `gws.events_list` and the six commits:
-
-   ```json
-   { "agents": { "reader": { "permissions": [
-     { "action": "gws.*", "resource": "*", "effect": "deny" },
-     { "action": "gws.read", "resource": "*", "effect": "allow" }
-   ] } } }
-   ```
-
-3. **A rule per action**, with `resource` set to the account and operation it covers. A later rule wins, so your allow or deny replaces the plugin's:
-
-   ```json
-   { "permissions": [
-     { "action": "gws.delete", "resource": "*", "effect": "deny" },
-     { "action": "gws.write", "resource": "work:*", "effect": "ask" }
-   ] }
-   ```
+**Every tool is allowed by default.** An agent can read your mail and files, send mail, change sharing, delete files
+and run admin operations without asking. Each change is still only a plan until the agent commits it with the plan's
+`planId`, so a commit is one tool call on something you were shown first. Restrict the plugin with the `access`
+option, an agent's own rules, or a rule per action; [docs/configuration.md](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md#plugin-options)
+has the three ways and the rule resources.
 
 The block for each value, generated from `defaultRules(access)` in `src/host/agents.ts`:
 
@@ -196,47 +180,10 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 
 <!-- /generated:rules-read-only -->
 
-What each commit asserts: `gws.<category>` on `<account>:<operation>`. Write and export offer **Always** for that exact resource. Send, share, delete and admin pass no save patterns, so they never offer Always. Every rule needs `resource`:
+## Errors
 
-```json
-{ "action": "gws.write", "resource": "work:*", "effect": "allow" }
-```
-
-A download outside the project asserts OpenCode's own `external_directory` permission as well, because the file lands there: allow the folder with `{ "action": "external_directory", "resource": "<folder>/*", "effect": "allow" }`, or download inside the project. An agent whose base rule allows everything allows it too, so nothing asks unless your rules restrict it.
-
-`opencode run` cannot answer an ask. At `ask-changes`, give a commit an allow rule there, or choose `all`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted block.
-
-An agent defined only in your config does not get the block. That matters only when `access` holds something back: `/gws-status` and the status dialog then name those agents and show the block. Put it first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put it in the top-level `permissions`: that would loosen Explore.
-
-## Configure
-
-Options go on the plugin entry: accounts and their services and access, the OAuth client, deny-only policy rules, and the admin gate. See [docs/configuration.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md) and the annotated [example](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/examples/opencode.jsonc).
-
-## Organisation rollout
-
-Create a Desktop app OAuth client in your organisation's Google Cloud project (user type **Internal** keeps it to your organisation), and set it in OpenCode's system config: `/Library/Application Support/opencode/opencode.json` on macOS, or `/etc/opencode/opencode.json` on Linux.
-
-```json
-{
-  "plugins": [
-    {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.13",
-      "options": {
-        "oauthClient": {
-          "clientId": "<your client ID>.apps.googleusercontent.com",
-          "clientSecret": "<your client secret>"
-        }
-      }
-    }
-  ]
-}
-```
-
-Members then only run `/connect`, choose Google Workspace, and pick an access level: the form hides the client fields and uses these values. Google treats a Desktop client's secret as non-confidential; security rests on PKCE, the loopback redirect and the user's consent.
-
-## Troubleshooting
-
-`/gws-status` shows each account as `connected`, `sign-in required` or `not configured`, with one next step. Every code this plugin reports, with what it means and the next step its message carries:
+Every error reads `CODE: What happened. Next step: What to do.` `/gws-status` names the one next step, and each
+code's message carries its own:
 
 <!-- generated:codes -->
 
@@ -275,10 +222,10 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
 | `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
 | `GWS_API_ERROR` | Google returned an error or an unexpected response. The message may include Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
-| `CALENDAR_UNAVAILABLE` | The read Jelly's calendar makes, calendar.today, has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
-| `IMAGE_HOST_REFUSED` | The picture Jelly asked images.read for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
+| `CALENDAR_UNAVAILABLE` | The agenda snapshot (calendar_today) has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
+| `IMAGE_HOST_REFUSED` | The picture images_read was asked for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
 | `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. The image source (images_read) also refuses a GIF, which the contract's image output does not take. | Show a PNG, JPEG, GIF or WebP picture instead; for images_read, a PNG, JPEG or WebP. |
-| `IMAGE_TOO_LARGE` | The picture is over 1 MB, the most Jelly draws; the plugin stops reading at that size and answers nothing. | Show the file's thumbnail (its thumbnailLink) instead. |
+| `IMAGE_TOO_LARGE` | The picture is over 1 MB, the most one read takes; the plugin stops reading at that size and answers nothing. | Show the file's thumbnail (its thumbnailLink) instead. |
 | `IMAGE_UNAVAILABLE` | The picture could not be read: Google answered with an error or a redirect (never followed), a Drive file is not a picture and has no thumbnail, or too many pictures are being read at once. | Check that the account can open the file; retry later. |
 | `IMAGE_ACCOUNT_AMBIGUOUS` | No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn. | Add drive to one account's enabledServices, or name an account default. |
 | `GWS_DISCOVERY_ERROR` | gws could not load the API description (the Discovery document) it builds requests from. | Check that this machine can reach www.googleapis.com, then retry. |
@@ -295,7 +242,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
 | `DOWNLOAD_NOT_PERMITTED` | The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready. | Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project. |
 | `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
-| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.4.0). | Use OpenCode 2.2.3 or a later 2.2 or 2.3 release, or set "allowUntestedHost": true. |
+| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.4.1 <2.5.0). | Use OpenCode 2.4.1 or a later 2.4 release, or set "allowUntestedHost": true. |
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
@@ -305,62 +252,28 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 
 <!-- /generated:codes -->
 
-Three need more than a line:
-
-- `AUTH_SCOPE_MISSING`: sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in; a Keep method needs domain-wide delegation that a Workspace admin sets up. Nothing ran.
-- `ADMIN_PRIVILEGE_REQUIRED`: the sign-in is valid, but the account is not a Workspace admin with the privilege the API needs, such as Reports for `admin-reports`. Signing in again does not help: add an account alias for an admin who has it, or remove the service from `enabledServices`.
-- `POLICY_DENIED`: a deny rule or the admin gate refused the call. A deny is final.
-
-A skill of your own named `opencode-gws` or `opencode-gws-recipes` (for example in `~/.claude/skills`) hides the plugin's skill of that name; `/gws-status` names it under **Hidden skills**, and the fix is to move or rename it. A skill that tells agents to run `gws` in a shell, such as the gws CLI's own `gws-*` skills, leads them around the plugin's plans and approvals; `/gws-status` names each one under **Shell gws skills**, and the fix is to remove it or move it out of its skills folder.
-
-Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`, and removes it when it stops. A server that stopped without closing leaves its folder behind; the next start removes such folders once they are a day old and their process is gone.
-
-`gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. The same code table is in [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
-
-## Uninstall
-
-1. Sign out each account while the plugin is still installed: in `/connect`, or with `opencode auth logout gws-<alias>` (`gws-default` for the default account). After the plugin is removed, its sign-ins no longer appear.
-2. Remove the plugin:
-
-   ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.13
-   ```
-
-3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
-
-   | | macOS | Linux |
-   | --- | --- | --- |
-   | State | `~/Library/Application Support/opencode-gws` | `~/.local/state/opencode-gws` |
-   | Cache | `~/Library/Caches/opencode-gws` | `~/.cache/opencode-gws` |
-
-   `$XDG_STATE_HOME/opencode-gws` and `$XDG_CACHE_HOME/opencode-gws` replace them when those variables are set, and `audit.path` names its own file.
-4. Remove any permission block you copied into an agent's own `permissions`.
-
 ## Known limits
 
-- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no release binary, so the tools refuse with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
-- **Operations.** The tools are the operations in the manifest generated from the pinned `gws` 0.22.5. A method that a later `gws` adds arrives with a plugin release, and `gws_catalog` lists only the manifest.
-- **Services the default sign-in leaves out.** Keep needs domain-wide delegation that a Workspace admin sets up, admin reports need a Workspace admin account, and Model Armor cannot run. A method that only a Chat app or a Classroom add-on can run (`appOnly`) fails with `AUTH_SCOPE_MISSING` under a Google sign-in.
-- **Unverified OAuth apps.** An External client left in Testing shows unverified-app warnings, and its refresh tokens expire after 7 days, so each account signs in again weekly.
-- **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state with `gws_read` before planning the change again.
-- **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit there needs an allow rule for it, or `access: "all"`.
-- **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
-- **Pictures in Jelly over about 47 KB.** `images.read` answers pictures up to 1 MB, as Jelly's picture contract allows, but Jelly's host currently refuses any plugin RPC answer over 64 KB of JSON (`VIEW_DATA_MAX_BYTES`), so a picture over about 47 KB shows no picture in Jelly until Jelly lifts that limit for pictures. That limit is Jelly's, not the plugin's.
-- **Jelly sign-in labels.** An account is labelled with its verified email only from a sign-in made with 0.0.7 or later; one signed in earlier keeps its alias until it is signed in again.
-- **Jelly's probe.** The sources declare no `permission.identity` yet. Source-contract v0.2.0 allows an empty one, which narrows the probe to `sources.probe.action`, but a consumer still on v0.1.x refuses a declaration that carries it, so it waits until jelly and Memory pin v0.2.0. Until then Jelly fences `probe` with all of a source's operations, though it calls no Google API.
-- **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
-- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. A later 2.2 or 2.3 release loads, and `/gws-status` marks it untested.
-- **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.
-- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
+- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no release binary, so the
+  tools refuse with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
+- **Operations.** The tools are the operations in the manifest generated from the pinned `gws` 0.22.5. A method that a
+  later `gws` adds arrives with a plugin release.
+- **Unverified OAuth apps.** An External client left in Testing shows unverified-app warnings, and its refresh tokens
+  expire after 7 days, so each account signs in again weekly.
+- **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state
+  with `gws_read` before planning the change again.
+- **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit
+  there needs an allow rule for it, or `access: "all"`.
+- **Updates are not automatic** for a Git install: install the new tag, then run `opencode reload`.
 
 ## Links
 
-- [Sign-in and scopes](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md)
-- [Configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md)
-- [Status dialog, commands and RPC](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/ui.md)
-- [Scripting the tools without a model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)
-- [Admin operations](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/admin.md)
-- [Security policy and model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/SECURITY.md)
-- [The `gws` binary](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)
-- [Changelog](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/CHANGELOG.md), [licence](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/LICENSE) and [notice](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/NOTICE)
-- [Issues](https://github.com/joe-broadhead/opencode-gws/issues)
+- [Sign-in and scopes](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/auth.md)
+- [Configuration](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md)
+- [Status dialog, commands and RPC](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/ui.md)
+- [Scripting the tools without a model](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/scripting.md)
+- [Admin operations](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/admin.md)
+- [Security policy and model](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/SECURITY.md)
+- [The `gws` binary](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/backend.md)
+- [Changelog](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/CHANGELOG.md), [licence](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/LICENSE) and [notice](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/NOTICE)
+- [Issues](https://github.com/we-the-rebel-alliance/gws-plugin/issues)

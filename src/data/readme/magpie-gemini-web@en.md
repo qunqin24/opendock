@@ -4,7 +4,7 @@
 
 [中文](README.md) | English | [Contributing & issue guide](CONTRIBUTING.md)
 
-Use **Google AI Studio** and **Gemini on the web** through your Google account in [Magpie](https://usemagpie.ai/). The plugin runs [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) and [gemini-web2api-go](https://github.com/zexadev/gemini-web2api-go) locally, providing chat, native function calling, Nano Banana image generation, and Deep Research through OpenAI-compatible and Gemini APIs.
+Use **Google AI Studio** and **Gemini on the web** through your Google account in [Magpie](https://usemagpie.ai/). [Agent2API](https://github.com/aimod-cc/Agent2API) can load the same plugin. The plugin runs [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) and [gemini-web2api-go](https://github.com/zexadev/gemini-web2api-go) locally, providing chat, native function calling, Nano Banana image generation, and Deep Research through OpenAI-compatible and Gemini APIs.
 
 > **New model support:** Both providers now list **`gemini-4-hydrogen`** and **`gemini-4-carbon`**. AI Studio follows official stable backend releases and maps Hydrogen's `xhigh` thinking tier. Gemini Web's one-click local backend exposes dedicated model IDs starting with **`4.30.0-magpie.1`**: Hydrogen works with signed-in accounts (including free accounts), Carbon requires an eligible paid/Ultra account, and the legacy `gemini-4-argon` name remains a Carbon alias. Upstream v4.31.0 already includes paid `gemini-4-neon` and its thinking tier, with `gemini-3.1-pro` retained as a Neon alias. Optimized backend **`4.31.0-magpie.2`** keeps that catalog and stops Argon/Carbon identity errors from tripping the proxy circuit breaker.
 
@@ -79,6 +79,14 @@ For an independently running service, choose **Connect an existing AIStudio2API 
 
 > **Why is a private window required?** The backend periodically refreshes this session to keep it alive. If it shares a session with your daily browser, Google will revoke the session and sign your browser out of all Google services. A private window (or a dedicated secondary Google account) gives the backend an isolated session.
 
+### Using it in Agent2API
+
+[Agent2API](https://github.com/aimod-cc/Agent2API) can load this plugin alongside other Magpie / OpenCode plugins. Install `magpie-gemini-web` from its plugin catalog and follow the sign-in steps above. Models come from the local Google AI Studio and Gemini Web backends.
+
+- Both providers list their login methods. When the local service is stopped, it starts once you begin sign-in.
+- To connect a backend you already run, enter its API key in the password field.
+- The AI Studio account page stays on the loopback login page you already authorized.
+
 ---
 
 ## Multiple Accounts & Usage Cards
@@ -143,6 +151,8 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 | `requestTimeoutMs` / `modelTimeoutMs` | Web: `570000` / `10000`; Studio: `1800000` / `10000` | Shared (override via `studio.*`) | Timeout (ms) per backend wait or model list fetch; resets on stream data, explicit settings take precedence |
 | `stripCitations` | `true` | `gemini-web` only | Strip `[cite: 1]` and `[cite_start]` markers from replies and tool arguments (not supported on AI Studio) |
 | `proxy` | none | `gemini-web` only | Proxy for the managed Gemini Web backend to reach Google (`http` / `https` / `socks5` / `socks5h`), or set `GEMINI_WEB_PROXY` env var / enter during sign-in |
+| `quickSignIn` | `false` | `gemini-web` only | One-click setup asks for neither the proxy nor the account index: the proxy comes from the `proxy` option, `GEMINI_WEB_PROXY` or the proxy pool, and the index from the paste (paste `{"cookie":"…","authuser":4}` to name one), else 0 |
+| `openBrowser` | `true` | `gemini-web` only | Whether one-click setup opens Gemini in the default browser; `false` only shows the address in the instructions, for copying from a private window |
 | `baseURL` | `http://127.0.0.1:8083/v1` | `gemini-web` only | Default Gemini Web backend URL |
 | `contextLimit` / `outputLimit` | `1000000` / `8192` | `gemini-web` only | Context and output limits reported to clients |
 | `studio.proxy` | none | `ai-studio` only | Proxy for reaching Google (`http` / `https` / `socks5`), or set `AI_STUDIO_PROXY` env var; when set, it takes precedence over the proxy saved in the admin page. An empty value counts as unset |

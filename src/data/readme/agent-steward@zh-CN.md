@@ -53,8 +53,8 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
 ### 语言
 
-界面提供俄语、英语和中文。默认选择「自动」模式——与 OpenCode 一样，界面语言跟随 OpenCode；
-也可以显式选择俄语、英语或中文。语言选择器位于调度器面板顶部（🌐 自动 / Русский / English / 中文），
+界面提供俄语、英语、中文和土耳其语。默认选择「自动」模式——与 OpenCode 一样，界面语言跟随 OpenCode；
+也可以显式选择俄语、英语、中文或土耳其语。语言选择器位于调度器面板顶部（🌐 自动 / Русский / English / 中文 / Türkçe），
 也可通过 `manage_settings` 工具切换（`action: "update"`，`locale: "zh"` 等）。
 `locale: "auto"`（「自动」，默认）跟随 OpenCode 界面语言：面板会立即响应语言切换，
 并将解析后的语言发送到服务器，使通知、摘要和仪表盘保持一致。切换无需重启。
@@ -62,8 +62,8 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 中文目前回退到英文界面文案。按设计，agent 工具描述与 schema 保持英语，
 输出到控制台的诊断信息保持俄语。
 
-字符串目录位于 `locales/ru.json`、`locales/en.json` 和 `locales/zh.json`；
-每个键必须同时存在于三者中，否则 CI 会失败。
+字符串目录位于 `locales/ru.json`、`locales/en.json`、`locales/zh.json` 和 `locales/tr.json`；
+每个键必须同时存在于四者中，否则 CI 会失败。
 
 ## 安装
 
@@ -226,6 +226,7 @@ steps:
 agent-steward pipeline validate opencode.pipeline.yaml
 agent-steward pipeline apply opencode.pipeline.yaml --dry-run
 agent-steward pipeline apply opencode.pipeline.yaml
+agent-steward apply -f opencode.pipeline.yaml          # GitOps-алиас
 agent-steward pipeline export --pipeline nightly-release --out opencode.pipeline.yaml
 ```
 
@@ -273,7 +274,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 116 test suites, 600+ checks
+npm test             # 128 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
@@ -291,6 +292,10 @@ npm run test:en      # same suites with the English locale
 - [docs/MIGRATION.md](MIGRATION.md) —— 从 cron、systemd、launchd 或任务计划程序迁移。
 - [docs/PIPELINE.md](PIPELINE.md) —— 流水线即代码：文件格式、CLI、幂等 apply。
 - [docs/SAVINGS.md](SAVINGS.md) —— "Saved $" 估算如何计算。
+- [RELIABILITY.md](RELIABILITY.md) —— 客观门禁与节省 token 的公开指标（S-3，English）。
+- [RECIPES.md](RECIPES.md) —— 带可验证证据的门禁通过配方库（S-4，English）。
+- [VERIFIED-CHAT.md](VERIFIED-CHAT.md) —— 仅在客观门禁/来源验证后才输出回答（S-5，English）。
+- [SCAFFOLD.md](SCAFFOLD.md) —— 从 gate-passed 配方一键生成项目（S-6，English）。
 - [CROSS_PLATFORM.md](../CROSS_PLATFORM.md) —— Windows / macOS / Linux 的差异与后端。
 - [文档站点（GitHub Pages 操作手册）](FEATURES.md#documentation-site-github-pages) —— 文档如何构建与发布。
 

@@ -104,7 +104,7 @@ code-mentor 只負責 diff 的收集、渲染與覆蓋檢查。「怎麼理解�
 |---|---|
 | `implementation-understanding-tutor` | tutor 決定情境、站的順序與逐段講法；有 `change-understanding-review` 時一併用它分組與判斷 Added／Modified／Removed |
 | 只有 `change-understanding-review` | review 負責分組與判斷，逐段講法用內建規則 |
-| 兩個都沒有 | 內建規則（`SKILL.md` 第 5 節），講解深度要求不變 |
+| 兩個都沒有 | 內建規則（skill 的 `references/`），講解深度要求不變 |
 
 有 `diagram-design` 時，只在你要架構圖、sequence 圖，或機制用文字講不清楚時才用它畫圖，存在工作資料夾的 `diagrams/`。
 
@@ -269,7 +269,7 @@ code-mentor serve --port 5000
 }]
 ```
 
-完整欄位見 [`skill/code-mentor/references/guide-format.md`](skill/code-mentor/references/guide-format.md)，寫作規則見 [`skill/code-mentor/SKILL.md`](skill/code-mentor/SKILL.md)。
+流程見 [`skill/code-mentor/SKILL.md`](skill/code-mentor/SKILL.md)。欄位與寫作規則依步驟分在 [`skill/code-mentor/references/`](skill/code-mentor/references/)：`plan.md`（站與骨架）、`station.md`（行註解與呼叫鏈）、`spine.md`（主線、機制與圖）、`logic.md`（邏輯導讀）、`migration.md`（產生檔）、`update.md`（更新、加深、看不懂）。
 
 ## 常見問題
 

@@ -5,7 +5,9 @@
 - event-driven automations (callbacks, webhooks, scheduled watchers that wake an agent up);
 - AI-assisted permission decisions;
 - per-agent meta-permissions;
-- `browser.*` tools driven by your own Chromium.
+- access to OpenCode's temporary directory without prompts;
+- (deprecated) `browser.*` tools driven by a headless or remote Chromium over CDP. To let
+  agents use your own browser, use OpenCode's [browse](https://opencode.ai/product/browse).
 
 > [!IMPORTANT]
 > **OpenCode V2 only (OpenCode ≥ 2.1).** apex is written against the V2 plugin runtime
@@ -48,7 +50,7 @@ A few OpenCode terms used throughout these docs:
 | **Skill** | A Markdown guide an agent can load when a task needs it. apex ships one. |
 | **RPC** | Here, an **authenticated HTTP POST to the OpenCode server** that runs a method a plugin registered: `POST <server>/api/rpc/apex/<method>`. It lets scripts and other programs talk to apex. |
 
-apex is one plugin with five independent modules. Each one can be switched on or off.
+apex is one plugin with six independent modules. Each one can be switched on or off.
 
 ## Modules
 
@@ -56,14 +58,16 @@ apex is one plugin with five independent modules. Each one can be switched on or
 | --- | --- | --- | --- |
 | **Redact** | Detects secrets (API keys, tokens, private keys…) in what the agent sees, encrypts them (AES-256-GCM) and replaces them with a readable marker. When the agent passes the marker back to a tool, the real value is restored. 41 bundles / 104 patterns. | on | [docs/REDACT.md](docs/REDACT.md) |
 | **Events** | Lets programs outside OpenCode (scripts, cron jobs, webhooks, n8n…) notify an agent. **Subscriptions** decide which session receives what. `tools.run` lets those programs use OpenCode tools. | on | [docs/EVENTS.md](docs/EVENTS.md) |
-| **Advisor** | When a tool call needs permission ("ask"), a small dedicated agent decides `allow` or `deny`, so you aren't asked about every step. | on | [docs/ADVISOR.md](docs/ADVISOR.md) |
+| **Advisor** | When a tool call needs permission ("ask"), a small dedicated agent decides `allow` or `deny`, so you aren't asked about every step. For `kill`/`pkill` it is told whose process each target is (read from `/proc`). | on | [docs/ADVISOR.md](docs/ADVISOR.md) |
 | **Guard** | Meta-permissions per agent, tool and path, with a report of what was attempted and decided. | **off** | [docs/GUARD.md](docs/GUARD.md) |
-| **Browser** | Serves OpenCode's `browser.*` tools against an **external** Chromium over CDP (local or remote). You can also switch to the desktop app's built-in browser. 45 actions. | on | [docs/BROWSER.md](docs/BROWSER.md) |
+| **Browser** *(deprecated)* | Serves OpenCode's `browser.*` tools against an **external** Chromium over CDP. Superseded by OpenCode's [browse](https://opencode.ai/product/browse) for your own browser; kept for a headless or remote Chromium and for `browser.*` performance captures. | **off** | [docs/BROWSER.md](docs/BROWSER.md) |
+| **Temp access** | Allows `external_directory` in OpenCode's temporary directory (`<tmpdir>/opencode`, `/tmp/opencode` on Linux) without asking. OpenCode tells the model to use it but no rule approves it. A deny you configure for that path still wins. | on | — |
+| **Endpoints** | Public URLs through [OpenTunnel](https://opentunnel.xyz) (same device tunnel as OpenCode remote access, own routes), **verified webhooks** (GitHub, Stripe, Slack, HMAC, token) that wake agents without exposing the server password, and **supervised microservices** the agent writes. All with optional TTL, kept by a per-user apex daemon that outlives the plugin. Linux (any init), macOS, Windows; no systemd/launchd and no tunnel CLI. The daemon starts only when a tool is used. | on | [docs/ENDPOINTS.md](docs/ENDPOINTS.md) |
 
 Turn modules on or off in `modules`. That is the only switch: there is no `<module>.enabled`.
 
 ```jsonc
-"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": true }
+"modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": false, "tempAccess": true, "endpoints": true }
 ```
 
 ## Requirements
@@ -71,7 +75,9 @@ Turn modules on or off in `modules`. That is the only switch: there is no `<modu
 - **OpenCode ≥ 2.1** (V2). Nothing else: OpenCode downloads the plugin and its dependencies
   itself.
 - For the automation examples, a shell with `curl` and `sed`.
-- Optional: Chromium/Chrome for the Browser module, and `bun` if you want to hack on apex.
+- Optional: `bun` if you want to hack on apex. For browsers, OpenCode's
+  [browse](https://opencode.ai/product/browse); apex's deprecated Browser module needs a
+  Chromium with remote debugging.
 
 ## Install
 
@@ -86,7 +92,7 @@ Add apex to the `plugins` list of your OpenCode config:
     {
       "package": "opencode-apex",
       "options": {
-        "modules": { "redact": true, "events": true, "advisor": true, "guard": false, "browser": true }
+        "modules": { "redact": true, "events": true, "advisor": true, "guard": false }
       }
     }
   ]
@@ -235,9 +241,13 @@ curl -sS -u "opencode:$PW" -H 'content-type: application/json' \
 | `apex_list_subscriptions` | events | Lists subscriptions; config ones are marked read-only |
 | `apex_callback_endpoint` | events | How an external program reaches this server: URL, RPC URLs for this project, auth, curl examples |
 | `apex_set_callback_url` | events | Sets or clears the server's public URL (tunnel / reverse proxy), for senders on other machines |
+| `apex_webhook` | endpoints | Verified webhook URL (github, stripe, slack, hmac, token) that calls `events.ingest` locally: create / list / delete, TTL |
+| `apex_tunnel` | endpoints | Publishes a local port on an OpenTunnel HTTPS URL: open / list / close, TTL |
+| `apex_service` | endpoints | Supervised microservice (restart with backoff, logs, TTL, optional public URL, local ingest without the server password): up / list / down / restart / logs |
+| `apex_daemon` | endpoints | Daemon status, autostart after reboot (cron `@reboot` / Windows logon task), stop |
 | `apex_advisor_decide` | advisor | The advisor agent's only tool: `allow` / `deny` + reason |
 | `apex_guard_report` | guard | Report of what each agent attempted and what was decided |
-| `browser_target` | browser | Chooses which browser serves `browser.*`: `external` (CDP), `in-app` (desktop app) or `auto` |
+| `browser_target` | browser (deprecated, off by default) | Chooses which browser serves `browser.*`: `external` (CDP), `in-app` (desktop app) or `auto` |
 
 apex also registers two hidden agents: `apex-advisor` for the Advisor and `apex-runner`, the
 technical session behind `tools.run`.

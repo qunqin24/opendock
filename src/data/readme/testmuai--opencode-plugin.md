@@ -1,6 +1,6 @@
 # TestMu AI (Formerly LambdaTest) MCP Server
 
-[![ToolSDK MCP Registry](https://badges.toolsdk.ai/badge/@toolsdk-remote/testmu-ai-mcp)](https://toolsdk-ai.github.io/toolsdk-mcp-registry/#%40toolsdk-remote%2Ftestmu-ai-mcp)
+[![ToolSDK MCP Registry](https://badges.toolsdk.ai/badge/@toolsdk-remote/testmu-ai-mcp)](https://toolsdk-ai.github.io/toolsdk-mcp-registry/#%40toolsdk-remote%2Ftestmu-ai-mcp) [![TestMu AI MCP connector](https://glama.ai/mcp/connectors/com.lambdatest.mcp/mcp-server-by-test-mu-ai/badges/score.svg)](https://glama.ai/mcp/connectors/com.lambdatest.mcp/mcp-server-by-test-mu-ai)
 
 Run, debug, and triage tests using natural language, directly from your IDE.
 

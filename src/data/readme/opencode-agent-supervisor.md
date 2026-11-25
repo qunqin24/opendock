@@ -77,7 +77,7 @@ Requires OpenCode **1.19.0** or later.
 ### 3.1 Install for yourself
 
 ```bash
-opencode plugin opencode-agent-supervisor@2.14.1 --global
+opencode plugin opencode-agent-supervisor@2.15.0 --global
 ```
 
 OpenCode downloads the package and adds it to the `plugin` array of
@@ -93,7 +93,7 @@ the repository runs the same supervisor version:
 
 ```json
 {
-  "plugin": ["opencode-agent-supervisor@2.14.1"]
+  "plugin": ["opencode-agent-supervisor@2.15.0"]
 }
 ```
 
@@ -149,12 +149,17 @@ A release takes three steps:
    Unreleased entries under the new version, and update the version in
    the install commands above.
 2. Merge it.
-3. Push the tag from `main`: `git tag v<version> && git push origin v<version>`.
+3. Run the Publish workflow from `main` with the tag: Actions → Publish →
+   Run workflow, or `gh workflow run publish.yml -f tag=v<version>`.
+   Don't push the tag yourself; the workflow creates it.
 
-The tag starts the Publish workflow (`.github/workflows/publish.yml`).
-It checks that the tag matches `package.json`, skips a version already
-on npm, runs the typecheck, both test suites and the package check,
-then publishes with provenance. It authenticates through npm trusted
+The Publish workflow (`.github/workflows/publish.yml`) calls the shared
+npm pipeline in [`jflowers/ship`](https://github.com/jflowers/ship). It
+checks the tag (semver, new, CI green on `main`, unreleased commits) and
+creates it, checks that `package.json`'s version matches, runs the
+typecheck, both test suites and the package check, publishes with
+provenance, and creates the GitHub release with generated notes. A version
+already on npm is skipped, so re-running a release is safe. It authenticates through npm trusted
 publishing, so no npm token exists. A new version can take a couple of
 minutes to appear on the registry; an install in that window fails
 with "No matching version found" and works on retry.
@@ -186,9 +191,9 @@ Then, in the package's **Settings** on npmjs.com:
 
 The new trusted publisher shows **Pending validation** until the
 workflow publishes once, and npm sets a deadline of about two days for
-that. The hand-published version doesn't count (the workflow skips it),
-so release the next patch version through the three steps above right
-away.
+that. The hand-published version doesn't count (the workflow skips a
+version already on npm), so release the next patch version through the
+three steps above right away.
 
 ---
 
@@ -233,7 +238,22 @@ flowchart TD
    side session — created per audit through the OpenCode client
    (`auditorModel` / `auditorVariant`), with the session goal and
    engineer directives in the prompt, so scope drift and directive
-   violations are also findings. Audit traffic never enters the
+   violations are also findings. Each audit covers one step, so the
+   prompt also lists the session's completed tool calls so far (the
+   most recent 40, oldest first) as context. A goal rule such as
+   *"do not edit before `debug_open` succeeds"* is then judged
+   against the calls that already ran, not against a lone step
+   (FR-111). A finding based on the goal or directives must quote
+   the rule it applies, word for word. The plugin looks the quote
+   up in the goal and directive text; a rule that isn't there drops
+   the finding, and a found one is delivered with the critique as
+   `Rule cited: "..."` (FR-113).
+   The 8 newest calls show the start and end of their
+   output, where tools often put their verdict. When a minor peer
+   finding fails a step and the agent made more tool calls while the audit
+   ran, the step is audited once more with those calls' results
+   before anything is delivered. A step that planned a call is
+   judged with that call's result (FR-114). Audit traffic never enters the
    supervised conversation; auditor errors fail open. Steps join the
    **verified trace** as outcome-carrying entries: passed steps
    record normally, and a step that failed a minor invariant

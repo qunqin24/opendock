@@ -1,11 +1,11 @@
-<p align="center"><picture><source media="(prefers-reduced-motion: reduce)" srcset="./docs/assets/cover-motion-still.webp" /><img src="./docs/assets/cover-motion.webp" width="100%" alt="LitFamily 모션 커버: 일곱 로봇 패널이 차례로 켜지고, LitOpenCode 로봇의 눈과 테두리가 빛난 뒤 LITFAMILY와 KEEP THE WORK LIT. 문구가 밝아지는 영상" /></picture></p>
+<p align="center"><picture><source media="(prefers-reduced-motion: reduce)" srcset="./docs/assets/cover-motion-still.webp" /><img src="./docs/assets/cover-motion.webp" width="100%" alt="LitFamily 모션 커버: 노을빛 터미널 화면입니다. LitOpenCode의 모서리가 둥근 카드가 단계 지도, 작업 게이지, 스킬 알약, 레인, 컨텍스트 게이지와 함께 화면을 두르고, 가운데는 픽셀 글자 LITFAMILY와 줄무늬 해가 채우며, 일곱 제품 이름 줄에서 LITOPENCODE가 켜지고, 아래에서는 /lit-loop 프롬프트가 기다립니다." /></picture></p>
 
 # LitOpenCode
 
 **LitOpenCode는 OpenCode에 붙여 쓰는 추가 기능입니다. 에이전트가 "다 됐어요"라고 말하기 전에 자기 작업을 직접 확인하게 하고, 다음 세션이 이번 세션이 멈춘 곳에서 바로 시작하도록 기록을 남깁니다.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.53" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.55" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="월간 npm 다운로드 수" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT 라이선스" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub 스타" /></a>
@@ -17,7 +17,7 @@ OpenCode에 기능 하나를 부탁하면 코드를 쓰고 끝났다고 말합�
 <a href="./docs/guide-Ko-KR.md"><img src="./docs/assets/readme/lucide-book-open.svg" width="16" alt="" /> 사용 안내</a> &nbsp; <a href="./docs/screens-Ko-KR.md"><img src="./docs/assets/readme/lucide-play.svg" width="16" alt="" /> 화면</a> &nbsp; <a href="./docs/skills-Ko-KR.md">스킬</a> &nbsp; <a href="./LICENSE"><img src="./docs/assets/readme/lucide-shield-check.svg" width="16" alt="" /> MIT</a> &nbsp; <a href="./README.md">English</a>
 </p>
 
-<p align="center"><img src="./docs/assets/demo.webp" width="960" alt="LIT 마크와 함께 LitOpenCode, The lit workflow for OpenCode라고 적힌 타이틀이 나옵니다. 이어서 작은 프로젝트 ~/greet에서 OpenCode가 열리고, 단계마다 번호 붙은 이름표가 지금 일어나는 일을 짚어 줍니다. 1, “lit”으로 시작: OpenCode에 &quot;lit add a --shout flag that prints the greeting in capitals, with a test&quot;를 입력합니다. 2, LitOpenCode가 켜짐: LIT 마크와 &quot;🔥 LIT IGNITED · lit-task 🔥&quot;가 적힌 알림이 뜹니다. 3, 지도에 WORK가 켜짐: 아래쪽 LIT 상태 카드에 🔥 LIT · lit-task가 뜨고, 워크플로 지도 interview – plan – WORK – review – done에서 interview와 plan은 건너뛴 단계로 표시되고 WORK에 불이 들어옵니다. 그 아래에 lit-task 스킬 칩이 붙습니다. 4, 테스트와 함께 고침: test/greet.test.js에 node greet.js --shout Ada를 실행해 HELLO, ADA!를 기대하는 테스트가 추가됩니다. 5, 지금 도는 작업이 보임: npm test가 도는 동안 카드의 지도 옆에 bash · 0:00이 붙습니다. 6, 테스트가 정말 통과함: 테스트 결과에 ok 1이 찍히고, node greet.js --shout Ada가 HELLO, ADA!를 출력합니다. 7, 카드가 가라앉음: 요약에 Done, Added a test, npm test passes가 적히고, 카드는 ○ IDLE로 바뀌어 켜진 단계 없이 lit-task 칩만 회색으로 남습니다. 영상은 LitOpenCode 마크와 설치 명령으로 끝납니다." /></p> <!-- demo-gif -->
+<p align="center"><img src="./docs/assets/demo-ko.webp" width="960" alt="LitOpenCode를 쓰는 OpenCode 세션의 무음 반복 영상입니다. 프롬프트 &quot;lit add a --shout flag that prints the greeting in capitals, with a test&quot;를 보내면 🔥 LIT IGNITED · lit-task 🔥 토스트가 뜨고, 아래의 LIT 카드가 인터뷰와 계획을 건너뛴 채 WORK를 밝힙니다. 막대는 OpenCode의 할 일 목록을 따라가고, Lit Forge와 Lit Prover 두 레인이 자기 줄을 얻으며, 실시간 단계는 도구와 시계를 보여 줍니다. 테스트가 통과하고 node greet.js --shout Ada가 HELLO, ADA!를 출력하면 카드가 COMPLETE를 한 번 재생하고 노을 아래에서 쉽니다." /><br /><sub>요청 하나가 끝나기까지의 한 판입니다. 알림, 할 일 목록을 따르는 막대, 레인 두 개, COMPLETE. LIT 카드와 알림은 LitOpenCode가 직접 만든 출력이고, 그 주변의 OpenCode 화면은 다시 그린 것입니다.</sub></p> <!-- demo-gif -->
 
 ## 두 가지 사용법
 
@@ -53,7 +53,7 @@ Node.js와 npm, 그리고 모델 제공자를 설정해 둔 [OpenCode](https://o
 npm exec --package @litfamily/litopencode@latest -- litopencode install
 ```
 
-설치 도중 어떤 모델을 쓸지, 에이전트에게 권한을 얼마나 줄지 묻습니다. 권한은 무언가 하기 전에 OpenCode가 먼저 물어보는 `safe`에서 시작합니다. OpenAI 제공자로 새로 설치하면 계획과 검토는 GPT-6 Astra가, 만들기는 GPT-6 Luna가 맡으며, 다른 모델은 설치 중에 고를 수 있습니다. 모델 메뉴에는 OpenAI와 xAI만 있는 게 아닙니다. OpenCode가 아는 제공자가 모두 나오고, `opencode.json`에 직접 추가한 제공자도 함께 나옵니다. 회사 게이트웨이나 OpenAI API 방식으로 응답하는 로컬 서버가 그런 예입니다. 먼저 OpenCode에 제공자를 등록하고(`opencode models`에 보이면 됩니다), 설치 프로그램에서 번호로 고르거나 `provider/model` 이름을 직접 적으면 됩니다. 나중에 바꿀 때는 채팅에 `/lit-model`을 입력합니다. 같은 번호 목록이 나오고, `/lit-model 7`은 7번 모델을 리드와 헬퍼 모두로 정합니다. 하나만 바꾸려면 `/lit-model lead 7`이나 `/lit-model helper 7`을 씁니다. 고른 값은 `litopencode.json`에 저장되므로, OpenCode를 다시 켜면 새 터미널에서도 그대로 쓰입니다. 스크립트에서는 `--model my-gateway/deepseek-chat`이 같은 일을 하고, OpenCode 목록에 없는 이름은 설치 프로그램이 받지 않습니다.
+설치 도중 어떤 모델을 쓸지, 에이전트에게 권한을 얼마나 줄지 카드로 하나씩 묻고, 화살표와 Enter로 답합니다. 권한은 무언가 하기 전에 OpenCode가 먼저 물어보는 `safe`에서 시작합니다. OpenAI 제공자로 새로 설치하면 계획과 검토는 GPT-6 Astra가, 만들기는 GPT-6 Luna가 맡으며, 다른 모델은 설치 중에 고를 수 있습니다. 모델 메뉴에는 OpenAI와 xAI만 있는 게 아닙니다. OpenCode가 아는 제공자가 모두 나오고, `opencode.json`에 직접 추가한 제공자도 함께 나옵니다. 회사 게이트웨이나 OpenAI API 방식으로 응답하는 로컬 서버가 그런 예입니다. 먼저 OpenCode에 제공자를 등록하고(`opencode models`에 보이면 됩니다), 설치 프로그램의 목록에서 고르면 됩니다(모델이 많으면 글자를 몇 개 입력해 좁힙니다). `Type provider/model`을 골라 이름을 직접 적어도 됩니다. 나중에 바꿀 때는 채팅에 `/lit-model`을 입력합니다. 모델이 번호 목록으로 나오고, `/lit-model 7`은 7번 모델을 리드와 헬퍼 모두로 정합니다. 하나만 바꾸려면 `/lit-model lead 7`이나 `/lit-model helper 7`을 씁니다. 고른 값은 `litopencode.json`에 저장되므로, OpenCode를 다시 켜면 새 터미널에서도 그대로 쓰입니다. 스크립트에서는 `--model my-gateway/deepseek-chat`이 같은 일을 하고, OpenCode 목록에 없는 이름은 설치 프로그램이 받지 않습니다.
 
 OpenCode는 세션을 시작할 때마다 전역 `AGENTS.md` 하나를 읽습니다. 설치 프로그램은 거기에 `lit`이 무슨 뜻인지, 허락 없이는 push나 배포를 하지 않는다는 것을 적은 짧은 표시 블록을 넣자고 제안하며, 한 번만 묻습니다.
 
@@ -162,19 +162,19 @@ printf '{"id":"%s","source":"%s","variant":"litopencode","installed_at":"%s"}\n'
 
 ## LIT 상태 카드
 
-LitOpenCode를 설치하면 OpenCode 세션 화면 맨 아래에 작은 카드가 붙습니다. 카드는 세션 내내 그 자리에 있고, 작업이 돌든 안 돌든 같은 네 줄을 유지하기 때문에 프롬프트 입력 칸이 위아래로 움직이지 않습니다. 아래 테두리에는 컨텍스트 창이 얼마나 찼는지와 지금 git 브랜치가 나옵니다.
+LitOpenCode를 설치하면 OpenCode 세션 화면 맨 아래에 작은 카드가 붙습니다. 카드는 세션 내내 그 자리에서 지금 어느 단계인지, 무엇이 돌고 있는지, 어떤 스킬을 쓰는지 보여 줍니다. 아래 테두리에는 컨텍스트 창이 얼마나 찼는지와 지금 git 브랜치가 나옵니다. 어두운 테마에 트루컬러 터미널이고 폭이 74칸 이상이면 카드가 큰 모습으로 그려지고 노을이 깔립니다. 쉴 때는 대여섯 줄이고, 도구와 하위 에이전트가 도는 동안 늘어났다가(최대 아홉 줄) 끝나면 다시 줄어듭니다. 터미널이 그릴 수 있으면 알약과 막대의 끝이 둥글어집니다. 테두리가 분홍에서 하늘색으로 빛나고, 글자가 없는 빈자리에서 해가 바다에 잠깁니다. 에이전트가 일하는 동안에는 바다가 흐르고 별이 반짝이며 가끔 별똥별이 지나갑니다. 차례가 끝나면 모두 어두워지고 멈춥니다. 창이 24줄 이상이면 해는 세 줄 높이로 서고, 더 낮은 창에서는 여분의 빈 줄부터 뺍니다. 글자가 있는 칸은 건드리지 않습니다. 다른 터미널이나 테마, 좁은 창에서는 장식 없는 카드가 나오고, 이 카드는 여러 작업이 나란히 돌 때가 아니면 늘 네 줄입니다.
 
-**대기.** 첫 `lit` 프롬프트를 보내기 전에는 제목에 `🔥 LIT · ready`와 `○ IDLE`이 보이고, 작업 흐름 지도는 흐리며, 카드가 어떻게 시작하면 되는지 알려 줍니다.
+**대기.** 첫 `lit` 프롬프트를 보내기 전에는 제목에 `🔥 LIT · ready`가, 오른쪽 끝에 `IDLE ○`이 보이고, 작업 흐름 지도는 흐리며, 카드가 어떻게 시작하면 되는지 알려 줍니다.
 
-<p align="center"><img src="./docs/assets/readme/status-card-idle.webp" width="760" alt="lit 프롬프트를 보내기 전 OpenCode의 LIT 상태 카드. 위 테두리 왼쪽에 🔥 LIT · ready, 오른쪽에 ○ IDLE이 적혀 있다. 첫 줄에는 흐린 작업 흐름 지도 interview ─ plan ─ work ─ review ─ done과 add lit to a prompt to start가, 둘째 줄에는 skills none yet이 있고, 아래 테두리에는 ctx 4% · ⎇ main이 보인다." /></p>
+<p align="center"><img src="./docs/assets/readme/status-card-idle.webp" width="760" alt="lit 프롬프트를 보내기 전 OpenCode의 LIT 상태 카드. 위 테두리 왼쪽에는 둥근 알약 모양 LIT 배지와 🔥 LIT · ready가, 오른쪽에는 IDLE ○이 적혀 있다. 첫 줄에는 흐린 작업 흐름 지도 interview · ── plan · ── work · ── review · ── done ·이, 둘째 줄에는 └ add lit to a prompt to start가 있고, 아래 테두리에는 ctx 4%와 짧은 둥근 막대, ⎇ main이 보인다. 글자 옆으로는 별 몇 개 아래 어두운 세 줄짜리 해가 멈춘 바다에 잠겨 있다." /></p>
 
-**작업 중.** `lit`을 붙인 프롬프트를 보내면 카드가 깨어납니다. 제목에 워크플로 이름과 지금 단계가 나오고, 지도는 그 단계를 개수와 함께 밝힙니다. 이 lit-loop 목표는 기준 세 개 중 하나를 통과해 지도가 `CRITERION 1/3`으로 보이고, 건너뛴 단계에는 `–`가 붙으며, 막대는 끝난 몫을, 그 옆에는 도는 도구의 이름과 걸린 시간을 보여 줍니다.
+**작업 중.** `lit`을 붙인 프롬프트를 보내면 카드가 깨어납니다. 제목에 워크플로 이름과 지금 단계가 나오고, 지도는 그 단계를 개수와 함께 밝힙니다. 이 lit-loop 목표는 기준 세 개 중 하나를 통과해 둘째 줄에 `criterion 1/3`과 끝난 몫을 그린 막대, 다음 기준이 나오고, 지도에서 건너뛴 단계에는 `–`가 붙습니다. 도는 도구의 이름과 걸린 시간은 오른쪽 끝에 있습니다. 여기서는 하위 에이전트 둘이 일하고 있어 저마다 한 줄씩 차지합니다.
 
-<p align="center"><img src="./docs/assets/readme/status-card-working.webp" width="760" alt="lit-loop 요청이 진행 중인 LIT 상태 카드. 위 테두리에 🔥 LIT · lit-loop과 오른쪽 ● CRITERION이 적혀 있고, 분홍색 LIT 글자가 눈에 띈다. 첫 줄에는 작업 흐름 지도 interview – ━ plan – ━ CRITERION 1/3 ─ review ─ done이 있고 지금 단계는 하늘색으로 채운 알약으로 보이며, 3분의 1쯤 찬 막대와 지금 하는 일 ⠏ bash · 0:09가 이어진다. 둘째 줄은 skills lit-loop이고 lit-loop이 밝은 하늘색 칩이다. 아래 테두리에는 ctx 4% · ⟳ 0m · ⎇ main이 보인다." /></p>
+<p align="center"><img src="./docs/assets/readme/status-card-working.webp" width="760" alt="lit-loop 요청이 진행 중인 LIT 상태 카드. 위 테두리에 🔥 LIT · lit-loop과 오른쪽 CRITERION ●이 적혀 있고, 주황에서 물드는 둥근 분홍색 LIT 배지가 눈에 띈다. 첫 줄에는 작업 흐름 지도 interview – ━━ plan – ━━ CRITERION ── review · ── done ·이 있고 지금 단계는 라벤더색에서 하늘색으로 물든 둥근 알약으로 보이며, 오른쪽 끝에 2 lanes 0m이 있다. 둘째 줄에는 └ criterion 1/3과 3분의 1쯤 찬 둥근 막대, next ▸ C2 the default greeting is unchanged, 오른쪽 끝에 지금 하는 일 ⠏ bash · 0:09가 있다. 셋째 줄은 lit-loop 작업으로 초록 막대와 1/3 running이 보인다. 그 아래 2 lanes in parallel에는 1분이 안 되게 일하는 중인 explore와 test-writer가 가는 선과 함께 있고, 그 옆으로 어두운 틈이 난 금빛, 주황, 분홍 세 줄짜리 해가 별 몇 개 아래 빛나는 바다에 잠긴다. 마지막 줄은 skills lit-loop이고 lit-loop이 밝은 하늘색 칩이다. 테두리는 분홍에서 하늘색으로 빛난다. 아래 테두리에는 ctx 4%와 짧은 둥근 막대, ⎇ main이 보인다." /></p>
 
-**가라앉음.** 차례가 끝나면 제목이 `○ IDLE`로 바뀌고, 밝게 켜진 단계가 없어지며, 지금 하는 일 자리에는 다음에 할 항목이 들어갑니다. 다음 프롬프트를 보내면 카드가 다시 깨어납니다.
+**가라앉음.** 차례가 끝나면 제목이 `IDLE ○`로 바뀌고, 밝게 켜진 단계가 없어지며, 카드가 쉬는 높이로 돌아옵니다. 끝난 하위 에이전트는 1분 안에 카드에서 빠집니다. 다음 프롬프트를 보내면 카드가 다시 깨어납니다.
 
-<p align="center"><img src="./docs/assets/readme/status-card-recent.webp" width="760" alt="차례가 끝난 뒤의 LIT 상태 카드. 제목은 🔥 LIT · lit-loop과 ○ IDLE이다. 지도 interview – ━ plan – ━ criterion ─ review ─ done에는 밝게 켜진 단계가 없고, 막대는 여전히 3분의 1을 보여 주며, ▸ C2 the default greeting…이 다음 기준을 알려 준다. lit-loop 칩은 이제 회색이다. 아래 테두리에는 ctx 6% · ⟳ 0m · ⎇ main이 보인다." /></p>
+<p align="center"><img src="./docs/assets/readme/status-card-recent.webp" width="760" alt="차례가 끝난 뒤의 LIT 상태 카드. 제목은 🔥 LIT · lit-loop과 IDLE ○이다. 지도 interview – ━━ plan – ━━ criterion · ── review · ── done ·에는 밝게 켜진 단계가 없고, 둘째 줄의 └ criterion 1/3과 막대는 그대로이며, next ▸ C2 the default greeting is unchanged가 다음 기준을 알려 준다. lit-loop 칩은 이제 회색이고, explore와 test-writer 줄에는 가득 찬 초록 선과 done이 있으며, 해와 바다와 테두리도 어둡다. 아래 테두리에는 ctx 6%와 짧은 둥근 막대, ⎇ main이 보인다." /></p>
 
 카드는 기본으로 켜져 있고, OpenCode `tui.json`의 LitOpenCode 항목에 다음 옵션을 줄 수 있습니다.
 
@@ -184,7 +184,7 @@ LitOpenCode를 설치하면 OpenCode 세션 화면 맨 아래에 작은 카드�
 | `{ "band": { "card": true } }` | 목표, 다음 할 일, 경고를 담은 카드를 하나 더 아래에 붙입니다 |
 | `{ "notify": true }` | 미션이 끝나면 데스크톱 알림과 소리로 알려 줍니다 |
 
-`notify`는 직접 넣기 전에는 꺼져 있고, OpenCode 자체 설정 `"attention": { "enabled": true }`도 켜져 있어야 동작합니다. 지도와 스킬 칩이 어떻게 세는지는 [사용 안내](./docs/guide-Ko-KR.md#lit-상태-카드)에, 카드의 각 부분은 [레퍼런스](./docs/reference-Ko-KR.md#tui-미션-패널)에 자세히 있습니다. 설치 프로그램, `litopencode doctor`, `litopencode --help`는 신스웨이브 LIT 마크로 시작합니다. 어두운 테마에 트루컬러 터미널이면 카드 제목에도 같은 색의 작은 그라데이션 ` 🔥 LIT ` 배지가 붙습니다. 그림이 제대로 보이기 어려운 환경에서는 더 단순하게 나옵니다. 색을 끄면 마크가 한 가지 색으로 그려지고, 파이프로 넘기거나 창이 좁거나 UTF-8을 쓰지 않는 터미널에서는 `LIT · opencode` 한 줄만 찍힙니다. 배지를 그릴 수 없을 때 카드는 원래 제목을 그대로 씁니다.
+노을은 두고 움직임만 멈추려면 `{ "motion": false }`를 넣으세요. 둥근 끝이 네모난 상자로 깨져 보이면 `LITOPENCODE_GLYPHS=basic`을 설정하세요. `notify`는 직접 넣기 전에는 꺼져 있고, OpenCode 자체 설정 `"attention": { "enabled": true }`도 켜져 있어야 동작합니다. 지도와 스킬 칩이 어떻게 세는지는 [사용 안내](./docs/guide-Ko-KR.md#lit-상태-카드)에, 카드의 각 부분은 [레퍼런스](./docs/reference-Ko-KR.md#tui-미션-패널)에 자세히 있습니다. 설치 프로그램, `litopencode doctor`, `litopencode --help`는 신스웨이브 LIT 마크로 시작합니다. 어두운 테마에 트루컬러 터미널이면 사이드바 패널 제목에도 같은 색의 작은 그라데이션 ` 🔥 LIT ` 배지가 붙습니다. 그림이 제대로 보이기 어려운 환경에서는 더 단순하게 나옵니다. 색을 끄면 마크가 한 가지 색으로 그려지고, 파이프로 넘기거나 창이 좁거나 UTF-8을 쓰지 않는 터미널에서는 `LIT · opencode` 한 줄만 찍힙니다. 배지를 그릴 수 없을 때 패널은 원래 제목을 그대로 씁니다.
 
 ## OpenCode 2의 목표
 

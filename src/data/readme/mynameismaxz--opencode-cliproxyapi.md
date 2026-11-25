@@ -28,8 +28,12 @@ start; nothing to clone or build.
 **OpenCode 2.x** (`opencode.json`), or run `opencode plugin add @mynameismaxz/opencode-cliproxyapi`:
 
 ```json
-{ "plugins": ["@mynameismaxz/opencode-cliproxyapi"] }
+{ "plugins": ["@mynameismaxz/opencode-cliproxyapi@latest"] }
 ```
+
+OpenCode 2.4.0+ updates plugins that follow a version (`@latest`, a version range, or a Git
+branch) automatically. A bare package name stays pinned, so either keep `@latest`/a range in the
+config or run `opencode plugin update` after a new release.
 
 ### From a local build
 
@@ -44,16 +48,19 @@ at the repository root: OpenCode 2 loads local plugins from `<dir>/index.js` and
 ## Settings
 
 With CLIProxyAPI running locally on its default port and no API key, nothing else is needed.
-Otherwise there are two optional settings.
+Otherwise the optional settings below apply.
 
 | Setting | Env var | Option key | Default |
 |---------|---------|------------|---------|
 | Base URL | `CLIPROXYAPI_BASE_URL` | `baseURL` | `http://localhost:8317` |
 | API key | `CLIPROXYAPI_API_KEY` | `apiKey` | none (unauthenticated) |
+| Context lookup | `CLIPROXYAPI_CONTEXT_LOOKUP` | `contextLookup` | on |
+| Context catalog URL | `CLIPROXYAPI_CONTEXT_URL` | `contextURL` | `https://models.dev/api.json` |
 
 Environment variables win over options. An empty value counts as unset. The base URL may be
 given with or without `/v1`; `http://host:8317`, `http://host:8317/` and `http://host:8317/v1`
-are equivalent.
+are equivalent. The context lookup switch accepts `0` / `false` / `no` / `off` to disable it and
+a boolean `false` in the options block; everything else enables it.
 
 Options in OpenCode 1.19.3+:
 
@@ -64,7 +71,7 @@ Options in OpenCode 1.19.3+:
 Options in OpenCode 2.x:
 
 ```json
-{ "plugins": [{ "package": "@mynameismaxz/opencode-cliproxyapi", "options": { "baseURL": "http://192.168.1.10:8317", "apiKey": "{env:MY_PROXY_KEY}" } }] }
+{ "plugins": [{ "package": "@mynameismaxz/opencode-cliproxyapi@latest", "options": { "baseURL": "http://192.168.1.10:8317", "apiKey": "{env:MY_PROXY_KEY}" } }] }
 ```
 
 Prefer `{env:VAR}` over pasting a key into the config file.
@@ -88,17 +95,31 @@ The API key never appears in any message.
 
 ## Model defaults
 
-CLIProxyAPI's model list carries ids only. Every model is registered with a 200,000-token
-context window, 32,000 output tokens and tool calling enabled. These match OpenCode 2's own
-model defaults. Models appear in the order the proxy reports them, with duplicates removed.
-If you define a `cliproxyapi` provider yourself, your entries win and discovery only adds
-models you did not list.
+CLIProxyAPI's model list carries ids only. Every model is registered with tool calling enabled,
+and the context/output limits come from [models.dev](https://models.dev):
+
+- At startup the plugin downloads the public models.dev catalog (a bounded, best-effort fetch
+  that runs in parallel with proxy discovery and never delays OpenCode by itself).
+- Each discovered model id is matched against the catalog: an exact id match first, then the
+  part after a `/` prefix (e.g. `test/gpt-5-codex` matches `gpt-5-codex`).
+- When several providers publish the same id, the entry from the upstream the proxy reports in
+  `owned_by` wins; otherwise a first-party provider (Google, Anthropic, OpenAI, xAI, …) beats
+  aggregators, and otherwise the most commonly published context size wins.
+- Models the catalog does not know keep OpenCode's own defaults: 200,000 context and 32,000
+  output tokens.
+
+If models.dev is unreachable, the lookup silently falls back to those same defaults — models
+still register, and no message is shown. Set `CLIPROXYAPI_CONTEXT_LOOKUP=0` (or
+`"contextLookup": false`) to skip the lookup entirely, or `CLIPROXYAPI_CONTEXT_URL` to point at
+a mirror. Models appear in the order the proxy reports them, with duplicates removed. If you
+define a `cliproxyapi` provider yourself, your entries win and discovery only adds models you
+did not list.
 
 ## Development
 
 ```sh
 bun test                       # unit + contract tests (mock CLIProxyAPI, no network)
-./scripts/install-hosts.sh     # installs OpenCode 1.19.3 and 2.0.32 into .hosts/
+./scripts/install-hosts.sh     # installs OpenCode 1.19.3 and 2.4.1 into .hosts/
 bun run test:integration       # runs both real hosts against the mock proxy
 bun run mock-proxy --fixture models.json --port 8317   # manual testing
 ```

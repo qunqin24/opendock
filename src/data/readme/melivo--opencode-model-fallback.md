@@ -1,8 +1,139 @@
 # @melivo/opencode-model-fallback
 
-Native OpenCode v2 server plugin distributed as an npm package. It advances an explicitly configured child-subagent model chain on supported transient failures. This fork is based on [Smart-Coders-HQ/opencode-model-fallback](https://github.com/Smart-Coders-HQ/opencode-model-fallback) at commit `4920240fb95c48b42f8d9e9d7648aa473740afe0`; upstream attribution and the Apache-2.0 license are retained.
+Native OpenCode v2 server plugin distributed as an npm package. It advances an
+explicitly configured child-subagent model chain on supported transient
+failures. This fork is based on
+[Smart-Coders-HQ/opencode-model-fallback](https://github.com/Smart-Coders-HQ/opencode-model-fallback)
+at commit `4920240fb95c48b42f8d9e9d7648aa473740afe0`; upstream attribution and
+the Apache-2.0 license are retained.
 
-Check npm for available package versions and GitHub Releases for release details. See [Release and recovery runbook](docs/releases.md) for the safe-release procedure.
+The package is published on npm; see
+[GitHub Releases](https://github.com/Melivo/opencode-model-fallback/releases)
+for release details and the
+[release and recovery runbook](docs/releases.md) for the safe-release procedure.
+
+## OpenCode v2 installation and configuration
+
+This plugin helps a **subagent**—a helper the main agent starts in a separate
+child session to handle part of a task—continue with the next model in a
+fallback chain when its current model fails with a rate limit, quota error,
+timeout, provider overload, or 5xx server error. It only affects child
+subagents that you explicitly configure; your primary agent is never switched.
+Until you configure a chain, the plugin is a safe no-op and does not switch
+models. It can override HTTP JSON request bodies, but not WebSocket frames.
+Legacy status and toast features below belong to V1 and are not provided by the
+native v2 server.
+
+### 1. Install the plugin
+
+Install the package with OpenCode's plugin CLI:
+
+```sh
+opencode plugin add @melivo/opencode-model-fallback
+```
+
+The plugin is now installed but does nothing until you configure a fallback
+chain (next step).
+
+### 2. Add a fallback chain
+
+After installation, OpenCode prints the selected config path, for example:
+`Plugin "@melivo/opencode-model-fallback" installed and added to <path>`.
+Open that exact file; the path in the message is authoritative. OpenCode
+chooses the first existing file in the global config directory in this order:
+`opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`, then
+`.opencode/opencode.jsonc`. If none exists, it creates `opencode.json`.
+
+In that file, replace the plugin's string entry with the object below; keep all
+other settings and plugin entries. The CLI avoids adding the same package twice
+in that file. OpenCode may load both global `opencode.json` and
+`opencode.jsonc`, so check both and keep only one entry for this package. If
+the CLI says it is already configured, edit the existing entry in the reported
+file instead of adding another. Use the built-in subagent `general`; it works
+without defining a custom agent. The first model below is `general`'s start
+model, and the second is its fallback:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "@melivo/opencode-model-fallback",
+      "options": {
+        "config": {
+          "version": 2,
+          "cooldownMs": 300000,
+          "maxCycles": 1,
+          "agents": {
+            "general": {
+              "chain": [
+                { "model": "anthropic/claude-sonnet-5-5#high" },
+                { "model": "openai/gpt-6.1-sol" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+To use the example chain, ask the main agent to delegate a task to the built-in
+`general` subagent, for example: `Use the general subagent to research this
+question.` OpenCode starts it in a child session through the `subagent` tool.
+The built-in `build` agent is a primary agent, not a subagent, so this plugin
+does not switch its model.
+
+Notes:
+
+- For another subagent, use its exact configured name and include its actual
+  starting model as the first chain step. Write model references as
+  `provider/model`, optionally followed by `#variant`; the current model and
+  variant must match the chain entry exactly. For `general`, the plugin sets
+  its start model from the first chain step.
+- The model IDs above are documented examples, not a promise that they are
+  enabled for your account or project. Run `/models` in OpenCode and choose
+  models available to you; use a variant only if it is listed for that model.
+  See the official [Agents](https://opencode.ai/docs/agents) and
+  [Models](https://opencode.ai/docs/models) documentation for agent names,
+  model references, and variants.
+- `cooldownMs` (at least 10000) is how long a failed model stays skipped;
+  `maxCycles` (1–5, default 1) limits passes through the chain per child
+  session. The first pass counts as 1, so the default does not wrap around.
+- OpenCode merges `plugins` arrays from your config files instead of replacing
+  them and reloads watched config changes automatically; run `/reload` if
+  needed.
+- If `opencode plugin add` already listed the package in your `plugins` array as
+  a plain string, turn that entry into the object form above instead of adding a
+  second one.
+
+### Alternative: separate config file
+
+Instead of the inline `config` object you can keep the configuration in a
+separate file:
+
+1. Create `model-fallback.v2.json` in OpenCode's config directory, starting from
+   the neutral template below (also shipped as
+   `deployment/model-fallback.v2.json` inside the installed package). If a file
+   with this name already exists, edit it instead of overwriting it.
+2. Point the plugin at the file by replacing the `config` object with
+   `"configPath": "/absolute/path/to/model-fallback.v2.json"`. The path must be
+   absolute; expand `~` yourself. When both are supplied, `config` takes
+   precedence. With neither, the plugin uses the neutral empty config and
+   switches nothing.
+
+```json
+{
+  "version": 2,
+  "cooldownMs": 300000,
+  "maxCycles": 1,
+  "agents": {}
+}
+```
+
+See the [official OpenCode plugin guide](https://opencode.ai/docs/plugins) for
+the `plugins` key, `opencode plugin add`, and config precedence.
 
 ## Legacy OpenCode v1 behavior
 
@@ -24,68 +155,6 @@ The plugin tracks model health globally, keeps fallback depth per session, and w
 - Global model health tracking with automatic recovery windows
 - `/fallback-status` slash command for session depth, history, and model health
 - Structured logs with provider free-form error text redacted
-
-## OpenCode v2 installation and configuration
-
-Install the package by adding it to the plural `plugins` key in OpenCode v2 `opencode.jsonc`. Check npm for available package versions. The package exposes its native server part as `./server`. Its shipped deployment template is deliberately neutral: `version: 2`, `cooldownMs: 300000`, `maxCycles: 1`, and an empty `agents` object. Without configured chains, the plugin is a safe no-op and does not switch models.
-
-### Neutral template
-
-To create a separate config file, choose OpenCode's config directory: `$XDG_CONFIG_HOME/opencode` when `XDG_CONFIG_HOME` is set, otherwise `~/.config/opencode`. Install the package first, then copy `deployment/model-fallback.v2.json` from that installed package to `model-fallback.v2.json` in the config directory. For example, if the package is installed in the current project:
-
-```sh
-config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
-mkdir -p "$config_dir"
-cp -n node_modules/@melivo/opencode-model-fallback/deployment/model-fallback.v2.json "$config_dir/model-fallback.v2.json"
-```
-
-Use the installed package's actual directory if it differs from this example. `cp -n` leaves an existing destination untouched; if the destination already exists, inspect it and choose another filename rather than replacing it. Package installation itself does not create or modify files in your OpenCode config directory or install agent profiles.
-
-The complete neutral template is:
-
-```json
-{
-  "version": 2,
-  "cooldownMs": 300000,
-  "maxCycles": 1,
-  "agents": {}
-}
-```
-
-### Configured example (illustrative, not a default)
-
-To enable fallback, add an entry for an explicitly configured subagent and replace both example model references with exact provider/model references available in your own OpenCode setup. The chain requires 2–10 steps, including its start model and at least one fallback. Do not assume that the example provider names or model IDs exist in your setup.
-
-```json
-{
-  "version": 2,
-  "cooldownMs": 300000,
-  "maxCycles": 1,
-  "agents": {
-    "example-subagent": {
-      "chain": [
-        { "model": "your-provider/your-start-model" },
-        { "model": "your-provider/your-fallback-model" }
-      ]
-    }
-  }
-}
-```
-
-Use `options.configPath` to load the file. It must be an absolute path; expand `~` yourself and replace the placeholder below with the exact path to the file you created. You can add this object to your existing `plugins` array:
-
-```jsonc
-{
-  "package": "@melivo/opencode-model-fallback",
-  "options": {
-    "configPath": "/absolute/path/to/model-fallback.v2.json"
-  }
-}
-```
-
-If neither `options.config` nor `options.configPath` is supplied, the plugin uses the neutral empty config. When both are supplied, `options.config` takes precedence. OpenCode observes configuration changes; use `/reload` if needed. A process restart is not required for configuration changes.
-
-See the [official OpenCode v2 plugin guide](https://opencode.ai/docs/build/plugins) for package-based plugins and the plugins key.
 
 ## Legacy OpenCode v1 plugin
 

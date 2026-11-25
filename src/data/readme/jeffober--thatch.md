@@ -34,13 +34,16 @@ sessions and they cannot be woken. If you keep tabs open across long
 idle periods, set `experimental.location_idle_timeout` to a longer
 duration or `false`.
 
-**Claude Code** - paste into a session (requires [Bun](https://bun.sh) on
-PATH - the plugin's bundled server runs under it):
+**Claude Code** - paste into a session. Requires Node.js >= 22.13 or
+[Bun](https://bun.sh) >= 1.4.2 on PATH - the plugin ships no runtime:
 
 ```text
 /plugin marketplace add sysread/thatch
 /plugin install thatch
 ```
+
+The launcher probes a node on PATH for `node:sqlite` directly, falls
+back to bun, and fails with the prerequisite list when neither exists.
 
 Older Claude Code versions or enterprise policies that disable mods:
 `npm install -g @jeffober/thatch && thatch setup --claude --hooks`.
@@ -52,8 +55,11 @@ npm install -g @jeffober/thatch
 thatch setup --cursor            # or --global
 ```
 
+Requires Node.js >= 22.13 or Bun >= 1.4.2 on PATH (the same runtime
+pick as Claude Code: the launcher probes node, then bun).
+
 **NixOS / Nix** - the flake bundles Bun and the embedding runtime (no global
-install, no bun on PATH):
+install, no node or bun on PATH):
 
 ```bash
 nix run github:sysread/thatch -- --version   # try it

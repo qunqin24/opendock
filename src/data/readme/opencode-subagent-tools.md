@@ -6,7 +6,7 @@ descendants, steer or queue messages, and inject context.
 
 > Plugin ID: `subagent-tools`. Default tool namespace: `subagent`.
 
-Requires OpenCode 2.3.0+; tested against 2.3.2.
+Requires OpenCode 2.3.0+; tested against 2.4.1.
 
 ## Quick start
 
@@ -84,7 +84,7 @@ to be asked or blocked. See [security model](docs/security-model.md).
 ## Pitfalls
 
 - **`finished` is not task completion.** It means the last execution succeeded.
-  The child may still own a shell, image, subagent, or Code Mode job. Use `active` and
+  The child may still own a shell, image, video, subagent, or Code Mode job. Use `active` and
   `subtreeActive` to find work that is still in progress.
 - **`cancel` is a soft interrupt.** It does not cascade. A long tool call may
   finish first, and jobs owned by an idle session keep running. The result

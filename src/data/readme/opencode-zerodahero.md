@@ -96,8 +96,19 @@ without a path. The folder ignores itself, so it never shows up in `git status`.
 | Skill | What it does |
 | --- | --- |
 | `glossary` | Checks the domain terms a branch introduces against the codebase and the glossary, asks you to confirm each word, then renames and records them. |
+| `human-review` | Prepares a layered review that you walk yourself: short purpose, design, flow, and test-name docs, then the full diff in tuicr. It writes a [korin](https://github.com/zerodahero/korin) wizard pinned to one range, so every run shows the same thing. |
+| `plan-review` | Red-teams a plan in plan mode with an opencode reviewer over several rounds, and records every finding in a ledger at the end of the plan. You see only the decisions that need you. |
 | `review` | Reviews the branch with the `code-reviewer` agent, merges any second reviews, and triages every finding into should fix, could fix, out of scope, and skip. |
 | `second-review` | An independent review from another harness or model. It writes its findings to a file for `/review` to merge. It edits nothing else and runs no tests. |
+
+`human-review` needs `korin` 0.1.2 or later, `tuicr`, and either Plannotator or `nvim` on
+the `PATH` when you run the wizard. Run it from the repo root with `korin run
+.reviews/<id>/<range>/review.korin`. The wizard is a korin guide: it pauses before each
+stage instead of asking for approval. Each layer doc opens in Plannotator, and your
+annotations become your notes. Without Plannotator, it opens in nvim beside a notes pane;
+set `HUMAN_REVIEW_PREVIEW` to an nvim command, such as `MdKite start`, for a live preview
+there. korin keeps its run journal in `.korin/` at the repo root, so add that directory to
+a gitignore.
 
 `glossary` uses [Plannotator](https://github.com/backnotprop/plannotator) for the review
 step when it is installed. Without it, the skill asks through Claude Code's question
@@ -116,12 +127,100 @@ primary review:
 
 A second review merges once per commit, so running `/review` again does not repeat it.
 
+**Hand it off.** `/review second` runs both reviewers from the Claude Code session. It
+starts the `code-reviewer` agent and an opencode second review in a fresh session, in
+parallel, then triages both in one report. Name the opencode model after the keyword:
+`/review second openai/gpt-6.2-sol`. Without one, opencode uses its default model. When
+the second review fails, you get the primary triage alone, and its verdict line says why.
+
+It needs `opencode` 2.4 or later, `jq`, and the `second-reviewer` agent from the opencode
+section above. Claude runs the launcher script with the sandbox disabled, because opencode
+writes its log outside the sandbox. Add this to `~/.claude/settings.json` so it runs
+without a prompt, with your home directory in place of `/Users/you`. Claude types the
+script's full path, and the rule matches only the installed plugin's copy:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/you/.claude/plugins/cache/zerodahero/zerodahero-skills/*/skills/review/review/run-second.sh *)"
+    ]
+  }
+}
+```
+
+The two-session flow above still works.
+
+## Plan review
+
+`plan-review` red-teams a plan in Claude Code's plan mode before you read it. Claude
+drafts a locked **anchor** of what scoping agreed, and you approve it. Claude then writes
+the plan, and an opencode `plan-reviewer` agent reviews it in one persistent session over
+several rounds. Claude records each finding in a review ledger at the end of the plan and
+decides to accept, rebut, or defer it. Disputes and shifts away from the anchor come to
+you as questions. The plan reaches Plannotator with its revision notes and
+ledger already in place.
+
+Claude offers it when a plan settles architecture, a data model, an external contract, or
+a scope boundary. Run `/plan-review` in plan mode to start it yourself. To set it up:
+
+1. **Install the `plan-reviewer` agent.** It denies every tool except reading the repo,
+   read-only `git` and search commands, and writing its own report:
+
+   ```bash
+   mkdir -p ~/.config/opencode/agents
+   curl -fsSL -o ~/.config/opencode/agents/plan-reviewer.md \
+     https://raw.githubusercontent.com/zerodahero/agent-kit/main/opencode/agents/plan-reviewer.md
+   ```
+
+2. **Let the scripts run unprompted.** Claude runs `run-round.sh` and `ledger.py` with
+   the sandbox disabled: opencode writes its log outside the sandbox, and the plan file
+   sits outside it too. A `sandbox.excludedCommands` entry does not match these commands,
+   because their instructions arrive in a multi-line heredoc. Add the allow rules to
+   `~/.claude/settings.json`, with your home directory in place of `/Users/you`, so each
+   call skips the prompt:
+
+   ```json
+   {
+     "permissions": {
+       "allow": [
+         "Bash(/Users/you/.claude/plugins/cache/zerodahero/zerodahero-skills/*/skills/review/plan-review/run-round.sh *)",
+         "Bash(/Users/you/.claude/plugins/cache/zerodahero/zerodahero-skills/*/skills/review/plan-review/ledger.py *)"
+       ]
+     }
+   }
+   ```
+
+3. **Pick a model.** Pass one as `/plan-review openai/gpt-6.2-sol`, or set `model` in
+   your opencode config. opencode's free default model runs out of quota quickly.
+
+The scripts need `opencode` 2.4 or later, `jq`, and Python 3. Each round writes its
+frozen plan input, prompt, report, and event log to `.claude/plan/`, which ignores itself.
+
+The reviewer runs only read-only `git` and search commands. For a repo where a read-only
+tool would settle questions better, such as a linter that checks a config without running
+it, copy the agent to `.opencode/agents/plan-reviewer.md` in that repo and add an allow
+rule for the tool. A project agent replaces the global one.
+
+The reviewer's model provider receives the full plan, the ledger, and any source the
+reviewer reads. opencode keeps the session in its own store. Delete a finished review
+with `opencode session delete <id>`, using the `Session` ID from the plan's ledger.
+
+With `zerodahero-plan-capture` installed, `ExitPlanMode` writes `.claude/plan/current.md`
+before you approve the plan, so `/review` can pick up a draft you rejected. `plan-review`
+copies the approved plan there again once you approve it.
+
+After you build the plan, review the code with `/review second`, or with `/second-review`
+in a fresh opencode session. The plan reviewer approved the plan, so it reads code that matches the plan too
+kindly.
+
 ## Project overlay
 
 Both reviewers follow one generic method. To teach them a repo's specifics, add
 `docs/agents/code-review.md` to that repo. It lists only what differs, under the method's
 section names, and it wins where it conflicts with the method. Every harness reads it, so
-`/second-review` in opencode gets the same specifics.
+`/second-review` in opencode gets the same specifics. The plan reviewer reads only its
+`## Plan lenses` section.
 
 ```markdown
 # Code review overlay
@@ -139,6 +238,11 @@ Base ref: `refs/heads/dev`.
 - **Authorization:** `@Roles()` is inert without `@UseGuards(RolesGuard)`.
 - **Workflow determinism** (extra lens): no clocks, randomness, or I/O in a Temporal
   workflow's `run()`.
+
+## Plan lenses
+
+- **Workflow determinism:** a plan that adds a workflow step names its patch or
+  versioning strategy.
 
 ## Blast radius
 

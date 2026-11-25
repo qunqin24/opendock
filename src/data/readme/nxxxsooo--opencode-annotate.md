@@ -118,7 +118,8 @@ Bind **prefix, then `a`** (`Ctrl+B`, then `a` by default) to
 `annotate.review` using the [manifest and keybinding setup](tui/README.md#herdr).
 In AGY this opens a floating Markdown reviewer without starting a model turn.
 Send starts a turn if AGY is idle or done, or queues feedback if it is working.
-Quit sends nothing. Claude, Codex, Pi, and OpenCode use the existing `herdr last`
+Press `q` to send pending notes and close, or `Ctrl+C` to close without
+sending. Claude, Codex, Pi, and OpenCode use the existing `herdr last`
 route. With the AGY hooks installed, `/annotate` can open the same popup before
 the model runs; the skill remains available as a fallback.
 
@@ -176,7 +177,8 @@ find the package under `npm root -g`) or a checkout with `npm run build:tui`:
 
 **Send** (`Ctrl+S` or the Send button) returns feedback to the captured AGY
 conversation. In Herdr it starts a turn if AGY is idle or done, or queues
-feedback for its lifecycle hooks if AGY is working. `q` and `Ctrl+C` do not send.
+feedback for its lifecycle hooks if AGY is working. `q` sends pending notes and
+closes; with no notes it just closes. `Ctrl+C` closes without sending.
 
 - **CLI Commands**:
   ```sh

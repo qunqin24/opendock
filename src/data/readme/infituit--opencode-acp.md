@@ -41,12 +41,21 @@ GitHub Release 仍保留预构建 tarball；Git tag 安装会从源码执行 `pr
 
 ACP 提供 `/acp` 斜杠命令：
 
-| 命令           | 说明                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------- |
-| `/acp`         | 显示压缩状态（同 `/acp stats`）；`/acp help` 查看命令列表                                          |
-| `/acp context` | 按类别（system、user、assistant、tools 等）显示 token 用量明细，以及通过剪枝节省的量               |
-| `/acp stats`   | 压缩状态：压缩块、上下文用量、推荐范围（与 `acp_status` 工具同一报告）                             |
-| `/acp export`  | 导出活动压缩块到 markdown 文件。选项：`--output <path>`、`--tier t1,t2,t3`、`--stdout`、`--append` |
+| 命令                | 说明                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `/acp`              | 显示压缩状态（同 `/acp stats`）；`/acp help` 查看命令列表                                              |
+| `/acp context`      | 按类别（system、user、assistant、tools 等）显示 token 用量明细，以及通过剪枝节省的量                   |
+| `/acp stats`        | 压缩状态：压缩块、上下文用量、推荐范围（与 `acp_status` 工具同一报告）                                 |
+| `/acp export`       | 导出活动压缩块到 markdown 文件。选项：`--output <path>`、`--tier t1,t2,t3`、`--stdout`、`--append`     |
+| `/acp recover-fork` | Preview recovery for an existing fork with no compression records; `--apply` backs up and restores it. |
+
+### Recovering an existing empty fork
+
+`/acp recover-fork` previews a transfer from the fork source without changing ACP state or creating a backup. Use `/acp recover-fork --apply` only in an idle session with a single OpenCode instance accessing its storage. Other processes sharing the same state are not supported during recovery.
+
+Recovery requires valid fork metadata, a resolvable source boundary, and a completely empty compression history. Inactive/decompressed blocks, membership records, advanced block/run counters, compression statistics, or ambiguous decompression history prevent recovery. Existing message references are preserved. Uncertain mappings and incomplete nested blocks are rejected; recovery does not replay compression calls or partially transfer source state.
+
+Before applying, ACP saves a private backup under `fork-recovery-backups/` in the configured storage directory (or the default ACP data directory for native storage). The result includes its path and an executable `/acp recover-fork --rollback <backup-id>` command. Rollback uses the same storage backend and refuses to overwrite state that has changed since recovery. Keep the backup private: it contains session state and summaries. Neither recovery nor rollback edits OpenCode's stored message history.
 
 ## 工作原理
 

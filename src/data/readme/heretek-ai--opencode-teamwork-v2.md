@@ -15,7 +15,10 @@ an effect or setup function. (cause: SchemaError(Expected object at ["default"])
 This repo is the ported, V2-native version: the original 10 agents plus a
 security auditor, document segment reviewer, formalization reviewer,
 tournament referee, and independent victory auditor (15 total) and 7 slash commands,
-rewritten for the V2 plugin + agent APIs. Verified against **OpenCode `v2.0.26`**.
+rewritten for the V2 plugin + agent APIs. Verified against **OpenCode 2.4.1**.
+`package.json` declares an **optional** peer range `@opencode/plugin: ^2.4` (optional so
+the package stays dependency-free), and `setup` warns when `ctx.app.version` is outside
+the verified 2.4 pair.
 
 ## What changed (V1 → V2)
 
@@ -59,7 +62,12 @@ postinstall.mjs                   # asks for models during npm install
 ## Engine (tools + hooks)
 
 The run mechanics are real, not prompt prose. The plugin registers deterministic
-tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission hooks:
+tools and runtime permission hooks. Each registration carries
+`options: { namespace: "teamwork", codemode: false }`: OpenCode's effective id is
+`namespace + "_" + name` (`packages/core/src/tool/runtime.ts`), so the model sees
+direct `teamwork_*` tools (the same ids the agents and command templates call)
+rather than Code Mode-only `teamwork.plan` entries. The table below lists the
+exposed ids:
 
 | Tool | Purpose |
 | --- | --- |
@@ -72,7 +80,7 @@ tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission
 | `teamwork_preflight` | re-check a run's named inputs, write `preflight.json` (reports, never blocks) |
 | `teamwork_status` | per-task progress for the active run |
 | `teamwork_resume` | tasks still open, for a restart |
-| `teamwork_cost` | read real budget spend across OpenCode session tree (sentinel + workers + verifiers); snapshot updates are digest-idempotent |
+| `teamwork_cost` | read real spend across the OpenCode session tree (sentinel + workers + verifiers) against the **advisory** run budget (warns at 80%; only massive-proof tournaments enforce the threshold); snapshot updates are digest-idempotent |
 | `teamwork_pitfall` | append to the pitfall registry (dynamically injected into workers) |
 | `teamwork_next` | evaluates DAG dependencies, lifecycle states, and ready tasks; atomically leases each ready task (5 min + 5 min grace on claim protocol 2) with a monotonic fence so concurrent resumes cannot dispatch duplicates; a stale claim is reclaimed only when the side-effect fingerprint is unchanged, otherwise `needs-inspection`; strict runs stop at `NEEDS_STRICT_WAVE` until both wave verdicts exist |
 | `teamwork_task_update` | deterministic task state machine transitions (`pending` → `worker_active` → `worker_done` → `verifier_active` → `verified_pass` / `verified_fail` / `blocked`); every protocol-2 transition enforces the claim fence/ownership (`STALE_FENCE`, `CLAIM_OWNED_BY_OTHER`, `CLAIM_EXPIRED`), a reasoned Sentinel override is recorded, and terminal states release the claim |
@@ -81,6 +89,7 @@ tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission
 | `teamwork_report` | trusted writer for a signed `verify/report-<taskId>.json`: caller must be `team/verifier`, descend from the run root, and name an existing task; a `PASS` needs a summary or check |
 | `teamwork_security_audit` | mandatory pre-merge security gate (`verify/security-audit.json`; signed on a signed run) |
 | `teamwork_victory_audit` | record the independent `team/victory-auditor` acceptance verdict, bound to the current `ORIGINAL_REQUEST.md` and `requirements.json` hashes (`verify/victory.json`); caller must descend from the run root |
+| `teamwork_evidence` | write one bounded evidence artifact under `verify/evidence/<name>` (64 KiB, 32 files) through the pinned run writer; returns `{path, sha256, bytes}` so `teamwork_wave_record` can cite it. Bytes, not a verdict |
 | `teamwork_wave_record` | strict mode only: record one `team/falsifier` challenge (`PASS`) or `team/security-auditor` audit (`CLEAN`) per task (`verify/challenge-<task>.json` / `verify/audit-<task>.json`); trusted caller identity + session tree, sha256-bound to the verifier report (same-report write-once, changed-report replace) |
 | `teamwork_final_verify` | compute the final verdict from the task reports + security audit + victory audit (plus the strict wave when enabled, and `lemma/` artifacts when in LEMMA mode), verify the signed baseline, stamp it, write signed `verify/final.json` |
 | `teamwork_lemma_probe` | read-only probe for `lean`, `lake`, and the LEAP CLI (`leap`; legacy `leap-tools` accepted) on `PATH` |
@@ -145,7 +154,7 @@ topologies, and the JSON schemas (`spec.json`, `plan.dag.json`, `state.json`,
 
 - `verified_pass` requires a legal lifecycle transition and PASS evidence (an inline PASS verdict or a `PASS` per-task report).
 - A plan writes a signed `run.manifest.json` (the default). Verifier reports, security audit, strict-wave verdicts, victory verdict, and final verdict carry an `_auth` envelope and a `ctx.storage` digest-index entry. `final_verify`/`next` fail as `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_UNKNOWN_KEY`, `AUTH_INDEX_MISSING`, or `AUTH_STALE` when an artifact is forged, copied, edited, or the signed plan/requirements/policy baseline drifts. See [`docs/adr/0005-artifact-authenticity.md`](docs/adr/0005-artifact-authenticity.md).
-- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). `human-approved`/`ci-attested` require an Ed25519 approval from `OPENCODE_TEAMWORK_APPROVAL_DIR`, signed by a key distinct from the run key and bound to the **exact bytes of `prompt_draft.md`** plus the run id and a one-use nonce (0.11.0; manifest version 3). The plan verifies it before any `mkdir`, `final_verify` re-hashes the draft, and a re-plan cannot change the binding. The plugin/command signer refuses `approvals/` paths (`AUTH_APPROVAL_SCOPE`). See [`docs/adr/0011-authenticated-prompt-approval.md`](docs/adr/0011-authenticated-prompt-approval.md), [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
+- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). 0.14.0 signs witness receipts (`OPENCODE_TEAMWORK_WITNESS_PUBLIC_KEY`) so a forged KV record is `AUTH_INVALID`, labels a receipt `unverified` without that key, and adds signer protocol v2 plus `opencode-teamwork approve signer` when `OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` is set. `human-approved`/`ci-attested` require an Ed25519 approval from `OPENCODE_TEAMWORK_APPROVAL_DIR`, signed by a key distinct from the run key and bound to the **exact bytes of `prompt_draft.md`** plus the run id and a one-use nonce (0.11.0; manifest version 3). The plan verifies it before any `mkdir`, `final_verify` re-hashes the draft, and a re-plan cannot change the binding. The plugin/command signer refuses `approvals/` paths (`AUTH_APPROVAL_SCOPE`). See [`docs/adr/0011-authenticated-prompt-approval.md`](docs/adr/0011-authenticated-prompt-approval.md), [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
 - A run completes only with a `PASS` `verify/final.json` stamped by `teamwork_final_verify`; an unstamped report needs the recorded `allowUnstamped` bypass. An unsigned legacy run returns `AUTH_LEGACY` until the recorded `allowUnsignedLegacy` bypass is passed at the completion gate; `benchmark` refuses that bypass, `victoryAudit: "skip"`, and `requireHandoffs: "skip"`.
 - `teamwork_victory_audit`, `teamwork_wave_record`, and `teamwork_report` require the caller session to descend from the plan-time `rootSessionId`, so a top-level `opencode run --agent team/victory-auditor` cannot self-authorize.
 - That PASS also needs a `verify/victory.json` from the independent `team/victory-auditor` reporting `VICTORY CONFIRMED` for every requirement and the current `ORIGINAL_REQUEST.md` hash, unless the plan explicitly recorded `victoryAudit: "skip"` with a non-empty `victorySkipReason` (then `final_verify` records `victory: "SKIPPED (explicit): <reason>"`). A skip without a reason is refused; the legacy no-baseline default is labelled `SKIPPED (legacy default: no requirements baseline)`.
@@ -156,17 +165,20 @@ topologies, and the JSON schemas (`spec.json`, `plan.dag.json`, `state.json`,
 - Run-artifact writes are contained on Linux by a pinned directory descriptor ([ADR 0010](docs/adr/0010-pinned-fd-write-containment.md)): the target parent is opened once and every create, mkdir, rename, lstat and append is relative to `/proc/self/fd/<dirfd>`, so a directory swapped for a symlink cannot redirect bytes outside the run. Each write uses a random `O_EXCL` temp, `fsync`, a rename under the pin, and a post-rename inode check; appends refuse `nlink !== 1` (a hard link at `events.jsonl` cannot modify outside bytes); the lock file is created inside the same pinned directory. Linux without `/proc/self/fd` fails closed for writes. **macOS and Windows are detective-only** (path-based atomic write plus a post-write check; a transient reverted swap can be missed): 0.13.0 pins the run root and every existing ancestor `(dev, ino)`, re-checks them before the mutation and in the post-check (`identity-changed`), and records the run-root identity in the signed manifest. A detected write is a report about an event that already happened, not a prevented one, and it is not rolled back. `OPENCODE_TEAMWORK_REQUIRE_PINNED_WRITES=1` (or plan `requirePinnedWrites`) refuses control-plane writes on a non-pinned host (`containment-mode`). The run-root `mkdir` is still path-based, and a same-UID ptrace is outside the boundary. See [ADR 0013](docs/adr/0013-containment-parity-and-the-detective-boundary.md).
 - `state.json`, `costs.json`, `events.jsonl`, and `handoffs/index.json` are read-modify-written under a cross-process `<artifact>.lock` plus the in-process queue. Locks publish atomically (unique `wx` temp + hard link, cached `mkdir` fallback), age from the filesystem mtime, and reclaim via a single-winner quarantine rename; a lock from another host is never guessed at. Claim protocol 2 (new runs; absent = 0.9.0 legacy) stamps a 5-minute lease + 5-minute grace, a monotonic fence, a heartbeat and a side-effect baseline. `teamwork_next` returns the fence and never silently reclaims a stale claim whose worktree/artifact fingerprint changed or is unknown; that task becomes `needs-inspection` and requires `teamwork_recover` (inspect → adopt/requeue/block/release). Every `teamwork_task_update` transition enforces the fence and claim ownership, and a reason is required for a Sentinel override. Verifier reports are bound to the round/fence/branch head, so a moved branch refuses `verified_pass`/merge with `BRANCH_MOVED`. See [docs/ARTIFACTS.md](docs/ARTIFACTS.md#cross-process-lock-files-artifactlock) and [ADR 0009](docs/adr/0009-claim-protocol-and-crash-recovery.md).
 - `teamwork_cost` is digest-idempotent: `costs.json` stores `appliedSnapshotDigest` plus per-session `snapshotCursors`, so applying the same usage observation twice (including a retry after a crash between the costs and snapshots writes) adds the delta once and preserves budget/bucket totals.
+- **The run budget is advisory outside the massive-proof tournament.** `teamwork_cost` warns at 80% of a positive `budgetUsd`, returns `shouldHalt: true` and the explicit `thresholdPct: 80`, and the Sentinel is expected to halt non-essential workers and ask the user. A standard run is not gated: `teamwork_next` still leases ready tasks, `teamwork_task_update` still starts a round, and `teamwork_final_verify` still evaluates the recorded evidence. Only `teamwork_tournament` and `teamwork_next`'s tournament branch enforce the threshold, halting with `BUDGET_HALTED` and a `PRESENT_PARTIAL` report. `budgetUsd: 0` is an explicit no-budget run: usage reports 0% and no threshold can be reached.
 - Legacy topology aliases are normalised on write; an unknown topology is refused before anything is written.
 
 ## Install
 
 > **About the install prompt.** OpenCode installs plugins with **Bun**, and Bun
-> blocks dependency lifecycle scripts (`postinstall`) by default. The interactive
-> model prompt therefore may not appear during `opencode plugin add`, but the
-> agents are still created — the plugin self-heals them on load with the DeepSeek
-> defaults. To choose models, run the `init` command below. (`postinstall` does
-> fire for a plain `npm install`, and is intentionally skipped under `npx` /
-> `npm exec` so the `init` run doesn't prompt twice.)
+> blocks dependency lifecycle scripts (`postinstall`) by default, so the
+> interactive model prompt and the agent files may be skipped. Run the `init`
+> command below: it installs all 15 agents and writes the model map. On load the
+> plugin only verifies the agent files and warns (by filename) when any are
+> missing — it cannot install them mid-session because OpenCode has already read
+> its config. (`postinstall` does fire for a plain `npm install`, and is
+> intentionally skipped under `npx` / `npm exec` so the `init` run doesn't prompt
+> twice.)
 
 ### From GitHub (no npm account needed)
 
@@ -201,7 +213,11 @@ npx @heretek-ai/opencode-teamwork-v2 prune     # prune completed git worktrees
 npx @heretek-ai/opencode-teamwork-v2 approve request --session <id>  # show the draft binding
 npx @heretek-ai/opencode-teamwork-v2 approve sign --request <file> --draft <path> --key <path>
 npx @heretek-ai/opencode-teamwork-v2 approve verify --session <id>   # re-run the plan-time checks
+npx @heretek-ai/opencode-teamwork-v2 approve signer --session <id> --path <relPath> --digest <64hex>
 ```
+
+`approve signer` produces the signer-protocol-v2 approval under
+`OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` (or `--out`); the plugin never reads it.
 
 `opencode-teamwork` and `opencode-teamwork-v2` are aliases for the same CLI. If
 you are running from **inside this package's own checkout**, use the bundled
@@ -228,9 +244,11 @@ agent files are never overwritten wholesale — only their `model:` line is
 rewritten — and a one-time backup of touched files lands in
 `~/.config/opencode/.opencode-teamwork-backup/<timestamp>/`.
 
-The plugin also self-heals: if the agent files are missing when the plugin
-loads (e.g. the install prompt was skipped), it recreates them from the packaged
-defaults without touching files that already exist.
+`init` and the postinstall hook are the only writers of agent files. On load the
+plugin only **verifies** them and warns (by filename, without failing the load)
+when any are missing: OpenCode's config-agent plugin has already read its
+documents by then, so a write during plugin `setup` would not appear until a
+restart. Re-run `init` (or reinstall) and restart to repair a partial install.
 
 ### Manually (no npm)
 
@@ -375,6 +393,137 @@ budget, spend, tokens), a tasks table, the security audit, and the pitfalls. See
 [`docs/ARTIFACTS.md`](docs/ARTIFACTS.md#export-report-reporthtml--reportmd) for the
 format details.
 
+## Offline verification (`verify`)
+
+`opencode-teamwork verify` recomputes a run's named relations from the bytes in
+one run directory plus a public key. It needs no plugin, no database and no
+`ctx.storage`, and never writes into the run. Without `--rerun` it never
+executes a reported check; with `--rerun` it re-executes the signed
+`verify/rerun.json` in a disposable worktree (0.16.0).
+
+```sh
+# Ed25519: only the public key is needed
+opencode-teamwork verify --session <id> --public-key <base64url|@file> --json
+
+# Verify an archived copy directly
+opencode-teamwork verify --run-dir /path/to/run --public-key @run-pubkey.txt
+
+# HMAC run: the secret is required (an HMAC verifier is also a signer)
+opencode-teamwork verify --session <id> --hmac-key <b64url> --hmac-key-id <id>
+
+# Optional: branch head/diff and rollback snapshot
+opencode-teamwork verify --session <id> --public-key ... --repo . --require-git
+opencode-teamwork verify --session <id> --public-key ... --require-index snapshot.json
+
+# 0.16.0: re-execute recorded command evidence at the report's commit
+opencode-teamwork verify --run-dir /path/to/run --public-key ... \
+  --rerun --repo /path/to/clean-checkout [--timeout 300] [--keep-worktree]
+
+# 0.18.0: verify a CI attestation signed by a key the run does not hold
+opencode-teamwork verify --run-dir /path/to/run --public-key ... \
+  --attestation-public-key @ci-attestation.pub [--attestation-issuer <issuer>]
+```
+
+Under a plan that recorded `requiredProvenance: "command"`, a PASS report must
+carry at least one programmatic check with an argv-only `command`, an exit code,
+an untruncated output digest and a `headSha`; the engine writes a signed
+`verify/rerun.json`. `verify` without `--rerun` reports that claim as
+`provenance: claimed` and returns `UNKNOWN` (exit 2) — never `PASS`.
+`--rerun` creates a detached worktree at the report's commit, runs the argv with
+no shell and a minimal environment, enforces the recorded timeout, and compares
+the exit code and stdout+stderr digest. A changed digest is
+`output-digest-mismatch`, a non-zero exit is `command-failed`, a missing binary
+is exit 2 `command-unavailable`, a timeout is `command-timeout`, and a shell line
+or escaping `cwd` is `command-refused`. The source checkout is hashed before and
+after; the worktree is removed unless `--keep-worktree`. `declared` runs keep the
+0.15 behaviour.
+
+Since 0.18.0 a plan can set `attestationPolicy: "optional" | "required"`. A CI
+job runs `.github/workflows/attest.yml` (or `scripts/attest-sign.mjs`) under a
+separate Ed25519 key and writes `verify/ci/attestation.json`, binding the run
+nonce, plan hash, prompt hash, report commit and every command's argv/exit/output
+digest. `final_verify` refuses a `required` run without a valid attestation
+(`AUTH_ATTESTATION_MISSING/STALE/UNTRUSTED/COMMIT_MISMATCH/REPLAY`), and `verify`
+reports `attestation.status` plus `attested: true` with
+`--attestation-public-key`; without that key a present attestation is `UNKNOWN`
+(exit 2), never `PASS`. The attestation key must differ from `runKeyId`. See
+[ADR 0018](docs/adr/0018-ci-attestation.md).
+
+The signed `run.manifest.json` is the anchor: its `runNonce`, `runKeyId` and
+algorithm are covered by the envelope, and every other artifact is pinned to
+them. The verifier recomputes victory `evidenceDigests`, audit `ruleChecks` and
+`reviewedDigests`, report→worker-handoff bindings, wave `cites` (`sha256` and
+byte length), every handoff index entry's auth/body/header/cites, and the final
+verdict's report/audit/requirements digests. It also names the four
+`INCONSISTENT_*` contradictions.
+
+Exit codes: `0` verified, `1` fail, `2` unverifiable (no key, unsigned legacy,
+HMAC without a secret, required git/index unavailable), `3` usage.
+`--fail-on-warning` promotes a warning to exit 1, and `--allow-unsigned`
+analyses a legacy run without ever upgrading it to `PASS`. `--json` is the
+stable machine report; the human table is rendered from it.
+
+**Honest limit.** A verifier holding only the public key and a read-only copy can
+recompute every byte digest, citation, branch binding and cross-artifact
+relation; it still cannot prove an observation, a consistently authored false
+report passes every check, and a whole-run rollback to an earlier signed set is
+undetectable without a snapshot or witness. Re-execution narrows this: a false
+PASS under `command` must survive `--rerun`. A CI attestation narrows it again:
+the declared commands ran at the recorded commit under a separate identity. It
+does not prove the suite is meaningful or that a test was not edited in the same
+commit, and a CI principal reachable by the agent's UID is not a boundary. See
+[ADR 0015](docs/adr/0015-offline-verification.md),
+[ADR 0016](docs/adr/0016-re-executable-verification.md),
+[ADR 0018](docs/adr/0018-ci-attestation.md) and
+[`docs/ARTIFACTS.md`](docs/ARTIFACTS.md#offline-verification-opencode-teamwork-verify).
+
+## Runtime integration tests
+
+The engine contract is tested against the real host, not only against a shim:
+
+| Layer | What it proves |
+| --- | --- |
+| L0 | `npm test`: engine logic, crypto envelopes, containment primitives, catalog, verifier, security |
+| L1 | The plugin loads in OpenCode 2.4.1 (in memory and from a local directory): 26 `teamwork_*` tools, `codemode:false`, schemas, 7 commands, permission hook, storage namespacing, agent decoding, result shape |
+| L2 | Real sessions and KV: plan/manifest v5, claims and recovery, handoff→report→victory binding, approvals |
+| L3 | Full workflows in real git worktrees: standard and strict gates, victory rejection and resume, limits, a two-process claim race, and the verifier CLI |
+
+```sh
+npm test                 # L0, no dependencies beyond Node
+
+cd tests/runtime
+bun install --frozen-lockfile
+bun run test             # L1-L3, exact @opencode/*@2.4.1
+```
+
+The harness is dev-only: `tests/runtime/` is excluded from the tarball, its
+dependencies live in its own `package.json`, and the shipped package stays
+dependency-free. Assertions are made on tool results and run artifacts
+(`state.json`, `run.manifest.json`, `verify/*`, `handoffs/index.json`,
+`events.jsonl`, exit codes), never on model prose. The tool catalog is pinned as
+a golden so a host change cannot silently rename or hide a tool. No model is
+called by the default suite.
+
+The audited host contract, the 2.4.1 drift list and the boundaries no harness can
+cross are in [`docs/OPENCODE-COMPATIBILITY.md`](docs/OPENCODE-COMPATIBILITY.md)
+and [ADR 0017](docs/adr/0017-opencode-plugin-contract-and-test-strategy.md).
+
+## Known open work
+
+Tracked in GitHub issues:
+
+- [#38](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/38) L4 live-model opt-in suite
+- [#39](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/39) nightly OpenCode host-drift job
+- [#40](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/40) apply and verify the admin hardening runbook
+- [#41](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/41) NFS harness and `doctor --locks/--unlock`
+- [#42](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/42) durable containment incident records
+- [#43](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/43) reference non-oracle signer
+- [#44](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/44) real OIDC claim validation for attestations
+- [#45](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/45) strict-input diagnostics and host-repair independence
+- [#46](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/46) packed-tarball release test
+- [#47](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/47) process-level CLI/server E2E harness
+- [#48](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/48) remaining Document Review and PDF corpus runs
+
 ## Model assignment
 
 Each agent's model lives in the `model:` frontmatter of its markdown file. The
@@ -517,8 +666,10 @@ documented separately:
   rollback and an honest limit.
 - [`docs/SIGNER-PROTOCOL.md`](docs/SIGNER-PROTOCOL.md) — the v2 signer contract
   that turns a command signer from an oracle into a policy-enforcing signer.
-  It requires a plugin change; the 0.13.0 plugin sends v1 and cannot use a
-  v2-only signer.
+  0.14.0 sends v2 (with `runId` and a derived `approvalRef`) when
+  `OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` is set, and the exact v1 request
+  otherwise. The signer itself is not shipped: it must be built and installed,
+  and a version mismatch fails closed with `AUTH_SIGNER_UNAVAILABLE`.
 - [`scripts/hardening-check.sh`](scripts/hardening-check.sh) — a read-only
   Linux verifier that prints `PASS`/`FAIL`/`UNKNOWN` per probe. It never
   modifies the host; `UNKNOWN` is not a pass.
@@ -534,8 +685,8 @@ the plugin-side posture check.
   `@opencode/plugin`, so the loader never needs to resolve `node_modules` for it.
   The exported object shape is identical to `Plugin.define({ id, setup })`.
 - V2 agents cannot be created by a plugin, so the plugin only registers commands,
-  ships the `teamwork_*` engine tools, and (in the npm package) recreates any
-  missing `team/*.md` agent files from the packaged defaults on load. If you
+  ships the `teamwork_*` engine tools, and verifies (never writes) the `team/*.md`
+  agent files on load; `init`/postinstall install them. If you
   prefer no plugin at all, move the 7 command definitions into markdown files
   under `~/.config/opencode/commands/` (V2 discovers them natively).
 - Prompt invariants (one artifact root, one topology enum, no stale references,

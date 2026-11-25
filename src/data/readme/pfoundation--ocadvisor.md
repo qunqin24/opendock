@@ -1,7 +1,8 @@
 # ocAdvisor
 
-OpenCode V2 plugin: consult Claude Opus 5.5 as a senior advisor with your
-full session transcript (including parent sessions for subagents).
+OpenCode V2 plugin: consult Claude Fable 5.2 as a senior advisor with your
+full session transcript (including parent sessions for subagents). Claude
+Fable sessions never see or invoke the advisor.
 
 ## Installation
 
@@ -41,7 +42,7 @@ and the usage report accept both `advisor` and the pre-rename `ocAdvisor`.
 ## Configuration
 
 The advisor model and limits are configurable. Defaults:
-`anthropic/claude-opus-5-5#xhigh` (with one `opencode` retry when the
+`anthropic/claude-fable-5-2#xhigh` (with one `opencode` retry when the
 Anthropic route is unavailable), a 300 s generation timeout, no
 transcript cap, TypeSafe screening on when a key is present, and
 model-capability evidence from a local Artificial Analysis snapshot when
@@ -49,7 +50,7 @@ one is available.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `model` | `claude-opus-5-5` | Model id, or a full `provider/model#variant` reference |
+| `model` | `claude-fable-5-2` | Model id, or a full `provider/model#variant` reference |
 | `provider` | `anthropic` | Provider id (overrides the provider in `model`) |
 | `variant` | `xhigh` | Reasoning-effort variant; `null` or `"none"` pins no variant |
 | `timeoutMs` | `300000` | Per-consultation generation timeout, in milliseconds |
@@ -148,6 +149,15 @@ calls return a disabled notice. Point the advisor at a different model and
 the guard follows it; list a model in `disabledForModels` to exclude callers
 that are not the advisor model.
 
+Claude Fable callers are always excluded, independent of the configured
+advisor and of `disabledForModels`: any model id whose last path segment
+starts with `claude-fable-` (Fable 5, 5.1, 5.2, later versions and
+`claude-fable-latest`, on any provider route and at any effort) has the tool
+hidden, and direct calls return
+`advisor is disabled (Fable): <provider/model> cannot consult the advisor.`
+The configured advisor model itself still reports the self-consultation
+notice. Other models, including Claude Opus 5.5, can use the advisor.
+
 ## Usage policy (what agents are told)
 
 Use `advisor` when an independent perspective could improve the approach, help
@@ -175,8 +185,8 @@ Rules enforced by the tool description and an injected session instruction:
   counter-evidence. Clear factual corrections do not need another
   confirmation call.
 - The tool is hidden in sessions already running the advisor model (any
-  route, any effort) and in sessions whose caller model is listed in
-  `disabledForModels`. Direct calls there return a disabled notice and do
+  route, any effort), in Claude Fable sessions, and in sessions whose caller
+  model is listed in `disabledForModels`. Direct calls there return a disabled notice and do
   not run TypeSafe screening or advisor generation. Eligibility is
   reevaluated per request, so switching models mid-session takes effect
   immediately; a child session uses its own model, not the parent's.
@@ -279,7 +289,10 @@ What the gate receives, in the same single TypeSafe request:
 - `benchmarks` — the snapshot source and age, one match per profile, and
   comparisons for the shared metrics: Artificial Analysis Coding Index,
   Intelligence Index, and up to two reasoning/math results (HLE, GPQA, Math
-  Index) when present. Code computes oriented differences
+  Index) when present. Artificial Analysis no longer publishes the Coding
+  Index and the free endpoint carries no per-benchmark scores, so a snapshot
+  refreshed today compares on the Intelligence Index alone; the bundled
+  baseline predates that change. Code computes oriented differences
   (`advisor_minus_requester`); the model never does arithmetic. Scores that
   cannot be strictly compared carry an explicit `reason` (`effort_mismatch`,
   `effort_unknown`, `missing_requester`, …) and no delta.
@@ -313,8 +326,12 @@ ocadvisor benchmarks update --path /srv/ocadvisor/artificial-analysis.json
 ocadvisor benchmarks status --path /srv/ocadvisor/artificial-analysis.json --model openai/gpt-6-astra#xhigh
 ```
 
-- `benchmarks update` fetches the official models endpoint once, validates it,
-  and atomically replaces the snapshot. The old file is preserved byte-for-byte
+- `benchmarks update` fetches the official free language-models endpoint
+  (`/api/v2/language/models/free`, every page under one 30 s deadline; pages
+  must agree on the Intelligence Index version, which is recorded as the
+  snapshot's `methodologyVersion`), validates it, and atomically replaces the
+  snapshot. The legacy `/api/v2/data/llms/models` endpoint has returned
+  `410 Gone` since 2026-11-04, so releases before this one cannot refresh. The old file is preserved byte-for-byte
   if fetch, validation, or write fails; concurrent updaters coordinate through
   a per-target lock. It prints the path, fetch time, model count, metric
   coverage, and content hash.
@@ -342,6 +359,14 @@ first refresh. Regenerate the shipped data with
 `ARTIFICIAL_ANALYSIS_API_KEY=... bun scripts/buildBenchmarkData.ts
 --refresh-snapshot` (mappings only without the flag; the docs recommend
 refreshing the user snapshot instead of rerunning this).
+
+The default advisor, Claude Fable 5.2, was published after the bundled
+baseline (fetched 2026-09-23). Its bindings (both the `anthropic` and
+`opencode` routes, every effort) are pinned to the stable Artificial
+Analysis IDs from its public model page, so with the bundled baseline the
+advisor reports `missing_record` and the gate treats its scores as unknown.
+Run `ocadvisor benchmarks update` once to get Fable 5.2 scores; the
+bindings resolve without a plugin release.
 
 ### Model mappings
 
@@ -448,8 +473,8 @@ The equivalent environment variable is
   TUI. As a direct tool, the TUI's tool log shows the call's `mode`,
   `trigger`, and `question` fields followed by `output:` with the answer.
   Direct calls also avoid Code Mode's output-size truncation. The `context`
-  hook can only hide the tool (advisor-model sessions and `disabledForModels`
-  callers), never add one, and the selective-use instruction is injected
+  hook can only hide the tool (advisor-model sessions, Claude Fable sessions,
+  and `disabledForModels` callers), never add one, and the selective-use instruction is injected
   only when the tool is available to the request.
 - Before each consultation it checks OpenCode for support of the configured
   advisor model: the provider is enabled (`provider.get`), the model is
@@ -466,7 +491,7 @@ The equivalent environment variable is
   instead of guessing.
 - Consultations run as transient generations on a dedicated, reusable
   `advisor` session pinned to the configured model (default
-  `anthropic/claude-opus-5-5#xhigh`) via `session.create` +
+  `anthropic/claude-fable-5-2#xhigh`) via `session.create` +
   `session.switchModel` once, then `session.generate` per call. Transient
   generations do not mutate session history, so the advisor session stays
   empty while its stats attribute advisor spend. Title discovery also
@@ -488,7 +513,7 @@ The equivalent environment variable is
   what is new since then.
 - Real failures (provider/model/connection issues, missing
   transcript/session) throw so OpenCode records them as errors instead of
-  silent `completed` results. Self and configured-model skips still return
+  silent `completed` results. Self, Fable, and configured-model skips still return
   a disabled notice without TypeSafe or advisor requests.
 
 ## Metrics
@@ -496,7 +521,7 @@ The equivalent environment variable is
 Every invocation appends one JSON line to
 `~/.local/share/opencode/ocAdvisor-metrics.jsonl` with timestamp, session,
 caller model/agent, mode, trigger, effective effort, outcome (`advisor_response`,
-`skipped_self`, `skipped_model`, `skipped_typesafe`, `error`, `no_transcript`,
+`skipped_self`, `skipped_fable`, `skipped_model`, `skipped_typesafe`, `error`, `no_transcript`,
 `no_session`), error type
 (`provider_unavailable`, `model_unavailable`, `invalid_effort`, `auth`, …), latency,
 transcript size, prior-consultation count, and transport (`via`).
@@ -504,8 +529,9 @@ Token usage is `null`: OpenCode generation returns text only.
 Logging is best-effort and never breaks a call.
 Generated responses also record `advisorProvider`, the route that served
 them (`opencode` when the Anthropic fallback fired).
-Rows written before the advisor-model change use the legacy `skipped_fable`
-outcome for self-consultation skips; current rows use `skipped_self`.
+`skipped_fable` marks the built-in Claude Fable block. Rows written before
+the Opus 5.5 advisor change also used `skipped_fable` for self-consultation
+skips; self-consultation rows now use `skipped_self`.
 When the tool is hidden for the request, there is no invocation and no
 metrics row. A direct call that still reaches the executor for an excluded
 caller records one `skipped_model` line and no TypeSafe gate field.
@@ -604,6 +630,18 @@ criteria, tradeoffs, and limitations; these are scenario results, not a measured
 production error rate. The opt-in evaluation now includes mechanical edits,
 unchanged repeat questions, explicit advisor requests, and consequential small
 changes. Recalibrate after changing either question wording or threshold.
+
+Cases with `liveEvidence` name a real requester; the script resolves it
+against the bundled seed snapshot and mappings and the plugin's default
+advisor, so the gate sees the same evidence as in production. Fable 5.2
+advisor run (2026-11-25, `jev-1.13.0`, 21 cases including five live-evidence
+cases with Claude Opus 5.5 and DeepSeek V4.1 Flash requesters, unchanged
+question wording and `skipBelow: 0.20`, 27,864 input tokens, ≈$0.0012):
+**0 false skips** and **0 unnecessary proceeds**. The Opus 5.5 design and
+destructive-migration review proceeded (need 0.78 and 0.80) and its config
+lookup was skipped (0.07), with the advisor reported as `missing_record`
+until a snapshot refresh adds Fable 5.2 scores. No fallbacks; latency
+p50/p95 129/167 ms.
 
 ### End-to-end benchmark data flow
 

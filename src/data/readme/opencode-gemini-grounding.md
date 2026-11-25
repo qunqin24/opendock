@@ -42,11 +42,12 @@ Unlike standard web search tools, it returns concise, fact-checked answers accom
 - **🎯 Smart Sentence-Level Anti-Bloat Slicing (Independent Clickable Cards)**:
   - Every discovered source is rendered as an independent clickable card in the UI (with strict `http(s)://` URL validation/fallback), allowing instant navigation to any specific webpage;
   - The first card carries the complete synthesis report, while subsequent cards extract concise sentence-level snippets—**saving ~87.5% duplicate tokens (20,000+ context tokens saved per search)**.
-- **⚡ Multi-Dimensional Caching (`ctx.storage`) & Subscriber-Aware Singleflight**: SHA-256 caching across `query + context + model + maxSources` (and custom `baseURL`) with configurable TTL (default 10m) and expired-entry cleanup, plus subscriber-refcounted in-flight deduplication that works cleanly even with per-caller `AbortSignal`s.
-- **🔔 Live Progress Feedback (`context.progress`)**: Real-time status reporting in TUI and Web UI ("Searching Google...", "Found cached results", "Falling back to next model...").
+- **⚡ Multi-Dimensional Caching (`ctx.storage`), Auto-Pruning & Subscriber-Aware Singleflight**: SHA-256 caching across `query + context + model + maxSources` (plus custom `baseURL` and explicit `thinkingLevel`) with configurable TTL (default 10m), automatic background `ctx.storage.scan` sweeping of expired/excess entries, and subscriber-refcounted in-flight deduplication that works cleanly even with per-caller `AbortSignal`s.
+- **🌊 SSE Streaming Keep-Alive (`:streamGenerateContent?alt=sse`)**: Enabled by default to cut silent TTFB by ~38.5% and prevent Cloudflare (524) or reverse-proxy idle socket timeouts on deep multi-hop Gemini 4 research, with automatic fallback compatibility for plain JSON responses (`streaming: false` supported).
+- **🔔 Live Progress Feedback (`context.progress`)**: Real-time status reporting in TUI and Web UI ("Searching Google...", "Receiving grounded answer...", "Found cached results", "Falling back to next model...").
 - **🗄️ OpenCode V2.2.6+ `opencode.db` & `{file:...}` Support**: Automatically reads active key/OAuth credentials and metadata from `~/.local/share/opencode/opencode.db` (`credential` table in safe read-only WAL-aware mode), project-level `opencode.json(c)` / `.opencode/opencode.json(c)`, legacy `auth.json`, `{env:VAR}`, and `{file:path/to/secret}` placeholders.
-- **⚡ Automatic Fallback Chain**: Powered by **`gemini-4-hydrogen`** by default with a **60s** per-model timeout and **180s** (3 min) total timeout. Automatically rotates through candidate models on rate limits (HTTP 429), gateway errors, or empty/`MAX_TOKENS`/blocked responses, while immediately halting on fatal auth errors (including non-JSON 401/403 responses).
-- **🧠 Native Thinking Preservation & Dynamic Model Normalization**: Preserves `gemini-4-hydrogen`'s native server-side `HIGH` thinking by default; optionally accepts `thinkingLevel` (`LOW` / `MEDIUM` / `HIGH` / `XHIGH`) for Gemini 3/4 models. Strips provider prefixes (`google/`) and `#variant` suffixes (`google/gemini-4-hydrogen#xhigh` → `gemini-4-hydrogen`).
+- **⚡ Tiered Fallback Chain & Fast-Fallback Budget Protection**: Powered by **`gemini-4-hydrogen` → `gemini-4-neon` → `gemini-3.8-flash` → `gemini-3.5-flash-lite`** by default with a **180s** (3 min) per-model timeout, **360s** (6 min) total timeout, **60s** cap on fallback Flash/Lite models, and a **45s** reserved fast-fallback window so heavy flagship models can never starve high-speed Flash fallbacks. Deduplicates identical source URLs, ranks heavily cited sources first, aggregates full-chain failure diagnostics, and halts immediately on fatal auth errors.
+- **🧠 Native Thinking Preservation & Capability Clamping**: Preserves Gemini 4's native server-side thinking depth by default; optionally accepts `thinkingLevel` (`MINIMAL` / `LOW` / `MEDIUM` / `HIGH` / `XHIGH`) with automatic per-model capability clamping across fallbacks (e.g. clamping `XHIGH` → `HIGH` on Flash models). Strips provider prefixes (`google/`) and `#variant` suffixes (`google/gemini-4-hydrogen#xhigh` → `gemini-4-hydrogen`).
 - **🔐 Smart Official vs. Reverse-Proxy Auth Routing**: Automatically sends `x-goog-api-key` only on official `*.googleapis.com` endpoints (preventing dual-header conflicts), `Authorization: Bearer` only for OAuth credentials, and dual headers on custom third-party gateways (OneAPI/NewAPI), with explicit `authMode` and custom `headers` support.
 
 ---
@@ -74,7 +75,7 @@ The plugin provides two parallel search pathways to satisfy both transparent dai
             └───────────────┬───────────────┘
                             ▼
                Unified Google Grounding Engine
-      (Shares 60s timeouts, fallback chain, and cache)
+      (Shares 180s/360s tiered timeouts, SSE, fallback & cache)
 ```
 
 | Entry Pathway | Invocation Method | Best For | Key Advantages |
@@ -112,12 +113,14 @@ No cloning or manual symlinks needed. Add the plugin directly to the `plugins` a
         "apiKey": "{env:GOOGLE_API_KEY}",       // Supports {env:VAR} and {file:path/to/key}
         "fallbackModels": [                     // Optional custom fallback chain
           "gemini-4-hydrogen",
+          "gemini-4-neon",
           "gemini-3.8-flash",
           "gemini-3.5-flash-lite"
         ],
         "cacheTtlMs": 600000,                   // Storage cache TTL in ms (default 10m; 0 disables)
-        "requestTimeoutMs": 60000,              // Single-model timeout (60s)
-        "timeoutMs": 180000,                    // Total fallback chain timeout (3m)
+        "requestTimeoutMs": 180000,             // Per-model timeout (default 180s / 3m; fallback Flash capped at 60s)
+        "timeoutMs": 360000,                    // Total fallback chain timeout (default 360s / 6m)
+        "streaming": true,                      // SSE streaming via :streamGenerateContent?alt=sse (default true)
         "authMode": "auto",                     // "auto" | "x-goog-api-key" | "bearer" | "both"
         "setDefaultWebsearch": true             // Set as default OpenCode V2 websearch provider
       }
@@ -171,7 +174,7 @@ When invoking via custom tools (`google_grounding` or `websearch_cited`), the fo
 | Argument | Type | Required | Description |
 | :--- | :--- | :---: | :--- |
 | `query` | `string` | **Yes** | The question or natural language search query. |
-| `model` | `string` | No | Optional Gemini model ID (e.g. `gemini-4-hydrogen`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.7-flash`). Provider prefixes and `#variant` suffixes are stripped automatically. |
+| `model` | `string` | No | Optional Gemini model ID (e.g. `gemini-4-hydrogen`, `gemini-4-neon`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`). Provider prefixes and `#variant` suffixes are stripped automatically. |
 | `context` | `string` | No | Optional extra background, constraints, or guidelines for the search. |
 | `max_sources` | `number` | No | Maximum number of grounded source links to return (1-20, default: `8`). |
 
@@ -189,8 +192,8 @@ When invoking via custom tools (`google_grounding` or `websearch_cited`), the fo
 
 > **Automatic Fallback Chain**:
 > If a model fails, hits rate limits, or returns empty/`MAX_TOKENS`/blocked output, the plugin tries the next candidate automatically:
-> `[Requested Model] -> gemini-4-hydrogen -> gemini-3.8-flash -> gemini-3.5-flash-lite -> gemini-3.7-flash -> gemini-3.1-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`.
-> You can override the default list via `options.fallbackModels` or the comma-separated `OPENCODE_GOOGLE_FALLBACK_MODELS` environment variable.
+> `[Requested Model] -> gemini-4-hydrogen -> gemini-4-neon -> gemini-3.8-flash -> gemini-3.5-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`.
+> You can override the default list via `options.fallbackModels` (pass `[]` to disable fallbacks) or the comma-separated `OPENCODE_GOOGLE_FALLBACK_MODELS` environment variable.
 
 ### 2. Base URL & Headers
 1. `options.baseURL` in plugin options.
@@ -209,8 +212,9 @@ Custom headers from `providers.google.headers` / `settings.headers` / `options.h
 5. Stored OpenCode credentials (`opencode.db` or legacy `~/.local/share/opencode/auth.json`) for `"google"` / `"indor"` (supports both API keys and OAuth `access` tokens).
 6. `providers.google.settings.apiKey` in live `ctx.provider`, project, or global `opencode.json(c)`.
 
-### 4. Thinking Level & Auth Mode
-- **`thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL`**: Left unset by default so `gemini-4-hydrogen` keeps its native server-side `HIGH` thinking depth. Set to `"LOW"`, `"MEDIUM"`, `"HIGH"`, or `"XHIGH"` to explicitly inject `generationConfig.thinkingConfig.thinkingLevel` for Gemini 3/4 models (`/^gemini-[34]/i`).
+### 4. Thinking Level, Streaming & Auth Mode
+- **`thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL`**: Left unset by default so Gemini 4 models keep their native server-side thinking depth. Set to `"MINIMAL"`, `"LOW"`, `"MEDIUM"`, `"HIGH"`, or `"XHIGH"` to explicitly inject `generationConfig.thinkingConfig.thinkingLevel` for Gemini 3/4 models (`/^gemini-[34]/i`), with automatic capability clamping when falling back (e.g. `XHIGH` → `HIGH` on Flash models).
+- **`streaming` / `OPENCODE_GOOGLE_STREAMING`**: Defaults to `true` (`:streamGenerateContent?alt=sse`) to prevent proxy/Cloudflare idle read timeouts during deep research. Set to `false` to use standard `:generateContent`.
 - **`authMode` / `OPENCODE_GOOGLE_AUTH_MODE`**: Defaults to `"auto"` (sends `x-goog-api-key` only on `*.googleapis.com`, `Authorization: Bearer` only for OAuth, and both headers on third-party proxies). Can be forced to `"x-goog-api-key"`, `"bearer"`, or `"both"`.
 
 ---

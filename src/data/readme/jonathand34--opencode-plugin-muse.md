@@ -1,9 +1,61 @@
-# opencode-plugin-muse
+# Muse Bridge for OpenCode
 
-Use Muse models in [opencode](https://opencode.ai) with the `muse` CLI login you
-already have. Muse appears in the model picker as the `muse` provider, and
-requests go through the signed-in `muse` CLI, so no Muse credential reaches
-opencode or your config.
+Use your Muse Code subscription inside [opencode](https://opencode.ai): Muse
+appears in the model picker as the `muse` provider, and every request runs
+through the signed-in `muse` CLI.
+
+[![npm version](https://img.shields.io/npm/v/@jonathand34/opencode-plugin-muse?label=npm)](https://www.npmjs.com/package/@jonathand34/opencode-plugin-muse)
+[![test](https://github.com/jond34/opencode-plugin-muse/actions/workflows/test.yml/badge.svg)](https://github.com/jond34/opencode-plugin-muse/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jond34/opencode-plugin-muse/blob/main/LICENSE)
+![tested pair](https://img.shields.io/badge/tested-opencode%202.4.1%20%C2%B7%20muse%201.4.25-lightgrey)
+
+## Quickstart
+
+OpenCode 2.x and Muse Code CLI 1.4.20 or newer, already logged in.
+
+1. `muse login`
+2. `opencode plugin add @jonathand34/opencode-plugin-muse@1.0.1`
+3. Restart opencode and pick a Muse model, for example
+   `opencode run -m muse/muse-ember-1.0 "hello"`.
+
+The same pin in a config file, without the CLI step:
+
+```jsonc
+// opencode.jsonc
+{ "plugins": ["@jonathand34/opencode-plugin-muse@1.0.1"] }
+```
+
+Tested pair: opencode 2.4.1 with Muse Code CLI 1.4.25. MIT. Unofficial: not
+affiliated with, endorsed by, or supported by Meta or opencode.
+
+![opencode's model picker filtered to Muse Code, then a Muse Ember turn that reads notes.md, runs ./count.sh through opencode's shell tool, and answers "notes.md has 7 lines"](https://raw.githubusercontent.com/jond34/opencode-plugin-muse/main/media/muse-bridge-demo.gif)
+
+Recorded 2026-11-24 with opencode 2.4.1, Muse CLI 1.4.25, and the published
+`1.0.0`: `/models` → Muse Ember, one prompt, one `opencode_bash` call. The
+project is synthetic and no credential appears.
+
+## Why this one
+
+- **OpenCode owns the turn.** opencode executes every tool call and keeps the
+  permissions, transcript, and history; Muse supplies inference. The plugin
+  turns Muse's own tools, workflows, and subagents off.
+- **No Muse credential leaves the CLI.** The plugin spawns the signed-in
+  `muse serve` host and holds no token; the API key opencode sees is a
+  placeholder that is never sent to Muse.
+- **Signed `1.0.0`, fixed bytes.** The npm tarball carries a SLSA provenance
+  attestation naming this repository, and the `v1.0.0` GitHub Release is
+  immutable. The build hash and what it does and does not prove are in
+  [docs/provenance.md](https://github.com/jond34/opencode-plugin-muse/blob/main/docs/provenance.md).
+
+Those three are also why this is a separate package and not a patch request. The
+first is a disagreement with upstream's default rather than a defect, and the
+third cannot be added to bytes that already shipped.
+[CREDITS.md](https://github.com/jond34/opencode-plugin-muse/blob/main/CREDITS.md)
+argues both.
+
+![opencode's model picker, showing Muse Ember under the Muse Code provider](https://raw.githubusercontent.com/jond34/opencode-plugin-muse/v1.0.0/media/opencode-model-picker.png)
+
+## What `1.0.0` means
 
 `1.0.0` is published on npm with an immutable `v1.0.0` GitHub Release. X9a on
 2026-11-24 passed on opencode 2.4.1 with Muse CLI 1.4.25: the plugin answered a
@@ -13,22 +65,19 @@ package. The package compiles against `@opencode/plugin` 2.3.2 and
 `@muse-code/sdk` 1.4.24; that compile pair is not a live-tested pair in this
 run. On 2.4.1, `opencode models`
 does not list the plugin-injected `muse/*` provider even though `opencode run -m
-muse/...` resolves it. See [compatibility](https://github.com/jond34/opencode-plugin-muse/blob/main/docs/compatibility.md). This is a
-republished build of
+muse/...` resolves it. See [compatibility](https://github.com/jond34/opencode-plugin-muse/blob/main/docs/compatibility.md).
+The package starts from
 [`@rasyid_rafi/opencode-muse`](https://www.npmjs.com/package/@rasyid_rafi/opencode-muse)
-with five patches. [CREDITS.md](https://github.com/jond34/opencode-plugin-muse/blob/main/CREDITS.md)
-has the diffs; [docs/provenance.md](https://github.com/jond34/opencode-plugin-muse/blob/main/docs/provenance.md)
-has the build hash and what it does and does not prove. The first two patches
-reconcile the published 0.1.9 tarball; the third contains Muse to inference, the
-fourth makes opencode own the context, and the fifth finishes the effort, prompt,
-and rewritten-history boundaries.
+0.1.9. Two of its five patches reproduce that tarball byte for byte; the others
+contain Muse to inference, hand the context to opencode, and finish the effort,
+prompt, and rewritten-history boundaries. [CREDITS.md](https://github.com/jond34/opencode-plugin-muse/blob/main/CREDITS.md)
+has each diff and the reasoning for a separate package;
+[docs/provenance.md](https://github.com/jond34/opencode-plugin-muse/blob/main/docs/provenance.md)
+has the build hash and what it does and does not prove.
 
-Unofficial: not affiliated with, endorsed by, or supported by Meta or opencode.
 Best-effort maintenance by one person, with no support commitment. It never holds
 Muse credentials and writes one file of its own (the token ledger); everything
 else it keeps is in memory.
-
-![opencode's model picker, showing Muse Ember under the Muse Code provider](https://raw.githubusercontent.com/jond34/opencode-plugin-muse/v1.0.0/media/opencode-model-picker.png)
 
 ## What it does
 
@@ -308,7 +357,7 @@ the wire contract is in
 ## Install
 
 ```bash
-opencode plugin add @jonathand34/opencode-plugin-muse@1.0.0
+opencode plugin add @jonathand34/opencode-plugin-muse@1.0.1
 ```
 
 If that fails (some opencode builds currently error in their embedded installer
@@ -467,6 +516,23 @@ media/      README screenshots
 ```
 
 Local-only records are kept out of this tree; see `AGENTS.md`.
+
+## Credit
+
+MIT throughout. The base is
+[`@rasyid_rafi/opencode-muse`](https://www.npmjs.com/package/@rasyid_rafi/opencode-muse)
+0.1.9, rebuilt so it can be checked from outside;
+[CREDITS.md](https://github.com/jond34/opencode-plugin-muse/blob/main/CREDITS.md)
+records the base commit, each of the five diffs, and why the differences live in
+a separate package.
+
+- `@rasyid_rafi/opencode-agent-harness-core` 0.1.0 — `src/contract/` and the
+  test harness.
+- [pgquiles/opencode-muse](https://github.com/pgquiles/opencode-muse) 1.1.0 —
+  the effort handling; the containment keys follow the settings
+  `pi-muse-subscription` established.
+- [muse-code-sdk](https://github.com/meta-models/muse-code-sdk) — the session
+  protocol this package and upstream both drive.
 
 ## Licence
 

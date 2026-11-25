@@ -9,17 +9,18 @@ Granola is a trademark of Granola, Inc.; this unofficial plugin is not endorsed 
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. Another release inside that range runs, and status
-  calls it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`; see
-  [Troubleshooting](#troubleshooting).
+- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1. Another release inside that range runs, and status calls it untested.
+  Outside the range the plugin does not start, unless you set `allowUntestedHost`; see [Troubleshooting](#troubleshooting).
 - macOS or Linux.
 - A Granola account. Granola's free plan includes the last 30 days of meeting history; transcripts and folders are
   paid features.
 
 ## Install
 
+Not released yet: `v0.0.0` is the first release. Once it is out:
+
 ```sh
-opencode plugin add github:joe-broadhead/opencode-granola#v0.0.10
+opencode plugin add github:we-the-rebel-alliance/granola-plugin#v0.0.0
 ```
 
 This adds the plugin to your global OpenCode config. Run `opencode reload`, or restart OpenCode. Then run
@@ -30,12 +31,14 @@ The install takes the GitHub release tag. Its commit carries the built `dist/`, 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.10" }] }
+{ "plugins": [{ "package": "github:we-the-rebel-alliance/granola-plugin#v0.0.0" }] }
 ```
 
-### Update
-
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.2`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-granola#v<version>`.
+Full documentation, including the capabilities and accounts guides, arrives with the contract release. Until then,
+[configuration](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/configuration.md),
+[architecture](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/architecture.md) and
+[scripting](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/scripting.md) describe this
+release.
 
 ## Sign in
 
@@ -64,7 +67,7 @@ account gets. On the free plan:
 
 The plugin adds one export tool, `export_markdown` (`granola_export_markdown`). It saves the notes, transcripts or both of 1
 to 20 meetings to one Markdown file in your export folder, without passing the text through the conversation. At the
-default `access: "all"` the `granola_export_markdown` action is allowed; `"ask-changes"` makes it ask, and `"read-only"`
+default `access: "all"` the `granola_export_markdown` action will run; `"ask-changes"` makes it ask, and `"read-only"`
 denies it. A destination outside the project may also prompt for OpenCode's separate `external_directory` permission;
 that is a path check, not an extra tool-action allow. Its inputs are `meeting_ids`, `content` (`notes`, `transcript` or
 `both`), an optional `path` inside the export folder, and `overwrite`. When your plan has no transcripts, the file holds
@@ -74,7 +77,7 @@ It also declares sources under the source contract (`package.json`'s `sources`).
 collector and other scripts, not for answering questions: `events_list` (`granola_events_list`) lists the meetings you
 took part in since a cursor, as normalised events with their summaries, oldest first, for the account it names (the
 source's accounts are named: the signed-in email), and the tools RPC method `probe` names who is signed in, which is
-how a consumer learns that email. `granola.meetings.list` is the same `search_meetings` read, verified through `get_meetings`, as the contract's `list` output, so an app can render it without knowing Granola. `granola.meetings` is not renamed. Both only read, and never ask. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
+how a consumer learns that email. `granola.meetings.list` is the same `search_meetings` read, verified through `get_meetings`, as the contract's `list` output, so an app can render it without knowing Granola. `granola.meetings` is not renamed. Both only read, and never ask. See [Events list](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/configuration.md#events-list).
 
 To see the connection, the workspace, the tools and the next step:
 
@@ -87,7 +90,7 @@ only. Until then, status says the workspace is unknown; ask the agent to check y
 
 ### Scripts
 
-A script or a cron job can call Granola's tools with no model, through `opencode api`. It runs as a session and its
+A script or an automation can call Granola's tools with no model, through `opencode api`. It runs as a session and its
 agent, under that agent's permission rules and the session's own. Every known tool is a method. A call runs only when
 the resolved rule is `allow`: at the default `access: "all"` the plugin's block allows every method, so a script needs
 no extra tool-action rule to read, write, send or export. An unattended export outside the project still needs
@@ -105,14 +108,15 @@ opencode api post /api/rpc/granola.meetings.tools/search_meetings \
 The header names the location whose plugin and session you mean; without it the call goes to your home directory and
 fails `rpc.unavailable` when the plugin is not loaded there.
 
-See [Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md).
+See [Scripting](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/scripting.md).
 
 ## Permissions
 
-**Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied. At its default, `"all"`, an agent can read your meetings, transcripts and notes, and change them: create,
-rename and fill folders, update private notes, generate a summary, send `give_feedback` to Granola's team on its own
-(Granola's instructions tell it to), and export Markdown into the export folder. Nothing here deletes a meeting, but a
-write changes what you keep, and an export writes a file outside the project. Restrict it in any of these three ways:
+**Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied. At its
+default, `"all"`, an agent can read your meetings, transcripts and notes, and change them: create, rename and fill
+folders, update private notes, generate a summary, send `give_feedback` to Granola's team when the user asks for it,
+and export Markdown into the export folder. Nothing here deletes a meeting, but a write changes what you keep, and an
+export writes a file outside the project. Restrict it in any of these three ways:
 
 1. **The `access` option**, which drives the default rules the plugin inserts:
 
@@ -123,7 +127,7 @@ write changes what you keep, and an export writes a file outside the project. Re
    | `"read-only"` | the read tools | nothing: everything else is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-granola#v0.0.10", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:we-the-rebel-alliance/granola-plugin#v0.0.0", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that asks, or reads only**, with rules of its own, later than the plugin's:
@@ -136,8 +140,8 @@ write changes what you keep, and an export writes a file outside the project. Re
    ```
 
 3. **A rule per tool**, with the exact names in
-   [`src/known-tools.ts`](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/src/known-tools.ts). A later rule
-   wins, and a `deny` on `*` also hides the tool from the model:
+   [`src/known-tools.ts`](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/src/known-tools.ts). A
+   later rule wins, and a `deny` on `*` also hides the tool from the model.
 
    ```json
    { "permissions": [
@@ -180,8 +184,8 @@ The plugin inserts this block directly after each agent's base "allow everything
 ```
 
 An export folder is outside the project, so OpenCode asks for `external_directory` as well as the export's own action;
-[Markdown export](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#permission) has that
-rule.
+[Markdown export](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/configuration.md#permission)
+has that rule.
 
 Everything later than these rules still wins: an agent's own stricter rules (Explore cannot use Granola), your
 `permissions` in `opencode.json`, and your saved answers. In `opencode run` and other runs where nobody can answer, a
@@ -196,28 +200,8 @@ nothing and is not named. Do not put the block in the top-level `permissions`, w
 
 Three options, all optional: `exportDirectory`, an absolute path for exports (default: `Granola` in your home folder);
 `allowUntestedHost`; and `access`, which decides whether every tool runs, the changes ask, or only the reads run. The
-[configuration guide](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md) covers them,
-the full rule block, recipes, the export and every error code.
-
-## Organisation rollout
-
-Granola needs no client ID or app registration, so an organisation only installs the plugin for its members. Put the
-plugin in the system config, which outranks each member's own config: `/etc/opencode/opencode.json` on Linux, or
-`/Library/Application Support/opencode/opencode.json` on macOS.
-
-```jsonc
-{
-  "plugins": [
-    {
-      "package": "github:joe-broadhead/opencode-granola#v0.0.10",
-      "options": { "exportDirectory": "<an absolute path>/Granola" }
-    }
-  ]
-}
-```
-
-Each member then signs in once with `/connect` → Granola. A managed `mcp.servers.granola` entry for
-`https://mcp.granola.ai/mcp` is used as it is.
+[configuration guide](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/configuration.md) covers
+them, the full rule block, recipes, the export and every error code.
 
 ## Troubleshooting
 
@@ -233,7 +217,7 @@ exactly one `Next step`. Every error the plugin raises has a code and a next ste
 | `CONNECTION_FAILED` | The connection failed. | Reconnect Granola from `/mcps`, and if it keeps failing, run `/connect` and choose Granola to sign in again. |
 | `DISABLED` | `granola` is disabled in OpenCode. | Enable `granola` in `/mcps`, or remove `"disabled": true` from `mcp.servers.granola` in your OpenCode config. |
 | `TOOL_UNAVAILABLE` | Granola does not offer that tool for this account. | Your Granola plan may not include it; `/granola-status` lists the tools Granola offers you. |
-| `HOST_UNTESTED` | OpenCode is outside `>=2.2.3 <2.4.0`. | Use OpenCode `>=2.2.3 <2.4.0`, or set `allowUntestedHost: true` to run anyway. |
+| `HOST_UNTESTED` | OpenCode is outside `>=2.4.1 <2.5.0`. | Use OpenCode `>=2.4.1 <2.5.0`, or set `allowUntestedHost: true` to run anyway. |
 | `OPTIONS_INVALID` | A plugin option has an unknown name or a wrong type. | The message names the option; fix the Granola plugin options in `opencode.json`. |
 | `STATUS_UNAVAILABLE` | Status could not be read. | Run `/granola-status` again in a few seconds. |
 | `SKILLS_INVALID` | A bundled skill file is missing or broken. | Reinstall the plugin. |
@@ -262,10 +246,10 @@ loading for a few seconds. Run it again, or use `/connect`, which updates live.
 **A tool says your Granola plan does not include it, or `TOOL_UNAVAILABLE`.** Granola's free plan has no
 transcripts or folders.
 
-**`HOST_UNTESTED`.** The plugin does not start on an OpenCode version outside `>=2.2.3 <2.4.0`, including
-development builds. Use OpenCode `>=2.2.3 <2.4.0`, or set the plugin option `allowUntestedHost: true` to run anyway;
+**`HOST_UNTESTED`.** The plugin does not start on an OpenCode version outside `>=2.4.1 <2.5.0`, including
+development builds. Use OpenCode `>=2.4.1 <2.5.0`, or set the plugin option `allowUntestedHost: true` to run anyway;
 the `OpenCode` row then says `host untested`, and when nothing else is needed the next step says to use a tested
-release if Granola misbehaves. A release inside the range other than 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2 runs normally: only the
+release if Granola misbehaves. A release inside the range other than 2.4.1 runs normally: only the
 `OpenCode` row calls it untested.
 
 **`OPTIONS_INVALID`.** A plugin option has an unknown name or a wrong type. The message names the option.
@@ -280,7 +264,7 @@ overwrites it. An entry for Granola's official URL is used as it is.
 never sees the plugin's. Rename its folder and its `name`, or move it, as the next step says.
 
 **A script gets an error.** The tools RPC has its own codes, listed in
-[Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md#errors).
+[Scripting](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/scripting.md#errors).
 
 Granola uses the workspace that is active in your Granola app; meetings in other workspaces do not appear. The plugin
 supports one Granola account.
@@ -292,7 +276,7 @@ it cannot remove its sign-in, and `opencode auth list` stops showing it.
 
 1. Sign out of Granola: `opencode mcp logout granola`.
 2. Check: `opencode auth list` no longer lists **Granola**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-granola#v0.0.10`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:we-the-rebel-alliance/granola-plugin#v0.0.0`, then `opencode reload`.
    `opencode mcp list` no longer lists `granola`.
 4. Remove any Granola rules you copied into your agents' own `permissions`.
 
@@ -303,22 +287,22 @@ Files you exported stay in your export folder.
 - **Granola's server decides what the tools reach.** The plugin registers the tools Granola's server lists. A tool Granola adds later is not classed by the plugin: the `access` option decides whether it runs, asks or is denied, and `/granola-status` counts it as unknown.
 - **Plan limits.** Granola's free plan has no transcripts or folders, and its meeting history covers the last 30 days. Exports say what is missing rather than working around it.
 - **Exports are bounded.** An export takes 1 to 20 meetings and at most 8 MB; a transcript that does not fit is cut with a note. The file goes outside the project, so OpenCode also asks for `external_directory`.
-- **`give_feedback` reaches Granola's team.** It is allowed by default, and the skill tells the model to send it only when the user asks.
+- **`give_feedback` reaches Granola's team.** The skill sends it only when the user asks, whatever the server's own text says.
+- **The server's own instructions pass through.** OpenCode 2.4.1 offers no way to drop or replace an MCP server's text,
+  so the plugin counters the parts that claim another owner's job in its namespace line: `give_feedback` only when the
+  user asks, and Memory first for who the user is.
 - **No retries.** The plugin does not retry a failed call. The error names the next step.
-- **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, but the free plan's history does: `probe` records the plan `get_account_info` names, for a day, and on the free plan, or with no plan recorded in the last day, a listing whose cursor or `since` is more than 29 days old answers a `window-truncated` gap once and lists from there, so a consumer knows to resync; later pages of that read neither repeat the gap nor skip a meeting the plan still shows. A paid plan has no window and no gap. A move to the free plan within a day of `probe`, with a cursor more than 29 days behind, is still listed without a gap: re-probe after a plan change. The v0.0.3 and v0.0.4 sources listed only what the plan still showed, with no gap. Switching the active workspace changes what a listing reads under the same account.
-- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified. The synthetic account is on the free plan and the first listing starts before its 30 days, so the kit checks the `window-truncated` gap is answered once per read. Its report is complete and ok: every check that applies ran. It marks 14 checks not applicable for `granola.meetings` and 18 for `granola.meetings.list`; the two reasons the source states are for `failed-holds-cursor` (no meeting fails on its own; a failed read fails the whole listing) and `gap-and-cursor-expired` (no cursor is ever refused as expired; the source never answers `CURSOR_EXPIRED`, and the free plan's lost history is the window gap). The report gives no reason for the other checks that do not apply.
-- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, and runs on macOS or Linux. A later 2.2 or 2.3 release starts and is reported as untested.
-- In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
-  older Jelly refuses the plugin's whole declaration.
-- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
+- **The meetings source sees what Granola's MCP sees.** Granola's MCP reads only the active workspace, and on the free (Basic) plan only notes from the last 30 days; its rate limits vary by plan and tool and average about 100 requests per minute across all tools ([Granola MCP](https://docs.granola.ai/help-center/sharing/integrations/mcp)). A listing reads `search_meetings` once per page of each week, and `get_meetings` once per 10 meetings. A cursor never expires, but the free plan's history does: `probe` records the plan `get_account_info` names, for a day, and on the free plan, or with no plan recorded in the last day, a listing whose cursor or `since` is more than 29 days old answers a `window-truncated` gap once and lists from there, so a consumer knows to resync; later pages of that read neither repeat the gap nor skip a meeting the plan still shows. A paid plan has no window and no gap. Switching the active workspace changes what a listing reads under the same account.
+- **The meetings source's test data is invented.** The conformance kit runs on a synthetic Granola whose answers follow the shapes Granola's live tools returned when last checked, and the note-access scopes as `get_account_info`'s own description gives them; their content is made up, modelled on the provider's docs, not live-verified.
+- **Hosts and platforms.** The plugin is tested on 2.4.1, and runs on macOS or Linux. A later release inside the range starts and is reported as untested.
 
 ## Links
 
-- [Configuration](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md)
-- [Architecture](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/architecture.md)
-- [Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md)
-- [Contributing](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/CONTRIBUTING.md)
-- [Security](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/SECURITY.md)
-- [Changelog](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/CHANGELOG.md)
-- [License](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/LICENSE)
-- [Issues](https://github.com/joe-broadhead/opencode-granola/issues)
+- [Configuration](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/configuration.md)
+- [Architecture](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/architecture.md)
+- [Scripting](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/docs/scripting.md)
+- [Contributing](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/CONTRIBUTING.md)
+- [Security](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/SECURITY.md)
+- [Changelog](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/CHANGELOG.md)
+- [License](https://github.com/we-the-rebel-alliance/granola-plugin/blob/master/LICENSE)
+- [Issues](https://github.com/we-the-rebel-alliance/granola-plugin/issues)

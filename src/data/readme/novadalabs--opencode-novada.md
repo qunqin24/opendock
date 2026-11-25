@@ -19,9 +19,13 @@ Or add it to `opencode.json` yourself:
 }
 ```
 
-## Sign in
+## Credentials
 
-Open OpenCode, run `/mcps`, select `novada`, and sign in with your Novada account in the browser (OAuth). New accounts start with $10 in free credits, no credit card. Check your balance any time by asking the agent to run `novada_setup`.
+1. Sign up at [novada.com](https://www.novada.com/?npm-opencode-novada). **Novada MCP comes with $10 in free credit for every new account, no credit card required.** To keep going after the free credit, buy a Scraper API or Web Unblocker plan on the [pricing page](https://www.novada.com/pricing/scraping-solutions/).
+2. Open OpenCode, run `/mcps`, select `novada`, and sign in with your Novada account in the browser (OAuth). No API key is needed for this.
+3. Prefer an API key? Open the [Novada dashboard](https://dashboard.novada.com/), go to **API Playground** and copy your API key, then add the server yourself as shown under [What the plugin does](#what-the-plugin-does).
+
+The key is sent as `Authorization: Bearer <API key>`. Check your balance any time by asking the agent to run `novada_setup`.
 
 ## What the plugin does
 
