@@ -248,6 +248,10 @@ Two tools, each taking an `operation` plus its arguments, and an optional `profi
 
 Write operations act with the permissions of the chosen profile, as the CLI commands do.
 
+`pipeline_trigger` and `pipeline_rerun` take `wait` to block until the pipeline finishes. A long call (a `wait`, `pr_pipelines`, `pipeline_view` with logs, or a listing with `limit` above 25) runs as an MCP task, with progress heartbeats and `tasks/cancel` stopping the work, for a client that declares the `io.modelcontextprotocol/tasks` extension; every other call, and every call from a client without the extension, answers in the request itself.
+
+The server also serves the bitbucket skill, which says how to use the tools, as the resource `skill://bitbucket/SKILL.md` (and through the MCP skills extension, `skills/list` and `skills/get`). Its instructions tell the model to read it first.
+
 ## ⚙️ Configuration
 
 Configuration is stored in `~/.config/bitbucket-cli/config.toml`:

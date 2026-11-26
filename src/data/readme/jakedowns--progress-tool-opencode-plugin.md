@@ -19,8 +19,10 @@ without looking dead, plus a **zero-token-burn out-of-band relay** so the agent
 never has to poll `stdout` just to keep the UI alive. Token cost scales with
 milestones, not with task duration.
 
-Two MCP tools back this: `progress` (write) and `list` (read-only companion:
-your session's trees as text, with dismissed entries hidden). **The tree is the
+Three MCP tools back this: `progress` (write), `progress_touch` (refresh an
+entry's timestamp/detail without changing its status or progress), and `list`
+(read-only companion: your session's trees as text, with dismissed entries
+hidden). **The tree is the
 glance-able layer above the transcript** — thought traces and command output are
 a wall of text; the rollup is the live view of what is happening, what is
 blocked, and what is next.
@@ -29,7 +31,7 @@ Implements the [Agent Progress Tool proposal](https://gist.github.com/jakedowns/
 for OpenCode 2, and is written as a portable reference implementation any
 harness can copy or adapt.
 
-**Versions:** MCP server `2.11.0` · OpenCode plugin `2.21.2`
+**Versions:** MCP server `2.12.0` · OpenCode plugin `2.26.0`
 
 > **Advanced docs:** [schema, relay internals, state store, architecture, all
 > options, file map →](./README-advanced.md)
@@ -127,10 +129,45 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 
 ---
 
+## Custom nudges
+
+Custom nudges are **opt-in**: add `customNudges: true` to the plugin's options.
+They let a user or agent define the text, trigger, cooldown, criteria,
+lifetime, and delivery of an additional **model-facing** reminder.
+
+```text
+/progress nudge                 # wizard (session, project, or global scope)
+/progress nudge list
+/progress nudge on project:stale-build
+```
+
+Palette: **Progress: custom nudge…** and **Progress: custom nudge status**.
+Rules can also be edited directly in `~/.config/opencode/progress-nudge.json`
+or `<project>/.opencode/progress-nudge.json`.
+
+- Text supports `{id}`, `{title}`, `{status}`, `{age}`, `{count}`, `{action}`.
+- Triggers: interval, model steps, either, or event-only.
+- Criteria: status, stale age, no-progress time/steps, in-flight, tree
+  empty/non-empty, idle-only, entry ids, and session scope.
+- Delivery: replace built-ins, alongside them, or a synthetic `block` message.
+- TTL and a fire cap (one-shot) keep temporary rules temporary.
+
+Agent tool `progress_nudge` is **session-scoped only**; project/global rules
+require the user-facing slash command, palette, or config file. Agents can
+always quiet non-block reminders for the session with
+`progress_nudge({ action: "mute", minutes: 30 })`, even when the rule editor is
+disabled. See
+[README-advanced.md](./README-advanced.md#custom-nudges) for the full schema,
+files, presets, and semantics.
+
+---
+
 ## What the views do
 
 - **Desktop/web pill:** one row per root, with `(N · agg%)` when several roots
-  exist, hover details, and a menu with the full tree. Set
+  exist, hover details, and a menu with the full tree. The footer links the
+  plugin version to the repo's **Releases** page, and **[Settings]** opens a
+  read-only panel of the effective view, reminder, and data options. Set
   `guiLayout: "sidebar"` to move the tree into a pinned tab in the session's
   side panel (`guiSidebarWidth` sets its initial width), or use the pill's
   `[Sidebar]` action / the "Progress: swap layout" command at runtime.
@@ -138,10 +175,15 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
   (default `1` line with `…`; `0` hides details; `-1` shows full text).
   `treeTheme: "compact"` renders tree rows (pill popover and sidebar) without
   progress-bar glyphs or the started line, with a single clamped detail line
-  and a `40% · & N more` meta suffix. The composer pill capsule itself keeps
-  its `barStyle` rendering. Use the **Progress: switch tree theme** palette
-  command to pick **ASCII**, **Emoji**, or **Compact**; each option shows a
-  live preview of its bars. The choice applies immediately and is saved as
+  and a `40% · & N more` meta suffix. `treeTheme: "ultra-compact"` goes further:
+  one title line only, with a status-light emoji, a small `5m ago` prefix
+  (hover it for start→end and total duration), and the dismiss button. The
+  title is regular weight at 12px.
+  There is **no progress bar, percentage, `started` row, detail, or `& N more`**;
+  rows use 3px total spacing and the tree has a 5px outer margin. The composer pill capsule
+  itself keeps its `barStyle` rendering. Use the **Progress: switch tree theme**
+  palette command to pick **ASCII**, **Emoji**, **Compact**, or **Ultra**;
+  each option shows a live preview. The choice applies immediately and is saved as
   `treeTheme` plus `barStyle` in the OpenCode config that declares the plugin.
   Expanded child rows use the same `└─` branch prefix as the TUI, placed before
   the status dot.
@@ -191,7 +233,8 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 - **Subagents:** child sessions are mapped to their parent automatically
   (`session.created` → `~/.opencode-progress-sessions.json`), and the parent id
   is stamped into subagent prompts as a fallback. Roots created by a child
-  render as `[Subagent (Explore)]: Title`.
+  render as `[subagent <session name>]: Title` (name truncated to 20 chars);
+  hover the row to see the subagent type.
 - Entries are retained by default so the store doubles as a report. Opt into
   pruning with `PROGRESS_AUTO_PRUNE_S` (and `PROGRESS_STALE_MS` for orphans).
 
@@ -207,7 +250,9 @@ Multi-line titles and details accept real newlines, `\n` / `\r\n`, or `<br>`.
 | `guiLayout` | Desktop/web placement: `"composer"` pill (default) or pinned `"sidebar"` panel |
 | `guiSidebarWidth` | Desktop sidebar initial width in CSS pixels (default 360, clamp 240-800) |
 | `guiDetailLines` | Detail line cap in pill menu and sidebar: `-1` full, `0` hidden, `n` lines (default 1) |
-| `treeTheme` | Tree row theme: `"default"` or `"compact"` (no bars/started line, one detail line; pill capsule unaffected). The **Progress: switch tree theme** preset picker writes this and `barStyle` back to the config |
+| `treeTheme` | Tree row theme: `"ultra-compact"` (default; title + status-light emoji + age + dismiss), `"compact"` (no bars/started line, one detail line), or `"default"` (bars). The **Progress: switch tree theme** preset picker writes this and `barStyle` back to the config |
+| `indicatorStyle` | Status indicator: `"dot"` (default), `"circles"`, or `"checkbox"`. The **Progress: indicator style** command saves it globally (project config fallback) |
+| `customNudges` | Enable custom nudge rules, the `progress_nudge` tool, and their TUI/palette commands (default `false`) |
 | `taskListFile` | Mirror tasks to a local Markdown checklist (default off) |
 | `taskListLocation` | `1` = project root (default), `0` = `.progress/`, `2` = `~/.opencode-progress/` |
 | `taskListView` | `"ui"` (hide dismissed + rolled-up status) or `"raw"` |

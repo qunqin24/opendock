@@ -5,8 +5,8 @@
 [![Publish](https://github.com/St1ggy/opencode-navigator/actions/workflows/publish.yml/badge.svg?event=release)](https://github.com/St1ggy/opencode-navigator/actions/workflows/publish.yml)
 [![License](https://img.shields.io/github/license/St1ggy/opencode-navigator)](LICENSE)
 
-[![OpenCode 1.x minimum: 1.19.5](https://img.shields.io/badge/OpenCode%201.x-min%201.19.5-4c8bf5)](#installation)
-[![OpenCode 2.x minimum: 2.2.6](https://img.shields.io/badge/OpenCode%202.x-min%202.2.6-4c8bf5)](#installation)
+[![OpenCode 1.x TUI](https://img.shields.io/badge/OpenCode%201.x-TUI-4c8bf5)](#installation)
+[![OpenCode 2.x TUI](https://img.shields.io/badge/OpenCode%202.x-TUI-4c8bf5)](#installation)
 [![Desktop experimental](https://img.shields.io/badge/Desktop-experimental-orange)](#experimental-opencode-desktop)
 [![Monthly npm downloads](https://img.shields.io/npm/dm/opencode-navigator?label=npm%20downloads%2Fmonth)](https://www.npmjs.com/package/opencode-navigator)
 
@@ -56,7 +56,13 @@ Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
-**Minimum supported releases: OpenCode 1.19.5 (1.x) and 2.2.6 (2.x).**
+**Navigator supports both OpenCode 1.x and 2.x TUI lines.**
+
+The package metadata describes the base plugin API requirements. Optional features
+follow the public APIs exposed by the running host and selected server, not a
+version list. Navigator hides unsupported controls or explains the limitation
+where the feature is already expected. Disabled settings, loading, connection
+failures, and retryable errors are not reported as unsupported.
 CI checks both these floors and the current stable endpoints, **1.19.6** and
 **2.3.2**. Future OpenCode major versions are outside these ranges. The 2.x
 integration uses the host's OpenTUI runtime
@@ -287,8 +293,9 @@ the OpenCode 1.x launch must not load Navigator's 2.x server plugin.
 
 ### Experimental OpenCode Desktop
 
-Navigator exports `./gui-experimental` for **OpenCode Desktop 2.2.6 and newer
-within 2.x**. The packaged checks cover 2.2.6 and 2.3.2. This is not browser Web
+Navigator exports `./gui-experimental` for **OpenCode Desktop 2.x** builds with
+its public GUI plugin API. CI checks an earlier published contract and the current
+stable package. This is not browser Web
 support or a detached operating-system window. Navigator versions before
 0.27.0 do not include the GUI export.
 
@@ -687,8 +694,8 @@ response bodies. HTTP-only observations may be absent on WebSocket transports.
 REST reads use a short in-memory cache; Refresh bypasses it. Observed headers older
 than two minutes are marked stale instead of presented as current remaining quota.
 
-Navigator shares the host's Solid/OpenTUI runtime. Development and CI use Bun 1.4.4
-and Node 26.12.1; OpenTUI 0.8's supported Node path starts at 26.4.0. A confirmed
+Navigator shares the host's Solid/OpenTUI runtime. Development and CI use Bun 1.4.5
+and Node 26.13.1; OpenTUI's supported Node path starts at 26.4.0. A confirmed
 pinned-snapshot update verifies its target with supported Bun (at least 1.3.14)
 or Node before switching the wrapper. If neither is available, the running snapshot
 is preserved with guidance; the updater does not install a runtime globally.
@@ -1124,8 +1131,8 @@ session or workspace dismisses the entire search dialog chain.
 
 ## Scripts
 
-Development uses Bun 1.4.4 and stable TypeScript 6.0.3. Standalone Node/OpenTUI paths
-require Node.js 26.4 or newer; CI pins Node 26.12.1. Install dependencies with
+Development uses Bun 1.4.5 and stable TypeScript 6.0.3. Standalone Node/OpenTUI paths
+require Node.js 26.4 or newer; CI pins Node 26.13.1. Install dependencies with
 `bun install --frozen-lockfile`.
 
 Oxlint uses the `solid-ox` preset from

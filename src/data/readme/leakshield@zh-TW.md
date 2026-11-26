@@ -40,6 +40,7 @@ MCP Server 模式已移除。它依賴模型在已收到相關 context 後自行
 - **Claude Code**（實驗性）：透過本機 proxy（`leakshield --claude-code-proxy`，再設定 `ANTHROPIC_BASE_URL`），已用 Claude Code 2.1.321 搭配本機替身上游驗證（[紀錄](docs/evidence/2026-11-21-claude-code-proxy.md)）。它會遮罩模型請求並還原助理文字，但還不會在工具執行時還原 placeholder。詳見 [Claude Code](docs/claude-code.zh-TW.md)。
 - 尚未驗證：Windows 與 Linux 的 OS keychain 持久化（macOS 已於 2026-10-20 驗證）、真實 Anthropic provider、其他 provider 的長對話、長時間使用（[#26](https://github.com/jwcrystal/leakshield/issues/26)）。
 - `0.x` 期間預設值仍可能調整，變更見 [CHANGELOG](CHANGELOG.md)。
+- 後續方向見 [Roadmap](docs/ROADMAP.md)，區分優先工作、候選與研究，不代表目前支援範圍。
 - 驗證紀錄：[docs/evidence](docs/evidence/README.md)。漏洞請私下回報：[SECURITY.md](SECURITY.md)。授權：[Apache-2.0](LICENSE)。
 
 ---
@@ -195,7 +196,7 @@ npm run build
 
 ### 保護範圍與不保護的部分
 
-LeakShield 保護送往模型的對話內容：prompt、重播的歷史、工具輸出，以及可解析其結構的 provider 請求 body。各宿主涵蓋的程度不同，`leakshield --doctor <host>` 與[宿主能力矩陣](docs/host-capabilities.md)會列出來。它**不是**工具對外連線的防火牆：被允許的本機工具仍可透過 `curl`、遠端 MCP server 或任何其他管道把原文傳出去。要管控工具的目的地，需要 LeakShield 之外的權限層。從 0.3.0 起，`curl` 與 `http` 的參數內也可以放 placeholder，讓工具帶著受保護的值呼叫 API；這時原文會依設計離開本機。
+LeakShield 保護送往模型的對話內容：prompt、重播的歷史、工具輸出，以及可解析其結構的 provider 請求 body。各宿主涵蓋的程度不同，`leakshield --doctor <host>` 與[宿主能力矩陣](docs/host-capabilities.md)會列出來。它**不是**工具對外連線的防火牆：被允許的本機工具仍可透過 `curl`、遠端 MCP server 或任何其他管道把原文傳出去。要管控工具的目的地，需要 LeakShield 之外的權限層。宿主或其相依套件自行送出的流量也一樣，例如 telemetry、使用分析與 crash report：這些流量不經過模型邊界，LeakShield 看不到，即使 provider 採零資料保留（ZDR）也不例外。要限制這類流量，得靠宿主本身的設定，或 OS 層級的沙箱、防火牆。從 0.3.0 起，`curl` 與 `http` 的參數內也可以放 placeholder，讓工具帶著受保護的值呼叫 API；這時原文會依設計離開本機。
 
 偵測也有已知缺口：街道／郵遞地址、日期、IPv6，以及關鍵字清單之外或短於 8 字元的一般賦值都不會被偵測。信用卡與 IBAN 只有在檢查碼驗證通過時才會命中；IP 偵測只涵蓋公開 IPv4（超過四段的點分數字會整段回報，避免內嵌位址漏遮；`2026.10.21.14.32.59` 這類點分日期也會回報）；護照只讀 MRZ 那一行；美國 SSN、台灣統一編號、電話與 URL 偵測需手動開啟，見[偵測範圍](#偵測範圍)。
 

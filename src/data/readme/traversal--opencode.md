@@ -10,7 +10,7 @@ Each plugin bundles:
 | Agent | Plugin | Authentication |
 |---|---|---|
 | Claude Code | [`plugins/claude`](plugins/claude) | Traversal API key, prompted on install |
-| Cursor | [`plugins/cursor`](plugins/cursor) | Traversal API key, set in the Cursor dashboard |
+| Cursor | [`plugins/cursor`](plugins/cursor) | Sign in to Traversal, or a Traversal API key (see [`plugins/cursor`](plugins/cursor)) |
 | Codex | [`plugins/codex`](plugins/codex) | Sign in to Traversal |
 | OpenCode | [`plugins/opencode`](plugins/opencode) | Sign in to Traversal, or a Traversal API key in `TRAVERSAL_API_KEY` |
 
@@ -27,7 +27,7 @@ claude plugin install traversal@traversal
 
 ### Cursor
 
-Install **Traversal** from the Cursor Marketplace, then set `TRAVERSAL_API_KEY` under **Plugins → Configure**.
+Install **Traversal** from the Cursor Marketplace, then click **Connect** next to Traversal in **Cursor Settings → Tools & MCP** and sign in.
 
 ### Codex
 

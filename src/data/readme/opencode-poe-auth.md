@@ -162,6 +162,8 @@ poe-code models --search claude
 
 ## SDK
 
+Safe Bash offers opt-in [trash commands](packages/safe-bash-command-trash/README.md) backed by atomic filesystem operations. Native providers can route `rm` through the same recoverable deletion policy.
+
 The Rust [spreadsheet API](packages/safe-bash-rust/README.md) supports batch editing, formula recalculation, sparse tables, editable pivot tables, JSON persistence, and XLSX import/export in native applications and WebAssembly. Formula parsing and reference updates share the workbook engine; rejected edit batches preserve the previous workbook.
 
 WebVTT re-encoding removes initial ASCII dialogue spaces, preserving tabs, later-line indentation, trailing spaces, and stream-copy text. Unfinished WebVTT tags suppress enclosed text while preserving line breaks and decoded entities; stream copy preserves the original cue text. Signed MPL2 timestamps retain cue durations and spacing; WebVTT and SRT output shift negative starting timestamps to zero by default. Safe Bash FFmpeg `showwavespic` accepts generic `threads`, `thread_type`, and `extra_hw_frames` settings without changing pixels. It succeeds when upstream audio filters emit no samples, producing no raw frames and header-only `framemd5` output. FFmpeg Targa output honors `-pix_fmt bgr24`, `bgra`, `rgb555le`, `gray`, and `pal8` for both pixels and file storage. Safe Bash `join` distinguishes missing and extra file operands with GNU-style errors and a help hint, and quotes file-open operands with native error reasons. Safe Bash Git requires `git merge --allow-unrelated-histories` to combine histories without a common ancestor; otherwise it refuses without changing HEAD, index, or worktree.
@@ -289,7 +291,7 @@ These features are available but subject to breaking changes.
 - **[Pipeline](packages/pipeline/)** — Run task plans with configurable steps, live task progress, queued follow-up messages, and plans you can add while the TUI is running.
 - **[Ralph](packages/ralph/)** — Agentic build loop that iterates on a markdown doc
 - **[Experiment loop](packages/experiment-loop/)** — Karpathy-style optimize loop: agent changes code, eval script scores it, keep or discard via git, repeat.
-- **[Poe Agent](packages/poe-agent/)** — Composable agent runtime with interrupt, follow-up and queued input, shared safe-fs access, and user/system skill loading
+- **[Poe Agent](packages/poe-agent/)** — Composable agent runtime with parallel tool calls, interrupt, follow-up and queued input, shared safe-fs access, and user/system skill loading
 
 
 ### Update Poe Code

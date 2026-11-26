@@ -16,10 +16,11 @@ Open [`packages/`](packages), or take a row from the table below. Each package i
 | oc-harness-setup | CLI | `1.0.2` | Installs a Windows OpenCode starter, behind a doctor gate. | `npx --yes oc-harness-setup setup` |
 | oc-plugin-view | plugin | `0.2.0` | Lists every loaded server plugin in the sidebar. | `opencode plugin add oc-plugin-view` |
 | oc-talk | plugin | `0.6.2` | Sends addressed synthetic notes between sessions and reads the replies. | Add `oc-talk` to `plugins`. |
-| rea-shim | CLI | `0.3.0` | Installs and launches the pinned Craft Anything desktop app on Windows x64 in one command. | `npx -y rea-shim@latest` |
+| oc-title | plugin | `0.1.0` | Carries session state in the title: active, parked or closed, with scope refresh. | Add `oc-title` to `plugins`. |
+| rea-shim | CLI | `0.4.0` | Installs and launches Craft Anything on Windows x64, or serves it as a headless MCP with --mcp. | `npx -y rea-shim@latest` |
 | oc-collections | repo | — | This index and the npm-workspaces monorepo behind it. | — |
 
-An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once. `oc-graphify` is private, so it loads from this repo instead of the registry, by GitHub specifier such as `github:nathwn12/oc-collections#main::path:packages/oc-graphify`. It carries no version row.
+An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once.
 
 ## Requirements
 

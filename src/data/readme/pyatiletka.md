@@ -41,6 +41,51 @@ No v2 o plugin aceita opcoes, lidas como `ctx.options`:
 }
 ```
 
+### Worktree por marco e nvim (opencode v2)
+
+O pacote tem uma parte TUI, carregada junto com a parte servidor pelo mesmo
+`plugins` do `opencode.json`. Quando `issue_bind` conclui numa issue com marco,
+a TUI pergunta o que fazer:
+
+- criar uma worktree nova para o marco e abrir o `nvim` nela;
+- reusar a worktree que ja existe;
+- criar outra quando a worktree do marco ja esta em uso por outra sessao;
+- so abrir o terminal, sem worktree;
+- nao fazer nada.
+
+A sessao atual e movida para a worktree escolhida. O nome e
+`marco-<slug do marco>`, e o opencode acrescenta um sufixo quando o nome ja
+existe. A worktree fica em `~/.local/share/opencode/worktree/<projectID>/`,
+como qualquer worktree criada pelo opencode.
+
+O `nvim` abre no terminal persistente do opencode, o mesmo painel do `/terminal`,
+na raiz da worktree e sem arquivo. O `nvim` precisa estar no `PATH` do servidor.
+
+A pergunta da worktree usa o dialogo nativo da TUI. O bind em si e confirmado
+antes com a tool `question`, como na secao de goal. Requer opencode v2 com
+terminais persistentes.
+
+### Goal por issue e titulo da sessao (opencode v2)
+
+Cada issue vinculada vira o `/goal` da sessao. No `issue_bind`, o plugin monta
+o objetivo com a issue, o corpo e a regra de conclusao, define o `/goal` e
+acrescenta `[repo#123]` ao titulo da sessao sem trocar o nome. O `/goal` mantem
+a sessao trabalhando ate o reviewer confirmar que os criterios foram atendidos e
+a issue foi fechada.
+
+Antes de bindar, o agente e instruido a confirmar com a tool `question`: a
+partir dali a sessao sera daquela issue e o `/goal` sera definido para ela. A
+TUI tambem mostra um toast com a issue e o goal.
+
+`issue_unbind` limpa o `/goal` e tira o sufixo do titulo. Fechar a issue deixa o
+reviewer marcar o goal como cumprido, em vez de limpar o estado.
+
+`issue_create` nao vincula e nao define goal. Ele exige `objetivo` e grava as
+secoes `## Objetivo` e `## Criterio de aceite` no corpo. O vinculo e o `/goal`
+ficam para o `issue_bind` depois.
+
+Requer opencode v2.2.1 ou mais novo, que e onde o `/goal` nativo existe.
+
 ### Claude Code
 
 O mesmo pacote atende o Claude Code por um plugin que traz um servidor MCP com
@@ -247,9 +292,11 @@ labels: [Kind/Task, Priority/Medium]
 ## Depende de
 ```
 
-`issue_template_list` mostra o que existe. `issue_create` com `template` monta
-o corpo a partir de `objetivo`, `criterios` e `contexto`, aplica o prefixo do
-titulo e as labels do frontmatter.
+`issue_template_list` mostra o que existe. `issue_create` exige `objetivo`
+sempre. Com `template`, monta o corpo a partir de `objetivo`, `criterios` e
+`contexto`, aplica o prefixo do titulo e as labels do frontmatter. Sem template,
+as secoes de objetivo e criterio sao anexadas ao `body` literal. A tool nao
+vincula: o `issue_bind` depois define o vinculo e o `/goal`.
 
 ## Checagem de prosa
 
@@ -286,13 +333,13 @@ export PYATILETKA_PROSE=off
 
 | Tool | O que faz |
 |---|---|
-| `issue_bind` | vincula a sessao a uma issue. O contexto entra em todo turno |
-| `issue_unbind` | desvincula |
+| `issue_bind` | vincula a sessao a uma issue, define o `/goal` e acrescenta `[repo#123]` ao titulo (v2). O contexto entra em todo turno |
+| `issue_unbind` | desvincula, limpa o `/goal` e tira o sufixo do titulo (v2) |
 | `issue_binding` | mostra a issue vinculada |
 | `issue_view` | issue, dependencias e todos os comentarios |
 | `issue_list` | lista com filtro de marco, estado logico, autor, assignee e datas |
 | `issue_template_list` | templates de issue do repo |
-| `issue_create` | cria a issue, com template ou corpo literal |
+| `issue_create` | cria a issue com `objetivo` obrigatorio. Nao vincula, deixe o `issue_bind` depois |
 | `issue_depend` | gerencia as dependencias nativas |
 | `issue_comment` | comenta, com o gate de prosa |
 | `issue_attach` | anexa um arquivo local (video, imagem, log) a uma issue e devolve a URL e o markdown. Com `comment`, publica o comentario com o anexo embutido. So Gitea |

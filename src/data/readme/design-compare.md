@@ -311,7 +311,8 @@ go build -o design-compare
 引数付きで起動すると MCP ハンドシェイクなしで `compare_design` を1回実行し、ツールと同じ応答 JSON を stdout に出して終了します（`0` = success / `2` = mismatch・skipped（比較未実施を含む）/ `1` = エラー）。エラー（`1`）時のエラー本文は、stdout を JSON としてパースする呼び出し側を壊さないよう stderr に出ます。引数なし起動は従来どおり stdio MCP サーバーです。
 
 ```bash
-./design-compare --mode strict --image-a a.png --image-b b.png
+./design-compare --mode strict --image-a a.png --image-b b.png --generate-diff=false
+./design-compare --mode perceptual --image-a a.png --image-b b.png --diff-on-mismatch
 ./design-compare --mode strict --image-a-base64 "$(base64 -w0 a.png)" --image-b-base64 "$(base64 -w0 b.png)" --generate-diff=false
 ./design-compare --mode layout_tree --figma-layout-file figma.json --web-layout-file web.json
 ./design-compare --mode layout_tree --figma-layout '[{"id":"1","name":"card","x":0,"y":0,"w":400,"h":300}]' --web-layout '[{"selector":"#card","x":0,"y":0,"w":400,"h":300}]'
@@ -319,11 +320,13 @@ go build -o design-compare
 ./design-compare --version
 ```
 
+既定では応答 JSON の `diff_image` に base64 PNG が入ります。ターミナルや CI で合否だけを見る場合は `--generate-diff=false`、不一致時だけ画像が欲しい場合は `--diff-on-mismatch` を使ってください（CLI の既定値は MCP と同じで変えていません）。
+
 主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch` / `--diff-image-out` / `--version`
 
 真偽値フラグは `--include-aa`（値なしで true）または `--generate-diff=false` の形式で指定し、空白区切りの値（例: `--generate-diff false`）は受け付けません。位置引数や解釈できなかった引数はエラーになります。
 
-`--diff-image-out <path>` は CLI 専用です。指定時のみ応答 JSON の `diff_image`（PNG data URI）をデコードしてそのパスへ書き出します。`diff_image` が空のときは書き出さず stderr にその旨を出します。`--diff-image-content` は CLI 非対応です（CLI の出力は JSON テキストのみで、MCP の image コンテンツブロックを出しません）。入力側の `image_a_base64` / `image_b_base64` / `figma_layout` / `web_layout` はそれぞれ `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` で渡せます。
+`--diff-image-out <path>` は CLI 専用です。指定時のみ応答 JSON の `diff_image`（PNG data URI）をデコードしてそのパスへ書き出し、stdout の JSON では `diff_image` を空文字にします（他のフィールドは変わりません）。`diff_image` が空のときは書き出さず stderr にその旨を出します。書き出しに失敗したときは stderr にエラーを出して exit 1 とし、比較結果の JSON は出しません。`--diff-image-content` は CLI 非対応です（CLI の出力は JSON テキストのみで、MCP の image コンテンツブロックを出しません）。入力側の `image_a_base64` / `image_b_base64` / `figma_layout` / `web_layout` はそれぞれ `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` で渡せます。
 
 ### 単体テストの実行
 ブラウザの起動を必要としない超高速なメモリ内画像/ツリーデータ検証テストが実行できます。

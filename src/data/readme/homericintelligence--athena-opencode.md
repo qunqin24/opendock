@@ -126,7 +126,7 @@ The archive excludes these items:
 - Engineering: `brainstorm`, `implement`, `address-review`, `realign`, `simplify`, `systematic-debugging`, and
   `test-driven-development`.
 - Coordination: `myrmidon-swarm`, `git-worktrees`, and `tidy`.
-- Knowledge and enablement: `advise` and `learn`.
+- Knowledge and enablement: `advise`, `learn`, and `rollout-export`.
 
 All harnesses consume the same top-level [`skills/`](skills/) directory. Missing delegation runs
 sequentially with the current agent.

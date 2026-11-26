@@ -1,6 +1,12 @@
+<div align="center">
+
+<img src="assets/icon.svg" width="112" alt="Magpie Claude Desktop 1P">
+
 # Magpie Claude Desktop 1P
 
 [English](README.md) | 简体中文
+
+</div>
 
 在保持原生登录的 Claude Desktop 中，使用你在 [magpie](https://github.com/yetone/magpie) 里配置的模型。
 

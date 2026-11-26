@@ -5,9 +5,9 @@
 [![Release](https://img.shields.io/github/v/release/MyOldTime/opencode-codex-imagegen)](https://github.com/MyOldTime/opencode-codex-imagegen/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-OpenCode V2 插件，注册 `proxy_imagegen` 工具：通过 **Responses API 的托管 `image_generation` 工具** 生成/编辑图片（不使用 Images API）。
+OpenCode V2 插件，注册 `proxy_imagegen` 工具，支持文生图和参考图编辑。默认走 **OpenAI Responses API 的托管 `image_generation` 工具**（不使用 Images API）；也可配置为 **Google Gemini Interactions API（Nano Banana）**，见 [Google Gemini 配置](#google-gemini-配置)。
 
-两种凭据来源，优先级固定：
+OpenAI 模式下有两种凭据来源，优先级固定：
 
 1. **显式配置**：同时提供 `options.base_url` 与 `options.key` 时，只走你自己的代理，**完全不读取宿主的任何凭据**。只提供 `key` 时默认使用 `https://api.openai.com/v1`。
 2. **宿主托管**：两者都不配置时，每次调用通过 `ctx.integration.connection.active('openai')` + `resolve(connection)` 取得 OpenCode 已登录的 OpenAI 凭据，由 OpenCode 负责刷新，插件不读取、不写入任何凭据文件。
@@ -22,18 +22,18 @@ OpenCode V2 插件，注册 `proxy_imagegen` 工具：通过 **Responses API 的
 | npm 包名（npmjs 与 GitHub Packages 使用同一个 scoped name） | `@myoldtime/opencode-codex-imagegen` |
 | 插件 ID | `opencode-codex-imagegen` |
 | 工具名 | `proxy_imagegen` |
-| 版本 / 许可证 | `0.1.0` / MIT |
+| 版本 / 许可证 | `0.2.0` / MIT |
 
 ## 安装
 
-以下在线方式需对应的版本或标签已经发布：本包为 `0.1.0`，tag 为 `v0.1.0`。
+以下在线方式需对应的版本或标签已经发布：本包为 `0.2.0`，tag 为 `v0.2.0`。
 
 ### 方式一：从 npmjs.org 安装（推荐）
 
 npmjs.org 上的公开包安装不需要登录 npm，也不需要提供 token。
 
 ```powershell
-opencode plugin add "@myoldtime/opencode-codex-imagegen@0.1.0"
+opencode plugin add "@myoldtime/opencode-codex-imagegen@0.2.0"
 opencode plugin list
 ```
 
@@ -44,7 +44,7 @@ opencode plugin list
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@myoldtime/opencode-codex-imagegen@0.1.0"]
+  "plugins": ["@myoldtime/opencode-codex-imagegen@0.2.0"]
 }
 ```
 
@@ -53,11 +53,11 @@ opencode plugin list
 ### 方式二：从 GitHub 标签安装
 
 ```powershell
-opencode plugin add "github:MyOldTime/opencode-codex-imagegen#v0.1.0"
+opencode plugin add "github:MyOldTime/opencode-codex-imagegen#v0.2.0"
 opencode plugin list
 ```
 
-公共仓库通过该方式安装不需要 GitHub Packages token，也不经过 npm registry。仅对某个项目生效时，项目 `opencode.json` 的 `plugins` 条目可写成同一来源 `github:MyOldTime/opencode-codex-imagegen#v0.1.0`。`#v0.1.0` 指向该标签当前对应的提交，标签由仓库维护者控制，需要时请自行核对。
+公共仓库通过该方式安装不需要 GitHub Packages token，也不经过 npm registry。仅对某个项目生效时，项目 `opencode.json` 的 `plugins` 条目可写成同一来源 `github:MyOldTime/opencode-codex-imagegen#v0.2.0`。`#v0.2.0` 指向该标签当前对应的提交，标签由仓库维护者控制，需要时请自行核对。
 
 ### 方式三：从 GitHub Packages 安装
 
@@ -67,7 +67,7 @@ GitHub Packages 与本包在 npmjs.org 的同名包属于两个独立 registry�
 npm config set @myoldtime:registry https://npm.pkg.github.com --location=user
 npm login --scope=@myoldtime --auth-type=legacy --registry=https://npm.pkg.github.com
 # Username 输入 GitHub 用户名，Password 输入 token
-opencode plugin add "@myoldtime/opencode-codex-imagegen@0.1.0"
+opencode plugin add "@myoldtime/opencode-codex-imagegen@0.2.0"
 opencode plugin list
 ```
 
@@ -94,7 +94,7 @@ npm ci --ignore-scripts
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "@myoldtime/opencode-codex-imagegen@0.1.0",
+      "package": "@myoldtime/opencode-codex-imagegen@0.2.0",
       "options": {
         "model": "gpt-6.1-sol",
         "reasoning_effort": "medium",
@@ -106,18 +106,19 @@ npm ci --ignore-scripts
 }
 ```
 
-> 示例中的 `package` 固定为 `@0.1.0` 以便复现。若插件来自 npm 以外的来源，把这里的 `package` 换成对应值：GitHub 标签为 `github:MyOldTime/opencode-codex-imagegen#v0.1.0`，本地开发为仓库目录的绝对路径。请在原条目上配置 `options`，不要为同一个插件重复添加条目；合并配置时只增改本插件的字段，不要覆盖其它设置。
+> 上例为 OpenAI 配置，`package` 固定为已发布的 `@0.2.0`。若插件来自 npm 以外的来源，把这里的 `package` 换成对应值：GitHub 标签为 `github:MyOldTime/opencode-codex-imagegen#v0.2.0`，本地开发为仓库目录的绝对路径。请在原条目上配置 `options`，不要为同一个插件重复添加条目；合并配置时只增改本插件的字段，不要覆盖其它设置。
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `base_url` | 无 | 代理地址（可以写到 `/v1`，会自动补 `/responses`）。**必须同时给 `key`**。 |
-| `key` | 无 | Bearer key。可写 `{env:MY_VAR}` 由 OpenCode 做环境替换；替换未生效时会直接报错，不会悄悄改用别的通道。 |
-| `model` | `gpt-6.1-sol` | 负责调用 `image_generation` 工具的对话模型。 |
-| `reasoning_effort` | 不下发 | `none` / `minimal` / `low` / `medium` / `high` / `xhigh`，模型支持情况各异。 |
-| `fast_mode` | `false` | `true` 时下发 `service_tier: "priority"`。 |
+| `provider` | `openai` | `openai` 或 `google`，每个插件配置只选择一个后端。 |
+| `base_url` | 对应服务的官方地址（未配 OpenAI key 时走宿主账号） | 可选代理地址。OpenAI 可写到 `/v1`，自动补 `/responses`；Google 可写代理域名或 API 路径，见下方示例。**必须同时给 `key`**。 |
+| `key` | 无 | OpenAI：Bearer key，可省略以使用宿主账号。Google：必填 Gemini API key，建议写 `{env:GEMINI_API_KEY}`。 |
+| `model` | OpenAI：`gpt-6.1-sol`；Google：`gemini-nano-banana-2.1` | OpenAI 对话模型或 Google 图片模型。 |
+| `reasoning_effort` | 不下发 | 仅 OpenAI：`none` / `minimal` / `low` / `medium` / `high` / `xhigh`，模型支持情况各异。 |
+| `fast_mode` | `false` | 仅 OpenAI：`true` 时下发 `service_tier: "priority"`。 |
 | `timeout_ms` | `240000` | 单次请求超时（毫秒）。 |
 
-配置校验规则（都在发网络请求之前完成）：
+OpenAI 配置校验规则（都在发网络请求之前完成）：
 
 - `base_url` 或 `key` **只要写了就必须有效**：空串、`null`、全空白、非字符串、未解析的 `{env:...}` 一律报错，不会静默回退到宿主账号或官方地址。
 - 只给 `base_url` 不给 `key` → 报错，提示两者都配或都不配。
@@ -125,7 +126,49 @@ npm ci --ignore-scripts
 - `base_url` 含用户名密码、查询串、片段或非 HTTP(S) → 报错。
 - 两项都完全省略 → 走宿主托管凭据；宿主没有可用 OpenAI 连接时给出明确错误，不会退回到猜测的 endpoint。
 
-## 三种登录方法
+### Google Gemini 配置
+
+从 `0.2.0` 起支持 Google 文生图、参考图编辑及自定义代理。在 [Google AI Studio](https://aistudio.google.com/apikey) 创建 Gemini API key，把它设置为 OpenCode 环境中的 `GEMINI_API_KEY`，不要把明文 key 写进仓库。根据 [Google 官方模型文档](https://aistudio.google.com/docs/models/gemini-nano-banana-2.1)，默认模型需要付费层。
+
+在 `opencode.json(c)` 中配置已发布的 npm 插件。若已有本插件条目，请直接替换该条目：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "@myoldtime/opencode-codex-imagegen@0.2.0",
+      "options": {
+        "provider": "google",
+        "key": "{env:GEMINI_API_KEY}"
+      }
+    }
+  ]
+}
+```
+
+如果从 OpenAI 切换过来，请移除原先的 `base_url`、`reasoning_effort`、`fast_mode` 和 GPT `model`。可省略 `model` 使用默认模型，也可以填其他支持图片输出的 Gemini 模型 ID。保存后，在 OpenCode TUI 中输入 `/reload`。仅设置环境变量不会自动切换后端；由 `provider` 明确选择。
+
+- **文生图**：不传 `images`。例如：`用 proxy_imagegen 画一张水彩雪景，比例 16:9，分辨率 2K，保存为 snow.png`。
+- **图生图**：通过 `images` 传入一张或多张本地参考图。例如：`用 proxy_imagegen 参考 snow.png 和 cabin.jpg，把木屋放进雪景里，保存为 winter.jpg`。插件会将参考图按顺序发送给 Google。
+
+实现遵循官方 [Nano Banana 生图指南](https://aistudio.google.com/docs/image-generation?hl=zh-cn) 和 [Interactions REST 文档](https://aistudio.google.com/api-reference/interactions-api/create-interaction)：用 `POST` 发送 JSON，带 `x-goog-api-key`、`Content-Type: application/json` 和 `Api-Revision: 2026-05-20`。普通 `.png` 请求只发 `model` 和 `input`；仅指定比例、分辨率或 JPEG 输出时附加 `response_format`。不显式设置 `store`，交互保存策略遵循服务端默认值。响应为 JSON，从 `model_output` 读取最后一张内嵌图片；若返回 JPEG 而目标为 `.png`，在本地转码。参考图支持 PNG / JPEG / WebP，最多 14 张（部分模型更少），包含 Base64 和提示词的整个请求不超过 20 MB。
+
+#### Google 自定义代理地址
+
+要经由反向代理请求 Gemini，在同一个 `options` 中加入 `"base_url": "https://proxy.example.com"`：
+
+| `base_url` | 实际请求地址 |
+|---|---|
+| 省略 | `https://generativelanguage.googleapis.com/v1beta/interactions` |
+| `https://proxy.example.com` | `https://proxy.example.com/v1beta/interactions` |
+| `https://proxy.example.com/gemini` | `https://proxy.example.com/gemini/v1beta/interactions` |
+| `https://proxy.example.com/gemini/v1beta` | `https://proxy.example.com/gemini/v1beta/interactions` |
+| `https://proxy.example.com/gemini/v1/interactions` | `https://proxy.example.com/gemini/v1/interactions` |
+
+代理需要原样转发 Gemini Interactions POST 请求及 `x-goog-api-key`、`Api-Revision` 请求头。这不是用于配置 HTTP CONNECT 或 SOCKS 的选项，不会把协议改成 `generateContent` 或 OpenAI 兼容格式。代理出错不会回退到官方地址。远程代理请使用可信的 HTTPS 地址，因为代理会收到 API Key、提示词和参考图。
+
+## OpenAI 的三种登录方法
 
 宿主托管模式下，凭据来自 OpenCode 的 `openai` integration。插件只接受以下三种方法，遇到未知 `methodID` 直接报错：
 
@@ -145,15 +188,16 @@ npm ci --ignore-scripts
 
 ## 安全与隐私
 
-- **不读取也不写入任何凭据文件**（包括 `auth.json`），不缓存 token，不遍历或切换账号；每次调用都重新 `active` + `resolve`，刷新完全交给 OpenCode。
+- **不读取也不写入任何凭据文件**（包括 `auth.json`），不缓存 token，不遍历或切换账号。OpenAI 宿主托管模式每次调用都重新 `active` + `resolve`，刷新完全交给 OpenCode。
 - 显式 `base_url` + `key` 模式不会访问 integration API，key 只发送到 `base_url` 指向的地址。
+- Google 模式的 key 只通过请求头发送到所选地址（官方 Gemini API 或配置的代理）；提示词和参考图也会发送到该地址。仅提交你有权上传的内容。
 - 失败时**不重试、不换通道**（401/403/超时/能力受限都一样），避免重复计费。
 - 超时或取消后，即便上游晚到并返回了合法 PNG，也会在落盘前丢弃；流读取过程中的网络错误同样归一为固定文案。
 - 错误信息只包含 HTTP 状态码和固定白名单错误码；不会输出上游响应正文、token、账号或任意自定义 `error.code`。网络层异常也统一归一为固定文案。
-- 调用前先经过宿主的 permission 机制：读引用图 → `read`，写 PNG → `edit`；被宿主拒绝则不读文件、不发请求。
+- 调用前先经过宿主的 permission 机制：读引用图 → `read`，写图片 → `edit`；被宿主拒绝则不读文件、不发请求。
 - 信号已取消（或在解析凭据期间被取消）时不发网络请求、不落盘；超时同样不落盘。
 - 工具返回的 metadata 仅含 `out`、`versioned`、`bytes`、`route`、`method`、`model`，不含任何凭据或账户信息。
-- 只保存 PNG，且用独占创建 + `-v2`/`-v3` 后缀，绝不覆盖已有文件。
+- OpenAI 只保存 PNG，Google 可保存 PNG 或 JPEG；校验文件内容与扩展名一致，使用独占创建及 `-v2`/`-v3` 后缀，不覆盖已有文件。
 
 ## 用法
 
@@ -166,10 +210,12 @@ npm ci --ignore-scripts
 | 参数 | 必填 | 说明 |
 |---|---|---|
 | `prompt` | 是 | 图片描述；有参考图时按顺序说明每张图的作用。 |
-| `out` | 是 | 输出 PNG 路径（相对当前会话目录或绝对路径）。 |
-| `quality` | 否 | `auto` / `low` / `medium` / `high`。 |
-| `size` | 否 | `auto` 或 `宽x高`（16 的倍数，最长边 ≤ 3840，长宽比 ≤ 3:1，总像素 655360–8294400）。 |
-| `images` | 否 | 本地参考图路径数组（PNG / JPEG / GIF / WebP）。 |
+| `out` | 是 | 输出路径（相对当前会话目录或绝对路径）。OpenAI 支持 `.png`；Google 支持 `.png` / `.jpg` / `.jpeg`。 |
+| `images` | 否 | 本地参考图路径数组。两者支持 PNG / JPEG / WebP；仅 OpenAI 支持 GIF。 |
+| `quality` | 否 | 仅 OpenAI：`auto` / `low` / `medium` / `high`。 |
+| `size` | 否 | 仅 OpenAI：`auto` 或 `宽x高`（16 的倍数，最长边 ≤ 3840，长宽比 ≤ 3:1，总像素 655360–8294400）。 |
+| `aspect_ratio` | 否 | 仅 Google：宽高比，例如 `1:1`、`16:9` 或 `9:16`，以所选模型支持为准。 |
+| `image_size` | 否 | 仅 Google：`1K` / `2K` / `4K`，以所选模型支持为准。 |
 
 尺寸与画质都是"尽力而为"，最终由后端决定。
 
@@ -186,7 +232,11 @@ npm ci --ignore-scripts
 | `The OpenAI access token has expired and could not be refreshed` | 刷新失败，重新登录。 |
 | `Image request failed: HTTP 401/403` | 凭据或权限问题；插件不会自动重试。 |
 | `Image request failed: HTTP 400 (subscription_sharing_unsupported_capability)` | 已实测的 Sign in with ChatGPT 结果：上游拒绝该能力。白名单码会原样显示（如 `subscription_sharing_unsupported_capability`、`subscription_sharing_route_not_supported`），表示当前订阅/网关不支持该能力或路由。 |
-| `Image response contained invalid JSON` / `Response ended without an image_generation_call.result` | 上游没有按 Responses 协议返回图片。 |
+| `Image response contained invalid JSON` | 上游返回的 JSON 无法解析。 |
+| `Response ended without an image_generation_call.result` | OpenAI 没有按 Responses 协议返回图片。 |
+| `The Google provider requires a valid options.key` | 检查 OpenCode 能否解析 `{env:GEMINI_API_KEY}`，以及是否使用从 AI Studio 创建的 Gemini API key。 |
+| `Google response contained no generated image` | Gemini 没有返回可保存的图片；确认 `model` 支持图片输出，检查提示词与参考图。 |
+| `Google image MIME type does not match its bytes` | JSON 中的图片 MIME 与内嵌数据不符，未写入文件。 |
 | `Image request timed out` | 超过 `timeout_ms`，未写入文件。 |
 
 ## 发布流程
@@ -202,7 +252,7 @@ npm ci --ignore-scripts
 
 ```powershell
 npm whoami --registry=https://registry.npmjs.org   # 只读身份确认
-npm view @myoldtime/opencode-codex-imagegen@0.1.0 version --registry=https://registry.npmjs.org --@myoldtime:registry=https://registry.npmjs.org
+npm view @myoldtime/opencode-codex-imagegen@0.2.0 version --registry=https://registry.npmjs.org --@myoldtime:registry=https://registry.npmjs.org
 npm pack --dry-run --json                           # 只读打包检查
 ```
 
@@ -223,7 +273,7 @@ npm test        # node --test，全部离线：注入 fake fetch / fake integrat
 npm pack --dry-run --json
 ```
 
-测试覆盖：显式配置优先且不触碰 integration、三种 OAuth 方法的精确 URL/请求头/请求体、key 回退、每次调用重新 resolve、空白与半配置、未知方法与过期凭据、刷新/解析失败、HTTP/SSE/JSON 错误不泄密、参考图与 PNG 不覆盖、预取消与超时不落盘、插件注册 id/工具/权限顺序；另有发布元数据测试（包名、id、仓库链接、双 registry 与 scope override、workflow 校验、files 白名单）。
+测试覆盖：OpenAI 显式与宿主托管模式、三种 OAuth 路由、SSE；Google Interactions API 的文生图与多图编辑、尺寸参数、参考图限制和 PNG/JPEG 输出；两路的权限顺序、错误脱敏、取消/超时不落盘、不覆盖已有文件；另有发布元数据测试。
 
 ## License
 

@@ -1,54 +1,66 @@
-# OpenKodo plugin
+<h1 align="center">
+  <a href="https://openkodo.dev"><img src="resources/build/icon.png" alt="OpenKodo" width="64" valign="middle" /></a> OpenKodo Code
+</h1>
 
-Provider plugin that puts [OpenKodo](https://openkodo.dev) into Magpie and
-OpenCode: plans, credits, usage windows, and the live model catalog.
-Provider id: `openkodo`.
+<p align="center">
+  <b>The OpenKodo subscription, inside an agent IDE.</b><br />
+  An open-source fork of <a href="https://github.com/stablyai/orca">Orca</a> (MIT), adapted so a new account can sign in, pick a model and start coding without configuring a CLI by hand.
+</p>
 
-## What it shows
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms" />
+</p>
 
-- Plan name and the OpenKodo mark
-- Three rolling spend windows, shortest first: **5 hours**, **7 days**, and the
-  **monthly** pool — each with the amount used, the cap, and when it frees up
-- The per-model 5-hour request guardrail
-- The live catalog from [`/api/public/models`](https://api.openkodo.dev/api/public/models)
+## What this is
 
-The 5-hour and 7-day windows are enforced by the gateway, not decoration:
-Go is $25 / 5h and $50 / 7d, Pro is $50 / 5h and $100 / 7d. Reset times are
-rolling — the cap frees up when the oldest spend in the window ages out — so
-they move as new requests arrive.
+OpenKodo Code is the desktop client for [OpenKodo](https://openkodo.dev): one subscription, one API key, and every supported model in one place. It is built on Orca's agent IDE — parallel agents in isolated worktrees, a real editor and diff view, terminals, chat or raw CLI, and remote/mobile companions.
 
-## Install
+This repository is the fork. It is not a finished product: the Orca engine is intact, and the OpenKodo-specific onboarding (browser sign-in → key provisioning → model presets) is the work in progress.
 
-From the magpie plugin store, search for **OpenKodo**.
+## Use OpenKodo with it today
 
-From a checkout:
+The quickest path today is OpenCode plus the OpenKodo plugin, which validates the key and shows the live plan windows:
 
 ```bash
 pnpm add openkodo
 ```
 
-## Sign in
+Then paste an OpenKodo key (`ok_live_…`) from **Console → API keys**. The plugin reads the plan, the 5-hour / 7-day / monthly windows and the live model catalog from `https://api.openkodo.dev`.
 
-Paste an OpenKodo API key from **Console → API keys**. Keys start with
-`ok_live_`. The plugin validates the key against
-`https://api.openkodo.dev/api/plugin/usage`; it never stores anything except
-the key itself, and it never creates keys, changes plans, or spends credits.
+Codex can also point straight at the gateway:
 
-## Provider
+```toml
+model = "deepseek-v4-pro-0813"
+model_provider = "openkodo"
 
-- Base URL: `https://api.openkodo.dev/v1`
-- SDK: `@ai-sdk/openai-compatible`
-- Models: fetched live, with a bundled fallback for offline starts
+[model_providers.openkodo]
+name = "OpenKodo"
+base_url = "https://api.openkodo.dev/v1"
+env_key = "OPENKODO_API_KEY"
+wire_api = "responses"
+```
+
+Anthropic-compatible clients use `https://api.openkodo.dev` with the same key.
+
+> Accounts without a plan can only call `deepseek-v4.1-flash-1017` and `deepseek-v4.1-flash-economy`. Go and Pro unlock the full catalog.
+
+## Roadmap
+
+- Browser sign-in inside the app, with the key stored in the OS keychain
+- A first-run model preset per plan, and a quota strip (5h / 7d / monthly)
+- Branded builds for macOS, Windows and Linux with auto-update
+- One-click migration from an existing Orca install
 
 ## Development
 
 ```bash
-npm test           # unit tests, no network
-npm run pack:check # what would be published
+pnpm install
+pnpm dev
 ```
 
-The tests stub `fetch`, so they never use a real API key.
+Build and packaging follow Orca's scripts (`pnpm build`, `pnpm run build:mac`, and so on).
 
-## License
+## License and attribution
 
-[MIT](./LICENSE)
+MIT. This project is a fork of [Orca](https://github.com/stablyai/orca), copyright Lovecast Inc., and keeps the original license. See [ATTRIBUTION.md](./ATTRIBUTION.md). "Orca" and the Orca marks belong to their owners; OpenKodo Code is an independent fork and is not endorsed by the Orca project.

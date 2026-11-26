@@ -62,7 +62,7 @@ apex is one plugin with six independent modules. Each one can be switched on or 
 | **Guard** | Meta-permissions per agent, tool and path, with a report of what was attempted and decided. | **off** | [docs/GUARD.md](docs/GUARD.md) |
 | **Browser** *(deprecated)* | Serves OpenCode's `browser.*` tools against an **external** Chromium over CDP. Superseded by OpenCode's [browse](https://opencode.ai/product/browse) for your own browser; kept for a headless or remote Chromium and for `browser.*` performance captures. | **off** | [docs/BROWSER.md](docs/BROWSER.md) |
 | **Temp access** | Allows `external_directory` in OpenCode's temporary directory (`<tmpdir>/opencode`, `/tmp/opencode` on Linux) without asking. OpenCode tells the model to use it but no rule approves it. A deny you configure for that path still wins. | on | — |
-| **Endpoints** | Public URLs through [OpenTunnel](https://opentunnel.xyz) (same device tunnel as OpenCode remote access, own routes), **verified webhooks** (GitHub, Stripe, Slack, HMAC, token) that wake agents without exposing the server password, and **supervised microservices** the agent writes. All with optional TTL, kept by a per-user apex daemon that outlives the plugin. Linux (any init), macOS, Windows; no systemd/launchd and no tunnel CLI. The daemon starts only when a tool is used. | on | [docs/ENDPOINTS.md](docs/ENDPOINTS.md) |
+| **Endpoints** | Public URLs through [OpenTunnel](https://opentunnel.xyz) (same device tunnel as OpenCode remote access, own routes) and **verified webhooks** (GitHub, Stripe, Slack, HMAC, token) that wake agents without exposing the server password. Optional TTL. Kept by a per-user apex daemon that outlives the plugin; Linux, macOS, Windows, no tunnel CLI. The daemon starts only when a tool is used. | on | [docs/ENDPOINTS.md](docs/ENDPOINTS.md) |
 
 Turn modules on or off in `modules`. That is the only switch: there is no `<module>.enabled`.
 
@@ -243,8 +243,7 @@ curl -sS -u "opencode:$PW" -H 'content-type: application/json' \
 | `apex_set_callback_url` | events | Sets or clears the server's public URL (tunnel / reverse proxy), for senders on other machines |
 | `apex_webhook` | endpoints | Verified webhook URL (github, stripe, slack, hmac, token) that calls `events.ingest` locally: create / list / delete, TTL |
 | `apex_tunnel` | endpoints | Publishes a local port on an OpenTunnel HTTPS URL: open / list / close, TTL |
-| `apex_service` | endpoints | Supervised microservice (restart with backoff, logs, TTL, optional public URL, local ingest without the server password): up / list / down / restart / logs |
-| `apex_daemon` | endpoints | Daemon status, autostart after reboot (cron `@reboot` / Windows logon task), stop |
+| `apex_daemon` | endpoints | Daemon status and stop |
 | `apex_advisor_decide` | advisor | The advisor agent's only tool: `allow` / `deny` + reason |
 | `apex_guard_report` | guard | Report of what each agent attempted and what was decided |
 | `browser_target` | browser (deprecated, off by default) | Chooses which browser serves `browser.*`: `external` (CDP), `in-app` (desktop app) or `auto` |

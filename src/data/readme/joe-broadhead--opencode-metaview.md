@@ -1,165 +1,212 @@
-# Metaview for OpenCode
+# Metaview
 
-Find, read and cite your recruiting interviews, AI notes and candidates in Metaview from OpenCode, through Metaview's
-official MCP server. The plugin registers that server, adds default permission rules, a status command and dialog, three
-skills, and a tools RPC for scripts. It adds no tool of its own and makes no Metaview call of its own.
-
-Unofficial; not affiliated with Metaview.
-
-Metaview is a trademark of Metaview Labs Inc.; this unofficial plugin is not endorsed by them.
+Metaview recruiting interviews, transcripts, notes, candidates and reports in OpenCode, with Metaview's own MCP tools
+passed through. The plugin registers one Metaview MCP server per account alias and adds the contract's `status`,
+`probe` and `events_list` reads for the `metaview.conversations` source. It is built on
+[plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract) v0.0.0.
 
 ## Requirements
 
-- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1 only. Outside that range the plugin refuses to start, unless you set
-  `allowUntestedHost`.
-- macOS or Linux.
+- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1 only. Outside that range the plugin refuses to start with
+  `HOST_UNTESTED`, unless you set `allowUntestedHost`.
 - A Metaview account in a workspace where an admin has turned on **MCP integration**. Members also need **MCP for
   non-admins** (Metaview: Workspace settings).
 - What you can read follows your Metaview role: admins see every conversation in the workspace, members their own and
   those shared with them. Which tools appear depends on the Metaview products you have, and reports, AI fields and full
   transcripts may need a paid Metaview plan.
-- Metaview stores its data on AWS in the UK.
 
 ## Install
 
-Install from a release tag:
-
 ```sh
-opencode plugin add github:we-the-rebel-alliance/metaview-plugin#v<version>
+opencode plugin add github:we-the-rebel-alliance/metaview-plugin#v0.0.0
 ```
 
-The first release on plugin-contract is `v0.0.0` (phase 4b). Run `opencode reload`, or restart OpenCode. Then run
-`/metaview-status`: it shows `sign-in required` until you sign in (see [Sign in](#sign-in)).
-
-Or add the plugin to `opencode.json` instead, with the same spec:
+Run `opencode reload`, or restart OpenCode. Or add the plugin to `opencode.json` with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/metaview-plugin#v<version>" }] }
+{ "plugins": [{ "package": "github:we-the-rebel-alliance/metaview-plugin#v0.0.0" }] }
 ```
 
 ## Sign in
 
-Run `/connect` and choose **Metaview** (it is listed under MCP). In the terminal UI, press `o` or Enter to open the link
-to Metaview's sign-in page in your browser, and sign in with your Metaview account. No key is needed.
+The first account is the MCP server `metaview`; every other alias gets its own server, `metaview-<alias>`. Run
+`/connect` and choose the server for the account, then open the link with `o` or Enter. In a terminal, run
+`opencode mcp auth metaview` (or `opencode mcp auth metaview-work`). No key is needed.
 
-From a terminal, run `opencode mcp auth metaview` instead; it opens the link automatically. `/mcps` also offers the
-same sign-in. On a machine without a browser, you can use a Metaview API key in your own server entry instead; see
-[Configuration](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/configuration.md).
+## Accounts and options
 
-## Use
-
-Ask, for example:
-
-- "Prep me for my final round with Example Candidate tomorrow."
-- "What did the backend engineer candidate say about why they want to leave their current job?"
-- "Summarise yesterday's technical screen for the data engineer role."
-- "Which interviews did Example Interviewer run in the first week of October?"
-- "Compare our three finalists for the product designer role on the evidence."
-
-The model labels Metaview's AI notes and summaries as Metaview's, never makes a hiring decision you didn't ask for, and
-keeps candidate data out of other tools unless you name the destination.
-
-| Command | What it does |
-| --- | --- |
-| `/metaview-status` | Posts the status report into the session: connection, account, access, plan, tools, agents without the default rules, the OpenCode check and the next step. |
-| `/metaview`, or "Metaview: Status" in the command palette | Opens the same report in a dialog. Press `r` to refresh it and `Esc` to close it. |
-
-Three skills teach the model to use Metaview well:
-
-- `metaview`: finding a candidate or interviewer, filters and dates, how much of a transcript to read, citing
-  conversations and moments, job posts and their checks, and the rules for candidate data.
-- `metaview-candidate-brief`: interview prep, debriefs, evidence comparisons and draft scorecards, with every hiring
-  decision left to you.
-- `metaview-write`: who each change reaches (candidates, your ATS, the workspace, credits), reading first, saying
-  whom a change reaches before the call, and leaving the yes to OpenCode's permission prompt.
-
-### Scripts
-
-A script can call every tool this plugin knows with no model, through the tools RPC. It runs as a session and its
-agent, under that agent's permission rules and the session's own. An `ask` is refused, because no one can answer it,
-and so is a `deny`:
-
-```sh
-opencode api post /api/rpc/metaview.workspace.tools/search_conversations \
-  -H "x-opencode-directory:$PWD" \
-  -d '{"input":{"sessionID":"ses_…","input":{"rationale":"weekly interview list","limit":20}}}'
-```
-
-See [Scripting](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/scripting.md).
-
-## Permissions
-
-**Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied. At its
-default, `"all"`, an agent can act on candidates and your ATS without asking: it can record an application review
-decision, which can reject a candidate and sync to your ATS; add candidates to an outreach sequence or restart one,
-sending email, LinkedIn, SMS or WhatsApp; send job-post and sourcing messages; spend enrichment credits; and send
-feedback to the Metaview team. Every read runs without asking too, such as `search_conversations` and
-`fetch_candidates`.
-
-| Value | What runs | What asks |
-| --- | --- | --- |
-| `"all"` (the default) | every tool, and any tool Metaview adds later | nothing |
-| `"ask-changes"` | the read tools | everything else, new tools included |
-| `"read-only"` | the read tools | nothing: everything else is **denied** |
+Configure the aliases in `opencode.json`; each signs in separately and can belong to a different Metaview workspace:
 
 ```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/metaview-plugin#v<version>", "options": { "access": "read-only" } }] }
+{
+  "access": "all",
+  "accounts": { "work": {}, "personal": {} },
+  "allowUntestedHost": false
+}
 ```
 
-A rule of your own in an agent's `permissions` still wins over the plugin's block. Put it in the agent, not in the
-top-level `permissions`, which would reach Explore too.
-[Configuration](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/configuration.md#permissions)
-has worked examples, including one rule per tool.
+Methods that take an account accept `account: "work"` or `account: "personal"`. With two aliases and no account, a call
+is refused with `ACCOUNT_REQUIRED`; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`. The profile has no fields:
+Metaview decides the workspace at sign-in. See [Configuration](docs/configuration.md) for every option.
 
-## Options
+## Access
 
-| Option | Values | Default | Effect |
-| --- | --- | --- | --- |
-| `access` | `"all"`, `"ask-changes"` or `"read-only"` | `"all"` | What the default rules allow: every tool, the reads only with everything else asking, or the reads only with everything else denied. |
-| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.4.1 <2.5.0`, with a warning in status. |
+`access` is the ceiling. Metaview's own tools and the plugin's reads are separate permission actions, so a person can
+narrow either.
 
-[Configuration](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/configuration.md) has the
-details, including your own `mcp.servers.metaview` entry (also with a Metaview API key), permission recipes and every
-error.
+| Value | Reads | Writes and sends |
+|---|---|---|
+| `"all"` (the default) | run | run |
+| `"ask-changes"` | run | ask first |
+| `"read-only"` | run | are off |
+
+The classes come from the manifest: a Metaview tool that sends or deletes something is `send` or `delete`, and asks
+under `"ask-changes"`. A rule of your own in an agent's `permissions` still wins for one tool. See
+[Capabilities](docs/capabilities.md) for each method's class.
+
+## Capabilities
+
+<!-- generated:capabilities -->
+### Methods
+
+| Method | Class | Accounts | Operations |
+|---|---|---|---|
+| `status` | read | none | — |
+| `probe` | read | optional | `get_user_context` |
+| `events_list` | read | optional | `get_user_context`, `search_conversations` |
+| `mcp:fetch_candidates` | read | none | `fetch_candidates` |
+| `mcp:find_candidate_in_sequences` | read | none | `find_candidate_in_sequences` |
+| `mcp:get_application_review_details` | read | none | `get_application_review_details` |
+| `mcp:get_application_review_rules` | read | none | `get_application_review_rules` |
+| `mcp:get_chart_data` | read | none | `get_chart_data` |
+| `mcp:get_enrichment_status` | read | none | `get_enrichment_status` |
+| `mcp:get_job_post` | read | none | `get_job_post` |
+| `mcp:get_job_post_template` | read | none | `get_job_post_template` |
+| `mcp:get_job_post_thread` | read | none | `get_job_post_thread` |
+| `mcp:get_note_template` | read | none | `get_note_template` |
+| `mcp:get_platform_credits` | read | none | `get_platform_credits` |
+| `mcp:get_screen_details` | read | none | `get_screen_details` |
+| `mcp:get_screen_interview` | read | none | `get_screen_interview` |
+| `mcp:get_search_details` | read | none | `get_search_details` |
+| `mcp:get_sourcing_analytics` | read | none | `get_sourcing_analytics` |
+| `mcp:get_sourcing_messages` | read | none | `get_sourcing_messages` |
+| `mcp:get_user_context` | read | none | `get_user_context` |
+| `mcp:group_conversations` | read | none | `group_conversations` |
+| `mcp:list_application_review_candidates` | read | none | `list_application_review_candidates` |
+| `mcp:list_application_review_rejection_options` | read | none | `list_application_review_rejection_options` |
+| `mcp:list_application_reviews` | read | none | `list_application_reviews` |
+| `mcp:list_ats_jobs` | read | none | `list_ats_jobs` |
+| `mcp:list_ats_stages` | read | none | `list_ats_stages` |
+| `mcp:list_connectors` | read | none | `list_connectors` |
+| `mcp:list_field_values` | read | none | `list_field_values` |
+| `mcp:list_fields` | read | none | `list_fields` |
+| `mcp:list_job_post_checks` | read | none | `list_job_post_checks` |
+| `mcp:list_job_post_templates` | read | none | `list_job_post_templates` |
+| `mcp:list_job_post_threads` | read | none | `list_job_post_threads` |
+| `mcp:list_job_posts` | read | none | `list_job_posts` |
+| `mcp:list_mailboxes` | read | none | `list_mailboxes` |
+| `mcp:list_note_template_groups` | read | none | `list_note_template_groups` |
+| `mcp:list_note_templates` | read | none | `list_note_templates` |
+| `mcp:list_screen_candidates` | read | none | `list_screen_candidates` |
+| `mcp:list_screens` | read | none | `list_screens` |
+| `mcp:list_sequence_candidates` | read | none | `list_sequence_candidates` |
+| `mcp:list_sequences` | read | none | `list_sequences` |
+| `mcp:list_sourcing_candidates` | read | none | `list_sourcing_candidates` |
+| `mcp:list_sourcing_knowledge` | read | none | `list_sourcing_knowledge` |
+| `mcp:list_sourcing_searches` | read | none | `list_sourcing_searches` |
+| `mcp:search_conversations` | read | none | `search_conversations` |
+| `mcp:search_reports` | read | none | `search_reports` |
+| `mcp:search_snippets` | read | none | `search_snippets` |
+| `mcp:create_ai_field` | write | none | `create_ai_field` |
+| `mcp:create_job_post_check` | write | none | `create_job_post_check` |
+| `mcp:create_report` | write | none | `create_report` |
+| `mcp:enrich_candidate_contacts` | write | none | `enrich_candidate_contacts` |
+| `mcp:generate_notes` | write | none | `generate_notes` |
+| `mcp:give_sourcing_feedback` | write | none | `give_sourcing_feedback` |
+| `mcp:manage_notes_sources` | write | none | `manage_notes_sources` |
+| `mcp:resolve_job_post_suggestion` | write | none | `resolve_job_post_suggestion` |
+| `mcp:restore_application_review_icp` | write | none | `restore_application_review_icp` |
+| `mcp:run_job_post_checks` | write | none | `run_job_post_checks` |
+| `mcp:update_application_review_icp` | write | none | `update_application_review_icp` |
+| `mcp:update_application_review_rules` | write | none | `update_application_review_rules` |
+| `mcp:update_screen_plan` | write | none | `update_screen_plan` |
+| `mcp:upsert_job_post_template` | write | none | `upsert_job_post_template` |
+| `mcp:give_application_review_candidate_feedback` | send | none | `give_application_review_candidate_feedback` |
+| `mcp:manage_candidate_sequence` | send | none | `manage_candidate_sequence` |
+| `mcp:post_sourcing_candidates_to_ats` | send | none | `post_sourcing_candidates_to_ats` |
+| `mcp:send_job_post_message` | send | none | `send_job_post_message` |
+| `mcp:send_sourcing_message` | send | none | `send_sourcing_message` |
+| `mcp:submit_feedback` | send | none | `submit_feedback` |
+| `mcp:update_screen_outreach` | send | none | `update_screen_outreach` |
+| `mcp:create_snippet` | share | none | `create_snippet` |
+| `mcp:manage_note_template` | delete | none | `manage_note_template` |
+| `mcp:manage_sequence` | delete | none | `manage_sequence` |
+| `mcp:manage_sourcing_knowledge` | delete | none | `manage_sourcing_knowledge` |
+
+### Sources
+
+| Source | Kind | Reads or output | Method | Cost |
+|---|---|---|---|---|
+| `metaview.conversations` | events | `meeting` | `events_list` | free |
+
+### Actions
+
+None.
+
+### Bus events
+
+None.
+<!-- /generated:capabilities -->
+
+## Errors
+
+<!-- generated:errors -->
+| Code | Meaning |
+|---|---|
+| `NEEDS_SIGN_IN` | the account is not signed in |
+| `SCOPE_MISSING` | the call needs a scope the person has not confirmed |
+| `ACCOUNT_REQUIRED` | the plugin serves several accounts and the call names none |
+| `ACCOUNT_UNKNOWN` | the call names an alias the plugin does not serve |
+| `ACCOUNT_MISMATCH` | the item belongs to another account |
+| `CURSOR_INVALID` | the cursor is malformed, or belongs to another source, account or scope |
+| `CURSOR_EXPIRED` | the provider no longer keeps the history the cursor names |
+| `RATE_LIMITED` | the provider asked the plugin to slow down |
+| `BUDGET_EXCEEDED` | the read would cost more than the person allows |
+| `SOURCE_DISABLED` | the person turned this source or action off |
+| `TOO_LARGE` | the answer is larger than the source's maxBytes |
+| `INPUT_INVALID` | the input does not match the method's schema |
+| `SOURCE_UNKNOWN` | the plugin declares no such source |
+| `SCHEMA_VIOLATION` | an answer does not keep the contract's shape |
+| `PERMISSION_DENIED` | the person's grant does not cover the call |
+| `PLAN_INVALID` | the plan is missing, or belongs to another method |
+| `PLAN_USED` | the plan was already used by an earlier commit |
+| `GRANT_INVALID` | the action grant did not verify, or was already spent |
+| `HOST_UNTESTED` | OpenCode is outside the plugin's tested range |
+| `OPTIONS_INVALID` | the plugin's options do not match their schema |
+| `UNAVAILABLE` | the provider could not be reached |
+<!-- /generated:errors -->
 
 ## Troubleshooting
 
-Run `/metaview-status` first. Its last line is the next step.
+| Symptom | Next step |
+|---|---|
+| `NEEDS_SIGN_IN` | Run `/connect` and choose the account's server, `metaview` or `metaview-<alias>`, then try again. |
+| `ACCOUNT_REQUIRED` | Pass `account: "<alias>"`; the error lists the aliases. |
+| `ACCOUNT_UNKNOWN` | Use an alias from `status.accounts`, or add it under `accounts` in `opencode.json`. |
+| `CURSOR_INVALID` | Read again without the cursor, or pass the cursor with the account and `reports` scope that issued it. |
+| `PERMISSION_DENIED` | Check `access` and the agent's own rules; a deny is final, and a read-only plugin refuses every change. |
+| `HOST_UNTESTED` | Install OpenCode 2.4.1, or set `allowUntestedHost` deliberately. |
+| `RATE_LIMITED` | Wait a minute, then retry the same call. |
+| `UNAVAILABLE` | Check `status` and the account's server in `/mcps`; a server that needs sign-in is `NEEDS_SIGN_IN`. |
 
-| Status or error | What to do |
-| --- | --- |
-| Connection: sign-in required | Run `/connect` and choose Metaview, then press `o` or Enter to open the link. In a terminal, `opencode mcp auth metaview` opens it automatically. |
-| Connection: failed | Check your network, then run `/metaview-status` again. With your own entry that sends an API key, check the key. |
-| Connection: conflict | Your config has an `mcp.servers.metaview` entry with a URL other than `https://mcp.metaview.ai/mcp`. Point it there or remove it, then restart OpenCode. |
-| Tools: 0 available | Metaview lists no tools for your account. Ask a workspace admin to turn on **MCP integration**, and **MCP for non-admins** if you are a member. |
-| Agents without default rules | Put the default rules shown by `/metaview-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file. |
-| `HOST_UNTESTED` | Your OpenCode is outside `>=2.4.1 <2.5.0`, so the plugin did not start. Use a supported release, or set `"allowUntestedHost": true` to run anyway. |
-| `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `RULES_NOT_ADDED` | The default permission rules could not be added, so Metaview tools may run without asking. Restart OpenCode. |
-| `SERVER_NOT_REGISTERED` | The plugin could not register the `metaview` server. Restart OpenCode. |
-| `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
-| `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
+`status` reports the plugin's version, OpenCode host, every alias's state and one next step. It reads no conversation.
 
-## Uninstall
+## Docs
 
-Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `metaview` server, so
-`opencode mcp logout metaview` fails with `MCP server not found: metaview` and the sign-in stays in OpenCode's
-credential store.
-
-1. Sign out: `opencode mcp logout metaview`.
-2. Check: `opencode auth list` no longer lists **Metaview**.
-3. Remove the plugin: `opencode plugin remove github:we-the-rebel-alliance/metaview-plugin#v<version>`, then
-   `opencode reload`.
-4. Remove any Metaview rules you copied into your agents' own `permissions`. If you used an API key, delete it in
-   Metaview: Settings, MCP.
-
-## Links
-
-- [Configuration](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/configuration.md)
-- [Scripting](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/scripting.md)
-- [Architecture](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/docs/architecture.md)
-- [Contributing](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/CONTRIBUTING.md)
-- [Security](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/SECURITY.md)
-- [Changelog](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/CHANGELOG.md)
-- [MIT license](https://github.com/we-the-rebel-alliance/metaview-plugin/blob/master/LICENSE)
-- [Metaview's MCP integration](https://support.metaview.ai/integrations/mcp-integration/mcp-overview)
+- [Capabilities](docs/capabilities.md)
+- [Configuration](docs/configuration.md)
+- [Accounts](docs/accounts.md)
+- [Automations](docs/automations.md)
+- [Architecture](docs/architecture.md)
+- [Security](docs/security.md)
+- [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract)

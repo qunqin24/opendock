@@ -1,279 +1,162 @@
-# Google Workspace for OpenCode
+# Google Workspace
 
-Gives OpenCode agents Gmail, Calendar, Drive, Docs, Sheets and the rest of Google Workspace through Google's
-open-source [`gws`](https://github.com/googleworkspace/cli) CLI, with every change planned first and committed as a
-second, visible step.
-
-Unofficial; not affiliated with Google Workspace or Google.
-
-Google is a trademark of Google LLC; this unofficial plugin is not endorsed by them.
-
-> **v0.0.0 is unreleased.** This repository is the plugin's first release under the `we-the-rebel-alliance` org, and
-> its tag, release and native binary do not exist yet. Install it from a checkout (see [Install](#install)); the
-> published release follows.
-
-## Requirements
-
-- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1. Another release in that range, such as 2.4.2, works as usual and status
-  marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
-- macOS (arm64, x64) or Linux (arm64, x64, glibc).
-- A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
+Google Workspace for OpenCode: Gmail, Calendar, Drive, Docs and Sheets, with plans and per-class commits. The plugin
+is built for a pinned, verified `gws` 0.22.5 executable against each account's own Google sign-in. The `v0.0.0`
+package carries `manifest/native.json`, and its release assets carry the verified `gws-<target>.gz` files. It never
+calls a `gws` found on `PATH`, and it ships no OAuth client.
 
 ## Install
 
-From a checkout:
-
 ```sh
-npm ci --ignore-scripts
-npm run fetch:gws
-npm run build
+opencode plugin add github:we-the-rebel-alliance/gws-plugin#v0.0.0
 ```
 
-Then add the checkout's absolute path to `opencode.json`:
+The install tag is `v0.0.0`; the lead's release bot cuts it after merge. The plugin needs Node 24 and
+OpenCode `>=2.4.1 <2.5.0`; it is tested on `2.4.1`. A release outside that range is refused with `HOST_UNTESTED`; a
+release inside the range starts, and status reports it as untested.
 
-```json
-{ "plugins": [{ "package": "/absolute/path/to/gws-plugin" }] }
-```
-
-The first release is published as `github:we-the-rebel-alliance/gws-plugin#v0.0.0`; until that tag exists, a
-`github:` spec does not resolve. Run `opencode reload`, or restart OpenCode, then `/gws-status`.
+On the first call that needs the `gws` executable, the plugin downloads and verifies the pinned 0.22.5 build from its
+`v0.0.0` release assets. `binary.path` can name an absolute system copy instead.
 
 ## Sign in
 
-Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: press `o` or Enter to open it in your
-browser. The CLI opens the browser automatically:
+Each account is one OpenCode integration: `gws` for the default account, `gws-work` for an account named `work`. In
+`/connect`, choose **Google Workspace** (or **Google Workspace (work)**), paste a Desktop OAuth client's ID and secret,
+and approve the scopes. One client can serve every alias.
 
-```sh
-opencode auth login gws-default
+Headless profiles read a credentials file or an access token from the environment variable their profile names; they
+need no browser. See [docs/accounts.md](docs/accounts.md).
+
+```json
+{
+  "options": {
+    "accounts": {
+      "work": { "enabledServices": ["gmail", "calendar", "drive"] },
+      "personal": { "mode": "access_token", "enabledServices": ["drive"], "tokenEnv": "GWS_PERSONAL_TOKEN" }
+    }
+  }
+}
 ```
 
-No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own
-Desktop app OAuth client, unless your organisation set one. Read and write is the default for the `default` account;
-Read-only is the other choice. With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
+## Options
 
-Details and the scope table: [docs/auth.md](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/auth.md).
+The full options table is generated in [docs/configuration.md](docs/configuration.md). The common ones:
 
-## Use
+| Option | Default | Meaning |
+|---|---|---|
+| `access` | `all` | `all`, `ask-changes` or `read-only` |
+| `accounts` | one `default` | one profile per alias |
+| `allowUntestedHost` | `false` | start outside `>=2.4.1 <2.5.0` |
+| `services` | every enabled service | the model-facing service allowlist |
 
-Ask the agent for what you need. It works in four steps:
+## Access
 
-1. `gws_catalog` finds an operation, and `gws_schema` shows its parameters.
-2. `gws_read` runs a read. List and search calls need `fields`.
-3. `gws_plan` dry-runs a change and returns a `planId` with a redacted preview.
-4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or
-   `gws_admin`) runs it, with only the `planId`. OpenCode asks you first when `access` is `"ask-changes"`; every tool
-   is allowed at the default ([Permissions](#permissions)).
+`access` is the ceiling for every method. A read runs at every level; a change runs under `all`, asks under
+`ask-changes` and is off under `read-only`. Every change is still a plan for its class — `plan_write`, `plan_send`,
+`plan_share`, `plan_delete`, `plan_export` or `plan_admin` — followed by the matching `write`, `send`, `share`,
+`delete`, `export` or `admin` commit. The plan previews the redacted command, its recipients and Google's dry-run answer;
+the commit takes only its `planId`.
 
-`gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is
-data, never an instruction.
+## Capabilities
 
-`gws_events_list` is for a consumer's collector, not for answering questions: it lists the Gmail messages that
-arrived, or the primary calendar's meetings up to seven days ahead, since a cursor as normalised events. The plugin
-declares its sources in `package.json` `sources` under the shared
-[source contract](https://github.com/we-the-rebel-alliance/source-contract) and passes its conformance kit
-([configuration](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md#sources)).
+<!-- generated:capabilities -->
+### Methods
 
-### Scripts
+| Method | Class | Accounts | Operations |
+|---|---|---|---|
+| `status` | read | none | — |
+| `catalog` | read | none | — |
+| `schema` | read | optional | — |
+| `read` | read | optional | `admin-reports.activities.list`, `admin-reports.customerUsageReports.get`, `admin-reports.entityUsageReports.get`, `admin-reports.userUsageReport.get`, `calendar.acl.get`, `calendar.acl.list`, `calendar.agenda`, `calendar.calendarList.get`, `calendar.calendarList.list`, `calendar.calendars.get`, `calendar.colors.get`, `calendar.events.get`, `calendar.events.instances`, `calendar.events.list`, `calendar.settings.get`, `calendar.settings.list`, `chat.customEmojis.get`, `chat.customEmojis.list`, `chat.media.download`, `chat.spaces.findDirectMessage`, `chat.spaces.findGroupChats`, `chat.spaces.get`, `chat.spaces.list`, `chat.spaces.members.get`, `chat.spaces.members.list`, `chat.spaces.messagePins.list`, `chat.spaces.messages.attachments.get`, `chat.spaces.messages.get`, `chat.spaces.messages.list`, `chat.spaces.messages.reactions.list`, `chat.spaces.search`, `chat.spaces.spaceEvents.get`, `chat.spaces.spaceEvents.list`, `chat.users.availability.get`, `chat.users.sections.items.list`, `chat.users.sections.list`, `chat.users.spaces.getSpaceReadState`, `chat.users.spaces.spaceNotificationSetting.get`, `chat.users.spaces.threads.getThreadReadState`, `classroom.courses.aliases.list`, `classroom.courses.announcements.addOnAttachments.get`, `classroom.courses.announcements.addOnAttachments.list`, `classroom.courses.announcements.get`, `classroom.courses.announcements.getAddOnContext`, `classroom.courses.announcements.list`, `classroom.courses.courseWork.addOnAttachments.get`, `classroom.courses.courseWork.addOnAttachments.list`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.get`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.list`, `classroom.courses.courseWork.get`, `classroom.courses.courseWork.getAddOnContext`, `classroom.courses.courseWork.list`, `classroom.courses.courseWork.rubrics.get`, `classroom.courses.courseWork.rubrics.list`, `classroom.courses.courseWork.studentSubmissions.get`, `classroom.courses.courseWork.studentSubmissions.list`, `classroom.courses.courseWorkMaterials.addOnAttachments.get`, `classroom.courses.courseWorkMaterials.addOnAttachments.list`, `classroom.courses.courseWorkMaterials.get`, `classroom.courses.courseWorkMaterials.getAddOnContext`, `classroom.courses.courseWorkMaterials.list`, `classroom.courses.get`, `classroom.courses.getGradingPeriodSettings`, `classroom.courses.list`, `classroom.courses.posts.addOnAttachments.get`, `classroom.courses.posts.addOnAttachments.list`, `classroom.courses.posts.addOnAttachments.studentSubmissions.get`, `classroom.courses.posts.getAddOnContext`, `classroom.courses.studentGroups.list`, `classroom.courses.studentGroups.studentGroupMembers.list`, `classroom.courses.students.get`, `classroom.courses.students.list`, `classroom.courses.teachers.get`, `classroom.courses.teachers.list`, `classroom.courses.topics.get`, `classroom.courses.topics.list`, `classroom.invitations.get`, `classroom.invitations.list`, `classroom.userProfiles.get`, `classroom.userProfiles.guardianInvitations.get`, `classroom.userProfiles.guardianInvitations.list`, `classroom.userProfiles.guardians.get`, `classroom.userProfiles.guardians.list`, `docs.documents.get`, `drive.about.get`, `drive.accessproposals.get`, `drive.accessproposals.list`, `drive.approvals.get`, `drive.approvals.list`, `drive.apps.get`, `drive.apps.list`, `drive.changes.getStartPageToken`, `drive.changes.list`, `drive.comments.get`, `drive.comments.list`, `drive.drives.get`, `drive.drives.list`, `drive.files.download`, `drive.files.generateIds`, `drive.files.get`, `drive.files.list`, `drive.files.listLabels`, `drive.operations.get`, `drive.permissions.get`, `drive.permissions.list`, `drive.replies.get`, `drive.replies.list`, `drive.revisions.get`, `drive.revisions.list`, `events.operations.get`, `forms.forms.get`, `forms.forms.responses.get`, `forms.forms.responses.list`, `gmail.read`, `gmail.triage`, `gmail.users.drafts.get`, `gmail.users.drafts.list`, `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.labels.get`, `gmail.users.labels.list`, `gmail.users.messages.attachments.get`, `gmail.users.messages.get`, `gmail.users.messages.list`, `gmail.users.settings.cse.identities.get`, `gmail.users.settings.cse.identities.list`, `gmail.users.settings.cse.keypairs.get`, `gmail.users.settings.cse.keypairs.list`, `gmail.users.settings.delegates.get`, `gmail.users.settings.delegates.list`, `gmail.users.settings.filters.get`, `gmail.users.settings.filters.list`, `gmail.users.settings.forwardingAddresses.get`, `gmail.users.settings.forwardingAddresses.list`, `gmail.users.settings.getAutoForwarding`, `gmail.users.settings.getImap`, `gmail.users.settings.getLanguage`, `gmail.users.settings.getPop`, `gmail.users.settings.getVacation`, `gmail.users.settings.sendAs.get`, `gmail.users.settings.sendAs.list`, `gmail.users.threads.get`, `gmail.users.threads.list`, `keep.media.download`, `keep.notes.get`, `keep.notes.list`, `meet.conferenceRecords.get`, `meet.conferenceRecords.list`, `meet.conferenceRecords.participants.get`, `meet.conferenceRecords.participants.list`, `meet.conferenceRecords.participants.participantSessions.get`, `meet.conferenceRecords.participants.participantSessions.list`, `meet.conferenceRecords.recordings.get`, `meet.conferenceRecords.recordings.list`, `meet.conferenceRecords.smartNotes.get`, `meet.conferenceRecords.smartNotes.list`, `meet.conferenceRecords.transcripts.entries.get`, `meet.conferenceRecords.transcripts.entries.list`, `meet.conferenceRecords.transcripts.get`, `meet.conferenceRecords.transcripts.list`, `meet.spaces.get`, `meet.spaces.members.get`, `meet.spaces.members.list`, `people.contactGroups.batchGet`, `people.contactGroups.get`, `people.contactGroups.list`, `people.otherContacts.list`, `people.otherContacts.search`, `people.people.connections.list`, `people.people.get`, `people.people.getBatchGet`, `people.people.listDirectoryPeople`, `people.people.searchContacts`, `people.people.searchDirectoryPeople`, `script.processes.list`, `script.processes.listScriptProcesses`, `script.projects.get`, `script.projects.getContent`, `script.projects.getMetrics`, `script.projects.versions.get`, `script.projects.versions.list`, `sheets.read`, `sheets.spreadsheets.developerMetadata.get`, `sheets.spreadsheets.developerMetadata.search`, `sheets.spreadsheets.get`, `sheets.spreadsheets.getByDataFilter`, `sheets.spreadsheets.values.batchGet`, `sheets.spreadsheets.values.batchGetByDataFilter`, `sheets.spreadsheets.values.get`, `slides.presentations.get`, `slides.presentations.pages.get`, `slides.presentations.pages.getThumbnail`, `tasks.tasklists.get`, `tasks.tasklists.list`, `tasks.tasks.get`, `tasks.tasks.list`, `workflow.meeting-prep`, `workflow.standup-report`, `workflow.weekly-digest` |
+| `plan_write` | read | optional | `calendar.calendarList.insert`, `calendar.calendarList.patch`, `calendar.calendarList.update`, `calendar.calendarList.watch`, `calendar.calendars.get`, `calendar.calendars.insert`, `calendar.events.get`, `calendar.events.import`, `calendar.events.insert`, `calendar.events.move`, `calendar.events.patch`, `calendar.events.quickAdd`, `calendar.events.update`, `calendar.freebusy.query`, `calendar.settings.watch`, `chat.customEmojis.create`, `chat.media.upload`, `chat.spaces.completeImport`, `chat.spaces.create`, `chat.spaces.members.patch`, `chat.spaces.messagePins.create`, `chat.spaces.messages.patch`, `chat.spaces.messages.replaceCards`, `chat.spaces.messages.search`, `chat.spaces.messages.update`, `chat.spaces.patch`, `chat.spaces.setup`, `chat.users.availability.markAsActive`, `chat.users.availability.markAsAway`, `chat.users.availability.markAsDoNotDisturb`, `chat.users.availability.patch`, `chat.users.sections.create`, `chat.users.sections.items.move`, `chat.users.sections.patch`, `chat.users.sections.position`, `chat.users.spaces.spaceNotificationSetting.patch`, `chat.users.spaces.threads.updateThreadReadState`, `chat.users.spaces.updateSpaceReadState`, `classroom.courses.aliases.create`, `classroom.courses.announcements.addOnAttachments.create`, `classroom.courses.announcements.addOnAttachments.patch`, `classroom.courses.announcements.create`, `classroom.courses.announcements.modifyAssignees`, `classroom.courses.announcements.patch`, `classroom.courses.courseWork.addOnAttachments.create`, `classroom.courses.courseWork.addOnAttachments.patch`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch`, `classroom.courses.courseWork.create`, `classroom.courses.courseWork.modifyAssignees`, `classroom.courses.courseWork.patch`, `classroom.courses.courseWork.rubrics.create`, `classroom.courses.courseWork.rubrics.patch`, `classroom.courses.courseWork.studentSubmissions.modifyAttachments`, `classroom.courses.courseWork.studentSubmissions.patch`, `classroom.courses.courseWork.studentSubmissions.reclaim`, `classroom.courses.courseWork.studentSubmissions.return`, `classroom.courses.courseWork.studentSubmissions.turnIn`, `classroom.courses.courseWork.updateRubric`, `classroom.courses.courseWorkMaterials.addOnAttachments.create`, `classroom.courses.courseWorkMaterials.addOnAttachments.patch`, `classroom.courses.courseWorkMaterials.create`, `classroom.courses.courseWorkMaterials.patch`, `classroom.courses.create`, `classroom.courses.patch`, `classroom.courses.posts.addOnAttachments.create`, `classroom.courses.posts.addOnAttachments.patch`, `classroom.courses.posts.addOnAttachments.studentSubmissions.patch`, `classroom.courses.studentGroups.create`, `classroom.courses.studentGroups.patch`, `classroom.courses.students.create`, `classroom.courses.teachers.create`, `classroom.courses.topics.create`, `classroom.courses.topics.patch`, `classroom.courses.update`, `classroom.courses.updateGradingPeriodSettings`, `classroom.invitations.accept`, `classroom.userProfiles.guardianInvitations.create`, `classroom.userProfiles.guardianInvitations.patch`, `docs.documents.batchUpdate`, `docs.documents.create`, `drive.about.get`, `drive.comments.create`, `drive.comments.update`, `drive.drives.create`, `drive.drives.hide`, `drive.drives.unhide`, `drive.drives.update`, `drive.files.copy`, `drive.files.create`, `drive.files.modifyLabels`, `drive.files.update`, `drive.permissions.get`, `drive.replies.create`, `drive.replies.update`, `drive.revisions.update`, `forms.forms.batchUpdate`, `forms.forms.create`, `forms.forms.setPublishSettings`, `gmail.forward`, `gmail.reply`, `gmail.reply-all`, `gmail.send`, `gmail.users.drafts.create`, `gmail.users.drafts.get`, `gmail.users.drafts.update`, `gmail.users.getProfile`, `gmail.users.labels.create`, `gmail.users.labels.patch`, `gmail.users.labels.update`, `gmail.users.messages.batchModify`, `gmail.users.messages.get`, `gmail.users.messages.import`, `gmail.users.messages.insert`, `gmail.users.messages.modify`, `gmail.users.settings.cse.identities.create`, `gmail.users.settings.cse.identities.patch`, `gmail.users.settings.cse.keypairs.create`, `gmail.users.settings.cse.keypairs.disable`, `gmail.users.settings.cse.keypairs.enable`, `gmail.users.settings.filters.create`, `gmail.users.settings.sendAs.create`, `gmail.users.settings.sendAs.patch`, `gmail.users.settings.sendAs.smimeInfo.delete`, `gmail.users.settings.sendAs.smimeInfo.get`, `gmail.users.settings.sendAs.smimeInfo.insert`, `gmail.users.settings.sendAs.smimeInfo.list`, `gmail.users.settings.sendAs.smimeInfo.setDefault`, `gmail.users.settings.sendAs.update`, `gmail.users.settings.sendAs.verify`, `gmail.users.settings.updateImap`, `gmail.users.settings.updateLanguage`, `gmail.users.settings.updatePop`, `gmail.users.settings.updateVacation`, `gmail.users.threads.modify`, `keep.notes.create`, `meet.spaces.create`, `meet.spaces.endActiveConference`, `meet.spaces.members.patch`, `meet.spaces.patch`, `people.contactGroups.create`, `people.contactGroups.update`, `people.otherContacts.copyOtherContactToMyContactsGroup`, `people.people.batchCreateContacts`, `people.people.batchUpdateContacts`, `people.people.createContact`, `people.people.updateContact`, `people.people.updateContactPhoto`, `script.projects.create`, `script.projects.updateContent`, `sheets.spreadsheets.batchUpdate`, `sheets.spreadsheets.create`, `sheets.spreadsheets.sheets.copyTo`, `sheets.spreadsheets.values.append`, `sheets.spreadsheets.values.batchUpdate`, `sheets.spreadsheets.values.batchUpdateByDataFilter`, `sheets.spreadsheets.values.update`, `slides.presentations.batchUpdate`, `slides.presentations.create`, `tasks.tasklists.insert`, `tasks.tasklists.patch`, `tasks.tasklists.update`, `tasks.tasks.insert`, `tasks.tasks.move`, `tasks.tasks.patch`, `tasks.tasks.update` |
+| `plan_send` | read | optional | `calendar.calendars.get`, `calendar.events.get`, `calendar.events.import`, `calendar.events.insert`, `calendar.events.move`, `calendar.events.patch`, `calendar.events.quickAdd`, `calendar.events.update`, `chat.spaces.messages.create`, `chat.spaces.messages.reactions.create`, `drive.about.get`, `drive.approvals.comment`, `drive.approvals.reassign`, `drive.approvals.start`, `drive.permissions.get`, `gmail.forward`, `gmail.reply`, `gmail.reply-all`, `gmail.send`, `gmail.users.drafts.get`, `gmail.users.drafts.send`, `gmail.users.getProfile`, `gmail.users.messages.get`, `gmail.users.messages.send` |
+| `plan_share` | read | optional | `calendar.acl.delete`, `calendar.acl.insert`, `calendar.acl.patch`, `calendar.acl.update`, `calendar.acl.watch`, `calendar.calendars.get`, `calendar.events.get`, `chat.spaces.members.create`, `chat.spaces.members.delete`, `classroom.courses.studentGroups.studentGroupMembers.create`, `classroom.invitations.create`, `classroom.invitations.delete`, `drive.about.get`, `drive.accessproposals.resolve`, `drive.approvals.approve`, `drive.approvals.cancel`, `drive.approvals.decline`, `drive.permissions.create`, `drive.permissions.delete`, `drive.permissions.get`, `drive.permissions.update`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.messages.get`, `gmail.users.settings.delegates.create`, `gmail.users.settings.delegates.delete`, `gmail.users.settings.forwardingAddresses.create`, `gmail.users.settings.forwardingAddresses.delete`, `gmail.users.settings.updateAutoForwarding`, `keep.notes.permissions.batchCreate`, `keep.notes.permissions.batchDelete`, `meet.spaces.members.batchUpdate`, `meet.spaces.members.create`, `people.contactGroups.members.modify` |
+| `plan_delete` | read | optional | `calendar.calendarList.delete`, `calendar.calendars.clear`, `calendar.calendars.delete`, `calendar.calendars.get`, `calendar.events.delete`, `calendar.events.get`, `chat.customEmojis.delete`, `chat.spaces.delete`, `chat.spaces.messagePins.delete`, `chat.spaces.messages.delete`, `chat.spaces.messages.reactions.delete`, `chat.users.sections.delete`, `classroom.courses.aliases.delete`, `classroom.courses.announcements.addOnAttachments.delete`, `classroom.courses.announcements.delete`, `classroom.courses.courseWork.addOnAttachments.delete`, `classroom.courses.courseWork.delete`, `classroom.courses.courseWork.rubrics.delete`, `classroom.courses.courseWorkMaterials.addOnAttachments.delete`, `classroom.courses.courseWorkMaterials.delete`, `classroom.courses.delete`, `classroom.courses.posts.addOnAttachments.delete`, `classroom.courses.studentGroups.delete`, `classroom.courses.studentGroups.studentGroupMembers.delete`, `classroom.courses.students.delete`, `classroom.courses.teachers.delete`, `classroom.courses.topics.delete`, `classroom.userProfiles.guardians.delete`, `drive.about.get`, `drive.comments.delete`, `drive.drives.delete`, `drive.files.delete`, `drive.files.emptyTrash`, `drive.files.update`, `drive.permissions.get`, `drive.replies.delete`, `drive.revisions.delete`, `gmail.users.drafts.delete`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.labels.delete`, `gmail.users.messages.batchDelete`, `gmail.users.messages.delete`, `gmail.users.messages.get`, `gmail.users.messages.trash`, `gmail.users.messages.untrash`, `gmail.users.settings.cse.identities.delete`, `gmail.users.settings.cse.keypairs.obliterate`, `gmail.users.settings.filters.delete`, `gmail.users.settings.sendAs.delete`, `gmail.users.threads.delete`, `gmail.users.threads.trash`, `gmail.users.threads.untrash`, `keep.notes.delete`, `meet.spaces.members.delete`, `people.contactGroups.delete`, `people.people.batchDeleteContacts`, `people.people.deleteContact`, `people.people.deleteContactPhoto`, `sheets.spreadsheets.values.batchClear`, `sheets.spreadsheets.values.batchClearByDataFilter`, `sheets.spreadsheets.values.clear`, `tasks.tasklists.delete`, `tasks.tasks.clear`, `tasks.tasks.delete` |
+| `plan_export` | read | optional | `admin-reports.activities.list`, `admin-reports.customerUsageReports.get`, `admin-reports.entityUsageReports.get`, `admin-reports.userUsageReport.get`, `calendar.acl.get`, `calendar.acl.list`, `calendar.agenda`, `calendar.calendarList.get`, `calendar.calendarList.list`, `calendar.calendars.get`, `calendar.colors.get`, `calendar.events.get`, `calendar.events.instances`, `calendar.events.list`, `calendar.settings.get`, `calendar.settings.list`, `chat.customEmojis.get`, `chat.customEmojis.list`, `chat.media.download`, `chat.spaces.findDirectMessage`, `chat.spaces.findGroupChats`, `chat.spaces.get`, `chat.spaces.list`, `chat.spaces.members.get`, `chat.spaces.members.list`, `chat.spaces.messagePins.list`, `chat.spaces.messages.attachments.get`, `chat.spaces.messages.get`, `chat.spaces.messages.list`, `chat.spaces.messages.reactions.list`, `chat.spaces.search`, `chat.spaces.spaceEvents.get`, `chat.spaces.spaceEvents.list`, `chat.users.availability.get`, `chat.users.sections.items.list`, `chat.users.sections.list`, `chat.users.spaces.getSpaceReadState`, `chat.users.spaces.spaceNotificationSetting.get`, `chat.users.spaces.threads.getThreadReadState`, `classroom.courses.aliases.list`, `classroom.courses.announcements.addOnAttachments.get`, `classroom.courses.announcements.addOnAttachments.list`, `classroom.courses.announcements.get`, `classroom.courses.announcements.getAddOnContext`, `classroom.courses.announcements.list`, `classroom.courses.courseWork.addOnAttachments.get`, `classroom.courses.courseWork.addOnAttachments.list`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.get`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.list`, `classroom.courses.courseWork.get`, `classroom.courses.courseWork.getAddOnContext`, `classroom.courses.courseWork.list`, `classroom.courses.courseWork.rubrics.get`, `classroom.courses.courseWork.rubrics.list`, `classroom.courses.courseWork.studentSubmissions.get`, `classroom.courses.courseWork.studentSubmissions.list`, `classroom.courses.courseWorkMaterials.addOnAttachments.get`, `classroom.courses.courseWorkMaterials.addOnAttachments.list`, `classroom.courses.courseWorkMaterials.get`, `classroom.courses.courseWorkMaterials.getAddOnContext`, `classroom.courses.courseWorkMaterials.list`, `classroom.courses.get`, `classroom.courses.getGradingPeriodSettings`, `classroom.courses.list`, `classroom.courses.posts.addOnAttachments.get`, `classroom.courses.posts.addOnAttachments.list`, `classroom.courses.posts.addOnAttachments.studentSubmissions.get`, `classroom.courses.posts.getAddOnContext`, `classroom.courses.studentGroups.list`, `classroom.courses.studentGroups.studentGroupMembers.list`, `classroom.courses.students.get`, `classroom.courses.students.list`, `classroom.courses.teachers.get`, `classroom.courses.teachers.list`, `classroom.courses.topics.get`, `classroom.courses.topics.list`, `classroom.invitations.get`, `classroom.invitations.list`, `classroom.userProfiles.get`, `classroom.userProfiles.guardianInvitations.get`, `classroom.userProfiles.guardianInvitations.list`, `classroom.userProfiles.guardians.get`, `classroom.userProfiles.guardians.list`, `docs.documents.get`, `drive.about.get`, `drive.accessproposals.get`, `drive.accessproposals.list`, `drive.approvals.get`, `drive.approvals.list`, `drive.apps.get`, `drive.apps.list`, `drive.changes.getStartPageToken`, `drive.changes.list`, `drive.comments.get`, `drive.comments.list`, `drive.drives.get`, `drive.drives.list`, `drive.files.download`, `drive.files.export`, `drive.files.generateIds`, `drive.files.get`, `drive.files.list`, `drive.files.listLabels`, `drive.operations.get`, `drive.permissions.get`, `drive.permissions.list`, `drive.replies.get`, `drive.replies.list`, `drive.revisions.get`, `drive.revisions.list`, `events.operations.get`, `forms.forms.get`, `forms.forms.responses.get`, `forms.forms.responses.list`, `gmail.read`, `gmail.triage`, `gmail.users.drafts.get`, `gmail.users.drafts.list`, `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.labels.get`, `gmail.users.labels.list`, `gmail.users.messages.attachments.get`, `gmail.users.messages.get`, `gmail.users.messages.list`, `gmail.users.settings.cse.identities.get`, `gmail.users.settings.cse.identities.list`, `gmail.users.settings.cse.keypairs.get`, `gmail.users.settings.cse.keypairs.list`, `gmail.users.settings.delegates.get`, `gmail.users.settings.delegates.list`, `gmail.users.settings.filters.get`, `gmail.users.settings.filters.list`, `gmail.users.settings.forwardingAddresses.get`, `gmail.users.settings.forwardingAddresses.list`, `gmail.users.settings.getAutoForwarding`, `gmail.users.settings.getImap`, `gmail.users.settings.getLanguage`, `gmail.users.settings.getPop`, `gmail.users.settings.getVacation`, `gmail.users.settings.sendAs.get`, `gmail.users.settings.sendAs.list`, `gmail.users.threads.get`, `gmail.users.threads.list`, `keep.media.download`, `keep.notes.get`, `keep.notes.list`, `meet.conferenceRecords.get`, `meet.conferenceRecords.list`, `meet.conferenceRecords.participants.get`, `meet.conferenceRecords.participants.list`, `meet.conferenceRecords.participants.participantSessions.get`, `meet.conferenceRecords.participants.participantSessions.list`, `meet.conferenceRecords.recordings.get`, `meet.conferenceRecords.recordings.list`, `meet.conferenceRecords.smartNotes.get`, `meet.conferenceRecords.smartNotes.list`, `meet.conferenceRecords.transcripts.entries.get`, `meet.conferenceRecords.transcripts.entries.list`, `meet.conferenceRecords.transcripts.get`, `meet.conferenceRecords.transcripts.list`, `meet.spaces.get`, `meet.spaces.members.get`, `meet.spaces.members.list`, `people.contactGroups.batchGet`, `people.contactGroups.get`, `people.contactGroups.list`, `people.otherContacts.list`, `people.otherContacts.search`, `people.people.connections.list`, `people.people.get`, `people.people.getBatchGet`, `people.people.listDirectoryPeople`, `people.people.searchContacts`, `people.people.searchDirectoryPeople`, `script.processes.list`, `script.processes.listScriptProcesses`, `script.projects.get`, `script.projects.getContent`, `script.projects.getMetrics`, `script.projects.versions.get`, `script.projects.versions.list`, `sheets.read`, `sheets.spreadsheets.developerMetadata.get`, `sheets.spreadsheets.developerMetadata.search`, `sheets.spreadsheets.get`, `sheets.spreadsheets.getByDataFilter`, `sheets.spreadsheets.values.batchGet`, `sheets.spreadsheets.values.batchGetByDataFilter`, `sheets.spreadsheets.values.get`, `slides.presentations.get`, `slides.presentations.pages.get`, `slides.presentations.pages.getThumbnail`, `tasks.tasklists.get`, `tasks.tasklists.list`, `tasks.tasks.get`, `tasks.tasks.list`, `workflow.meeting-prep`, `workflow.standup-report`, `workflow.weekly-digest` |
+| `plan_admin` | read | optional | `admin-reports.activities.watch`, `admin-reports.channels.stop`, `calendar.calendars.get`, `calendar.events.get`, `drive.about.get`, `drive.files.generateCseToken`, `drive.permissions.get`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.messages.get` |
+| `events_list` | read | optional | `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list`, `gmail.users.messages.get`, `calendar.calendarList.get`, `calendar.events.list` |
+| `calendar_today` | read | optional | `calendar.calendars.get`, `calendar.events.list` |
+| `images_read` | read | optional | `drive.files.get` |
+| `probe` | read | optional | — |
+| `write` | write | none | `calendar.calendarList.insert`, `calendar.calendarList.patch`, `calendar.calendarList.update`, `calendar.calendarList.watch`, `calendar.calendars.get`, `calendar.calendars.insert`, `calendar.events.get`, `calendar.events.import`, `calendar.events.insert`, `calendar.events.move`, `calendar.events.patch`, `calendar.events.quickAdd`, `calendar.events.update`, `calendar.freebusy.query`, `calendar.settings.watch`, `chat.customEmojis.create`, `chat.media.upload`, `chat.spaces.completeImport`, `chat.spaces.create`, `chat.spaces.members.patch`, `chat.spaces.messagePins.create`, `chat.spaces.messages.patch`, `chat.spaces.messages.replaceCards`, `chat.spaces.messages.search`, `chat.spaces.messages.update`, `chat.spaces.patch`, `chat.spaces.setup`, `chat.users.availability.markAsActive`, `chat.users.availability.markAsAway`, `chat.users.availability.markAsDoNotDisturb`, `chat.users.availability.patch`, `chat.users.sections.create`, `chat.users.sections.items.move`, `chat.users.sections.patch`, `chat.users.sections.position`, `chat.users.spaces.spaceNotificationSetting.patch`, `chat.users.spaces.threads.updateThreadReadState`, `chat.users.spaces.updateSpaceReadState`, `classroom.courses.aliases.create`, `classroom.courses.announcements.addOnAttachments.create`, `classroom.courses.announcements.addOnAttachments.patch`, `classroom.courses.announcements.create`, `classroom.courses.announcements.modifyAssignees`, `classroom.courses.announcements.patch`, `classroom.courses.courseWork.addOnAttachments.create`, `classroom.courses.courseWork.addOnAttachments.patch`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch`, `classroom.courses.courseWork.create`, `classroom.courses.courseWork.modifyAssignees`, `classroom.courses.courseWork.patch`, `classroom.courses.courseWork.rubrics.create`, `classroom.courses.courseWork.rubrics.patch`, `classroom.courses.courseWork.studentSubmissions.modifyAttachments`, `classroom.courses.courseWork.studentSubmissions.patch`, `classroom.courses.courseWork.studentSubmissions.reclaim`, `classroom.courses.courseWork.studentSubmissions.return`, `classroom.courses.courseWork.studentSubmissions.turnIn`, `classroom.courses.courseWork.updateRubric`, `classroom.courses.courseWorkMaterials.addOnAttachments.create`, `classroom.courses.courseWorkMaterials.addOnAttachments.patch`, `classroom.courses.courseWorkMaterials.create`, `classroom.courses.courseWorkMaterials.patch`, `classroom.courses.create`, `classroom.courses.patch`, `classroom.courses.posts.addOnAttachments.create`, `classroom.courses.posts.addOnAttachments.patch`, `classroom.courses.posts.addOnAttachments.studentSubmissions.patch`, `classroom.courses.studentGroups.create`, `classroom.courses.studentGroups.patch`, `classroom.courses.students.create`, `classroom.courses.teachers.create`, `classroom.courses.topics.create`, `classroom.courses.topics.patch`, `classroom.courses.update`, `classroom.courses.updateGradingPeriodSettings`, `classroom.invitations.accept`, `classroom.userProfiles.guardianInvitations.create`, `classroom.userProfiles.guardianInvitations.patch`, `docs.documents.batchUpdate`, `docs.documents.create`, `drive.about.get`, `drive.comments.create`, `drive.comments.update`, `drive.drives.create`, `drive.drives.hide`, `drive.drives.unhide`, `drive.drives.update`, `drive.files.copy`, `drive.files.create`, `drive.files.modifyLabels`, `drive.files.update`, `drive.permissions.get`, `drive.replies.create`, `drive.replies.update`, `drive.revisions.update`, `forms.forms.batchUpdate`, `forms.forms.create`, `forms.forms.setPublishSettings`, `gmail.forward`, `gmail.reply`, `gmail.reply-all`, `gmail.send`, `gmail.users.drafts.create`, `gmail.users.drafts.get`, `gmail.users.drafts.update`, `gmail.users.getProfile`, `gmail.users.labels.create`, `gmail.users.labels.patch`, `gmail.users.labels.update`, `gmail.users.messages.batchModify`, `gmail.users.messages.get`, `gmail.users.messages.import`, `gmail.users.messages.insert`, `gmail.users.messages.modify`, `gmail.users.settings.cse.identities.create`, `gmail.users.settings.cse.identities.patch`, `gmail.users.settings.cse.keypairs.create`, `gmail.users.settings.cse.keypairs.disable`, `gmail.users.settings.cse.keypairs.enable`, `gmail.users.settings.filters.create`, `gmail.users.settings.sendAs.create`, `gmail.users.settings.sendAs.patch`, `gmail.users.settings.sendAs.smimeInfo.delete`, `gmail.users.settings.sendAs.smimeInfo.get`, `gmail.users.settings.sendAs.smimeInfo.insert`, `gmail.users.settings.sendAs.smimeInfo.list`, `gmail.users.settings.sendAs.smimeInfo.setDefault`, `gmail.users.settings.sendAs.update`, `gmail.users.settings.sendAs.verify`, `gmail.users.settings.updateImap`, `gmail.users.settings.updateLanguage`, `gmail.users.settings.updatePop`, `gmail.users.settings.updateVacation`, `gmail.users.threads.modify`, `keep.notes.create`, `meet.spaces.create`, `meet.spaces.endActiveConference`, `meet.spaces.members.patch`, `meet.spaces.patch`, `people.contactGroups.create`, `people.contactGroups.update`, `people.otherContacts.copyOtherContactToMyContactsGroup`, `people.people.batchCreateContacts`, `people.people.batchUpdateContacts`, `people.people.createContact`, `people.people.updateContact`, `people.people.updateContactPhoto`, `script.projects.create`, `script.projects.updateContent`, `sheets.spreadsheets.batchUpdate`, `sheets.spreadsheets.create`, `sheets.spreadsheets.sheets.copyTo`, `sheets.spreadsheets.values.append`, `sheets.spreadsheets.values.batchUpdate`, `sheets.spreadsheets.values.batchUpdateByDataFilter`, `sheets.spreadsheets.values.update`, `slides.presentations.batchUpdate`, `slides.presentations.create`, `tasks.tasklists.insert`, `tasks.tasklists.patch`, `tasks.tasklists.update`, `tasks.tasks.insert`, `tasks.tasks.move`, `tasks.tasks.patch`, `tasks.tasks.update` |
+| `send` | send | none | `calendar.calendars.get`, `calendar.events.get`, `calendar.events.import`, `calendar.events.insert`, `calendar.events.move`, `calendar.events.patch`, `calendar.events.quickAdd`, `calendar.events.update`, `chat.spaces.messages.create`, `chat.spaces.messages.reactions.create`, `drive.about.get`, `drive.approvals.comment`, `drive.approvals.reassign`, `drive.approvals.start`, `drive.permissions.get`, `gmail.forward`, `gmail.reply`, `gmail.reply-all`, `gmail.send`, `gmail.users.drafts.get`, `gmail.users.drafts.send`, `gmail.users.getProfile`, `gmail.users.messages.get`, `gmail.users.messages.send` |
+| `share` | share | none | `calendar.acl.delete`, `calendar.acl.insert`, `calendar.acl.patch`, `calendar.acl.update`, `calendar.acl.watch`, `calendar.calendars.get`, `calendar.events.get`, `chat.spaces.members.create`, `chat.spaces.members.delete`, `classroom.courses.studentGroups.studentGroupMembers.create`, `classroom.invitations.create`, `classroom.invitations.delete`, `drive.about.get`, `drive.accessproposals.resolve`, `drive.approvals.approve`, `drive.approvals.cancel`, `drive.approvals.decline`, `drive.permissions.create`, `drive.permissions.delete`, `drive.permissions.get`, `drive.permissions.update`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.messages.get`, `gmail.users.settings.delegates.create`, `gmail.users.settings.delegates.delete`, `gmail.users.settings.forwardingAddresses.create`, `gmail.users.settings.forwardingAddresses.delete`, `gmail.users.settings.updateAutoForwarding`, `keep.notes.permissions.batchCreate`, `keep.notes.permissions.batchDelete`, `meet.spaces.members.batchUpdate`, `meet.spaces.members.create`, `people.contactGroups.members.modify` |
+| `delete` | delete | none | `calendar.calendarList.delete`, `calendar.calendars.clear`, `calendar.calendars.delete`, `calendar.calendars.get`, `calendar.events.delete`, `calendar.events.get`, `chat.customEmojis.delete`, `chat.spaces.delete`, `chat.spaces.messagePins.delete`, `chat.spaces.messages.delete`, `chat.spaces.messages.reactions.delete`, `chat.users.sections.delete`, `classroom.courses.aliases.delete`, `classroom.courses.announcements.addOnAttachments.delete`, `classroom.courses.announcements.delete`, `classroom.courses.courseWork.addOnAttachments.delete`, `classroom.courses.courseWork.delete`, `classroom.courses.courseWork.rubrics.delete`, `classroom.courses.courseWorkMaterials.addOnAttachments.delete`, `classroom.courses.courseWorkMaterials.delete`, `classroom.courses.delete`, `classroom.courses.posts.addOnAttachments.delete`, `classroom.courses.studentGroups.delete`, `classroom.courses.studentGroups.studentGroupMembers.delete`, `classroom.courses.students.delete`, `classroom.courses.teachers.delete`, `classroom.courses.topics.delete`, `classroom.userProfiles.guardians.delete`, `drive.about.get`, `drive.comments.delete`, `drive.drives.delete`, `drive.files.delete`, `drive.files.emptyTrash`, `drive.files.update`, `drive.permissions.get`, `drive.replies.delete`, `drive.revisions.delete`, `gmail.users.drafts.delete`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.labels.delete`, `gmail.users.messages.batchDelete`, `gmail.users.messages.delete`, `gmail.users.messages.get`, `gmail.users.messages.trash`, `gmail.users.messages.untrash`, `gmail.users.settings.cse.identities.delete`, `gmail.users.settings.cse.keypairs.obliterate`, `gmail.users.settings.filters.delete`, `gmail.users.settings.sendAs.delete`, `gmail.users.threads.delete`, `gmail.users.threads.trash`, `gmail.users.threads.untrash`, `keep.notes.delete`, `meet.spaces.members.delete`, `people.contactGroups.delete`, `people.people.batchDeleteContacts`, `people.people.deleteContact`, `people.people.deleteContactPhoto`, `sheets.spreadsheets.values.batchClear`, `sheets.spreadsheets.values.batchClearByDataFilter`, `sheets.spreadsheets.values.clear`, `tasks.tasklists.delete`, `tasks.tasks.clear`, `tasks.tasks.delete` |
+| `export` | export | none | `admin-reports.activities.list`, `admin-reports.customerUsageReports.get`, `admin-reports.entityUsageReports.get`, `admin-reports.userUsageReport.get`, `calendar.acl.get`, `calendar.acl.list`, `calendar.agenda`, `calendar.calendarList.get`, `calendar.calendarList.list`, `calendar.calendars.get`, `calendar.colors.get`, `calendar.events.get`, `calendar.events.instances`, `calendar.events.list`, `calendar.settings.get`, `calendar.settings.list`, `chat.customEmojis.get`, `chat.customEmojis.list`, `chat.media.download`, `chat.spaces.findDirectMessage`, `chat.spaces.findGroupChats`, `chat.spaces.get`, `chat.spaces.list`, `chat.spaces.members.get`, `chat.spaces.members.list`, `chat.spaces.messagePins.list`, `chat.spaces.messages.attachments.get`, `chat.spaces.messages.get`, `chat.spaces.messages.list`, `chat.spaces.messages.reactions.list`, `chat.spaces.search`, `chat.spaces.spaceEvents.get`, `chat.spaces.spaceEvents.list`, `chat.users.availability.get`, `chat.users.sections.items.list`, `chat.users.sections.list`, `chat.users.spaces.getSpaceReadState`, `chat.users.spaces.spaceNotificationSetting.get`, `chat.users.spaces.threads.getThreadReadState`, `classroom.courses.aliases.list`, `classroom.courses.announcements.addOnAttachments.get`, `classroom.courses.announcements.addOnAttachments.list`, `classroom.courses.announcements.get`, `classroom.courses.announcements.getAddOnContext`, `classroom.courses.announcements.list`, `classroom.courses.courseWork.addOnAttachments.get`, `classroom.courses.courseWork.addOnAttachments.list`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.get`, `classroom.courses.courseWork.addOnAttachments.studentSubmissions.list`, `classroom.courses.courseWork.get`, `classroom.courses.courseWork.getAddOnContext`, `classroom.courses.courseWork.list`, `classroom.courses.courseWork.rubrics.get`, `classroom.courses.courseWork.rubrics.list`, `classroom.courses.courseWork.studentSubmissions.get`, `classroom.courses.courseWork.studentSubmissions.list`, `classroom.courses.courseWorkMaterials.addOnAttachments.get`, `classroom.courses.courseWorkMaterials.addOnAttachments.list`, `classroom.courses.courseWorkMaterials.get`, `classroom.courses.courseWorkMaterials.getAddOnContext`, `classroom.courses.courseWorkMaterials.list`, `classroom.courses.get`, `classroom.courses.getGradingPeriodSettings`, `classroom.courses.list`, `classroom.courses.posts.addOnAttachments.get`, `classroom.courses.posts.addOnAttachments.list`, `classroom.courses.posts.addOnAttachments.studentSubmissions.get`, `classroom.courses.posts.getAddOnContext`, `classroom.courses.studentGroups.list`, `classroom.courses.studentGroups.studentGroupMembers.list`, `classroom.courses.students.get`, `classroom.courses.students.list`, `classroom.courses.teachers.get`, `classroom.courses.teachers.list`, `classroom.courses.topics.get`, `classroom.courses.topics.list`, `classroom.invitations.get`, `classroom.invitations.list`, `classroom.userProfiles.get`, `classroom.userProfiles.guardianInvitations.get`, `classroom.userProfiles.guardianInvitations.list`, `classroom.userProfiles.guardians.get`, `classroom.userProfiles.guardians.list`, `docs.documents.get`, `drive.about.get`, `drive.accessproposals.get`, `drive.accessproposals.list`, `drive.approvals.get`, `drive.approvals.list`, `drive.apps.get`, `drive.apps.list`, `drive.changes.getStartPageToken`, `drive.changes.list`, `drive.comments.get`, `drive.comments.list`, `drive.drives.get`, `drive.drives.list`, `drive.files.download`, `drive.files.export`, `drive.files.generateIds`, `drive.files.get`, `drive.files.list`, `drive.files.listLabels`, `drive.operations.get`, `drive.permissions.get`, `drive.permissions.list`, `drive.replies.get`, `drive.replies.list`, `drive.revisions.get`, `drive.revisions.list`, `events.operations.get`, `forms.forms.get`, `forms.forms.responses.get`, `forms.forms.responses.list`, `gmail.read`, `gmail.triage`, `gmail.users.drafts.get`, `gmail.users.drafts.list`, `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.labels.get`, `gmail.users.labels.list`, `gmail.users.messages.attachments.get`, `gmail.users.messages.get`, `gmail.users.messages.list`, `gmail.users.settings.cse.identities.get`, `gmail.users.settings.cse.identities.list`, `gmail.users.settings.cse.keypairs.get`, `gmail.users.settings.cse.keypairs.list`, `gmail.users.settings.delegates.get`, `gmail.users.settings.delegates.list`, `gmail.users.settings.filters.get`, `gmail.users.settings.filters.list`, `gmail.users.settings.forwardingAddresses.get`, `gmail.users.settings.forwardingAddresses.list`, `gmail.users.settings.getAutoForwarding`, `gmail.users.settings.getImap`, `gmail.users.settings.getLanguage`, `gmail.users.settings.getPop`, `gmail.users.settings.getVacation`, `gmail.users.settings.sendAs.get`, `gmail.users.settings.sendAs.list`, `gmail.users.threads.get`, `gmail.users.threads.list`, `keep.media.download`, `keep.notes.get`, `keep.notes.list`, `meet.conferenceRecords.get`, `meet.conferenceRecords.list`, `meet.conferenceRecords.participants.get`, `meet.conferenceRecords.participants.list`, `meet.conferenceRecords.participants.participantSessions.get`, `meet.conferenceRecords.participants.participantSessions.list`, `meet.conferenceRecords.recordings.get`, `meet.conferenceRecords.recordings.list`, `meet.conferenceRecords.smartNotes.get`, `meet.conferenceRecords.smartNotes.list`, `meet.conferenceRecords.transcripts.entries.get`, `meet.conferenceRecords.transcripts.entries.list`, `meet.conferenceRecords.transcripts.get`, `meet.conferenceRecords.transcripts.list`, `meet.spaces.get`, `meet.spaces.members.get`, `meet.spaces.members.list`, `people.contactGroups.batchGet`, `people.contactGroups.get`, `people.contactGroups.list`, `people.otherContacts.list`, `people.otherContacts.search`, `people.people.connections.list`, `people.people.get`, `people.people.getBatchGet`, `people.people.listDirectoryPeople`, `people.people.searchContacts`, `people.people.searchDirectoryPeople`, `script.processes.list`, `script.processes.listScriptProcesses`, `script.projects.get`, `script.projects.getContent`, `script.projects.getMetrics`, `script.projects.versions.get`, `script.projects.versions.list`, `sheets.read`, `sheets.spreadsheets.developerMetadata.get`, `sheets.spreadsheets.developerMetadata.search`, `sheets.spreadsheets.get`, `sheets.spreadsheets.getByDataFilter`, `sheets.spreadsheets.values.batchGet`, `sheets.spreadsheets.values.batchGetByDataFilter`, `sheets.spreadsheets.values.get`, `slides.presentations.get`, `slides.presentations.pages.get`, `slides.presentations.pages.getThumbnail`, `tasks.tasklists.get`, `tasks.tasklists.list`, `tasks.tasks.get`, `tasks.tasks.list`, `workflow.meeting-prep`, `workflow.standup-report`, `workflow.weekly-digest` |
+| `admin` | admin | none | `admin-reports.activities.watch`, `admin-reports.channels.stop`, `calendar.calendars.get`, `calendar.events.get`, `drive.about.get`, `drive.files.generateCseToken`, `drive.permissions.get`, `gmail.users.drafts.get`, `gmail.users.getProfile`, `gmail.users.messages.get` |
 
-A script or an OpenCode automation can call the read tools with no model, through `opencode api`: `status`, `catalog`,
-`schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules,
-which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits
-it, unless the host turns on `rpcCommits` because it confirms changes itself.
+### Sources
 
-```sh
-opencode api post /api/rpc/google-workspace.gws.tools/read \
-  -H "x-opencode-directory:$PWD" \
-  -d '{"input":{"sessionID":"ses_…","input":{"operation":"gmail.users.messages.list","params":{"userId":"me","q":"is:unread"},"fields":"messages(id)"}}}'
-```
+| Source | Kind | Reads or output | Method | Cost |
+|---|---|---|---|---|
+| `gws.gmail` | events | `message` | `events_list` | free |
+| `gws.calendar` | events | `meeting` | `events_list` | free |
+| `gws.calendar.today` | snapshot | `agenda` | `calendar_today` | free |
+| `gws.image` | snapshot | `image` | `images_read` | free |
 
-See [Scripting](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/scripting.md).
+### Actions
 
-In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, opens a status dialog. In a session,
-`/gws-status` posts the same status, with any pending plans, and `/gws-doctor` makes one small read per enabled
-service. None of them can approve or commit.
+None.
 
-## Permissions
+### Bus events
 
-**Every tool is allowed by default.** An agent can read your mail and files, send mail, change sharing, delete files
-and run admin operations without asking. Each change is still only a plan until the agent commits it with the plan's
-`planId`, so a commit is one tool call on something you were shown first. Restrict the plugin with the `access`
-option, an agent's own rules, or a rule per action; [docs/configuration.md](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md#plugin-options)
-has the three ways and the rule resources.
-
-The block for each value, generated from `defaultRules(access)` in `src/host/agents.ts`:
-
-<!-- generated:rules-all -->
-
-`access: "all"`
-
-| Action | Resource | Effect |
-| --- | --- | --- |
-| `gws.*` | `*` | `allow` |
-| `gws.status` | `*` | `allow` |
-| `gws.catalog` | `*` | `allow` |
-| `gws.schema` | `*` | `allow` |
-| `gws.read` | `*` | `allow` |
-| `gws.plan` | `*` | `allow` |
-| `gws.events_list` | `*` | `allow` |
-| `gws.probe` | `*` | `allow` |
-| `gws.calendar_today` | `*` | `allow` |
-| `gws.images_read` | `*` | `allow` |
-| `gws.sheets_read` | `*` | `allow` |
-| `gws.write` | `*` | `allow` |
-| `gws.export` | `*` | `allow` |
-| `gws.send` | `*` | `allow` |
-| `gws.share` | `*` | `allow` |
-| `gws.delete` | `*` | `allow` |
-| `gws.admin` | `*` | `allow` |
-
-<!-- /generated:rules-all -->
-
-<!-- generated:rules-ask-changes -->
-
-`access: "ask-changes"`
-
-| Action | Resource | Effect |
-| --- | --- | --- |
-| `gws.*` | `*` | `ask` |
-| `gws.status` | `*` | `allow` |
-| `gws.catalog` | `*` | `allow` |
-| `gws.schema` | `*` | `allow` |
-| `gws.read` | `*` | `allow` |
-| `gws.plan` | `*` | `allow` |
-| `gws.events_list` | `*` | `allow` |
-| `gws.probe` | `*` | `allow` |
-| `gws.calendar_today` | `*` | `allow` |
-| `gws.images_read` | `*` | `allow` |
-| `gws.sheets_read` | `*` | `allow` |
-| `gws.write` | `*` | `ask` |
-| `gws.export` | `*` | `ask` |
-| `gws.send` | `*` | `ask` |
-| `gws.share` | `*` | `ask` |
-| `gws.delete` | `*` | `ask` |
-| `gws.admin` | `*` | `ask` |
-
-<!-- /generated:rules-ask-changes -->
-
-<!-- generated:rules-read-only -->
-
-`access: "read-only"`
-
-| Action | Resource | Effect |
-| --- | --- | --- |
-| `gws.*` | `*` | `deny` |
-| `gws.status` | `*` | `allow` |
-| `gws.catalog` | `*` | `allow` |
-| `gws.schema` | `*` | `allow` |
-| `gws.read` | `*` | `allow` |
-| `gws.plan` | `*` | `allow` |
-| `gws.events_list` | `*` | `allow` |
-| `gws.probe` | `*` | `allow` |
-| `gws.calendar_today` | `*` | `allow` |
-| `gws.images_read` | `*` | `allow` |
-| `gws.sheets_read` | `*` | `allow` |
-| `gws.write` | `*` | `deny` |
-| `gws.export` | `*` | `deny` |
-| `gws.send` | `*` | `deny` |
-| `gws.share` | `*` | `deny` |
-| `gws.delete` | `*` | `deny` |
-| `gws.admin` | `*` | `deny` |
-
-<!-- /generated:rules-read-only -->
+`rpc.gws.changed`
+<!-- /generated:capabilities -->
 
 ## Errors
 
-Every error reads `CODE: What happened. Next step: What to do.` `/gws-status` names the one next step, and each
-code's message carries its own:
+<!-- generated:errors -->
+| Code | Meaning |
+|---|---|
+| `NEEDS_SIGN_IN` | the account is not signed in |
+| `SCOPE_MISSING` | the call needs a scope the person has not confirmed |
+| `ACCOUNT_REQUIRED` | the plugin serves several accounts and the call names none |
+| `ACCOUNT_UNKNOWN` | the call names an alias the plugin does not serve |
+| `ACCOUNT_MISMATCH` | the item belongs to another account |
+| `CURSOR_INVALID` | the cursor is malformed, or belongs to another source, account or scope |
+| `CURSOR_EXPIRED` | the provider no longer keeps the history the cursor names |
+| `RATE_LIMITED` | the provider asked the plugin to slow down |
+| `BUDGET_EXCEEDED` | the read would cost more than the person allows |
+| `SOURCE_DISABLED` | the person turned this source or action off |
+| `TOO_LARGE` | the answer is larger than the source's maxBytes |
+| `INPUT_INVALID` | the input does not match the method's schema |
+| `SOURCE_UNKNOWN` | the plugin declares no such source |
+| `SCHEMA_VIOLATION` | an answer does not keep the contract's shape |
+| `PERMISSION_DENIED` | the person's grant does not cover the call |
+| `PLAN_INVALID` | the plan is missing, or belongs to another method |
+| `PLAN_USED` | the plan was already used by an earlier commit |
+| `GRANT_INVALID` | the action grant did not verify, or was already spent |
+| `HOST_UNTESTED` | OpenCode is outside the plugin's tested range |
+| `OPTIONS_INVALID` | the plugin's options do not match their schema |
+| `UNAVAILABLE` | the provider could not be reached |
+<!-- /generated:errors -->
 
-<!-- generated:codes -->
+## Troubleshooting
 
-Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit this section by hand.
+- **`HOST_UNTESTED`**: the running OpenCode is outside `>=2.4.1 <2.5.0`. Install a supported release, or set
+  `allowUntestedHost: true` if you accept an untested host. An in-range release such as 2.4.2 starts and `status`
+  reports it as untested.
+- **`NEEDS_SIGN_IN`, `SCOPE_MISSING`**: run `/connect`, choose the account's integration and approve every scope. A
+  read-only sign-in cannot approve a write; sign in again and choose Read and write.
+- **`ACCOUNT_REQUIRED`, `ACCOUNT_UNKNOWN`**: pass `account` with one of the aliases `status` lists.
+- **`GWS_UNAVAILABLE`, `BINARY_TRUST_FAILED`**: the first-use download was refused, or the configured `binary.path` is
+  not a trusted 0.22.5 executable. Remove a bad cached copy under the plugin cache, or point `binary.path` at a copy
+  only you can write.
+- **`PLAN_INVALID`, `PLAN_USED`**: plan again and show the new preview; check the current state with `read` before
+  repeating a committed change.
+- **`PERMISSION_DENIED`**: a deny-only policy rule, the admin gate or the session's rules refused the call. Tell the
+  user; do not rephrase the call to get around it.
+- **`UNAVAILABLE`**: the provider, the `gws` process or a guard failed. Retry once; if it persists, read `status` and
+  the audit log.
 
-| Code | Meaning | Next step |
-| --- | --- | --- |
-| `ACCOUNT_REQUIRED` | More than one account is configured and the call named none. | Pass account with one of the configured aliases; gws_status lists them. |
-| `ACCOUNT_UNKNOWN` | The account alias is not configured. | Pass a configured alias; gws_status lists them. |
-| `OPERATION_UNKNOWN` | The operation id is not in the gws manifest. | Find the exact method or helper id with gws_catalog, then retry. |
-| `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
-| `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
-| `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this source, account and scope: another account's, source's or calendar's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
-| `INPUT_INVALID` | A source read refused its input, or Google could not find the spreadsheet or read the named range for sheets_read. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
-| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today, image or sheets for probe. |
-| `TOO_LARGE` | A source read's answer exceeds its size limit: 1 MiB for the Sheets snapshot, or 1 MiB less 4 KiB for a picture's data URI. Nothing is cut short. | Read a smaller range or picture, such as the file's thumbnail. |
-| `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
-| `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
-| `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
-| `ACCOUNT_DOMAIN_UNKNOWN` | A policy rule sets allowExternalRecipients to false, and the account's own email domain is unknown: accounts.<alias>.domains is unset and the signed-in address could not be read. Nothing ran. | Ask the user to set accounts.<alias>.domains to the account's email domains, or to enable Gmail, Drive or Calendar for the account so the plugin can read its address. |
-| `PLAN_NOT_FOUND` | No plan has this planId: it never existed, or its time limit passed and it was removed. | Create a plan with gws_plan, then commit its planId. |
-| `PLAN_ALREADY_USED` | The plan was committed, or is being committed. Plans are single-use. | Check the result of the earlier commit with gws_read before planning the change again. |
-| `PLAN_EXPIRED` | The plan's time limit passed, or a failed commit expired it. | Check the current state with gws_read, then plan again and show the new preview. |
-| `PLAN_CALLER_MISMATCH` | Another session, agent, or account created the plan. | Plan again from the session and agent that will commit it. |
-| `CATEGORY_MISMATCH` | The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool. | Call the tool the message names. |
-| `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
-| `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
-| `PERMISSION_DENIED` | The session's permission rules denied the call or require an approval a script cannot give. For sheets_read, Google may instead have refused the selected account's access. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
-| `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
-| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
-| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code. | Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices. |
-| `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
-| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
-| `AUTH_REDIRECT_INVALID` | The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port. | Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect. |
-| `AUTH_REDIRECT_MISMATCH` | Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser. | Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client. |
-| `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
-| `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
-| `GWS_API_ERROR` | Google returned an error or an unexpected response. The message may include Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
-| `CALENDAR_UNAVAILABLE` | The agenda snapshot (calendar_today) has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
-| `IMAGE_HOST_REFUSED` | The picture images_read was asked for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
-| `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. The image source (images_read) also refuses a GIF, which the contract's image output does not take. | Show a PNG, JPEG, GIF or WebP picture instead; for images_read, a PNG, JPEG or WebP. |
-| `IMAGE_TOO_LARGE` | The picture is over 1 MB, the most one read takes; the plugin stops reading at that size and answers nothing. | Show the file's thumbnail (its thumbnailLink) instead. |
-| `IMAGE_UNAVAILABLE` | The picture could not be read: Google answered with an error or a redirect (never followed), a Drive file is not a picture and has no thumbnail, or too many pictures are being read at once. | Check that the account can open the file; retry later. |
-| `IMAGE_ACCOUNT_AMBIGUOUS` | No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn. | Add drive to one account's enabledServices, or name an account default. |
-| `GWS_DISCOVERY_ERROR` | gws could not load the API description (the Discovery document) it builds requests from. | Check that this machine can reach www.googleapis.com, then retry. |
-| `GWS_INTERNAL_ERROR` | gws failed unexpectedly. | Retry once; if it fails again, report the message. |
-| `TIMEOUT` | gws did not finish within execution.timeoutMs. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
-| `OUTPUT_LIMIT` | gws output exceeded execution.maxStdoutBytes or execution.maxStderrBytes. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
-| `CANCELLED` | The call was cancelled and the gws process stopped. A commit stopped while gws ran may or may not have been applied. | Do not retry unless the user asks; check the state with gws_read before planning again. |
-| `SCHEMA_INVALID` | gws schema returned no usable JSON. | Retry once; if it fails again, report the message. |
-| `SCHEMA_NOT_FOUND` | gws schema does not know this method. | Check the operation id with gws_catalog. |
-| `UPLOAD_INVALID` | An upload or attachment path is not absolute, does not exist, or is not a regular file. | Use the absolute path of an existing regular file. |
-| `UPLOAD_LIMIT` | The upload is larger than execution.maxUploadBytes. | Use a smaller file, or ask the user to raise execution.maxUploadBytes. |
-| `UPLOAD_CHANGED` | An upload or attachment changed between the plan and the commit, so the plan expired. | Plan again and show the new preview. |
-| `DOWNLOAD_EXISTS` | The download destination exists and download.overwrite is not true. | Choose another path, or plan again with download.overwrite set to true after the user agrees. |
-| `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
-| `DOWNLOAD_NOT_PERMITTED` | The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready. | Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project. |
-| `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
-| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.4.1 <2.5.0). | Use OpenCode 2.4.1 or a later 2.4 release, or set "allowUntestedHost": true. |
-| `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
-| `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
-| `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
-| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no release binary, the binary is not installed yet, or binary.path does not exist. | Run /gws-install, which downloads and verifies it, or set binary.path to a gws 0.22.5 executable. |
-| `GWS_VERSION_MISMATCH` | The gws version check failed, or gws is not the version the manifest was generated from. | Reinstall the plugin, or point binary.path at gws 0.22.5. |
-| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Follow the step the message names: remove the named cached copy and call the tool again, move the binary.path executable to a location only you can write, or reinstall the plugin from a valid release. |
+## Docs
 
-<!-- /generated:codes -->
+- [Capabilities](docs/capabilities.md)
+- [Configuration](docs/configuration.md)
+- [Accounts](docs/accounts.md)
+- [Architecture](docs/architecture.md)
+- [Automations](docs/automations.md)
+- [Security](docs/security.md)
 
-## Known limits
-
-- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no release binary, so the
-  tools refuse with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
-- **Operations.** The tools are the operations in the manifest generated from the pinned `gws` 0.22.5. A method that a
-  later `gws` adds arrives with a plugin release.
-- **Unverified OAuth apps.** An External client left in Testing shows unverified-app warnings, and its refresh tokens
-  expire after 7 days, so each account signs in again weekly.
-- **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state
-  with `gws_read` before planning the change again.
-- **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit
-  there needs an allow rule for it, or `access: "all"`.
-- **Updates are not automatic** for a Git install: install the new tag, then run `opencode reload`.
-
-## Links
-
-- [Sign-in and scopes](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/auth.md)
-- [Configuration](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/configuration.md)
-- [Status dialog, commands and RPC](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/ui.md)
-- [Scripting the tools without a model](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/scripting.md)
-- [Admin operations](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/admin.md)
-- [Security policy and model](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/SECURITY.md)
-- [The `gws` binary](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/docs/backend.md)
-- [Changelog](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/CHANGELOG.md), [licence](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/LICENSE) and [notice](https://github.com/we-the-rebel-alliance/gws-plugin/blob/master/NOTICE)
-- [Issues](https://github.com/we-the-rebel-alliance/gws-plugin/issues)
+The contract and the plugin standard are in
+[`plugin-contract`](https://github.com/we-the-rebel-alliance/plugin-contract).

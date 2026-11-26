@@ -12,21 +12,22 @@ The design is in [SPEC.md](SPEC.md). Phase 1 is topic, ledger, gate and export; 
 
 ## Install
 
-```bash
-bun install
-```
-
-In the research workspace's `opencode.json`, load it by absolute path:
+In the research workspace's `opencode.json` (or the global
+`~/.config/opencode/opencode.jsonc`, since the plugin does nothing outside a
+research workspace):
 
 ```jsonc
 {
-  "plugin": ["/Users/jflowers/Projects/github/jflowers/opencode-research-harness"]
+  "plugin": ["opencode-research-harness"]
 }
 ```
 
-Copy or symlink `skills/research-ledger/` into the workspace's `.opencode/skills/`.
+In a research workspace the plugin also loads its `research-ledger` skill;
+there is nothing to copy into `.opencode/skills/`. To run a checkout instead
+of the release, `bun install` in it and list its absolute path in place of the
+package name.
 
-Load it **once**, from the project config only. A second copy for the same directory disables itself and logs a warning. Do not load `opencode-agent-supervisor` from the project config either; it is already global.
+Load it **once**: from the global config or the project config, not both. A second copy for the same directory disables itself and logs a warning. Do not load `opencode-agent-supervisor` from the project config either; it is already global.
 
 The plugin does nothing in a directory without `topics/`.
 
@@ -83,9 +84,9 @@ Releases go through [`jflowers/ship`](https://github.com/jflowers/ship)'s shared
 npm workflow, the same one the other opencode plugins use, so the pipeline
 is fixed in one place. To release:
 
-1. Commit the version bump to `main` (`package.json`), and wait for CI.
-2. Dispatch the Publish workflow with the matching tag (don't push tags
-   yourself):
+1. Make sure CI passed on `main`. There is no version bump: `package.json`
+   holds `0.0.0-development`, and the release sets the version from the tag.
+2. Dispatch the Publish workflow with the tag (don't push tags yourself):
 
    ```bash
    gh workflow run publish.yml -f tag=vX.Y.Z
@@ -99,13 +100,6 @@ notes. A version already on npm is skipped, so a re-run is safe.
 
 npm trusts `publish.yml` by name: renaming it breaks publishing until the
 trusted publisher on npmjs.com is updated.
-
-**First release only.** `opencode-research-harness` isn't on npm yet. Publish 0.1.0 once by
-hand (`npm publish` from a clean checkout of `main`, with 2FA), add the
-trusted publisher on npmjs.com (repository `jflowers/opencode-research-harness`, workflow
-`publish.yml`, no environment), then dispatch `v0.1.0`: the run tags it,
-skips the publish because 0.1.0 is already there, and creates the GitHub
-release.
 
 ## Development
 

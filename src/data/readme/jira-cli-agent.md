@@ -229,7 +229,12 @@ spawned by an agent harness. It exposes three tools whose results are the
 | `jira_write` | `comment` | posts to Jira |
 | `jira_download_attachments` | `download` | writes files on the server's machine; changes nothing in Jira |
 
-Every operation takes an optional `instance`. Register it in Claude Code with
+Every operation takes an optional `instance`. The server also serves the
+`jira-ticket` skill as the resource `skill://jira-ticket/SKILL.md` and names it
+in its instructions. For a client that supports MCP tasks, a download or a
+search with `limit` above 50 returns a task with progress and cancellation; any
+other call, and any call from a client without task support, is answered
+directly. Register it in Claude Code with
 `claude mcp add jira -- jira mcp`; the `jira-ticket` skill lists the Codex and
 OpenCode forms.
 

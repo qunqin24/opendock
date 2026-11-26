@@ -1,12 +1,12 @@
 # agent-steward
 
-> 用于在 OpenCode V1（≥ 1.18.29）或 V2 中调度与编排 AI agent 任务的插件 —— cron、一次性运行、DAG 流水线、矩阵构建、质量门禁、SQLite 历史记录和本地 Web 仪表盘。支持 Windows、macOS 和 Linux。免费开源（MIT）。
+> 本地优先的 AI agent 任务编排框架，当前通过 OpenCode V1（≥ 1.18.29）/V2 插件提供入口 —— cron、一次性运行、DAG 流水线、矩阵构建、质量门禁、SQLite 历史记录和本地 Web 仪表盘。同一内核也可通过 MCP、CLI 和 standalone 模式使用。支持 Windows、macOS 和 Linux。免费开源（MIT）。
 
 [![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
 [![npm downloads](https://img.shields.io/npm/dm/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
-[![license](https://img.shields.io/npm/l/agent-steward.svg)](LICENSE)
-[![node](https://img.shields.io/node/v/agent-steward.svg)](package.json)
+[![license](https://img.shields.io/npm/l/agent-steward.svg)](../LICENSE)
+[![node](https://img.shields.io/node/v/agent-steward.svg)](../package.json)
 
 Translations: [English](../README.md) · [Русский](README.ru.md).
 
@@ -49,7 +49,7 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 | 多仓库 | 带路径校验的 workspace、按 workspace 运行、围绕父任务的矩阵 |
 | 可观测性 | SQLite 历史（success / error / timeout / partial / running）、指标（耗时、token、成本）、可通过 `/api/logs` 读取的 JSONL 运行日志、Prometheus `/metrics`、OTLP 导出、按任务日志、带 14 天分析的本地 Web 仪表盘、历史保留策略与 CSV/JSON 导出 |
 | 运维 | dry-run 预览、JSON 导出/导入、模板、多渠道通知（webhook、Telegram、系统原生 toast）、免打扰时段、摘要、加密密钥（`${secret:NAME}`）、审计日志、设置 |
-| 接口 | OpenCode GUI 面板、Web 仪表盘、25 个 agent 工具、内置 agent skill |
+| 接口 | OpenCode GUI 面板、Web 仪表盘、34 个 agent 工具、内置 agent skill |
 
 ### 语言
 
@@ -67,7 +67,7 @@ Translations: [English](../README.md) · [Русский](README.ru.md).
 
 ## 安装
 
-需要 OpenCode V1（≥ 1.18.29）或 V2，以及 Node.js 22.22+。版本矩阵与界面差异见
+需要 OpenCode V1（≥ 1.18.29）或 V2，以及 Node.js 26.4+（`@opentui/core` 的下限）。版本矩阵与界面差异见
 [COMPATIBILITY.md](COMPATIBILITY.md)（GUI 与 RPC 仅支持 V2，TUI 两条版本线都支持）。
 
 配置键因版本线而异：
@@ -117,7 +117,7 @@ npm run build && npm run build:gui
 
 ## Agent 工具
 
-agent 可获得完整功能 —— 32 个工具，覆盖调度、流水线、运维、可观测性与管理：
+agent 可获得完整功能 —— 34 个工具，覆盖调度、流水线、运维、可观测性与管理：
 
 | 工具 | 参数 | 作用 |
 |---|---|---|
@@ -133,6 +133,8 @@ agent 可获得完整功能 —— 32 个工具，覆盖调度、流水线、运
 | `get_history` | `taskName?`、`status?`、`limit?` | 最近运行记录，含耗时、token、成本、模型、质量门禁与钩子 |
 | `get_task_logs` | `name`、`lines?` | 运行日志尾部 |
 | `dry_run` | `name?` | 模拟流水线（或全部任务）：执行顺序、DAG、矩阵扇出、估算 |
+| `backup_db` | `file?` | 在线 SQLite 快照到 `<db>.backup`，附带 SHA-256 校验和与文件大小 |
+| `restore_db` | `file`、`sha256?` | 就地恢复已验证的快照，无需关闭仪表盘连接 |
 | `manage_workspaces` | `action`、`id?`、`name?`、`path?`、`color?` | 多仓库 workspace：列出、添加、更新、删除 |
 | `matrix_control` | `action`、`name?` | 矩阵结果、取消待运行克隆、清理孤儿、预览克隆 |
 | `get_metrics` | — | 汇总的运行数、成功数与失败数 |
@@ -152,6 +154,7 @@ agent 可获得完整功能 —— 32 个工具，覆盖调度、流水线、运
 | `pipeline_validate` | `path?`、`source?` | 校验 `opencode.pipeline.yaml`，不修改任务 |
 | `pipeline_apply` | `path?`、`source?`、`dryRun?` | 幂等地创建/更新流水线任务；`dryRun` 只报告差异 |
 | `pipeline_export` | `pipeline` | 将流水线任务导出回 YAML |
+| `report_bug` | `description`、`taskName?`、`includeLogs?`、`includeAnalytics?`、`channel?` | 上报 agent-steward 问题，附带诊断信息与可选的复现上下文 |
 
 `schedule_task` 还接受完整的矩阵配置（`workspaceIds`、`strategy`、`failureMode`、`aggregation`、`concurrency`、`overrides`、`createAggregator`）。
 
@@ -166,6 +169,8 @@ Agent 任务以 `opencode run --auto` 运行，因此其工具策略必须显式
 | `legacy` | 全部十个动作 | — |
 
 `deniedTools` 始终优先。非空的 `allowedTools` 是针对非只读动作的 allowlist：read、glob、grep 和 skill 会自动加入（PL-133），因此要禁止它们必须在 `deniedTools` 中显式列出。它也可以显式恢复被策略禁止的动作（例如 `shell`）。`legacyShell: true` 仅在 `hybrid` 下恢复 `shell`，用于从旧版本迁移的任务。
+
+适用范围：上表只约束计划任务中的 agent 运行。插件自身的工具（`schedule_task`、`run_task_now` 等）不受 `defaultPolicy` 限制——`qualityGate`、`beforeScript` 和 `afterScript` 无论策略如何都会在包装脚本中以 shell 命令执行。因此「无 shell」的配置还需要通过 OpenCode 工具权限限制插件工具本身。
 
 被阻止的动作会以 `tool.blocked` 写入审计日志，带 `reason: "default-policy"` 和 `hint`；每次运行还会记录当前生效的策略。
 
@@ -274,7 +279,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 128 test suites, 600+ checks
+npm test             # 131 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
@@ -297,6 +302,13 @@ npm run test:en      # same suites with the English locale
 - [VERIFIED-CHAT.md](VERIFIED-CHAT.md) —— 仅在客观门禁/来源验证后才输出回答（S-5，English）。
 - [SCAFFOLD.md](SCAFFOLD.md) —— 从 gate-passed 配方一键生成项目（S-6，English）。
 - [CROSS_PLATFORM.md](../CROSS_PLATFORM.md) —— Windows / macOS / Linux 的差异与后端。
+- [mcp-setup.md](mcp-setup.md) —— stdio 上的 MCP 适配器：34 个工具加 `batch_call`。
+- [ROUTER.md](ROUTER.md) —— 路由、升级与 capability map。
+- [OPEN-SPEC.md](OPEN-SPEC.md) —— 执行契约的开放规范。
+- [portability.md](portability.md) —— 可移植构建与跨平台检查。
+- [NATIVE-SCHEDULER.md](NATIVE-SCHEDULER.md) —— 与原生调度器的集成模式。
+- [EXECUTION-LOOP.md](EXECUTION-LOOP.md) —— 执行循环的内部结构。
+- [SAFETY.md](SAFETY.md) —— 安全策略与诊断通道。
 - [文档站点（GitHub Pages 操作手册）](FEATURES.md#documentation-site-github-pages) —— 文档如何构建与发布。
 
 ## FAQ
@@ -317,6 +329,9 @@ cron 和一次性任务可以。它们注册在操作系统原生调度器中，
 
 **没人登录时任务会运行吗？**
 在 Windows 上，只有显式设置 `runWhenLoggedOff: true` 才会：任务以 `schtasks /ru SYSTEM` 注册，在会话 0 中运行，没有你的配置文件、映射磁盘或已保存凭据。默认仅交互式 —— 用户登录时任务才运行。Linux crontab 始终无需登录即可运行；macOS launchd agent 仅在用户会话内运行。
+
+**Windows 上创建任务出现 “Access is denied” 怎么办？**
+部分主机（加固的 OEM 镜像、撤销了「作为批处理作业登录」权限）禁止未提升权限的进程注册任务——`schtasks.exe` 与 COM 接口均如此。此时插件会通过 Windows 权限提升提示重试同一命令：每次操作确认一次，OpenCode 本身无需以管理员身份运行。只有修改调度器的命令（`/create`、`/delete`、`/change`、`/run`、`/end`）会请求提升；在无法显示提示的环境（服务、session 0）会自动跳过，也可用 `AGENT_STEWARD_NO_UAC=1`（CI、headless）关闭。拒绝提示时保留原有错误信息。链路上没有 `cmd.exe`，且提示是可读的：其中显示 `schtasks.exe`（「Task Scheduler Command Line」）及操作的完整参数——你确认的是具体的计划程序操作，而非不透明的脚本。提升进程的文本输出不会被捕获（ShellExecute 没有管道），错误依据退出码解释。对话框 2 分钟内无人应答则重试放弃；未提升的进程无法关闭提升对话框，请手动关闭。
 
 **支持哪些平台？**
 Windows（任务计划程序）、macOS（launchd）和 Linux（crontab）。后端差异见 [CROSS_PLATFORM.md](../CROSS_PLATFORM.md)。

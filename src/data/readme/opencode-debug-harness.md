@@ -16,19 +16,18 @@ See [SPEC.md](SPEC.md) for the design, and §3.13 there for how Phase 1 differs 
 ```jsonc
 {
   "plugin": [
-    "/Users/jflowers/Projects/github/jflowers/opencode-debug-harness/src/index.ts"
-    // or with options: ["/…/src/index.ts", { "reportDir": "docs/debugging" }]
+    "opencode-debug-harness"
+    // or with options: ["opencode-debug-harness", { "reportDir": "docs/debugging" }]
   ]
 }
 ```
 
-Link the agent, skill and command:
-
-```bash
-ln -s "$PWD/agents/debugger.md" ~/.config/opencode/agents/debugger.md
-ln -s "$PWD/skills/debug-loop" ~/.config/opencode/skills/debug-loop
-ln -s "$PWD/commands/debug.md" ~/.config/opencode/commands/debug.md
-```
+The plugin registers its `debugger` agent, `/debug` command and `debug-loop`
+skill itself; there is nothing to link into `~/.config/opencode`. A
+`debugger` entry in your own config is layered over the bundled one, so you
+can change its model or permissions and keep its prompt. To run a checkout
+instead of the release, `bun install` in it and list its `src/index.ts` by
+absolute path in place of the package name.
 
 Then, in any git repo, run `/debug <symptom>` or switch to the `debugger` agent.
 
@@ -62,9 +61,9 @@ Releases go through [`jflowers/ship`](https://github.com/jflowers/ship)'s shared
 npm workflow, the same one the other opencode plugins use, so the pipeline
 is fixed in one place. To release:
 
-1. Commit the version bump to `main` (`package.json`), and wait for CI.
-2. Dispatch the Publish workflow with the matching tag (don't push tags
-   yourself):
+1. Make sure CI passed on `main`. There is no version bump: `package.json`
+   holds `0.0.0-development`, and the release sets the version from the tag.
+2. Dispatch the Publish workflow with the tag (don't push tags yourself):
 
    ```bash
    gh workflow run publish.yml -f tag=vX.Y.Z
@@ -78,13 +77,6 @@ notes. A version already on npm is skipped, so a re-run is safe.
 
 npm trusts `publish.yml` by name: renaming it breaks publishing until the
 trusted publisher on npmjs.com is updated.
-
-**First release only.** `opencode-debug-harness` isn't on npm yet. Publish 0.1.0 once by
-hand (`npm publish` from a clean checkout of `main`, with 2FA), add the
-trusted publisher on npmjs.com (repository `jflowers/opencode-debug-harness`, workflow
-`publish.yml`, no environment), then dispatch `v0.1.0`: the run tags it,
-skips the publish because 0.1.0 is already there, and creates the GitHub
-release.
 
 ## Development
 

@@ -1,16 +1,16 @@
-# Estelle plugins
+# Fate Labs Estelle plugins
 
-Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode, Pi, Qwen Code, Hermes Agent, mini-swe-agent,
+Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode, Pi, Qwen Code, Gemini CLI, Hermes Agent, mini-swe-agent,
 OpenClaw and fx. Each host has its own package
 under `plugins/`. They connect to `https://api.fatelabs.ca/mcp`.
 
-Install your coding host first, with external Node.js 22+. Claude Code signs in to MCP with OAuth and
-needs a key only for session capture. The other hosts need a valid `ESTELLE_API_KEY` from your Estelle
+Install your coding host first, with external Node.js 22+. Claude Code needs no key: run `/estelle:login` once
+to connect the tools and record sessions. The other hosts need a valid `ESTELLE_API_KEY` from your Estelle
 account in the actual host process, where hooks and MCP use the same key. GUI apps on macOS and Windows
 may not inherit your terminal environment, so quit and reopen them after setting a key. The plugin does
 not install the host or Node, or create an account. No backend clone or Estelle CLI is needed.
 
-Version: `0.0.25`.
+Version: `0.0.27`.
 
 [Release notes](docs/releases/v0.0.19.md)
 
@@ -25,9 +25,11 @@ Version: `0.0.25`.
 | OpenCode | [OpenCode](docs/install/opencode.md) · [what it supports](docs/hosts/opencode.md) · npm [`@fatelabs/opencode-estelle`](https://www.npmjs.com/package/@fatelabs/opencode-estelle) |
 | Pi | [Pi](docs/install/pi.md) · [what it supports](docs/hosts/pi.md) · npm [`@fatelabs/pi-estelle`](https://www.npmjs.com/package/@fatelabs/pi-estelle) · [pi.dev packages](https://pi.dev/packages) |
 | Qwen Code | [Qwen Code](docs/install/qwen.md) · [what it supports](docs/hosts/qwen.md) |
+| Gemini CLI | [Gemini CLI](docs/install/gemini.md) · [what it supports](docs/hosts/gemini.md) |
+| Google Antigravity (IDE and `agy` CLI) | [Antigravity](docs/install/antigravity.md) · [what it supports](docs/hosts/antigravity.md) |
 | Hermes Agent | [Hermes](docs/install/hermes.md) · [what it supports](docs/hosts/hermes.md) |
 | mini-swe-agent (MCP tools through bash, no capture) | [mini-swe-agent](docs/install/mini-swe-agent.md) · [what it supports](docs/hosts/mini-swe-agent.md) |
-| OpenClaw (skills and MCP, no capture yet) | [OpenClaw](docs/install/openclaw.md) · [what it supports](docs/hosts/openclaw.md) |
+| OpenClaw (native plugin: hooks, recall, capture; or a skills bundle) | [OpenClaw native](docs/install/openclaw-native.md) · [bundle](docs/install/openclaw.md) · [what it supports](docs/hosts/openclaw.md) |
 | fx (skills and MCP, no capture) | [fx](docs/install/fx.md) · [what it supports](docs/hosts/fx.md) |
 
 OpenCode and Pi install from npm with one command each:

@@ -220,9 +220,10 @@ After updates, run `npm run build:safari` with the signing variables again, then
 
 ### Chrome (direct delivery)
 
-1. Clone this repository and load its `browser/` directory as an unpacked extension in `chrome://extensions`. Allow file URL access if reviewing local HTML.
-2. Reopen the OpenCode terminal client. The plugin registers the native host and active sessions automatically on macOS; the shared service needs no restart. The host allows only this companion's fixed extension ID, resolves Node absolutely, starts on demand and opens no HTTP port.
-3. Open the extension panel and choose a destination. If automatic setup reports an error, run `npm run install:bridge` in the clone to repair it.
+1. Run `/annotate <url-or-html>` in OpenCode or `agy-annotate web [url-or-html]` in AGY. If Annotate isn't enabled in any Chrome profile, the command copies the absolute `browser/` path, reveals it in Finder, and shows the setup steps. If it is enabled in only some profiles, the command names those profiles.
+2. In the Chrome profile you use for reviews, open `chrome://extensions`. Turn on **Developer mode**, click **Load unpacked**, press **⌘⇧G**, and paste the path. If Annotate is already listed, turn it on. Under **Details**, enable **Allow access to file URLs** for local HTML. You can also clone this repository and load its `browser/` directory the same way.
+3. The plugin registers the native host and active sessions automatically when OpenCode starts on macOS. The host allows only this companion's fixed extension ID, resolves Node absolutely, starts on demand and opens no HTTP port. If automatic setup reports an error, run `npm run install:bridge` in the clone to repair it.
+4. Return to the page, press **Alt+Shift+A** (or click the extension icon), and choose a destination in the panel.
 
 Click the destination beside **To** to filter sessions by title or directory and sort by recent activity, creation or title. The picker refreshes automatically and shows current session titles. **New session** creates an empty session with the chosen session's location/model, or the blank OpenCode home's current selection, without starting a model turn. **Disconnect** keeps the destination named and notes local; choosing that session again reconnects. A disconnected destination never silently switches to another session. Restarted receivers reconnect by stable provider/session identity, carrying any retry batch to the replacement.
 
@@ -247,8 +248,7 @@ Plain `/annotate`, `/annotate-file`, `/annotate-pick` and `/annotate-selection` 
 Picking and text selection work inside same-origin iframes, legacy framesets and
 nested frames. Reveal and page markers can find those notes after reload; delivered
 Markdown includes a `Frame:` line for frame context. Cross-origin frames cannot be
-picked and show a clear message. After updating to 0.17.0 (browser protocol 8), reload
-the Chrome extension and restart OpenCode.
+picked and show a clear message.
 
 Written drafts autosave locally and restore after panel reload or a return to the same URL, including SPA routes. Selecting another target with unfinished feedback offers **Add/Save & switch**, **Keep editing**, or **Discard & switch**. Storage failures keep the input and offer a retry; competing panels require an explicit choice of draft. Saved-note revision checks likewise prevent stale tabs overwriting newer feedback. Full JSON/Markdown exports include redacted URLs, exact selected text/context, verified selector hints, styles and accessibility. Missing/changed/ambiguous targets are labeled in the sidebar instead of silently rebound. Comments and drafts live in extension-owned UI/storage; the page receives only selection metadata and numbered markers, not your written feedback.
 
@@ -258,9 +258,9 @@ See [implementation plan](docs/annotate-html-integration-plan.md) and [shipped-a
 
 ### Reload after browser companion updates
 
-After updating the unpacked `browser/` files, open `chrome://extensions` and click **Reload** for **OpenCode Annotate**. Return to the target webpage and open Annotate using its extension icon or **Alt+Shift+A**.
+Keep **Developer mode** on and update the `browser/` folder that Chrome loaded. An up-to-date native host checks the installed unpacked files when the panel connects. If that copy has a newer manifest version and the review is idle, Annotate reloads once, then you can reopen the panel with the extension icon or **Alt+Shift+A**. Updates wait if notes, drafts, or a retry are pending, or another review panel is open. Finish the review and use **Reload Annotate** when ready.
 
-A newly opened sidebar can load the updated `panel.mjs` while Chrome still runs an older `worker.mjs`. The panel detects this protocol mismatch and shows **Annotate was updated** with a **Reload Annotate** button; reopen the panel afterwards. Saved extension-local data survives an extension reload.
+A newly opened sidebar can load the updated `panel.mjs` while Chrome still runs an older `worker.mjs`. The panel detects this protocol mismatch and shows **Annotate was updated** with a **Reload Annotate** button. Use it or click **Reload** for **OpenCode Annotate** in `chrome://extensions` to load the first version with automatic reload, or after editing files without a manifest version increase. Saved extension-local notes and drafts survive an extension reload. Reopen OpenCode or run `npm run install:bridge` if the native host also needs updating.
 
 For diagnosis, compare the running worker's source (DevTools/CDP `Debugger.getScriptSource`) with `browser/worker.mjs` in the loaded checkout. The manifest version alone cannot identify edits to an unpacked extension.
 

@@ -3,7 +3,7 @@
 **Epic Visual Git** is an interactive Git control panel for [OpenCode](https://opencode.ai) — pick branches, fetch, pull, stage,
 commit, merge, and push from a dialog-driven GUI in the OpenCode TUI.
 
-> Made by [PrudentDev](https://PrudentDev.com) — software engineering, done prudently.
+> Made by [PrudentDev](https://PrudentDev.com) — expert software engineering.
 
 ## Features
 
@@ -13,15 +13,24 @@ palette, or the side-panel **+** menu).
 `⎇ branch ↑1 ±3` footer badge.
 
 - Panel / panel dialogs cover:
-  - **Status** — branch, upstream, ahead/behind counts, porcelain file list
+  - **Status** — branch, upstream, ahead/behind counts, porcelain file list, and a ⟳ refresh button for an
+    immediate reload of status, branches, and history
   - **Diff** — click any changed file in the desktop panel for an inline colored diff
-    (additions green, deletions red; untracked files render as all-added)
+    (additions green, deletions red; untracked files render as all-added). The file list stays beside the diff in a
+    split view, so you can click through files without any back-and-forth
   - **Stage / unstage** — *Stage all* / *Unstage all*, or hover any file row for its own **+ stage** / **− unstage**
     button (`git add -- <file>` / `git restore --staged -- <file>`); on a conflicted file **+** marks it resolved
   - **Not a repository?** The panel says so in plain words and offers a one-tap *Initialize repository* (`git init`) —
     nothing is modified, and nothing leaves the machine until you add a remote and push
+  - **No remote?** Paste the clone URL from your git hosting page and press *Set as origin*
+    (`git remote add origin <url>`, or `set-url` if origin exists, then one non-interactive fetch). Works with
+    GitHub, Azure DevOps, GitLab, Bitbucket, self-hosted, or a local-path remote
   - **Commit** — message prompt, optional auto-stage, then an optional one-tap *Push now?*
   - **Push** — safe by default; publishes with `git push -u origin <branch>` when there is no upstream
+  - **Pull Request ↗** — once a remote is configured, opens your host's pull-request page in the browser with the
+    current branch preselected against your default branch, and your last commit message as the PR title —
+    pre-filled via URL where the host supports it (GitHub, GitLab), always copied to the clipboard everywhere else
+    (Azure DevOps, Bitbucket); the host's familiar web UI manages the review itself
   - **Pull** — *Fast forward only* (safe default), *Rebase*, or *Merge*, with a plain-language hint for each
   - **Fetch** — `git fetch --all --prune --tags`
   - **Branches** — searchable picker (local + remote), track remote branches on checkout, create new branches,
@@ -55,7 +64,7 @@ The GUI part is the prebuilt bundle in `dist/`. Make sure the global `~/.config/
 
 The server and TUI parts load from the global plugins directory or any `plugins` entry; no build needed.
 
-### From npm (once published)
+### From npm
 
 ```jsonc
 // ~/.config/opencode/opencode.json

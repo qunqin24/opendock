@@ -1,6 +1,6 @@
 # agent-steward
 
-> Плагин для планирования и оркестрации задач AI-агентов в OpenCode V1 (≥ 1.18.29) и V2: cron, одноразовые запуски, DAG-пайплайны, матричные сборки, Quality Gates и наблюдаемость. Бесплатно, с открытым кодом (MIT).
+> Локально-первый фреймворк оркестрации задач AI-агентов, сейчас доступный через плагин OpenCode V1 (≥ 1.18.29)/V2: cron, одноразовые запуски, DAG-пайплайны, матричные сборки, Quality Gates, SQLite-история и локальный веб-дашборд. То же ядро работает через MCP, CLI и в standalone-режиме. Бесплатно, с открытым кодом (MIT).
 
 [![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
@@ -46,7 +46,7 @@ Translations: [English](../README.md) · [中文](README.zh.md).
 | Мультирепо | workspaces с валидацией путей, запуски по workspace, матрица поверх родительской задачи |
 | Наблюдаемость | история SQLite (success / error / timeout / partial / running), метрики (длительность, токены, стоимость), JSONL-логи с `/api/logs`, Prometheus `/metrics`, экспорт OTLP, логи по задачам, веб-дашборд с аналитикой за 14 дней, ретеншн истории и экспорт CSV/JSON |
 | Эксплуатация | dry-run, экспорт/импорт JSON, шаблоны, уведомления по нескольким каналам (webhook, Telegram, нативные toast), тихие часы, дайджест, локальный ассистент для триажа уведомлений (fail-open, shadow-режим), зашифрованные секреты (`${secret:NAME}`), журнал аудита, настройки |
-| Интерфейсы | панель OpenCode GUI, веб-дашборд, 32 инструментов для агента, встроенный скилл |
+| Интерфейсы | панель OpenCode GUI, веб-дашборд, 34 инструментов для агента, встроенный скилл |
 
 ### Язык интерфейса
 
@@ -56,7 +56,7 @@ Translations: [English](../README.md) · [中文](README.zh.md).
 
 ## Установка
 
-Нужны OpenCode V1 ≥ 1.18.29 или V2, и Node.js 22.22+. Матрица версий и различия
+Нужны OpenCode V1 ≥ 1.18.29 или V2, и Node.js 26.4+ (нижняя граница `@opentui/core`). Матрица версий и различия
 поверхностей — в [COMPATIBILITY.md](COMPATIBILITY.md) (GUI и RPC — только V2, TUI — обе линии).
 
 Ключ конфигурации зависит от линии:
@@ -106,7 +106,7 @@ npm run build && npm run build:gui
 
 ## Инструменты для агента
 
-Агенту доступен весь функционал — 32 инструментов: расписание, пайплайны, эксплуатация, аналитика и администрирование.
+Агенту доступен весь функционал — 34 инструмента: расписание, пайплайны, эксплуатация, аналитика и администрирование.
 
 | Инструмент | Аргументы | Что делает |
 |---|---|---|
@@ -122,6 +122,8 @@ npm run build && npm run build:gui
 | `get_history` | `taskName?`, `status?`, `limit?` | История запусков: длительность, токены, стоимость, модель, Quality Gate, хуки |
 | `get_task_logs` | `name`, `lines?` | Хвост лога запуска |
 | `dry_run` | `name?` | Симуляция пайплайна (или всех задач): порядок, DAG, fan-out, оценки |
+| `backup_db` | `file?` | Онлайн-снимок SQLite в `<db>.backup` с контрольной суммой SHA-256 и размером |
+| `restore_db` | `file`, `sha256?` | Восстановление проверенного снимка без закрытия соединения дашборда |
 | `manage_workspaces` | `action`, `id?`, `name?`, `path?`, `color?` | Multi-repo workspace: список, добавление, изменение, удаление |
 | `matrix_control` | `action`, `name?` | Результаты матрицы, отмена клонов, очистка осиротевших задач, предпросмотр |
 | `get_metrics` | — | Всего запусков, успехов и падений |
@@ -141,6 +143,7 @@ npm run build && npm run build:gui
 | `pipeline_validate` | `path?`, `source?` | Проверяет `opencode.pipeline.yaml`, не меняя задачи |
 | `pipeline_apply` | `path?`, `source?`, `dryRun?` | Идемпотентно создаёт и обновляет задачи конвейера; `dryRun` только показывает diff |
 | `pipeline_export` | `pipeline` | Выгружает задачи конвейера обратно в YAML |
+| `report_bug` | `description`, `taskName?`, `includeLogs?`, `includeAnalytics?`, `channel?` | Сообщает об issue agent-steward с диагностикой и контекстом воспроизведения |
 
 `schedule_task` принимает и полную конфигурацию матрицы (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
 
@@ -155,6 +158,8 @@ npm run build && npm run build:gui
 | `legacy` | все десять действий | — |
 
 `deniedTools` всегда важнее. Непустой `allowedTools` — это allowlist для действий, не связанных с чтением: read, glob, grep и skill добавляются автоматически (PL-133), поэтому чтобы запретить их, нужно явно перечислить их в `deniedTools`. Можно также явно вернуть действие, запрещённое политикой (например, `shell`). `legacyShell: true` возвращает `shell` только при `hybrid` — для задач, перенесённых со старых версий.
+
+Зона действия: таблица выше описывает только запуск запланированной агент-задачи. Инструменты самого плагина (`schedule_task`, `run_task_now`, …) под `defaultPolicy` не попадают — `qualityGate`, `beforeScript` и `afterScript` выполняются shell-командами во враппере независимо от политики. Поэтому конфигурация «без shell» должна ограничивать и сами инструменты плагина через разрешения инструментов OpenCode, а не только политикой.
 
 Заблокированные действия пишутся в аудит как `tool.blocked` с `reason: "default-policy"` и `hint`, а каждый запуск записывает действующую политику.
 
@@ -265,7 +270,7 @@ src/
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 128 сюита, 600+ проверок
+npm test             # 131 сюита, 600+ проверок
 npm run test:en      # те же сюиты с английской локалью
 ```
 
@@ -287,6 +292,13 @@ npm run test:en      # те же сюиты с английской локаль
 - [VERIFIED-CHAT.md](VERIFIED-CHAT.md) — ответ чата только с объективным гейтом/источником (S-5, English).
 - [SCAFFOLD.md](SCAFFOLD.md) — разворачивание проекта из gate-passed рецепта одной командой (S-6, English).
 - [../CROSS_PLATFORM.md](../CROSS_PLATFORM.md) — различия и бэкенды Windows / macOS / Linux.
+- [mcp-setup.md](mcp-setup.md) — MCP-адаптер на stdio: 34 инструмента плюс `batch_call`.
+- [ROUTER.md](ROUTER.md) — маршрутизация, эскалация и capability map.
+- [OPEN-SPEC.md](OPEN-SPEC.md) — открытая спецификация контракта исполнения.
+- [portability.md](portability.md) — портативные сборки и кросс-платформенные проверки.
+- [NATIVE-SCHEDULER.md](NATIVE-SCHEDULER.md) — режим интеграции с нативным планировщиком.
+- [EXECUTION-LOOP.md](EXECUTION-LOOP.md) — устройство цикла исполнения.
+- [SAFETY.md](SAFETY.md) — политики безопасности и каналы диагностики.
 - [Сайт документации (runbook GitHub Pages)](FEATURES.md#documentation-site-github-pages) — как собирается и публикуется документация.
 
 ## FAQ
@@ -296,6 +308,9 @@ npm run test:en      # те же сюиты с английской локаль
 
 **Выполняются ли задачи, когда никто не вошёл в систему?**
 На Windows — только если явно включить `runWhenLoggedOff: true`: задача регистрируется как `schtasks /ru SYSTEM` и идёт в session 0 без вашего профиля, подключённых дисков и сохранённых учётных данных. По умолчанию задача интерактивная и работает при активном входе. Linux crontab выполняет задачи и без входа, а launchd-агент macOS — только внутри пользовательской сессии.
+
+**Создание задачи завершается «Access is denied» на Windows?**
+На части машин (жёсткий OEM-образ, отозванное право «Вход в пакетном режиме») регистрация задач запрещена неповышенному процессу — и `schtasks.exe`, и COM-апик. Плагин повторяет ту же команду с запросом повышения Windows: вы подтверждаете один раз на операцию, сам OpenCode продолжает работать без прав администратора. Запрос касается только команд, меняющих планировщик (`/create`, `/delete`, `/change`, `/run`, `/end`), не делается там, где промпт некому показать (службы, session 0), и отключается через `AGENT_STEWARD_NO_UAC=1` (CI, headless). При отказе от промпта остаётся исходный текст ошибки. `cmd.exe` в цепочке нет, и промпт читается: в нём виден `schtasks.exe` («Task Scheduler Command Line») с полными аргументами операции — подтверждается конкретное изменение планировщика, а не непонятный скрипт. Текстовый вывод повышенного процесса не перехватывается (у ShellExecute нет pipe'ов), ошибки объясняются по коду возврата. Если за 2 минуты ответа нет, повтор прерывается: неповышенный процесс не может закрыть повышенный диалог, закройте его вручную.
 
 **Какие платформы поддерживаются?**
 Windows (Планировщик Windows), macOS (launchd) и Linux (crontab). Различия описаны в [CROSS_PLATFORM.md](../CROSS_PLATFORM.md).

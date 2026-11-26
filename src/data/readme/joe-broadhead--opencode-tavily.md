@@ -1,150 +1,181 @@
-# Tavily for OpenCode
+# Tavily
 
-Search, extract, map, crawl and research the web from OpenCode through Tavily's official MCP server. The plugin
-registers the server, adds default permission rules and tells you what is signed in; Tavily owns the five tools and
-their parameters.
+Tavily's hosted MCP server gives OpenCode five web tools: search, page extraction, site maps, site crawls and cited
+research. This plugin is the connector around it, on
+[plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract) v0. It adds one named account per alias, the
+`status` and `probe` reads, the permission rules and this documentation. Tavily's server owns the tools and the sign-in;
+the plugin adds no tools of its own, reads no web content and stores no credential.
 
-Unofficial; not affiliated with Tavily. Tavily is a trademark of Tavily Inc.; this unofficial plugin is not endorsed by
-them.
-
-## Requirements
-
-- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1. A later 2.4 release, such as 2.4.99, runs and `/tavily-status` calls it
-  untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
-- macOS or Linux.
-- A Tavily account. Each call spends your Tavily credits.
+**Every tool call spends Tavily credits**, and the plugin sets no spending limit.
 
 ## Install
 
+The maintainer cuts this line's `v0.0.0` after the pull request merges, and deletes the old pre-transfer `v0.0.0`–`v0.0.7`
+tags first. Then:
+
 ```sh
 opencode plugin add github:we-the-rebel-alliance/tavily-plugin#v0.0.0
-opencode reload
 ```
-
-Then run `/tavily-status` in a session. Or add it to `opencode.json`:
-
-```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/tavily-plugin#v0.0.0" }] }
-```
-
-`v0.0.0` is the first release; its commit carries the built `dist/`, so the install runs no build. A Git install does
-not update by itself: remove the old entry with `opencode plugin remove`, then add the new tag.
 
 ## Sign in
 
-Run `/connect` and choose **Tavily account** for OAuth. OpenCode's own **Tavily** entry connects an API key instead;
-`TAVILY_API_KEY` in the OpenCode server's environment works too. A connected key wins over the variable. Tavily's MCP
-server accepts any key, so the plugin asks Tavily's usage endpoint once per key, which costs no credits.
+The mechanism is `mcp`: OpenCode runs one Tavily MCP server per account alias, and keeps each server's OAuth
+separately.
 
-## Use
+| Alias | MCP server |
+|---|---|
+| `default` | `tavily` |
+| any other, such as `work` | `tavily-work` |
 
-| Tool | Code Mode name | Permission name |
-| --- | --- | --- |
-| Search | `tools.tavily.tavily_search` | `tavily_tavily_search` |
-| Extract | `tools.tavily.tavily_extract` | `tavily_tavily_extract` |
-| Map | `tools.tavily.tavily_map` | `tavily_tavily_map` |
-| Crawl | `tools.tavily.tavily_crawl` | `tavily_tavily_crawl` |
-| Research | `tools.tavily.tavily_research` | `tavily_tavily_research` |
+Sign in to each server once through OpenCode's MCP sign-in; `/connect` lists the server names. OpenCode obtains and
+keeps Tavily's OAuth token. The plugin never sees it.
 
-The `tavily` skill chooses the cheapest tool and cites its sources; `tavily-research` proposes the scope and cost of a
-Research task before it starts. OpenCode's `websearch` tool uses Tavily too, unless `opencode.json` chooses another
-provider.
+One account needs no options at all. Several are a map of alias to an empty profile:
 
-## Costs
+```json
+{
+  "accounts": {
+    "work": {},
+    "personal": {}
+  }
+}
+```
 
-Every search, extract, map, crawl and research call spends Tavily credits from the signed-in account or key. A research
-task costs 4-110 credits with mini and 15-250 with pro, and a crawl reads up to 50 pages by default. The plugin sets no
-spending limit.
+Only the plugin's own `probe` takes `account`: pass `account: "work"` or `account: "personal"` to read that alias's
+OpenCode connection. With two aliases and none, `probe` is refused with `ACCOUNT_REQUIRED`, whose next step lists the
+aliases; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`. Tavily's own tools do not take an account: the alias is
+the MCP server, and the tool name says which one (`tavily-work_tavily_search`, or `tools["tavily-work"].tavily_search` in
+Code Mode).
 
-| Tool | Cost |
-| --- | --- |
+## Access
+
+`access` is `all` (the default), `ask-changes` or `read-only`.
+
+| Level | `status` and `probe` | the five Tavily tools |
+|---|---|---|
+| `all` | run | ask first |
+| `ask-changes` | run | ask first |
+| `read-only` | run | off |
+
+The five tools are classified `write` for access, not because they change anything at Tavily but because each call
+spends credits: a free-looking read that bills the person is not a read. They also carry `effect: "ask"`, so a call
+asks first even at `all`; `ask-changes` is the same ask, and `read-only` turns all five off. A Tavily tool added later is
+covered by `mcp:*`, which also asks, until a release reviews it.
+
+## Options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `access` | `all` | `all`, `ask-changes` or `read-only`: the ceiling for every method; billed Tavily methods ask even at `all`. |
+| `accounts` | one `default` | One empty profile per alias; the alias is the whole setting. |
+| `allowUntestedHost` | `false` | Start outside `>=2.4.1 <2.5.0`. Leave it off. |
+| `websearch` | `true` | Select OpenCode's built-in Tavily web search provider when nothing earlier chose one. |
+| `executionTimeoutMs` | `900000` | The MCP server's `timeout.execution`: 1 minute to 1 hour. |
+
+[Configuration](docs/configuration.md) has the schema, the defaults and examples.
+
+## Troubleshooting
+
+- **`status` says `needs_sign_in` for an alias.** Sign in to that alias's MCP server (`tavily`, or `tavily-<alias>`) through
+  OpenCode's MCP sign-in, then read `status` again. Each alias has its own OAuth session.
+- **`status` says `error` for an alias.** Read its `reason`: `the server is disabled` or `OpenCode lists no such server`
+  means the server did not load; restart OpenCode, and check that the plugin is installed and enabled. A `failed` server
+  reports the host's reason, redacted; if it keeps failing, sign in again.
+- **`status.nextStep` names a problem.** Quote it whole; it is the one fix. A registration problem means the MCP server
+  could not be added; an unreadable server list means OpenCode could not answer, so nothing is known.
+- **The Tavily tools are absent.** Check that OpenCode is 2.4.1 or another 2.4.x, the plugin is installed, and the
+  alias's server is signed in. The tools are `tavily_tavily_search` for `default` and `tavily-<alias>_tavily_search` for
+  another alias, or `tools.tavily.tavily_search` in Code Mode (`tools["tavily-work"].tavily_search` for `work`).
+- **A call is refused.** `ACCOUNT_REQUIRED` or `ACCOUNT_UNKNOWN` comes from `probe` only: pass `account`, or use an alias
+  that exists. A Tavily tool has no `account` field; its alias is the server in its name. `PERMISSION_DENIED` means the
+  access level or a rule refuses it (under `read-only` every Tavily tool is off); `INPUT_INVALID` means the tool's own
+  schema was not met; `UNAVAILABLE` means the host could not answer — read `status`.
+
+## Cost
+
+| Tool | Cost per call |
+|---|---|
 | Search | 1 credit (basic, fast, ultra-fast), 2 (advanced) |
 | Extract | 1 per 5 pages read (basic), 2 per 5 (advanced); failed pages are free |
 | Map | 1 per 10 pages found, 2 per 10 with instructions |
 | Crawl | map's cost plus extract's for each page read |
 | Research | 4-110 credits (mini), 15-250 (pro) per task |
 
-A tool Tavily adds later is not classified by the plugin: the `access` option decides whether it runs, asks or is
-denied, and `/tavily-status` counts it as unknown.
+`status` and `probe` cost nothing. Every Tavily tool call asks first, even at `access: "all"`; the ask is a permission,
+not a spending confirmation. The plugin sets no spending limit; Tavily's plan does. `executionTimeoutMs` bounds how long
+one call may run (15 minutes by default), not what it costs.
 
-## Permissions
+## Tavily's server instructions
 
-**Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied:
+Tavily's hosted server may send its own instructions to the model, and this build does not record them: an
+unauthenticated `initialize` answers `401 Unauthorized`, and no signed-in account was available when this plugin was
+written. The plugin neither repeats nor counters text it has not read.
 
-| Value | What runs | What asks or is denied |
-| --- | --- | --- |
-| `"all"` (the default) | the five tools, and a tool Tavily adds later | nothing |
-| `"ask-changes"` | nothing: each of the five spends credits | the five tools, and a tool Tavily adds later: each asks |
-| `"read-only"` | nothing | the five tools, and a tool Tavily adds later: they are **denied** |
+## Capabilities
 
-The plugin inserts this block right after each agent's first base allow. Your own rules come later and win.
+<!-- generated:capabilities -->
+### Methods
 
-The default block, generated from `defaultRules()` for `access: "all"`:
+| Method | Class | Accounts | Operations |
+|---|---|---|---|
+| `status` | read | none | — |
+| `probe` | read | optional | — |
+| `mcp:tavily_search` | write | optional | `tavily_search` |
+| `mcp:tavily_extract` | write | optional | `tavily_extract` |
+| `mcp:tavily_map` | write | optional | `tavily_map` |
+| `mcp:tavily_crawl` | write | optional | `tavily_crawl` |
+| `mcp:tavily_research` | write | optional | `tavily_research` |
+| `mcp:*` | write | optional | — |
 
-```json
-[
-  { "action": "tavily_*", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_search", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_extract", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_map", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_crawl", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_research", "resource": "*", "effect": "allow" }
-]
-```
+### Sources
 
-## Configure
+| Source | Kind | Reads or output | Method | Cost |
+|---|---|---|---|---|
 
-The plugin works without options. [Configuration](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/docs/configuration.md)
-prints the block for `ask-changes` and `read-only` too, and covers the options (`websearch`, `executionTimeoutMs`,
-`allowUntestedHost`, `access`), per-agent rules and API keys.
+### Actions
 
-## Scripts and OpenCode automations
+None.
 
-A script or an OpenCode automation can call the five tools with no model, through `opencode api`. It runs as a session
-and its agent, under that agent's rules and the session's own, and spends credits as the tool does. Only an explicit
-`allow` runs: an `ask` is refused. See [Scripting](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/docs/scripting.md).
+### Bus events
 
-```sh
-opencode api post /api/rpc/tavily.web.tools/tavily_search \
-  -H "x-opencode-directory:$PWD" \
-  -d '{"input":{"sessionID":"ses_…","input":{"query":"OpenCode plugin API"}}}'
-```
+None.
+<!-- /generated:capabilities -->
 
-## Status
+## Errors
 
-`/tavily-status` adds a status message without starting a model turn: connection, account, access, cost, sign-in, web
-search, skills, tools, unguarded agents and one next step, `Nothing to do.` when everything is ready. The TUI also has
-**Tavily: Status** and `/tavily`.
+<!-- generated:errors -->
+| Code | Meaning |
+|---|---|
+| `NEEDS_SIGN_IN` | the account is not signed in |
+| `SCOPE_MISSING` | the call needs a scope the person has not confirmed |
+| `ACCOUNT_REQUIRED` | the plugin serves several accounts and the call names none |
+| `ACCOUNT_UNKNOWN` | the call names an alias the plugin does not serve |
+| `ACCOUNT_MISMATCH` | the item belongs to another account |
+| `CURSOR_INVALID` | the cursor is malformed, or belongs to another source, account or scope |
+| `CURSOR_EXPIRED` | the provider no longer keeps the history the cursor names |
+| `RATE_LIMITED` | the provider asked the plugin to slow down |
+| `BUDGET_EXCEEDED` | the read would cost more than the person allows |
+| `SOURCE_DISABLED` | the person turned this source or action off |
+| `TOO_LARGE` | the answer is larger than the source's maxBytes |
+| `INPUT_INVALID` | the input does not match the method's schema |
+| `SOURCE_UNKNOWN` | the plugin declares no such source |
+| `SCHEMA_VIOLATION` | an answer does not keep the contract's shape |
+| `PERMISSION_DENIED` | the person's grant does not cover the call |
+| `PLAN_INVALID` | the plan is missing, or belongs to another method |
+| `PLAN_USED` | the plan was already used by an earlier commit |
+| `GRANT_INVALID` | the action grant did not verify, or was already spent |
+| `HOST_UNTESTED` | OpenCode is outside the plugin's tested range |
+| `OPTIONS_INVALID` | the plugin's options do not match their schema |
+| `UNAVAILABLE` | the provider could not be reached |
+<!-- /generated:errors -->
 
-## Server instructions
+## Docs
 
-OpenCode 2.4.1 passes an MCP server's instructions to the model verbatim and offers no override. Tavily's text claims
-no other owner's job, so this plugin adds no counter-claim; the namespace line still marks page content as untrusted
-data.
-
-## Troubleshooting
-
-Run `/tavily-status` first; it always ends with one next step. The plugin's own codes:
-
-| Code | When | Next step |
-| --- | --- | --- |
-| `HOST_UNTESTED` | Start-up, outside `>=2.4.1 <2.5.0` | Use OpenCode 2.4.1, or set `allowUntestedHost`. With it, this is a warning. |
-| `OPTIONS_INVALID` | Start-up | Fix the plugin's options in `opencode.json`. The message names the option. |
-| `SKILLS_INVALID` | Start-up | Reinstall the plugin. |
-| `KEY_UNAVAILABLE` | Log warning | Run `/connect` and choose **Tavily**, then connect the key again. |
-| `KEY_WATCH_STOPPED` | Log warning | Restart OpenCode after you change the key. |
-| `STATUS_UNAVAILABLE` | Status | Run `/tavily-status` again, and restart OpenCode if it keeps failing. |
-| `UPSTREAM_ERROR` | A Tavily tool's result is Tavily's error object | Follow the next step in the message, by Tavily's status: 401 or 403, `/tavily-status`; 429, wait and retry; 432 or 433, the plan's limits; 5xx, wait and retry; any other, the input. |
-
-## Links
-
-- [Configuration](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/docs/configuration.md)
-- [Scripting](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/docs/scripting.md)
-- [Architecture](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/docs/architecture.md)
-- [Security](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/SECURITY.md)
-- [Contributing](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/CONTRIBUTING.md)
-- [Changelog](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/CHANGELOG.md)
-- [Issues](https://github.com/we-the-rebel-alliance/tavily-plugin/issues)
-- [Tavily's MCP documentation](https://docs.tavily.com/documentation/mcp)
-
-MIT licence; see [LICENSE](https://github.com/we-the-rebel-alliance/tavily-plugin/blob/master/LICENSE).
+- [Capabilities](docs/capabilities.md)
+- [Configuration](docs/configuration.md)
+- [Accounts](docs/accounts.md)
+- [Automations](docs/automations.md)
+- [Architecture](docs/architecture.md)
+- [Security](docs/security.md)
+- [Plugin contract](https://github.com/we-the-rebel-alliance/plugin-contract)
+- [Third-party notices](NOTICE)

@@ -1,252 +1,177 @@
-# charts-plugin
+# Charts
 
-Deterministic, publication-grade charts from a spec, with no model and no network. It takes Vega-Lite, Vega, ECharts,
-Observable Plot, table and diagram input, and writes SVG, PNG, GIF and an optional offline interactive HTML page — or a
-multi-panel dashboard — under `outputs/charts/`. The same input gives the same bytes on the same platform. Nothing is
-ever loaded from the network.
+Publication-grade charts, maps, tables and diagrams from your data and workspace files: deterministic SVG, PNG, GIF
+and offline HTML, with no network at runtime.
 
-Unofficial; not affiliated with OpenCode or Anomaly.
-
-## Requirements
-
-- OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1.
-- macOS or Linux.
-- No network, no system fonts and no provider: every render is local and deterministic.
+Charts draws 79 chart types across six engines from a spec or a chart document: Vega-Lite for statistical charts, Vega for
+treemaps and networks, ECharts for Sankey, chord and gauge, Observable Plot for the Plot recipes, plus publication
+tables, Mermaid or structured diagrams, and a board document that becomes a self-contained dashboard. Every chart is
+validated and linted before anything is written, and every file is written under `outputs/charts/` unless a call names
+another folder.
 
 ## Install
 
-Install from a release:
+Install from a release tag:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/charts-plugin#v<version>
+opencode plugin add github:we-the-rebel-alliance/charts-plugin#v0.0.0
 ```
 
-The first release on plugin-contract is v0.0.0 (phase 4b).
+`v0.0.0` is the first release of this rebuild on plugin-contract. The package is
+`@we-the-rebel-alliance/charts-plugin`; it exports its server entry and its terminal UI, and it has no runtime
+dependencies.
 
-Or add it to `opencode.json` with the same spec:
+## Sign in
 
-```json
-{ "plugins": ["github:we-the-rebel-alliance/charts-plugin#v<version>"] }
-```
+Nothing to sign in to. Charts has no provider, no integration and no credentials; its `capabilities` manifest declares
+no `accounts`. The only data it reads is a workspace file a call names, with your host's `read` rule asserted for that
+file.
 
-Run `opencode reload`, or restart OpenCode, then run `/charts-status`. Options (all optional) go on the plugin's entry:
+## Access
 
-```json
-{ "plugins": [["github:we-the-rebel-alliance/charts-plugin#v<version>", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts" }]] }
-```
+`access` decides how much the plugin's methods may do:
 
-Every option and its default is in [docs/configuration.md](docs/configuration.md).
+| Level | Reads | Writes |
+|---|---|---|
+| `all` (default) | run | run |
+| `ask-changes` | run | ask first |
+| `read-only` | run | are off |
 
-## Skills
+A read is `validate`, `recommend`, `capabilities`, `catalogue`, `themes`, `status`, `state`, `theme_get` and the nine
+`plan_*` methods. The nine commits (`render`, `quick`, `update`, `board`, `table`, `diagram`, `theme_save`,
+`theme_sync`, `theme_clear`) are writes. Every commit takes only the `planId` its plan answered, so a person confirms
+the files and changes before anything is written; the three theme commits ask even under `all`, because they change
+what every later render in the session uses.
 
-Two skills load with the plugin:
+An agent's own rules still narrow the plugin's level, and a per-tool rule wins for that one tool for that account. The
+rules the plugin generates are durable defaults; an agent that already lacks them is named in `status`, and nothing
+patches it behind the person's back.
 
-- **`charts`** — when and how to draw: the typed recipe documents, the engines, tables, diagrams and dashboards, the
-  document/`documentPath` arms, and when code on the machine is the better answer.
-- **`charts-cookbook`** — a tested example for every chart type: a typed recipe document for the standard 14, an engine
-  spec for the rest, and a board document.
+## What it draws
 
-The plugin pins no tool. Code Mode lists one namespace line; `search({ namespace: "charts", query })` finds any tool's
-signature, and the two skills carry the workflow.
+- **Charts**: bars, lines, areas, scatters, bubbles, pie and donut, histograms, box plots, heatmaps, maps, sankey, chord,
+  gauge, funnel, calendar, candlestick, radar, parallel coordinates, treemaps, networks and word clouds.
+- **Tables**: publication data-graphic tables with inline nanoplots, spanners, row groups, summary rows and a
+  sortable, accessible HTML version.
+- **Diagrams**: Mermaid flowcharts, sequence, state, class and ER diagrams; mindmaps, org charts, fishbones and
+  architecture sketches; every diagram also answers a Unicode outline for a terminal.
+- **Boards**: a dashboard document with datasets, filters, KPI cards and chart or table panels, published as a retina
+  PNG, its poster SVG, an offline `.board.html` and the `.board.json` it was built from.
+- **Chart documents**: a typed recipe or an engine chart, validated with a JSON path for each problem, saved as an
+  editable `<name>.chart.json` and replayable or updatable without changing its data.
 
-## Use
-
-Ask for the chart you want, as a question or a spec:
-
-> Chart revenue by region for 2024 as bars, in the dark theme.
-
-For the 14 standard types the agent writes a typed **chart document** for `charts_quick`: a recipe, its data, field
-bindings and an explicit aggregation, checked strictly. The files come with an editable `<name>.chart.json`, and
-`charts_update` then changes its theme, size or interactions without touching its data or meaning. Any other chart is a
-spec for `charts_render` on one of its six engines; tables, diagrams and dashboards have their own tools. Documents are
-described in [docs/documents.md](docs/documents.md).
-
-```json
-{
-  "document": {
-    "version": 1,
-    "chart": { "kind": "recipe", "recipe": "bar", "data": { "path": "data/sales.csv" }, "bindings": { "category": "region", "value": "revenue_eur" }, "options": { "aggregate": "sum", "yTitle": "Revenue (€)" } },
-    "title": "Revenue by region, 2024",
-    "currency": "EUR",
-    "appearance": { "theme": "dark" },
-    "layout": { "target": "report" }
-  },
-  "name": "revenue-by-region"
-}
-```
+Nothing is fetched: the bundled fonts, atlases and locales are the only runtime data, and an interactive page carries
+its own scripts and fonts.
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `charts_render` | Any spec on any of the six engines (Vega-Lite, Vega, ECharts, Observable Plot, table or diagram, detected) plus `data` (`rows`, or a workspace `path`), and the editorial frame, annotations and motion. Writes SVG, PNG (and GIF or HTML on request) and the resolved spec, and returns a markdown image line. Also takes a `document` or a saved `documentPath`. |
-| `charts_quick` | `bar`, `horizontal_bar`, `grouped_bar`, `stacked_bar`, `line`, `area`, `stacked_area`, `scatter`, `bubble`, `pie`, `donut`, `histogram`, `box_plot` and `heatmap`, from a typed recipe `document` (recommended) or from a type and field names. |
-| `charts_validate` | The same checks as render, plus the PNG, with no files written; returns `valid: true` or `valid: false` with the issues and the figure tree. |
-| `charts_update` | Change a saved chart's presentation (theme, overrides, category colours, layout, title, alt text, interactions) from its `.chart.json` at a known revision; writes a new generation folder and never overwrites the saved chart. |
-| `charts_board` | A multi-panel `BoardDocumentV1` dashboard: KPI strip, filters, chart and table panels, a 2× poster PNG, its SVG and an offline cross-filtering `.board.html`. |
-| `charts_table` | A publication data-graphic table: spanners, row groups, a summary row, and inline bar, sparkline, bullet, delta, badge, heatmap and dot cells, to SVG, PNG and sortable HTML. |
-| `charts_diagram` | A deterministic offline diagram from Mermaid DSL (flowchart, sequence, state, class, ER) or structured mindmap, org chart, fishbone and architecture specs, to SVG, PNG and terminal ASCII. |
-| `charts_recommend` | Which chart fits a question, its data and its medium: a ranked shortlist with a reason each, the encoding, a ready call and, for a recipe type, a `charts_quick` document draft. Advises; it never renders. |
-| `charts_capabilities` | Exactly what this build can do: engines, working output formats, document versions, recipes, layout targets, themes, fonts, data formats, limits, and what is known not to work. |
-| `charts_catalogue` | Every chart type, and a working example of any, with its data; for a recipe type, its contract and exact `charts_quick` document calls. |
-| `charts_themes` | The built-in and saved themes and their tokens; with a `seed`, a preview of a synthesised theme and its paired light and dark variants. |
-| `charts_theme_save` | Save a custom theme by name in the workspace (`.charts/themes/<name>.json`), after checking its tokens and their contrast. |
+Every method is a tool in Code Mode and an RPC method under the one id `charts`; the manifest's table below is the
+authority. The nine writes are plan/commit pairs, and nothing is pinned.
 
-`src/registry.ts` defines each tool once; the plugin's tool registration, the package declaration, the tools RPC and
-`docs/tool-parity.md` are projections of it, and a test fails when they drift.
+## Capabilities
 
-## Permissions
+Every method, its class and its operations come from the installed manifest.
 
-**Every tool is allowed by default.** The plugin inserts this block after each agent's base allow rule. `access: "all"`
-is the default, so this is the block in force:
+<!-- generated:capabilities -->
+### Methods
 
-<!-- rules:all -->
-```json
-[
-  {"action": "charts_*", "resource": "*", "effect": "allow"},
-  {"action": "charts_render", "resource": "*", "effect": "allow"},
-  {"action": "charts_quick", "resource": "*", "effect": "allow"},
-  {"action": "charts_validate", "resource": "*", "effect": "allow"},
-  {"action": "charts_update", "resource": "*", "effect": "allow"},
-  {"action": "charts_board", "resource": "*", "effect": "allow"},
-  {"action": "charts_table", "resource": "*", "effect": "allow"},
-  {"action": "charts_diagram", "resource": "*", "effect": "allow"},
-  {"action": "charts_recommend", "resource": "*", "effect": "allow"},
-  {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
-  {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
-  {"action": "charts_themes", "resource": "*", "effect": "allow"},
-  {"action": "charts_theme_save", "resource": "*", "effect": "allow"}
-]
-```
-<!-- /rules:all -->
+| Method | Class | Accounts | Operations |
+|---|---|---|---|
+| `status` | read | none | — |
+| `state` | read | none | `file.read` |
+| `plan_render` | read | none | `charts.plan_render`, `charts.render`, `file.read` |
+| `render` | write | none | `charts.render`, `file.read`, `file.write` |
+| `plan_quick` | read | none | `charts.plan_quick`, `charts.quick`, `file.read` |
+| `quick` | write | none | `charts.quick`, `file.read`, `file.write` |
+| `plan_update` | read | none | `charts.plan_update`, `charts.update`, `file.read` |
+| `update` | write | none | `charts.update`, `file.read`, `file.write` |
+| `plan_board` | read | none | `charts.plan_board`, `charts.board`, `file.read` |
+| `board` | write | none | `charts.board`, `file.read`, `file.write` |
+| `plan_table` | read | none | `charts.plan_table`, `charts.table`, `file.read` |
+| `table` | write | none | `charts.table`, `file.read`, `file.write` |
+| `plan_diagram` | read | none | `charts.plan_diagram`, `charts.diagram`, `file.read` |
+| `diagram` | write | none | `charts.diagram`, `file.read`, `file.write` |
+| `plan_theme_save` | read | none | `charts.plan_theme_save`, `charts.theme_save`, `file.read` |
+| `theme_save` | write | none | `charts.theme_save`, `file.read`, `file.write` |
+| `plan_theme_sync` | read | none | `charts.plan_theme_sync`, `charts.theme_sync`, `file.read` |
+| `theme_sync` | write | none | `charts.theme_sync`, `file.read` |
+| `plan_theme_clear` | read | none | `charts.plan_theme_clear`, `charts.theme_clear` |
+| `theme_clear` | write | none | `charts.theme_clear` |
+| `validate` | read | none | `charts.validate`, `file.read` |
+| `recommend` | read | none | `charts.recommend`, `file.read` |
+| `capabilities` | read | none | `charts.capabilities` |
+| `catalogue` | read | none | `charts.catalogue` |
+| `themes` | read | none | `charts.themes`, `file.read` |
+| `theme_get` | read | none | `charts.theme_get` |
 
-With `access: "ask-changes"`, the five reads run and the seven writers ask:
+### Sources
 
-<!-- rules:ask-changes -->
-```json
-[
-  {"action": "charts_*", "resource": "*", "effect": "ask"},
-  {"action": "charts_render", "resource": "*", "effect": "ask"},
-  {"action": "charts_quick", "resource": "*", "effect": "ask"},
-  {"action": "charts_validate", "resource": "*", "effect": "allow"},
-  {"action": "charts_update", "resource": "*", "effect": "ask"},
-  {"action": "charts_board", "resource": "*", "effect": "ask"},
-  {"action": "charts_table", "resource": "*", "effect": "ask"},
-  {"action": "charts_diagram", "resource": "*", "effect": "ask"},
-  {"action": "charts_recommend", "resource": "*", "effect": "allow"},
-  {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
-  {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
-  {"action": "charts_themes", "resource": "*", "effect": "allow"},
-  {"action": "charts_theme_save", "resource": "*", "effect": "ask"}
-]
-```
-<!-- /rules:ask-changes -->
+| Source | Kind | Reads or output | Method | Cost |
+|---|---|---|---|---|
+| `charts.state` | snapshot | `list` | `state` | free |
 
-With `access: "read-only"`, the five reads run and the seven writers are denied:
+### Actions
 
-<!-- rules:read-only -->
-```json
-[
-  {"action": "charts_*", "resource": "*", "effect": "deny"},
-  {"action": "charts_render", "resource": "*", "effect": "deny"},
-  {"action": "charts_quick", "resource": "*", "effect": "deny"},
-  {"action": "charts_validate", "resource": "*", "effect": "allow"},
-  {"action": "charts_update", "resource": "*", "effect": "deny"},
-  {"action": "charts_board", "resource": "*", "effect": "deny"},
-  {"action": "charts_table", "resource": "*", "effect": "deny"},
-  {"action": "charts_diagram", "resource": "*", "effect": "deny"},
-  {"action": "charts_recommend", "resource": "*", "effect": "allow"},
-  {"action": "charts_capabilities", "resource": "*", "effect": "allow"},
-  {"action": "charts_catalogue", "resource": "*", "effect": "allow"},
-  {"action": "charts_themes", "resource": "*", "effect": "allow"},
-  {"action": "charts_theme_save", "resource": "*", "effect": "deny"}
-]
-```
-<!-- /rules:read-only -->
+None.
 
-So a render writes files into the project whenever an agent decides to, with no prompt; each tool still asks the host
-for `read` on a data file and `edit` on its output folder. An output folder outside the project also needs an
-`external_directory` allow:
+### Bus events
 
-```json
-{ "permissions": [{ "action": "external_directory", "resource": "/path/to/charts/*", "effect": "allow" }] }
-```
-
-To restrict, choose one of three:
-
-1. **`access`**, one option for the plugin: `"all"` (the default), `"ask-changes"` (the five reads run, the writers
-   ask) or `"read-only"` (the reads run, the writers are denied).
-2. **An agent's own rules**, such as a drafts-only agent: `"permissions": [{ "action": "charts_*", "resource": "*",
-   "effect": "deny" }, { "action": "charts_validate", "resource": "*", "effect": "allow" }]`.
-3. **A per-tool rule** in your `opencode.json`: `{ "action": "charts_render", "resource": "*", "effect": "ask" }`, or
-   `"deny"` to turn one tool off.
-
-The last matching rule wins, so a later rule of yours still decides.
-
-## Status
-
-`/charts-status` shows the renderers, the defaults, the themes, the skills, the tools the agent can see, any agent
-missing the plugin's default block, the OpenCode version and the next step.
+`rpc.charts.changed`
+<!-- /generated:capabilities -->
 
 ## Errors
 
-Every error reads `CODE: what happened (at /json/path). Next step: what to do.` The code is also in the tool error's
-metadata, and a test keeps this table and the code equal.
+<!-- generated:errors -->
+| Code | Meaning |
+|---|---|
+| `NEEDS_SIGN_IN` | the account is not signed in |
+| `SCOPE_MISSING` | the call needs a scope the person has not confirmed |
+| `ACCOUNT_REQUIRED` | the plugin serves several accounts and the call names none |
+| `ACCOUNT_UNKNOWN` | the call names an alias the plugin does not serve |
+| `ACCOUNT_MISMATCH` | the item belongs to another account |
+| `CURSOR_INVALID` | the cursor is malformed, or belongs to another source, account or scope |
+| `CURSOR_EXPIRED` | the provider no longer keeps the history the cursor names |
+| `RATE_LIMITED` | the provider asked the plugin to slow down |
+| `BUDGET_EXCEEDED` | the read would cost more than the person allows |
+| `SOURCE_DISABLED` | the person turned this source or action off |
+| `TOO_LARGE` | the answer is larger than the source's maxBytes |
+| `INPUT_INVALID` | the input does not match the method's schema |
+| `SOURCE_UNKNOWN` | the plugin declares no such source |
+| `SCHEMA_VIOLATION` | an answer does not keep the contract's shape |
+| `PERMISSION_DENIED` | the person's grant does not cover the call |
+| `PLAN_INVALID` | the plan is missing, or belongs to another method |
+| `PLAN_USED` | the plan was already used by an earlier commit |
+| `GRANT_INVALID` | the action grant did not verify, or was already spent |
+| `HOST_UNTESTED` | OpenCode is outside the plugin's tested range |
+| `OPTIONS_INVALID` | the plugin's options do not match their schema |
+| `UNAVAILABLE` | the provider could not be reached |
+<!-- /generated:errors -->
 
-| Code | When |
-| --- | --- |
-| `SPEC_INVALID`, `SPEC_UNSAFE`, `SPEC_TOO_LARGE`, `SPEC_TOO_EXPENSIVE` | The spec cannot render, would load something, or is too large or slow. |
-| `INPUT_INVALID`, `OPTIONS_INVALID` | The call does not match the tool's parameters, or the plugin's options are not valid. |
-| `INPUT_CONFLICT` | A chart call mixes input arms: a legacy spec (or quick's type and fields), `document` and `documentPath` are one per call. Nothing is read or written; the error says where each legacy field goes in a document. |
-| `DATA_INVALID`, `DATA_EMPTY`, `DATA_TOO_LARGE`, `DATA_FORMAT_UNKNOWN`, `TRANSFORM_INVALID` | The data or its transform; `DATA_EMPTY` is a table with no rows. |
-| `PATH_INVALID`, `PATH_OUTSIDE_WORKSPACE`, `PATH_IS_URL`, `PATH_PRIVATE`, `FILE_NOT_FOUND`, `NOT_A_FILE` | A workspace path. |
-| `THEME_NOT_FOUND`, `THEME_INVALID`, `THEME_CYCLE`, `THEME_NAME_INVALID`, `THEME_NAME_TAKEN`, `FONT_INVALID`, `FONT_TOO_LARGE` | A theme, a theme name, or its fonts. |
-| `LOCALE_UNKNOWN`, `CURRENCY_UNKNOWN`, `ATLAS_UNKNOWN`, `CHART_TYPE_UNKNOWN`, `FIELD_MISSING`, `SIZE_INVALID`, `SCALE_INVALID` | A name or a value the call gives. |
-| `PNG_UNAVAILABLE`, `PNG_TOO_LARGE`, `HTML_UNAVAILABLE`, `RENDER_FAILED` | A renderer. |
-| `HTML_RUNTIME_FAILED` | Shown in an interactive HTML page, not returned by a tool: the live chart did not start in the browser, so the page keeps the static chart and shows the failure with a short diagnostic. |
-| `OUTPUT_WRITE_FAILED` | Writing the files failed; every file is made before any is written, and the error names any file that could not be put back as it was. |
-| `SKILLS_INVALID`, `STATUS_UNAVAILABLE` | Setup could not load a skill, or `/charts-status` could not be read (in the server log, or the session). |
-| `NO_MARK`, `NO_MARKS`, `NO_SERIES`, `DATA_TWICE`, `AXES_MISSING`, `SANKEY_CYCLE`, `SERIES_TYPE_MISSING`, `ECHARTS_COMPONENT_UNSUPPORTED`, `ECHARTS_MARKUP_REFUSED`, `UNKNOWN_MARK`, `UNKNOWN_CHANNEL`, `UNKNOWN_PROPERTY`, `UNKNOWN_TYPE`, `UNKNOWN_DATASET`, `UNKNOWN_FIELD`, `TYPE_MISMATCH`, `PIE_NEGATIVE`, `DATA_MISSING` | A spec or data problem that stops the render, reported inside `SPEC_INVALID` with its JSON path and a fix. |
-| `DOCUMENT_INVALID`, `DOCUMENT_VERSION_UNSUPPORTED`, `DOCUMENT_REVISION_MISMATCH`, `DOCUMENT_DEPENDENCY_CHANGED`, `ARTIFACT_INVALID` | A chart document or a saved `.chart.json` artifact: its shape (with the JSON path), a version this build does not read, a revision that is stale or does not match the content, a custom font whose bytes changed, or a file that is not a chart artifact. |
-| `AGGREGATION_REQUIRED`, `POSITION_MISSING`, `LAYOUT_UNSUPPORTED`, `INTERACTION_UNSUPPORTED` | A recipe document that cannot compile as written: several rows for one mark without `options.aggregate`, a temporal or numeric x missing, or a layout or interaction preset its chart kind does not support. |
-| `LAYOUT_UNSATISFIABLE` | A recipe chart that cannot be drawn as asked: no layout candidate fits the outer size with every label and legend entry at or above the target's readability floor (or a font override is below it). The error lists the measured conflicts and alternatives; nothing is written. |
-| `INTERACTION_FORMAT_MISMATCH` | A document asks for an interaction only the HTML page carries (an explicit tooltip, legend highlight, x zoom or a brush), and the explicit `formats` list has no `html`. Refused before any file is written. |
-| `VALUE_MISSING`, `CATEGORY_COLOR_UNUSED` | A recipe warning: rows without a measure (left out and counted, never read as zero), or a category colour for a category the data does not have. |
-| `EMPTY_DATA`, `NOT_A_DATE`, `DATE_AS_CATEGORY`, `MISSING_UNITS`, `TRUNCATED_AXIS`, `DUAL_AXIS`, `DUPLICATE_TICKS`, `UNSORTED_BARS`, `OVERPLOTTING`, `TOO_MANY_SERIES`, `PIE_TOO_MANY_SLICES`, `RAINBOW_SEQUENTIAL`, `LOW_CONTRAST`, `LABEL_COLLISION`, `LABEL_CLIPPED`, `LABEL_DENSITY`, `FONT_NOT_BUNDLED`, `FONT_GLYPH_MISSING`, `VEGA_LITE_WARNING`, `VEGA_WARNING` | A lint or drawing warning, returned with the result beside the chart. |
-| `SIZE_OVERRIDE_IGNORED` | The spec's own `width` or `height` beats the tool's (the spec keeps precedence), or an ECharts size is not a pixel count; the warning names both values and the path, such as `/spec/width`. |
+A chart problem also carries its own code in the sentence, such as `SPEC_UNSAFE` or `DATA_EMPTY`, with the path it is
+at and one next step.
 
-## Links
+## Troubleshooting
 
-- [docs/documents.md](docs/documents.md) — the chart document, the board document and the saved `.chart.json`.
-- [docs/configuration.md](docs/configuration.md) — options, theme resolution, output files, limits and errors.
-- [docs/scripting.md](docs/scripting.md) — the tools RPC, for a script with no model.
-- [docs/architecture.md](docs/architecture.md) — how it is built.
-- [docs/status.md](docs/status.md) — what does not work, and why.
-- [docs/tool-parity.md](docs/tool-parity.md) — every tool, its class and every surface.
-- [DESIGN.md](DESIGN.md) — the design and its evidence; [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — licences.
+- **`status` reports `error` or `nextStep` names the agent list.** An agent's rules could not be read; check the
+  OpenCode server log and reload the plugin.
+- **A call is refused with `PERMISSION_DENIED`.** The person's `access` level or an agent rule denies it. Reads always
+  run; `ask-changes` asks for the writes, and `read-only` turns them off. `theme_save`, `theme_sync` and `theme_clear`
+  ask even under `all`.
+- **No files appear.** A render writes under `outputs/charts/` (or the configured `outDir`) in the session's workspace.
+  Charts refuses an output folder outside the workspace; keep `outDir` inside it.
+- **A PNG or HTML file is missing.** The PNG rasteriser and the browser runtimes ship in `dist/`; reinstall the
+  release if `capabilities` says one is unavailable.
+- **A saved chart will not update.** `update` needs the `revision` the call that wrote it returned; a stale revision is
+  `DOCUMENT_REVISION_MISMATCH` before anything is drawn. A change of data or meaning is a new document.
+- **A theme is not used.** A host's synced theme applies to that session only; a call's own `theme` wins, then the
+  session's synced theme, then the plugin's configured default.
 
-## Development
+## Docs
 
-```sh
-npm ci
-npx playwright-core install --only-shell chromium   # once; on Linux add --with-deps
-npm run check
-```
-
-`npm run check` runs `build`, `typecheck`, `unit`, `kit`, `browser`, `copies`, `forbidden`, `icons`, `whitelist`,
-`jelly`, `actionlint`, `pack`, `evals` and `host`; [CONTRIBUTING.md](CONTRIBUTING.md) describes each stage. The host
-stage spawns a stock OpenCode 2.4.1 `opencode serve`, from `OPENCODE_BIN_2_4_1` or `$OPENCODE_STOCK_ROOT/2.4.1`.
-`node scripts/data.mjs` regenerates the locales and atlases, and `bun scripts/cookbook.ts` regenerates the cookbook
-skill and the recipe table in `docs/documents.md`; both outputs are committed.
-
-## Known limits
-
-- **OpenCode `>=2.4.1 <2.5.0`**, tested on 2.4.1. Status says when the host is untested or outside the range.
-- **No PDF output and no Plotly input.** Mermaid is supported for the five diagram kinds `charts_diagram` draws.
-- **Bundled fonts cover Latin, Greek and Cyrillic.** A label beyond them gets `FONT_GLYPH_MISSING`; the fix is a font
-  file with `theme.font.files`.
-- **Nothing is loaded from the network.** A remote data file or image is not fetched.
-- **PNG and HTML need the packaged runtime.** A missing runtime is `PNG_UNAVAILABLE` or `HTML_UNAVAILABLE`;
-  reinstalling the plugin restores it.
-- **A render runs to its deadline.** Stop does not interrupt one already running; 10 s by default
-  (`CHARTS_RENDER_TIMEOUT_MS`).
+- [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract): the standard, the contract and the kit.
+- [Capabilities](docs/capabilities.md): every method, source, action and bus event, and the class convention.
+- [Configuration](docs/configuration.md): the options and their defaults.
+- [Accounts](docs/accounts.md): why there are none.
+- [Automations](docs/automations.md): refreshing a chart on a schedule.
+- [Architecture](docs/architecture.md): the layers, the renderer and what is cached.
+- [Security](docs/security.md): what leaves the machine, redaction and the plan/commit flow.

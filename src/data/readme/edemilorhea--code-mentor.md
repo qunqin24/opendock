@@ -41,20 +41,35 @@ Diff 的功能：
 npm i -g @edemilorhea/code-mentor
 ```
 
-全域安裝時會自動把 skill 裝到 `~/.agents/skills/code-mentor`、agent 裝到 `~/.config/opencode/agent/code-mentor.md`（從 0.1.106 起）。裝完記得**重開 AI 工具**（例如 OpenCode），它才會讀到新的 skill 和 agent。
+接著選擇要裝到哪些 AI 工具（支援 OpenCode、Claude Code、Codex）：
 
-自動安裝沒跑時（例如 npm 設了 `ignore-scripts=true`），手動補一次：`code-mentor setup`。不想自動寫入家目錄，安裝前設環境變數 `CODE_MENTOR_SKIP_SETUP=1`。
+```bash
+code-mentor setup                          # 列出三個工具讓你輸入編號；直接 Enter = 本機偵測到的工具
+code-mentor setup --target claude,codex    # 不詢問，直接指定
+code-mentor setup --all                    # 三個都裝
+```
 
-確認裝到新版：`code-mentor help` 的用法裡要有 `setup`。
+偵測方式：家目錄有 `.config/opencode`、`.claude`、`.codex` 就算有裝。裝完記得**重開 AI 工具**，它才會讀到新的 skill。
+
+| 工具 | 裝了什麼 | 怎麼叫出來 |
+|---|---|---|
+| OpenCode | skill `~/.agents/skills/code-mentor`、agent `~/.config/opencode/agent/code-mentor.md` | `/code-mentor`（需加 plugin，見下方），或 Tab 切到 `code-mentor` agent |
+| Claude Code | skill `~/.claude/skills/code-mentor` | `/code-mentor` |
+| Codex | skill `~/.agents/skills/code-mentor`（和 OpenCode 共用同一份） | `$code-mentor`，或 `/skills` 選 |
+
+Claude Code 和 Codex 沒有 `code_mentor` 工具，skill 會改用 `code-mentor` CLI，所以 CLI 要先全域安裝。
+
+之後 `npm i -g` 升級時，只會更新已經裝過的那幾份；第一次安裝不會寫任何檔案，只提示執行 `setup`。自動更新沒跑時（例如 npm 設了 `ignore-scripts=true`），手動再跑一次 `code-mentor setup`。不想自動更新家目錄的檔案，安裝前設環境變數 `CODE_MENTOR_SKIP_SETUP=1`。
+
+確認裝到新版：`code-mentor help` 的用法裡要有 `setup [--target`。
 
 | 裝了什麼 | 位置 | 範圍 |
 |---|---|---|
 | CLI | 全域 node_modules | 這台機器所有專案 |
-| skill | `~/.agents/skills/code-mentor` | 這台機器所有專案 |
-| agent | `~/.config/opencode/agent/code-mentor.md` | 這台機器所有專案 |
+| skill／agent | 見上表 | 這台機器所有專案 |
 | 產出 | 每個 repo 的 `.code-mentor/output/docs/<來源>-<hash>/` | 只有那個 repo，自動被 git 忽略 |
 
-用 `--project` 裝的 skill／agent 只在該專案生效，而且會蓋過全域那份；升級時要在該專案重跑一次。
+`setup --project` 改裝到目前專案：`.agents/skills/`、`.claude/skills/`、`.opencode/agent/`。只在該專案生效，而且會蓋過全域那份；升級時要在該專案重跑一次。
 
 其他安裝方式：
 
@@ -283,16 +298,16 @@ code-mentor serve --port 5000
 
 **裝了新版，`code-mentor help` 還是舊的**：PATH 上可能有別處的舊版（例如 Bun 或其他 Node 版本）。用 `npm ls -g @edemilorhea/code-mentor` 看 npm 裝的版本，`Get-Command code-mentor -All`（PowerShell）或 `which -a code-mentor` 看實際執行的是哪一個。
 
-**看不到 code-mentor agent**：先重開 OpenCode；還是沒有就跑 `code-mentor setup` 再重開（npm 的 `ignore-scripts` 會擋掉自動安裝）。
+**看不到 code-mentor skill／agent**：先重開 AI 工具；還是沒有就跑 `code-mentor setup` 並選那個工具，再重開。
 
 ## 更新與移除
 
 ```bash
-# 更新（每台機器一次；skill 和 agent 會自動一起更新）
+# 更新（每台機器一次；已裝過的 skill 和 agent 會自動一起更新）
 npm i -g @edemilorhea/code-mentor@latest
 
 npm rm -g @edemilorhea/code-mentor   # 移除工具
-# skill、agent 要手動刪掉：~/.agents/skills/code-mentor、~/.config/opencode/agent/code-mentor.md
+# skill、agent 要手動刪掉：~/.agents/skills/code-mentor、~/.claude/skills/code-mentor、~/.config/opencode/agent/code-mentor.md
 ```
 
 ## 規劃中

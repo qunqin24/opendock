@@ -15,6 +15,7 @@ Deleted files stay recoverable, so a wrong delete is no longer a disaster.
 - **No false positives**: strings like `echo rm foo`, `'rm ...'`, `"rm ..."`, or `confirm` are left untouched; quotes and escapes are parsed correctly.
 - **Cross-platform backends**: prefers macOS `trash` and Linux `trash-put` / `gio trash`.
 - **Built-in fallback, zero install**: when no backend is found, the plugin generates a pure `sh` trash script and uses it automatically.
+- **Blocks permanent-deletion bypasses**: rejects commands that would empty the Trash or delete around `rm` (see [Guardrails](#guardrails)).
 - **No runtime dependencies**: the plugin uses only Node built-ins and runs as a single file.
 
 ---
@@ -39,6 +40,22 @@ sudo rm -rf /tmp/x               ->  sudo rm -rf /tmp/x (unchanged)
 ```
 
 > For safety, `sudo rm ...` is never rewritten (and you should generally deny `sudo` in your permissions config).
+
+---
+
+## Guardrails
+
+The guarantee is simple: **nothing the assistant deletes should be permanent**. Some commands cannot be turned into a reversible move, so the plugin rejects them outright — the hook throws and nothing runs:
+
+- **Emptying the Trash**: `osascript … empty trash`, `trash-empty`, `gio trash --empty`
+- **Deleting Trash directories**: `rm -rf ~/.Trash`, `rm -rf ~/.local/share/Trash`
+- **`rm` bypasses**: absolute paths (`/bin/rm`, `/usr/bin/rm`), `busybox rm`
+- **Other permanent deletes**: `unlink`, `shred`, `srm`, `wipe`, `find … -delete`
+- **Indirect deletes**: `sudo rm`, `bash -c "rm …"`, Python `os.remove` / `shutil.rmtree`, Node `fs.rmSync` / `unlinkSync`
+
+Reversible commands keep working: `rm <paths>` (rewritten to the Trash), `trash <paths>`, and `find … -exec rm {} +` (rewritten in place).
+
+The rejection message explains why, so the assistant can switch to a reversible alternative instead of retrying another binary.
 
 ---
 

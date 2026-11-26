@@ -113,7 +113,7 @@ fails closed for mutating tools. Read-only `teamwork_status`,
 `team/*` role. See `docs/GUARDRAILS.md` for the full matrix.
 
 **URL network policy.** `document.url` ingestion and preflight URL checks use
-`url-guard.ts`: http/https only, public addresses only (loopback, private,
+`url-guard.mjs`: http/https only, public addresses only (loopback, private,
 link-local, metadata, multicast, reserved, and IPv4-mapped IPv6 are rejected),
 DNS answers are validated and the connection is pinned to them, redirects are
 not followed (a `Location` is validated before refusal), and timeouts/size caps
@@ -125,13 +125,14 @@ Hooks: `permission.evaluate` enforces the per-agent read-only policy **in code**
 `team/falsifier`, `team/scout`, `team/security-auditor`,
 `team/segment-reviewer`, `team/formalization-reviewer`, `team/referee`,
 `team/victory-auditor`) all deny the `edit` tool, so none of them can write
-through it. `shell` is still available to the verifier, scout, security auditor
-and victory auditor, and it can modify files; the falsifier, segment reviewer,
-formalization reviewer, and referee also have `shell` denied, and the segment,
-formalization, referee, and victory-auditor roles deny `webfetch` and
+through it. `shell` is still available to the verifier, falsifier, scout,
+security auditor and victory auditor, and it can modify files; the segment
+reviewer, formalization reviewer, and referee also have `shell` denied, and the
+segment, formalization, referee, and victory-auditor roles deny `webfetch` and
 `subagent` as well (the verifier and security auditor deny `webfetch`). In
-short: no writes through `edit` for all eight, and no `shell` writes for the
-falsifier, segment reviewer, formalization reviewer, or referee. The
+short: no writes through `edit` for all eight, and no `shell` for the segment
+reviewer, formalization reviewer, or referee; the falsifier uses `shell` only
+to run empirical tests and must not edit through it. The
 `team/victory-auditor` keeps `shell` (it can modify files) and is denied `edit`,
 `webfetch`, and `subagent`; its independence comes from a fresh session that
 inspects the delivered artifacts and runs tests itself, not from capability
@@ -147,19 +148,26 @@ prompt.
 All run artifacts live under `.opencode/teamwork/<session-id>/`; see
 [`docs/ARTIFACTS.md`](docs/ARTIFACTS.md) for the layout, the canonical
 topologies, and the JSON schemas (`spec.json`, `plan.dag.json`, `state.json`,
-`verification_report.json`). The installer copies that reference to
+`verification_report.json`). The Step 0 survey writes `PROJECT.md` (architecture
+and Feature Inventory) and `SCOPE.md`; the dual-track suite writes
+`TEST_INFRA.md` and, only after the E2E suite is green, `TEST_READY.md`;
+`DEAD_ENDS.md` records repeated dead ends. Open verifier issues live in the
+`state.json` `feedbackLog` ledger. A blocking dependency probe writes
+`PREREQUISITES.md` at the repository root before any run directory exists. The
+installer copies that reference to
 `<config-dir>/teamwork/ARTIFACTS.md` next to your agents.
 
 ### Completion guarantees
 
 - `verified_pass` requires a legal lifecycle transition and PASS evidence (an inline PASS verdict or a `PASS` per-task report).
 - A plan writes a signed `run.manifest.json` (the default). Verifier reports, security audit, strict-wave verdicts, victory verdict, and final verdict carry an `_auth` envelope and a `ctx.storage` digest-index entry. `final_verify`/`next` fail as `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_UNKNOWN_KEY`, `AUTH_INDEX_MISSING`, or `AUTH_STALE` when an artifact is forged, copied, edited, or the signed plan/requirements/policy baseline drifts. See [`docs/adr/0005-artifact-authenticity.md`](docs/adr/0005-artifact-authenticity.md).
-- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). 0.14.0 signs witness receipts (`OPENCODE_TEAMWORK_WITNESS_PUBLIC_KEY`) so a forged KV record is `AUTH_INVALID`, labels a receipt `unverified` without that key, and adds signer protocol v2 plus `opencode-teamwork approve signer` when `OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` is set. `human-approved`/`ci-attested` require an Ed25519 approval from `OPENCODE_TEAMWORK_APPROVAL_DIR`, signed by a key distinct from the run key and bound to the **exact bytes of `prompt_draft.md`** plus the run id and a one-use nonce (0.11.0; manifest version 3). The plan verifies it before any `mkdir`, `final_verify` re-hashes the draft, and a re-plan cannot change the binding. The plugin/command signer refuses `approvals/` paths (`AUTH_APPROVAL_SCOPE`). See [`docs/adr/0011-authenticated-prompt-approval.md`](docs/adr/0011-authenticated-prompt-approval.md), [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
+- `_auth` supports HMAC-SHA256 (backward-compatible `mac`) and Ed25519 (`sig`). Every new signed run pins a 128-bit `runNonce` and `runKeyId` in the manifest, so a cross-run copy or a rotated re-sign fails. With Ed25519, verification needs only the SPKI public key. `teamwork_plan` also records `trustLevel` (`local-hmac` default, `external-signer`, `human-approved`, `ci-attested`) and optional `requireWitness`; `final_verify` enforces the level, and `OPENCODE_TEAMWORK_SIGNER`/`OPENCODE_TEAMWORK_WITNESS` fail closed (`AUTH_SIGNER_UNAVAILABLE`/`AUTH_WITNESS_UNAVAILABLE`). 0.14.0 signs witness receipts (`OPENCODE_TEAMWORK_WITNESS_PUBLIC_KEY`) so a forged KV record is `AUTH_INVALID`, labels an optional receipt `unverified` without that key, and adds signer protocol v2 plus `opencode-teamwork approve signer` when `OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` is set; since 0.19.3 a required witness fails closed when no witness key is configured. `human-approved`/`ci-attested` require an Ed25519 approval from `OPENCODE_TEAMWORK_APPROVAL_DIR`, signed by a key distinct from the run key and bound to the **exact bytes of `prompt_draft.md`** plus the run id and a one-use nonce (0.11.0; manifest version 3). The plan verifies it before any `mkdir`, `final_verify` re-hashes the draft, and a re-plan cannot change the binding. The plugin/command signer refuses `approvals/` paths (`AUTH_APPROVAL_SCOPE`). See [`docs/adr/0011-authenticated-prompt-approval.md`](docs/adr/0011-authenticated-prompt-approval.md), [`docs/adr/0008-signer-spi-and-trust-levels.md`](docs/adr/0008-signer-spi-and-trust-levels.md) and [`SECURITY.md`](SECURITY.md).
 - A run completes only with a `PASS` `verify/final.json` stamped by `teamwork_final_verify`; an unstamped report needs the recorded `allowUnstamped` bypass. An unsigned legacy run returns `AUTH_LEGACY` until the recorded `allowUnsignedLegacy` bypass is passed at the completion gate; `benchmark` refuses that bypass, `victoryAudit: "skip"`, and `requireHandoffs: "skip"`.
 - `teamwork_victory_audit`, `teamwork_wave_record`, and `teamwork_report` require the caller session to descend from the plan-time `rootSessionId`, so a top-level `opencode run --agent team/victory-auditor` cannot self-authorize.
 - That PASS also needs a `verify/victory.json` from the independent `team/victory-auditor` reporting `VICTORY CONFIRMED` for every requirement and the current `ORIGINAL_REQUEST.md` hash, unless the plan explicitly recorded `victoryAudit: "skip"` with a non-empty `victorySkipReason` (then `final_verify` records `victory: "SKIPPED (explicit): <reason>"`). A skip without a reason is refused; the legacy no-baseline default is labelled `SKIPPED (legacy default: no requirements baseline)`.
+- `small-focused` is a refinement loop (up to **32** rounds), not one shot. Every verifier FAIL adds an open issue to the `state.json` `feedbackLog` ledger; the next round must address every open entry; a PASS resolves them; an entry is never silently dropped. The loop stops only at 0 open issues, 0 edits, an empty ledger, and an independent re-run of the tests. A small-focused run gets at most **2** victory audits: after a second `VICTORY REJECTED` (or a block/deadlock/budget stop) the Sentinel enters the terminal non-victory state and records `interrupted.md` (the engine writes it on an AbortSignal); the engine refuses a third audit. The Sentinel reports the open issues and never records `VICTORY CONFIRMED`.
 - The security audit fails on integrity-rule violations for the run's mode, and that blocks the merge.
-- Opt-in `verification: "strict"` adds exactly one `team/falsifier` challenge (`PASS`) and one `team/security-auditor` audit (`CLEAN`) per task after its verifier report. Missing, stale, or non-PASS/CLEAN verdicts block `teamwork_next` (`NEEDS_STRICT_WAVE`) and `teamwork_final_verify`; a strict PASS writes `GATE_STATUS.md` with worker/verifier/challenger/auditor rows and a `## Continuity` handoff table. The default `standard` mode is unchanged, and the wave reuses the existing agents rather than adding roles.
+- **`distributed-coding` defaults to `verification: "strict"`**: one `team/verifier` reviewer report, plus one `team/falsifier` challenger (`PASS`) and one `team/security-auditor` forensic auditor (`CLEAN`) per task. Passing `verification: "standard"` is an explicit, recorded opt-out. Missing, stale, or non-PASS/CLEAN verdicts block `teamwork_next` (`NEEDS_STRICT_WAVE`) and `teamwork_final_verify`; a strict PASS writes `GATE_STATUS.md` with worker/verifier/challenger/auditor rows and a `## Continuity` handoff table. The wave reuses the existing agents rather than adding roles.
 - `requireHandoffs: "required"` (the default for a new run with a request or requirements baseline) makes `final_verify` and `next` demand continuity handoffs derived from the plan: the assigned worker and `team/verifier` per task, `team/falsifier` + `team/security-auditor` per task in strict mode, one `team/sentinel`/`team/orchestrator` run-level handoff, and the `team/victory-auditor` run-level handoff after a confirmed victory audit. Each entry must match `handoffs/index.json` (regular non-symlink file, sha256/byte length) and cite the current report/wave/audit/victory; a changed cited artifact makes it stale. Missing pairs return `NEEDS_HANDOFFS`, stale/duplicate/unknown/tampered evidence returns `BLOCKED_BY_HANDOFFS`, and a passing gate records `handoffs` plus `evidence.handoffs` in `verify/final.json`. An explicit `requireHandoffs: "skip"` is recorded as `handoffs: "SKIPPED (explicit)"` and never reads the index; handoff prose is never a verdict.
 - Planning refuses to start when blocking inputs are missing or unreachable unless `allowMissingInputs` is recorded.
 - Run-artifact writes are contained on Linux by a pinned directory descriptor ([ADR 0010](docs/adr/0010-pinned-fd-write-containment.md)): the target parent is opened once and every create, mkdir, rename, lstat and append is relative to `/proc/self/fd/<dirfd>`, so a directory swapped for a symlink cannot redirect bytes outside the run. Each write uses a random `O_EXCL` temp, `fsync`, a rename under the pin, and a post-rename inode check; appends refuse `nlink !== 1` (a hard link at `events.jsonl` cannot modify outside bytes); the lock file is created inside the same pinned directory. Linux without `/proc/self/fd` fails closed for writes. **macOS and Windows are detective-only** (path-based atomic write plus a post-write check; a transient reverted swap can be missed): 0.13.0 pins the run root and every existing ancestor `(dev, ino)`, re-checks them before the mutation and in the post-check (`identity-changed`), and records the run-root identity in the signed manifest. A detected write is a report about an event that already happened, not a prevented one, and it is not rolled back. `OPENCODE_TEAMWORK_REQUIRE_PINNED_WRITES=1` (or plan `requirePinnedWrites`) refuses control-plane writes on a non-pinned host (`containment-mode`). The run-root `mkdir` is still path-based, and a same-UID ptrace is outside the boundary. See [ADR 0013](docs/adr/0013-containment-parity-and-the-detective-boundary.md).
@@ -422,7 +430,19 @@ opencode-teamwork verify --run-dir /path/to/run --public-key ... \
 # 0.18.0: verify a CI attestation signed by a key the run does not hold
 opencode-teamwork verify --run-dir /path/to/run --public-key ... \
   --attestation-public-key @ci-attestation.pub [--attestation-issuer <issuer>]
+
+# Fetch the issuer JWKS over HTTPS at verification time
+opencode-teamwork verify --run-dir /path/to/run --public-key ... \
+  --fetch-jwks https://token.actions.githubusercontent.com
 ```
+
+`--fetch-jwks <issuer>` fetches `/.well-known/openid-configuration` and then
+its `jwks_uri`. Both URLs must be `https:`, carry no credentials, resolve only
+to public addresses, and return a non-redirect 2xx; one 10 s deadline spans
+discovery, DNS validation and the JWKS fetch, and bodies are capped at 512 KiB.
+Loopback, private, link-local, and
+cloud-metadata issuers are refused on this network path; for an intranet
+issuer, or an offline copy, use `--oidc-jwks <file>`.
 
 Under a plan that recorded `requiredProvenance: "command"`, a PASS report must
 carry at least one programmatic check with an argv-only `command`, an exit code,
@@ -431,12 +451,33 @@ an untruncated output digest and a `headSha`; the engine writes a signed
 `provenance: claimed` and returns `UNKNOWN` (exit 2) — never `PASS`.
 `--rerun` creates a detached worktree at the report's commit, runs the argv with
 no shell and a minimal environment, enforces the recorded timeout, and compares
-the exit code and stdout+stderr digest. A changed digest is
+the exit code and stdout+stderr digest. Before any worktree is created it
+requires the manifest, `verify/rerun.json` and every report the record names to
+authenticate, and the rerun record to match the report projection; otherwise it
+emits `RERUN_UNTRUSTED` and executes nothing. A changed digest is
 `output-digest-mismatch`, a non-zero exit is `command-failed`, a missing binary
 is exit 2 `command-unavailable`, a timeout is `command-timeout`, and a shell line
 or escaping `cwd` is `command-refused`. The source checkout is hashed before and
 after; the worktree is removed unless `--keep-worktree`. `declared` runs keep the
 0.15 behaviour.
+
+**`--rerun` executes code.** The commands come from a signed file, but a
+signature proves who recorded them, not that they are safe. A detached worktree
+is a checkout, not a sandbox: the recorded process runs with your UID and can
+reach the rest of the machine. Run `--rerun` only against evidence you are
+willing to execute, and prefer a disposable container or VM for untrusted runs.
+`--rerun` is refused together with `--allow-unsigned`; re-execution requires an
+authenticated manifest and reports.
+
+A manifest `trustLevel` of `human-approved` or `ci-attested` is reported as
+`trust:approval` / `AUTH_APPROVAL_UNVERIFIED` (`UNKNOWN`), because offline
+verification has no approval enforcement. `requireWitness` without a usable
+receipt is `trust:witness` / `AUTH_WITNESS_UNVERIFIED` (`UNKNOWN`) offline. At
+completion, since 0.19.3 `final_verify` fails closed (`AUTH_WITNESS_UNVERIFIED`)
+when `requireWitness: true` has no configured witness public key instead of
+accepting an `unverified` receipt; an optional witness without a key is still
+recorded as `unverified`. The JSON `trust` object carries `runTrustLevel`,
+`approval.status` and `witness.status`.
 
 Since 0.18.0 a plan can set `attestationPolicy: "optional" | "required"`. A CI
 job runs `.github/workflows/attest.yml` (or `scripts/attest-sign.mjs`) under a
@@ -446,8 +487,12 @@ digest. `final_verify` refuses a `required` run without a valid attestation
 (`AUTH_ATTESTATION_MISSING/STALE/UNTRUSTED/COMMIT_MISMATCH/REPLAY`), and `verify`
 reports `attestation.status` plus `attested: true` with
 `--attestation-public-key`; without that key a present attestation is `UNKNOWN`
-(exit 2), never `PASS`. The attestation key must differ from `runKeyId`. See
-[ADR 0018](docs/adr/0018-ci-attestation.md).
+(exit 2), never `PASS`. The attestation key must differ from `runKeyId`.
+
+> **Experimental in 0.19.3.** CI attestation is not a working control until
+> OIDC JWKS verification, commit binding and expiry handling are fixed.
+> `attestationPolicy: "required"` may refuse a run, but it is not independent
+> assurance yet. See [ADR 0018](docs/adr/0018-ci-attestation.md).
 
 The signed `run.manifest.json` is the anchor: its `runNonce`, `runKeyId` and
 algorithm are covered by the envelope, and every other artifact is pinned to
@@ -460,8 +505,12 @@ verdict's report/audit/requirements digests. It also names the four
 Exit codes: `0` verified, `1` fail, `2` unverifiable (no key, unsigned legacy,
 HMAC without a secret, required git/index unavailable), `3` usage.
 `--fail-on-warning` promotes a warning to exit 1, and `--allow-unsigned`
-analyses a legacy run without ever upgrading it to `PASS`. `--json` is the
-stable machine report; the human table is rendered from it.
+analyses a legacy run that has no `run.manifest.json` without ever upgrading it
+to `PASS`; it is refused with `--rerun`. When a manifest is present, signed or
+not, `--allow-unsigned` has no effect: a missing artifact envelope is `FAIL`, as
+is a missing handoff-index envelope on a run whose manifest requires signed
+handoffs. `--json` is the stable machine report; the human table is rendered
+from it.
 
 **Honest limit.** A verifier holding only the public key and a read-only copy can
 recompute every byte digest, citation, branch binding and cross-artifact
@@ -488,6 +537,12 @@ The engine contract is tested against the real host, not only against a shim:
 | L2 | Real sessions and KV: plan/manifest v5, claims and recovery, handoff→report→victory binding, approvals |
 | L3 | Full workflows in real git worktrees: standard and strict gates, victory rejection and resume, limits, a two-process claim race, and the verifier CLI |
 
+The 153-case L0 parity/audit suite is a separate `l0-parity` check; it is not
+part of `npm test`. `pack-t4` builds and installs the npm tarball and loads it
+through the real host. `runtime-l1` installs the pinned `@opencode/cli@2.4.1`
+and fails unless the process E2E runs (118 pass, 1 skip, 0 fail). See
+[`docs/RELEASE-RUNBOOK.md`](docs/RELEASE-RUNBOOK.md) for the gate list.
+
 ```sh
 npm test                 # L0, no dependencies beyond Node
 
@@ -512,17 +567,30 @@ and [ADR 0017](docs/adr/0017-opencode-plugin-contract-and-test-strategy.md).
 
 Tracked in GitHub issues:
 
-- [#38](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/38) L4 live-model opt-in suite
-- [#39](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/39) nightly OpenCode host-drift job
-- [#40](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/40) apply and verify the admin hardening runbook
-- [#41](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/41) NFS harness and `doctor --locks/--unlock`
-- [#42](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/42) durable containment incident records
-- [#43](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/43) reference non-oracle signer
-- [#44](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/44) real OIDC claim validation for attestations
-- [#45](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/45) strict-input diagnostics and host-repair independence
-- [#46](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/46) packed-tarball release test
-- [#47](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/47) process-level CLI/server E2E harness
+- [#38](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/38) L4 live-model opt-in suite (harness and workflow exist; live runs remain opt-in)
+- [#40](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/40) apply and verify the admin hardening runbook on a real host
 - [#48](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/48) remaining Document Review and PDF corpus runs
+- [#51](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/51) document-review visual audit (per-page PNGs / `view_file`)
+- [#52](https://github.com/Heretek-AI/opencode-teamwork-v2/issues/52) per-dispatch model override
+
+0.19.2 shipped the critical `verify --rerun`/`--allow-unsigned` false-PASS fix
+recorded in [GHSA-jf59-xgq8-hjmv](https://github.com/Heretek-AI/opencode-teamwork-v2/security/advisories/GHSA-jf59-xgq8-hjmv),
+together with attestation input validation, fail-closed trust/evidence, and the
+Sonar/packaging checks. 0.19.3 adds the verifier-completeness (C-1) and central
+signed-run legacy-downgrade (H-1) fixes, rerun output-digest binding (M-1),
+`requireWitness` fail-closed behavior (M-4), and release-pipeline hardening
+(C-2); CI attestation is explicitly experimental until JWKS, commit and expiry
+handling are fixed. A new advisory is required for the 0.19.2 verifier defects;
+GHSA-jf59-xgq8-hjmv covers the earlier `--rerun` defect and is not reused. The
+earlier matrix (#39, #41–#47) is implemented and closed.
+
+> **Breaking for signed LEMMA, tournament and document-review runs.** Those
+> writers still emit plain JSON/text without `_auth` envelopes, so
+> `final_verify` now refuses `PASS` (`LEMMA_EVIDENCE_UNSIGNED`,
+> `TOURNAMENT_EVIDENCE_UNSIGNED`, `DOCUMENT_REVIEW_EVIDENCE_UNSIGNED`) until
+> route-evidence signing lands in Phase 2. Explicit `allowUnsignedLegacy` runs
+> keep the historical behaviour. The alternative — an authenticated verdict
+> over unauthenticated evidence — is worse.
 
 ## Model assignment
 
@@ -557,9 +625,13 @@ git tag v0.3.0 && git push origin main --tags
 npm config set //registry.npmjs.org/:_authToken=TOKEN
 npm whoami                       # verify
 npm pack                         # inspect the tarball
-npm publish --dry-run
-npm publish --access public
+npm publish --dry-run heretek-ai-opencode-teamwork-v2-<version>.tgz
+npm publish --access public heretek-ai-opencode-teamwork-v2-<version>.tgz
 ```
+
+Publish the packed tarball, not the directory: a directory publish can run
+repository lifecycle code. Release checks reject a repository `.npmrc` and a
+`publishConfig` entry that could redirect the registry, access or tag.
 
 For CI, this repo ships [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
 using **npm Trusted Publishing** (OIDC, no long-lived token). One-time setup:
@@ -569,19 +641,37 @@ using **npm Trusted Publishing** (OIDC, no long-lived token). One-time setup:
 2. On npmjs.com: **Package → Settings → Trusted Publisher → GitHub Actions**
    with user `Heretek-AI`, repo `opencode-teamwork-v2`, workflow `publish.yml`,
    and `npm publish` allowed.
-3. Release afterwards by tagging:
+3. Release afterwards by bumping **both** package versions and the changelog in
+   one commit, then tagging that commit (full steps in
+   [`docs/RELEASE-RUNBOOK.md`](docs/RELEASE-RUNBOOK.md)):
 
    ```sh
-   npm version patch        # bumps package.json + creates the vX.Y.Z tag
+   npm version patch --no-git-tag-version  # then bump plugins/opencode-teamwork/package.json
+   # add the ## [X.Y.Z] section to CHANGELOG.md, commit, then:
+   git tag "v$(node -p "require('./package.json').version")"
    git push --follow-tags   # triggers the workflow
    ```
 
+   `scripts/check-release-consistency.mjs` refuses a tag whose name does not
+   match the package version and a release whose two package versions or
+   changelog heading disagree.
+
 Release tags are provenance-checked before publish:
 `scripts/check-release-tag.mjs` requires the tag's commit to be an ancestor of
-`origin/main`. The historical `v0.6.0` and `v0.7.0` tags are sibling release
+`origin/main`. The runbook additionally requires a new release tag to point at
+the current tip of `main`; ancestry alone is not sufficient. The historical
+`v0.6.0` and `v0.7.0` tags are sibling release
 commits with trees identical to their `main` release commits; they predate this
 guard. Every future `v*` tag push must point at a commit already on `main`, and
 published tags are never rewritten.
+
+The complete gate list, the tag-only publish boundary, the dry-run path and the
+admin-owned ruleset settings are in
+[`docs/RELEASE-RUNBOOK.md`](docs/RELEASE-RUNBOOK.md). CI runs the 153-case parity
+suite as a distinct `l0-parity` job, the packed-tarball install as `pack-t4`,
+release consistency as `release-consistency`, and the full runtime suite with
+the pinned `@opencode/cli@2.4.1` in `runtime-l1`. The process E2E is expected to
+run; that job fails unless the only skip is the L4 live spec.
 
 Note that npm is restricting bypass-2FA tokens from January 2027, so Trusted
 Publishing is the durable option.
@@ -603,6 +693,10 @@ built-ins.
 | `/team-synthesize` | `team/orchestrator` | Run only the synthesizer step |
 | `/team-review` | `team/orchestrator` | Run the verifier on the current artifact |
 
+`/team-orchestrate`, `/team-propose`, `/team-falsify`, `/team-synthesize`, and
+`/team-review` are legacy v1 commands kept for compatibility; `/teamwork` is the
+supported entrypoint for new runs.
+
 ## Agents
 
 The 15 shipped agents are installed as markdown files under `~/.config/opencode/agents/team/`. Specialised roles are added strictly alongside the route that exercises them (never a 49-file flat roster or unused roles):
@@ -616,7 +710,7 @@ The 15 shipped agents are installed as markdown files under `~/.config/opencode/
 | `team/worker` | `worker.md` | `deepseek/deepseek-flash` | `small-focused`, `iterative-coding`, `distributed-coding` | — (`webfetch` denied when `network: denied`) | Implementation worker operating in an isolated git worktree |
 | `team/proof-worker` | `proof-worker.md` | `deepseek/deepseek-v4-pro` | `proof` (including LEMMA `lemmaMode: true`) & `massive-proof` | — | Formal and mathematical proof searcher / Lean 4 prover |
 | `team/proposer` | `proposer.md` | `deepseek/deepseek-flash` | `proof`, `massive-proof`, `/team-propose` | — | Parallel candidate generator with distinct proof/coding strategies |
-| `team/falsifier` | `falsifier.md` | `deepseek/deepseek-v4-pro` | `proof`, `massive-proof` (`FALSIFY_PRUNE`), `/team-falsify` | `edit`, `shell`, `subagent` | Read-only adversarial critic and tournament falser |
+| `team/falsifier` | `falsifier.md` | `deepseek/deepseek-v4-pro` | `proof`, `massive-proof` (`FALSIFY_PRUNE`), `distributed-coding` (strict wave), `/team-falsify` | `edit`, `subagent` (`shell` available, can modify files) | Adversarial critic and empirical challenger |
 | `team/synthesizer` | `synthesizer.md` | `deepseek/deepseek-v4-pro` | `distributed-coding` (merge conflict), `document-review` (`doc-synthesis`), `massive-proof` (`MERGE`), `/team-synthesize` | — | Candidate merger, tournament level aggregator, and cross-segment document synthesizer |
 | `team/verifier` | `verifier.md` | `deepseek/deepseek-v4-pro` | All routes (`readyForVerifier`, `teamwork_final_verify`, `/team-review`) | `edit`, `webfetch`, `subagent` (`shell` available, can modify files) | Independent verification forcing function |
 | `team/security-auditor` | `security-auditor.md` | `deepseek/deepseek-v4-pro` | All routes (`READY_FOR_SECURITY_AUDIT`, `teamwork_security_audit`) | `edit`, `webfetch`, `subagent` (`shell` available, can modify files) | Mandatory pre-merge security and integrity-mode auditor |
@@ -647,11 +741,53 @@ to the shared `BRIEFING.md` (see `docs/ARTIFACTS.md`).
 LEMMA is an explicit opt-in capability-gated route (`topology: "proof"`, `lemmaMode: true`) for Lean 4 proving and verification:
 
 - **Explicit opt-in only:** `teamwork_route` checks `document-review` first, requires an explicit Lean 4 prove/formalize/verify/check request in prose, ignores instructions inside fenced code blocks, and routes unrequested `.lean` or Lean-syntax tasks to `distributed-coding` (never `proof`).
-- **Pre-spending toolchain gate:** Requires user-installed **Lean 4** (`lean` and `lake` via `elan`) and the **LEAP CLI** (`leap`) on `PATH`; the legacy `leap-tools` name is also accepted. If any is missing, `teamwork_plan` refuses **before `mkdir`** (zero run files created, zero budget spent) and prints install instructions for both.
+- **Pre-spending toolchain gate:** Requires user-installed **Lean 4** (`lean` and `lake` via `elan`) and the **LEAP CLI** (`leap`) on `PATH`; the legacy `leap-tools` name is also accepted. If any is missing or unusable, `teamwork_plan` refuses **before `mkdir`** (zero run files created, zero budget spent), writes `PREREQUISITES.md` at the repository root recording the `MISSING`/`OUTAGE` probe verdict (the file is only written on failure; `READY` is not written), and prints install instructions for both; `leap doctor --offline` reports the same verdicts, except that a `LEAN_PROJECT_DIR`-only failure (no local Lake project) is a warning and does not block.
   - Install the pinned CLI with `pipx install git+https://github.com/billkunghappy/LEAP-CLI@afc016d23579d8236050a157fe6cac8f17b13096` (the `leap-tools` PyPI package does not exist). `leap lean` is the optional full Mathlib setup (~11 GB, 10–20 minutes); LEMMA verification needs only core Lean, no Mathlib.
 - **Bounded verification:** Phase 0 formalization (`problem_draft.lean` → `team/formalization-reviewer` `APPROVE` → `problem.lean`), bounded lemma tree (`maxDepth <= 3`, `maxWidth <= 4`, `maxNodes <= 24`, `maxRetries <= 4`), real `lean`/`lake` execution via `teamwork_lemma_verify` rejecting `sorry`/`admit`/unauthorized `axiom` even on exit `0`, and final `FAITHFUL` check before `teamwork_final_verify`.
 - **Declaration and axiom binding:** each node records its Lean `declaration` and `statement`. Before a node becomes `proved`/`disproved`, the attempt must declare that name and type (comments, strings, and syntax quotations are masked; duplicate/namespaced/`private`/`protected` declarations fail closed). The verifier then runs `#print axioms <declaration>` and records `declaration`, `declarationType`, `axiomDependencies`, and `unauthorizedAxioms`, accepting only `Classical.choice`, `propext`, `Quot.sound`, plus axioms approved once at plan time via `lemmaPolicy.allowedAxioms` (persisted in `lemma/manifest.json`). `sorryAx` is always rejected, and `#`/`logInfo`/`dbg_trace`/`trace`/`run_cmd`/`println`/`IO.`/`set_option trace` probe-hijacking attempts fail closed. Node statement/declaration metadata is immutable after a PASS; `teamwork_final_verify` re-checks stamped metadata before accepting a run.
 - **Known limits:** binding compares the elaborated type text lexically (binder/negation spellings normalized), not semantic equality; the transitive-axiom allowlist is approved at plan time (`lemmaPolicy.allowedAxioms`) and persisted in `lemma/manifest.json`, never caller-supplied at verify time; and the live Lean path is not exercised on hosts without `lean`/`lake`/`leap` (the E2E test skips loudly, while stub tests cover the control flow). CI installs core Lean + the LEAP CLI (no Mathlib) so the live E2E runs on every relevant pull request.
+
+## Prerequisites and troubleshooting
+
+Both capability-gated routes check their tools **before** creating a run and, on
+failure, write `PREREQUISITES.md` at the repository root recording the probe
+verdict (`MISSING` or `OUTAGE`) instead of spending budget. The artifact is only
+written when the probe fails; `READY` is not written.
+
+**PDF document review.** PDF ingestion needs Python 3 with `pypdfium2` and
+`Pillow` on `PATH`:
+
+```sh
+python3 -m pip install pypdfium2 Pillow
+python3 -c "import pypdfium2, PIL; print('ok')"
+```
+
+A failed probe is `MISSING` (not installed) or `OUTAGE` (installed but
+unusable). Plain-text and Markdown review need neither. `READY` means the probe
+ran, not that every page was extracted: check `extractionStatus` in
+`document-review/manifest.json` and the gap report in `DOCUMENT_TEXT_MAP.md`
+rather than assuming missing text is absent from the source.
+
+**LEMMA (Lean 4).** Requires `lean` and `lake` (via `elan`) plus the LEAP CLI
+(`leap`; legacy `leap-tools` is accepted):
+
+```sh
+elan toolchain install stable
+pipx install git+https://github.com/billkunghappy/LEAP-CLI@afc016d23579d8236050a157fe6cac8f17b13096
+leap doctor --offline
+```
+
+A missing tool refuses the plan before `mkdir`; install it and re-run. The probe
+runs `leap doctor --offline`, so it needs no network and does not download
+Mathlib. Its verdicts are `READY`, `WARN`, `MISSING`, or `OUTAGE` (`OUTAGE`
+means installed but not usable). A `LEAN_PROJECT_DIR`-only failure means there
+is no local Lake project: core Lean and the LEAP CLI are still usable, so it is
+a warning and does not block. `leap lean` (Mathlib, ~11 GB) is optional and not
+needed for LEMMA verification.
+
+`PREREQUISITES.md` is a diagnostic record: deleting or editing it does not
+install anything, and `READY` does not prove the toolchain will succeed on
+every input.
 
 ## High-assurance deployment
 
@@ -668,8 +804,9 @@ documented separately:
   that turns a command signer from an oracle into a policy-enforcing signer.
   0.14.0 sends v2 (with `runId` and a derived `approvalRef`) when
   `OPENCODE_TEAMWORK_SIGNER_APPROVAL_DIR` is set, and the exact v1 request
-  otherwise. The signer itself is not shipped: it must be built and installed,
-  and a version mismatch fails closed with `AUTH_SIGNER_UNAVAILABLE`.
+  otherwise. A Rust reference signer is in [`signer/`](signer/) but is **not
+  shipped in the npm package**: review it, build it, install it, and own its
+  policy. A version mismatch fails closed with `AUTH_SIGNER_UNAVAILABLE`.
 - [`scripts/hardening-check.sh`](scripts/hardening-check.sh) — a read-only
   Linux verifier that prints `PASS`/`FAIL`/`UNKNOWN` per probe. It never
   modifies the host; `UNKNOWN` is not a pass.

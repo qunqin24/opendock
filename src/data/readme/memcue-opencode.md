@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.4`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.5`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.5 | 9 | 0.40.5 | 0.40.5 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.5 (`hermes-agent` >=0.17.0) |
 | 0.40.4 | 9 | 0.40.4 | 0.40.4 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.4 (`hermes-agent` >=0.17.0) |
 | 0.40.3 | 9 | 0.40.3 | 0.40.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.3 (`hermes-agent` >=0.17.0) |
 | 0.40.2 | 9 | 0.40.2 | 0.40.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.2 (`hermes-agent` >=0.17.0) |
@@ -331,6 +332,16 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.5: retire explicitly resolved pitfalls (#802, #803)
+
+- Dream accepts `kind: "resolved"` when the packet explicitly records that a problem was fixed, a workaround is no
+  longer needed, or a replacement superseded the old behavior. `by` is optional when the fact's own text carries that
+  evidence and otherwise names another fact in the group; duplicate and outdated retirement rules are unchanged.
+- Native integrations now narrow pitfall capture to reproducible failures with a verified cause and fix or workaround
+  that remain useful in a fresh checkout. One-off incidents and defects resolved by the current task are excluded.
+- Update the binary and installed plugins together. The fact-base schema stays at 9; no migration is needed from
+  0.40.4.
 
 ### 0.40.4: Kimi Code support and fresh Pi snapshots (#795, #798)
 
@@ -1425,10 +1436,11 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
-- **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
-  `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
-  machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
-  fact; a retired fact stays in the history.
+- **Retire** a fact of a group as a duplicate, as contradicted, or as explicitly resolved. For `duplicate` and
+  `outdated`, name the fact that covers it (`by`). A `resolved` retirement needs no `by` when the fact's own text
+  records the fix; otherwise `by` names the grouped fact supplying that evidence. Of two duplicates the one with the
+  smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same copy and never
+  retire both. Every group keeps at least one fact; a retired fact stays in the history.
 - **Correct** a fact of a group with text built only from the facts of the group. Only the replacement content is written; it triggers no expansion or translation call.
 
 A duplicate learnt in another project than the fact that stays is kept (#607): a fact that holds in two repositories

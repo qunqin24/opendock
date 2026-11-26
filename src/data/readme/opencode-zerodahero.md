@@ -81,6 +81,10 @@ For one project only, save it to `.opencode/agents/second-reviewer.md` in that p
 instead. Without the agent, `/second-review` runs in your current agent, and the skill's
 instructions are the only guard against edits.
 
+An agent file does not update with the plugin. Download it again after each release that
+changes it. 0.7.0 does: the agent now denies `rg --pre`, which runs any command, and
+allows only `git branch --show-current` instead of every `git branch` form.
+
 ### Plan capture (optional)
 
 ```text
@@ -93,13 +97,13 @@ without a path. The folder ignores itself, so it never shows up in `git status`.
 
 ## Skills
 
-| Skill | What it does |
-| --- | --- |
-| `glossary` | Checks the domain terms a branch introduces against the codebase and the glossary, asks you to confirm each word, then renames and records them. |
-| `human-review` | Prepares a layered review that you walk yourself: short purpose, design, flow, and test-name docs, then the full diff in tuicr. It writes a [korin](https://github.com/zerodahero/korin) wizard pinned to one range, so every run shows the same thing. |
-| `plan-review` | Red-teams a plan in plan mode with an opencode reviewer over several rounds, and records every finding in a ledger at the end of the plan. You see only the decisions that need you. |
-| `review` | Reviews the branch with the `code-reviewer` agent, merges any second reviews, and triages every finding into should fix, could fix, out of scope, and skip. |
-| `second-review` | An independent review from another harness or model. It writes its findings to a file for `/review` to merge. It edits nothing else and runs no tests. |
+| Skill           | What it does                                                                                                                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `glossary`      | Checks the domain terms a branch introduces against the codebase and the glossary, asks you to confirm each word, then renames and records them.                                                                                                        |
+| `human-review`  | Prepares a layered review that you walk yourself: short purpose, design, flow, and test-name docs, then the full diff in tuicr. It writes a [korin](https://github.com/zerodahero/korin) wizard pinned to one range, so every run shows the same thing. |
+| `plan-review`   | Red-teams a plan in plan mode with an opencode reviewer over several rounds, and records every finding in a ledger at the end of the plan. You see only the decisions that need you.                                                                    |
+| `review`        | Reviews the branch with the `code-reviewer` agent, merges any second reviews, and triages every finding into should fix, could fix, out of scope, and skip.                                                                                             |
+| `second-review` | An independent review from another harness or model. It writes its findings to a file for `/review` to merge. It edits nothing else and runs no tests.                                                                                                  |
 
 `human-review` needs `korin` 0.1.2 or later, `tuicr`, and either Plannotator or `nvim` on
 the `PATH` when you run the wizard. Run it from the repo root with `korin run
@@ -113,6 +117,16 @@ a gitignore.
 `glossary` uses [Plannotator](https://github.com/backnotprop/plannotator) for the review
 step when it is installed. Without it, the skill asks through Claude Code's question
 prompts instead.
+
+## Output styles
+
+The plugin ships one output style, `neurospicy`. Select it with `/output-style` and pick
+`zerodahero-skills:neurospicy`.
+
+`neurospicy` shapes replies for a reader with ADHD or a similar working-memory load. Replies
+lead with the point, use plain short sentences, and end with one concrete next step. Long
+tasks repeat their full progress every phase, and tangents collect in one group at the end.
+See [`output-styles/neurospicy.md`](output-styles/neurospicy.md) for the full rules.
 
 ## Second review
 
@@ -251,6 +265,11 @@ Base ref: `refs/heads/dev`.
 | copy, a heading, an ARIA role, a test id | `smoke-tests/tests/` |
 | a table or column | `database/alembic/versions/` |
 ```
+
+## Changelog
+
+Both plugins and the opencode package release together at one version. See
+[CHANGELOG.md](CHANGELOG.md) for what each release changed.
 
 ## License
 

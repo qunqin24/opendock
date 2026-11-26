@@ -11,6 +11,18 @@
 
 > ⚠️ **风险声明**：本插件通过逆向非公开协议使用 JetBrains 的商业服务，不受 JetBrains 支持，可能随时失效。自动化/脚本化使用可能违反 [JetBrains AI Service Terms](https://www.jetbrains.com/legal/docs/terms/jetbrains-ai-service/)。请仅用于你自己的账号，风险自负。
 
+## 作者与贡献
+
+本项目是 [aqiu817/magpie-junie](https://github.com/aqiu817/magpie-junie) 的 fork，在此之上适配了新协议并补齐 agent 能力。各阶段贡献：
+
+| 阶段 | 作者 | 内容 |
+|---|---|---|
+| 原版 v0.1.0（2026-11-24） | [@aqiu817](https://github.com/aqiu817) | 最初的 Junie CLI headless 桥接方案：Windows 路径 / DPAPI 凭据、`bridge-server.mjs`、模型表、鉴权与代理基础（`constants.mjs` / `fetch.mjs` / `proxy.mjs`），以及"免费档需借 CLI 的 junie-lite 通道出字"的核心结论 |
+| GPT-6 Luna 直连适配（v0.2.0–v0.2.1） | [@Bemly](https://github.com/Bemly) | 逆向新版 CLI 4171.6 的 `/v1/responses` 协议（`X-Forced-License-Free: 2` + `gpt-6-luna`），实现**无需 CLI 的免费档直连**；macOS Keychain 凭据读取、跨平台 CLI 路径、浏览器/refresh-token 登录、多账号 |
+| Agent 与流式能力（v0.2.2–v0.2.9） | [@Bemly](https://github.com/Bemly) | 工具调用双向转换（含并行、历史）、真流式 SSE 与 SSE 解析加固、usage 与提示缓存透传、多模态/识图声明、`reasoning_content`、`refusal`、`finish_reason` 语义、错误帧、auth 边界加固 |
+
+原版 4 个提交完整保留在本仓库历史中；作者署名见各提交，v0.2.0 根提交另带 `Co-authored-by: aqiu817`。
+
 ## 登录方式
 
 给 `junie` 添加账号时可选（支持**多个账号同时接入**，由 magpie 管理轮换）：

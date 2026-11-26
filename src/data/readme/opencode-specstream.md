@@ -21,7 +21,7 @@ Ask for any dataset in plain words, and SpecStream builds it from the entire liv
 
 | Product | What it does | Price |
 | --- | --- | --- |
-| [Search API](https://specstream.ai/search-api) | `GET /v1/web-search`. The most accurate web search API in the world: 97.9 F-score on all 1,000 SimpleQA Verified questions and 64.0 item F1 on all 200 WideSearch tasks ([scores and method](https://specstream.ai/benchmarks)). Answers a question from the live web in seconds. | $5 per 1,000 searches, $1 per 1,000 with `speed=fast` |
+| [Search API](https://specstream.ai/search-api) | `GET /v1/web-search`. The most accurate web search API in the world: 99 F-score on all 1,000 SimpleQA Verified questions and 64.0 item F1 on all 200 WideSearch tasks ([scores and method](https://specstream.ai/benchmarks)). Answers a question from the live web in seconds. | $5 per 1,000 searches, $1 per 1,000 with `speed=fast` |
 | [Extract API](https://specstream.ai/extract-api) | `POST /v1/extract`. The main text of up to 20 web pages, PDF, Word or Excel files a call. The MCP tool is `read_pages`. | $0.80 per 1,000 pages. A page with no text is not charged. |
 | [Deep Search](https://specstream.ai/deep-search) | Ask in plain words. Get every match on the live web, in structured rows. It also enriches a list you have and monitors for change. | 5¢, 15¢ or $1 a row |
 
@@ -140,6 +140,7 @@ exa = Exa(api_key=os.environ["SPECSTREAM_API_KEY"], base_url="https://api.specst
 [![npm](https://img.shields.io/npm/v/@specstream/sdk)](https://www.npmjs.com/package/@specstream/sdk)
 [![n8n node](https://img.shields.io/npm/v/n8n-nodes-specstream?label=n8n%20node)](https://www.npmjs.com/package/n8n-nodes-specstream)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-ai.specstream%2Fspecstream-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=ai.specstream)
+[![SpecStream MCP server](https://glama.ai/mcp/connectors/ai.specstream/specstream/badges/score.svg)](https://glama.ai/mcp/connectors/ai.specstream/specstream)
 [![Add to Replit](https://replit.com/badge?caption=Add%20to%20Replit)](https://replit.com/integrations?mcp=eyJkaXNwbGF5TmFtZSI6IlNwZWNTdHJlYW0iLCJiYXNlVXJsIjoiaHR0cHM6Ly9hcGkuc3BlY3N0cmVhbS5haS9tY3AifQ==)
 
 This repository holds what you install around SpecStream: MCP client setup, agent plugins and skills, SDKs, the n8n node, a GitHub Action, and examples. The product itself runs at [specstream.ai](https://specstream.ai). Licensed MIT.
@@ -517,6 +518,24 @@ Each delivered row costs 5 cents, 15 cents or $1 depending on how much it needs,
 Four skills in [`skills/`](skills) teach an agent this order and where to stop and ask: `compile`, `review-work`, `approve-work`, `continue-work`.
 
 The Search API and Extract API are one call each, `search_web` and `read_pages` on MCP. The `search-web` and `extract-pages` skills teach them.
+
+## Browser sessions
+
+The same MCP server gives your agent a real browser, for a page that needs one: a form, a click, a page drawn by scripts. There is nothing more to install. Once the server is connected, these tools are in the list.
+
+- `open_browser` opens a Chromium browser on SpecStream's server and returns a `session_id`.
+- The `browser_` tools (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_take_screenshot` and the others) run one step each in that session.
+- `close_browser` ends the session and settles its charge.
+
+A session costs $0.10 an hour, charged by the second, and $1 per 1,000 steps. The agent asks you before it opens one.
+
+In Cline, one command connects the server, and you sign in through your browser:
+
+```sh
+cline mcp install specstream --transport http https://api.specstream.ai/mcp
+```
+
+An agent that installs SpecStream for you can follow [llms-install.md](llms-install.md). For the text of a page at a known address, `read_pages` is faster and cheaper.
 
 ## SDKs and command line
 

@@ -15,6 +15,7 @@
 - **不误伤字符串**：`echo rm foo`、`'rm ...'`、`"rm ..."`、`confirm` 之类不会被改写；引号与转义都被正确解析。
 - **跨平台后端**：优先使用 macOS 的 `trash`、Linux 的 `trash-put` / `gio trash`。
 - **内置回退，无需安装**：找不到上述后端时，插件会自动生成一个纯 `sh` 的废纸篓脚本作为后端，开箱即用。
+- **拦截绕过永久删除的操作**：拒绝清空废纸篓或绕开 `rm` 的删除命令（见[安全边界](#安全边界)）。
 - **零运行时依赖**：插件只使用 Node 内置模块，单文件即可运行。
 
 ---
@@ -39,6 +40,22 @@ sudo rm -rf /tmp/x               ->  sudo rm -rf /tmp/x (不变)
 ```
 
 > 出于安全考虑，`sudo rm ...` 不会被改写（配置里通常也应直接禁用 `sudo`）。
+
+---
+
+## 安全边界
+
+插件的承诺是：**AI 删除的任何东西都不该是永久的**。有些命令无法安全改写为“移入废纸篓”，插件会直接拒绝执行（钩子抛错，命令不会运行）：
+
+- **清空废纸篓**：`osascript … empty trash`、`trash-empty`、`gio trash --empty`
+- **删除废纸篓目录**：`rm -rf ~/.Trash`、`rm -rf ~/.local/share/Trash`
+- **绕过 `rm`**：绝对路径（`/bin/rm`、`/usr/bin/rm`）、`busybox rm`
+- **其他永久删除**：`unlink`、`shred`、`srm`、`wipe`、`find … -delete`
+- **间接删除**：`sudo rm`、`bash -c "rm …"`、Python 的 `os.remove` / `shutil.rmtree`、Node 的 `fs.rmSync` / `unlinkSync`
+
+可逆命令照常工作：`rm <路径>`（改写为移入废纸篓）、`trash <路径>`、`find … -exec rm {} +`（就地改写）。
+
+拒绝信息会说明原因，便于 AI 改用可逆方式，而不是换一个二进制继续尝试。
 
 ---
 

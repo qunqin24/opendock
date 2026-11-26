@@ -28,7 +28,7 @@ file.
 - Day-to-day reference (waivers, config, journals, install modes):
   [`docs/usage.md`](docs/usage.md)
 
-## TL;DR — try it in two minutes
+## TL;DR: try it in two minutes
 
 ```sh
 npx opencode-turnstile init      # install the plugin + pipeline agents
@@ -47,7 +47,7 @@ needs agents to dispatch against, so run `init` (or bring your own, see
 
 After restart the orchestrator dispatches the pipeline on your prompts,
 blocked work says `BLOCKED by turnstile: <reason>` instead of proceeding,
-and every decision is journaled — see it with
+and every decision is journaled; see it with
 `npx opencode-turnstile status`. To bypass the gates for a task, put
 `USER WAIVER:` in **your own prompt**.
 
@@ -57,7 +57,7 @@ You never invoke the pipeline stages directly. Start a task the way you
 already would, and the enforcement wraps it. The one habit to build: open
 with the planner.
 
-![turnstile — the enforced pipeline: planner → plan-reviewer → executor → test-runner → reviewer, with gates blocking every dispatch](docs/images/hero.svg)
+![turnstile, the enforced pipeline: planner → plan-reviewer → executor → test-runner → reviewer, with gates blocking every dispatch](docs/images/hero.svg)
 
 **1. Start a task by invoking the planner.** Paste an issue or a topic into
 your prompt and ask for a plan:
@@ -68,7 +68,7 @@ produce a plan with a decomposition, then run the pipeline through review.
 ```
 
 The planner writes a plan with numbered `AC-n` / `chunk-N` entries to
-`.opencode/plans/`. From here the pipeline drives itself — the `PIPELINE:`
+`.opencode/plans/`. From here the pipeline drives itself: the `PIPELINE:`
 status line on each result names the next stage:
 
 ```text
@@ -78,13 +78,13 @@ next=plan-reviewer — dispatch the next agent in this same turn
 
 **2. The plan gate fires.** The plan-reviewer must record `VERDICT: APPROVE`
 before any executor dispatch is allowed. A `VERDICT: BLOCK` sends the work
-back to the planner — nothing for you to do unless you want to override:
+back to the planner; nothing for you to do unless you want to override:
 
 ```text
 PLAN APPROVED: ship it as-is, the retry heuristic is good enough for now
 ```
 
-(in your prompt — see [Waivers and approvals](#waivers-and-approvals)).
+(in your prompt; see [Waivers and approvals](#waivers-and-approvals)).
 
 **3. The executor is gated on the approved plan** and must cite `chunk-N` /
 `AC-n` entries from the decomposition, so implementation traces to the plan.
@@ -132,14 +132,14 @@ hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 | Loop caps              | Per task: planner 3, plan-reviewer 3, test-runner 4, 16 total dispatches; exhaustion blocks and journals an `escalation` entry                                                                                                                                           |
 | Decomposition gate     | `executor` dispatches must cite `chunk-N` / `AC-n` when a plan has a `## Decomposition` block                                                                                                                                                                            |
 | Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                                                                                                          |
-| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                                                                                                              |
+| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty; the empty lists are the off switch)                                                                                                                               |
 | Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                     |
 | Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` blocks; a repeat attempt forces the interactive human ask                                                                                                                                                      |
 | Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                     |
 | Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors, per-session token/cost usage                                                                                                                                                             |
 | Journal concurrency    | Concurrent OpenCode instances share one journal safely: chained appends and the approval sidecar write under a per-file lock with an in-lock re-read; lock contention degrades to an unlocked write with a journaled `journal-lock:` warning, never blocking enforcement |
 | Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                              |
-| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                                                                                                         |
+| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot, de-tokenized so it can never re-parse as a marker                                                                                                                                          |
 
 A few behaviors worth knowing; the mechanics live in
 [`docs/architecture/gates.md`](docs/architecture/gates.md) and
@@ -152,7 +152,7 @@ A few behaviors worth knowing; the mechanics live in
   approval intact.
 - **Maintenance dispatches.** A bookkeeping-only executor dispatch (plan file
   named in the prompt, diff touching only docs/prose surfaces) skips the
-  plan-approval and decomposition gates — capped at 4 per plan; any
+  plan-approval and decomposition gates (capped at 4 per plan); any
   `src/`, `tests/`, `bin/`, `scripts/`, or config touch gates it as ordinary
   implementation work.
 - **Parent hands-on edits.** Direct `write`/`edit` calls in the parent (and
@@ -167,7 +167,7 @@ false` opts out (telemetry continues).
 ## Waivers and approvals
 
 Turnstile reads a waiver, a human plan approval, or an explicit task-retirement
-marker only from the user's own prompt — the plugin checks which channel the
+marker only from the user's own prompt: the plugin checks which channel the
 marker arrived through, never what an agent's dispatch prompt says.
 
 - **`USER WAIVER:`** in your prompt waives gates; naming agent stages scopes
@@ -175,13 +175,13 @@ marker arrived through, never what an agent's dispatch prompt says.
   credited reviewer verdict or your permission reply.
 - **`PLAN APPROVED:`** in your prompt approves the plan like a reviewer
   verdict, with human provenance; it replays across restart.
-- **`TASK DONE:`** in your prompt retires the session's active task — the
+- **`TASK DONE:`** in your prompt retires the session's active task; the
   next admitted prompt starts a fresh task scope. Child results and dispatch
   prompts never retire a task; only your prompt does. Config:
   `taskDoneMarker` renames the literal. Full semantics:
   [`docs/usage/configuration.md`](docs/usage/configuration.md).
 - **Permission escalation.** A retried landing or hands-on attempt escalates
-  to you through OpenCode's permission surface — reply `always`, `once`, or
+  to you through OpenCode's permission surface; reply `always`, `once`, or
   `reject`. Turnstile assumes a human answers these asks; an auto-accepting
   host (`session.permissions: "autoaccept"`) degrades them to delays, one
   reason `"block"` is the default.
@@ -203,7 +203,7 @@ survives a restart. Config: `planReviewAcceptMarker` /
 With `requirementsPhase: true`, an ungated requirements leg precedes the
 planner for non-trivial tasks: a `requirements` subagent returns a spec with
 numbered acceptance criteria and Open Questions; open questions come to you
-before planning. The phase is soft — its only enforcement surface is a loop
+before planning. The phase is soft: its only enforcement surface is a loop
 cap (`maxRequirementsRounds`, default 2). Config: `agents.requirements`
 renames the agent.
 
@@ -254,7 +254,7 @@ Capture is gated on `decisionLedger.enabled` (default `true`).
 
 Offline derived views over the decision ledger: classifies `prov:stated`
 prompts by origin, computes the chatter noise rate, and aggregates
-taste-drift signals. Purely read-time — journal rows are never rewritten, and
+taste-drift signals. Purely read-time: journal rows are never rewritten, and
 no derived value feeds gates.
 
     opencode-turnstile prov-views                 # every session
@@ -279,7 +279,7 @@ The parser accepts these markers wrapped in markdown backticks and credits
 them identically to the bare form; only a marker that does not match the
 fields above is treated as absent.
 
-Waiver and approval markers (must appear in the user's prompt, verbatim — a
+Waiver and approval markers (must appear in the user's prompt, verbatim; a
 dispatch prompt that merely contains the marker unlocks nothing):
 
 ```
@@ -295,18 +295,39 @@ Turnstile ships as the npm package
 Pick one way to install it; do not combine the plugin-array path with the
 CLI install:
 
-1. **Plugin only** — add `"plugins": ["opencode-turnstile"]` to
+1. **Plugin only**: add `"plugins": ["opencode-turnstile"]` to
    `~/.config/opencode/opencode.json` and restart. Gates enforce; agent
    definitions are not installed.
-2. **Full install** — `npx opencode-turnstile init` installs the plugin and
+2. **Full install**: `npx opencode-turnstile init` installs the plugin and
    the pipeline agent definitions into `~/.config/opencode`.
-3. **From a clone** — clone the repo and run `npm run init` (symlink mode)
+3. **From a clone**: clone the repo and run `npm run init` (symlink mode)
    so installed artifacts stay live against your edits.
 
 Turnstile has no npm lifecycle hooks: installing the package never writes to
-`~/.config/opencode` — that happens only when you run an explicit command.
+`~/.config/opencode`; that happens only when you run an explicit command.
 Modes, conflicts, the ledger, upgrades, uninstall, and per-agent model pins
 are covered in [`docs/usage/install.md`](docs/usage/install.md).
+
+### Verify the running version
+
+After upgrading, restart every OpenCode process that hosts sessions: the TUI
+or desktop app, and any persistent service (`opencode service restart`,
+`opencode serve`, ACP providers). A running host keeps the previously loaded
+plugin module, so sessions it serves keep enforcing the old version until it
+restarts, with no error to tell you.
+
+To confirm what a machine is actually running, read the newest `setup` row in
+the journal; it stamps the plugin version and load time:
+
+```sh
+grep '"type":"setup"' ~/.local/share/opencode/metrics/turnstile.jsonl | tail -1
+```
+
+If that row's version is older than the installed package, a process still
+runs the old module: restart it. `npx opencode-turnstile check` verifies
+files on disk, not the loaded module. The `opencode-turnstile status`
+command reports this gap directly (a `loaded plugin:` line, or `pluginLoad`
+in `--json`).
 
 Verify a clone with:
 
@@ -326,7 +347,7 @@ is described in [`docs/usage/field-tested.md`](docs/usage/field-tested.md).
 
 Defaults live in code (`src/config.ts`); override via
 `~/.config/opencode/turnstile.json`, environment variables, or both
-(precedence: defaults < file < env; config is read once at setup — restart
+(precedence: defaults < file < env; config is read once at setup; restart
 sessions to apply). Copy
 [`examples/turnstile.example.json`](examples/turnstile.example.json) as a
 starting point: every key is optional and matches the code defaults. (One
@@ -355,9 +376,9 @@ The knobs most people touch:
 | `tamperEvidence.enabled`     | `false`                | per-record SHA-256 hash chain over every journal row + Merkle epoch commits                                                                                        |
 
 Invalid keys are ignored, journaled, and summarized once into the session
-context; a malformed config file never breaks the host. The full table —
-every key, default, and environment variable (`TURNSTILE_TRACE`,
-`TURNSTILE_METRICS_DIR`, `TURNSTILE_CONFIG`) — is in
+context; a malformed config file never breaks the host. The full table
+(every key, default, and environment variable: `TURNSTILE_TRACE`,
+`TURNSTILE_METRICS_DIR`, `TURNSTILE_CONFIG`) is in
 [`docs/usage/configuration.md`](docs/usage/configuration.md);
 `schemas/turnstile.schema.json` ships with the package for editor
 completion.
@@ -365,7 +386,7 @@ completion.
 ## Show the evidence on your PR
 
 The journal is per-machine; your teammates never see it. Turn the last
-task's evidence into a shareable artifact — derived counts, canonical marker
+task's evidence into a shareable artifact: derived counts, canonical marker
 lines, and shas, never session IDs or prompts:
 
     npx opencode-turnstile evidence --task latest --out .turnstile/evidence.json
@@ -376,12 +397,12 @@ comment states what it is: a correlated claim, not proof. Re-emit and commit
 both files after every code push to a PR: the journal is per-machine, so CI
 can post the committed badge but never refresh it. To keep a stale badge from
 reading as current, the posting job compares the committed evidence's newest
-journaled timestamp (the plan/verdict, tests, or emit-time event — every
+journaled timestamp (the plan/verdict, tests, or emit-time event; every
 artifact write journals an `event:"emit"` row that lands in the artifact as
 `emittedAt`) with the latest commit that could have changed code, found by
 walking back from the PR head to the first commit touching anything outside
 `.turnstile/`. Badge staleness therefore means exactly one thing: a code
-commit landed and nobody has re-emitted since — the normal re-emit → commit →
+commit landed and nobody has re-emitted since: the normal re-emit → commit →
 push cycle is never flagged, on merge commits and mixed commits included.
 The emitter scopes its read to the task's session tree, so another agent's
 journal activity on the same machine cannot refresh the badge's freshness
@@ -390,7 +411,7 @@ workflow
 detail: validation runs on the pull request itself, while the comment posts
 from a trusted `pull_request_target` run; GitHub asks a maintainer to approve
 that run for a first-time contributor's fork PR, so an outside
-contributor's first badge can sit pending — the alternative is a job that
+contributor's first badge can sit pending; the alternative is a job that
 executes contributor code holding a write token.
 
 ![turnstile evidence posted on a pull request: one sticky comment with the plan verdict, the verified test counts, and the journal head sha](docs/images/pr-evidence.png)
@@ -414,21 +435,25 @@ tools remain unguarded. The full threat model:
   `turnstile.ts` summarizes it. CI keeps the marker examples in this README
   in sync with the parser regexes.
 - Host API is the OpenCode v2 promise-plugin shape
-  (`{ tool.hook, session.hook, permission.hook, event.subscribe }` — the
-  permission hook is registered when the host exposes it).
+  (`{ tool.hook, session.hook, permission.hook, event.subscribe }`, with the
+  permission hook registered when the host exposes it).
 - Host compatibility is checked at setup against the shipped range
   (`HOST_COMPAT` in `src/host-compat.ts`); see the matrix below.
 
 ### OpenCode compatibility matrix
 
-| OpenCode host       | turnstile (current) | Status                                                                        |
-| ------------------- | ------------------- | ----------------------------------------------------------------------------- |
-| ≥ 2.0.22, < 3.0.0   | 0.16.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0, 2.3.2) |
-| ≥ 3.0.0 or < 2.0.22 | all                 | Refuses to enforce at setup; upgrade turnstile                                |
-| version unreadable  | all                 | Enforces; one-time journal warning                                            |
+| OpenCode host       | turnstile (current) | Status                                                                               |
+| ------------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| ≥ 2.0.22, < 3.0.0   | 0.16.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0, 2.3.2, 2.4.1) |
+| ≥ 3.0.0 or < 2.0.22 | all                 | Refuses to enforce at setup; upgrade turnstile                                       |
+| version unreadable  | all                 | Enforces; one-time journal warning                                                   |
+
+2.4.1 verified for the token-usage surface; the 2.0.x event contract is
+preserved by construction and cannot be live-verified where only 2.4.1 is
+installed.
 
 On an incompatible host turnstile toasts the upgrade instruction and
-registers no hooks (a full no-op — fail-open):
+registers no hooks (a full no-op: fail-open):
 
 > turnstile 0.15.0 expects opencode >=2.0.22,<3.0.0; you're on 3.1.0 —
 > upgrade turnstile (npm i opencode-turnstile@latest) or pin opencode
@@ -438,16 +463,16 @@ reports when a newer turnstile is published.
 
 ## More documentation
 
-- [`docs/architecture.md`](docs/architecture.md) — the architecture
-  reference entry point: an overview plus links into the section files under
-  `docs/architecture/`, with rendered diagrams.
-- [`docs/modules.md`](docs/modules.md) — the authoritative module map: every
-  file under `src/` with its responsibility.
-- [`docs/journal.md`](docs/journal.md) — the journal reference entry point:
-  file layout, the entry-type catalog, rotation, replay, and tamper
-  evidence, each in its own section file under `docs/journal/`.
-- [`docs/usage.md`](docs/usage.md) — the usage entry point: a worked
+- [`docs/architecture.md`](docs/architecture.md): the architecture
+  reference entry point (an overview plus links into the section files under
+  `docs/architecture/`, with rendered diagrams).
+- [`docs/modules.md`](docs/modules.md): the authoritative module map (every
+  file under `src/` with its responsibility).
+- [`docs/journal.md`](docs/journal.md): the journal reference entry point
+  (file layout, the entry-type catalog, rotation, replay, and tamper
+  evidence, each in its own section file under `docs/journal/`).
+- [`docs/usage.md`](docs/usage.md): the usage entry point (a worked
   session, waivers and approvals in full, installing and maintaining, the
   complete configuration table, journals and retention, and the `status`
-  command.
-- [SECURITY.md](SECURITY.md) — journal sensitivity and trust model.
+  command).
+- [SECURITY.md](SECURITY.md): journal sensitivity and trust model.

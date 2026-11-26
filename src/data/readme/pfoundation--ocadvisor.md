@@ -460,7 +460,12 @@ The equivalent environment variable is
   `src/ocAdvisor.ts` holds the plugin implementation: it registers the
   `advisor` tool, injects a short selective-use instruction into eligible
   sessions via the `context` hook, and builds the transcript from the OpenCode
-  SQLite database. `src/typesafeGate.ts` and `src/typesafeState.ts` hold the
+  SQLite database. OpenCode 2.4+ stores assistant blocks in `session_part`
+  and leaves the message's inline content empty; `src/sessionParts.ts`
+  supplies those blocks to every reader (transcript, prior-call count, gate
+  state, requester detection, history, and the usage report). A transcript
+  whose assistant messages are all unreadable carries an explicit
+  "Transcript incomplete" note. `src/typesafeGate.ts` and `src/typesafeState.ts` hold the
   optional TypeSafe preflight. `src/benchmarkTypes.ts`, `src/artificialAnalysis.ts`,
   `src/benchmarkUpdate.ts`, `src/benchmarkStore.ts`, `src/benchmarkMatch.ts`,
   and `src/benchmarkEvidence.ts` hold the local Artificial Analysis snapshot,
@@ -498,6 +503,20 @@ The equivalent environment variable is
   accepts the pre-rename `ocAdvisor` session title. When the agent requests
   a different effort, the session is re-pinned to that variant first
   (a no-op when it already matches).
+- The advisor session is created in a directory the plugin owns
+  (`~/.local/share/opencode/ocadvisor/session`, or under `$XDG_DATA_HOME`),
+  not in the caller's location. Generation runs in the session's directory
+  and fails once it is gone, so a reused session whose directory no longer
+  exists (for example a removed worktree) is moved there first with
+  `session.move`, and a generation that still hits a missing directory is
+  retried once after that repair. A session in any other directory, or one
+  that cannot be moved, is replaced by a fresh advisor session.
+- The advisor session denies every tool (`permissions: [{ action: "*",
+  resource: "*", effect: "deny" }]`, applied on creation and to reused
+  sessions). Generation returns text only, so a tool call used to surface as
+  "Advisor returned an empty response"; denial also keeps the tool
+  definitions (about 37k tokens) out of every consultation. The prompt says
+  tools are unavailable as a second layer.
 - The generation timeout wraps only the model call, not the time a call
   spends queued behind another consultation. Oversized transcripts are
   capped to the configured `maxTranscriptChars` (keeping the recent tail)

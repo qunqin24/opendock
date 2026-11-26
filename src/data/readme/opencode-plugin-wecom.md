@@ -15,6 +15,7 @@ OpenCode V2 / [Yuri](https://github.com/yee94/yuri) 插件 Monorepo。`packages/
 | --- | --- | --- |
 | [`opencode-magpie-plugin`](packages/opencode-magpie-plugin) | [![npm](https://img.shields.io/npm/v/opencode-magpie-plugin.svg)](https://www.npmjs.com/package/opencode-magpie-plugin) | 在 OpenCode V2 中发现 Magpie Provider 与模型，内置价格表并自动启动本地网关 |
 | [`opencode-plugin-wecom`](packages/opencode-plugin-wecom) | [![npm](https://img.shields.io/npm/v/opencode-plugin-wecom.svg)](https://www.npmjs.com/package/opencode-plugin-wecom) | 零桌面客户端依赖的企业微信 / 大圆 A2A 只读插件（WorkBuddy 扫码换票、群聊摘要查询、可选 `@wecom/cli` 办公域桥接与 Yuri GUI 设置页） |
+| [`opencode-plugin-taptable`](packages/opencode-plugin-taptable) | [![npm](https://img.shields.io/npm/v/opencode-plugin-taptable.svg)](https://www.npmjs.com/package/opencode-plugin-taptable) | Yuri 需求跟进视图、SQLite 看板与维护 Skill |
 
 ## 快速使用
 

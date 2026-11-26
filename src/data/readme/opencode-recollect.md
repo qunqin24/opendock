@@ -47,6 +47,7 @@ Features:
 | [`github.com/dkmnx/recollect`](https://pkg.go.dev/github.com/dkmnx/recollect) | Go module   | `go get github.com/dkmnx/recollect@latest`                   | Engine library for facts, search, transactions, jobs, and prompt rendering.         |
 | [`recollect`](https://github.com/dkmnx/recollect/releases)                    | Go binary   | `go install github.com/dkmnx/recollect/cmd/recollect@latest` | JSON-RPC stdio engine, MCP server, and setup commands.                              |
 | [`opencode-recollect`](https://www.npmjs.com/package/opencode-recollect)      | npm package | `opencode plugin add opencode-recollect@latest`              | OpenCode plugin with the `memory` tool, `/recollect-*` commands, and event capture. |
+| [`dsh-recollect`](https://www.npmjs.com/package/dsh-recollect)                | npm package | `dsh plugin --profile <name> add dsh-recollect@latest`        | DeepSeek Harness plugin with the `recollect_memory` tool and a scoped memory snapshot. |
 
 ## Requirements
 
@@ -227,9 +228,19 @@ The OpenCode adapter starts the engine as a child process, exposes the
 `memory` tool, and registers the `/recollect-*` commands. Build the engine
 binary, then add the `opencode-recollect` package to `opencode.jsonc`, or use
 the adapter directory from a checkout. The adapter finds the binary from
-`binaryPath`, `RECOLLECT_BINARY`, `PATH`, or the default install directory.
-See [adapters/opencode/README.md](adapters/opencode/README.md) for the exact
+`binaryPath`, `RECOLLECT_BINARY`, the default install directory, or `PATH` as a
+fallback. See [adapters/opencode/README.md](adapters/opencode/README.md) for the exact
 config and verification steps.
+
+## DeepSeek Harness
+
+The DeepSeek Harness adapter gives each agent a `recollect_memory` tool and
+injects a memory snapshot bound to that agent's working directory. Add the
+`dsh-recollect` package to a DSH profile with `dsh plugin --profile <name> add
+dsh-recollect@latest`. The adapter finds the engine binary from `binaryPath`,
+`RECOLLECT_BINARY`, the default install directory, or `PATH` as a fallback.
+See [adapters/dsh/README.md](adapters/dsh/README.md) for the config and verification
+steps.
 
 ## Tests
 

@@ -1,5 +1,10 @@
 # opencode-chronoloop 🌀🌌🌠🎆
 
+> **⛔ DISCONTINUED — OUTDATED.**
+> This plugin was written for an older version of OpenCode, before the v2 rewrite. The plugin API it targets was removed, so it no longer loads, and it is outdated.
+> It is **superseded by built-in functionality**: native **automations** (OpenCode v2.4) — `every` for the repeating nudge plus `expires` for the wall-clock budget that was this plugin's whole point.
+> Kept for history only. Do not install.
+
 [![npm version](https://img.shields.io/npm/v/opencode-chronoloop?color=6b48ff)](https://www.npmjs.com/package/opencode-chronoloop)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 

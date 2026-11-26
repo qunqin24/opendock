@@ -1,12 +1,14 @@
-<a href="https://opc.fish"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/YE4IM/readme/main/project%20readme/assets/opc-fish-project-signature-web-dark.svg"><img src="https://raw.githubusercontent.com/YE4IM/readme/main/project%20readme/assets/opc-fish-project-signature.svg" alt="OPC.FISH 项目署名" width="720"></picture></a>
+<p align="center">
+<a href="https://opc.fish" title="OPC.FISH Project."><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/YE4IM/readme/main/project/assets/opc-fish-project-signature-web-dark.svg"><img src="https://raw.githubusercontent.com/YE4IM/readme/main/project/assets/opc-fish-project-signature.svg" alt="OPC.FISH 项目署名" width="720"></picture></a>
+</p>
 
 # magpie-ducoro
 
 [English](./README.md) | [**中文**](./README-zh-CN.md)
 
-在 Magpie 插件页面将模型、连接器、技能、指令和选定的子代理同步到 Ducoro。
+在 Magpie 中配置 Ducoro，让 Bot 跟随默认模型或使用单独分配的模型、连接器、技能和指令。
 
-[![npm 版本](https://img.shields.io/npm/v/magpie-ducoro)](https://www.npmjs.com/package/magpie-ducoro) [![MIT 许可证](https://img.shields.io/github/license/YE4IM/magpie-ducoro)](./LICENSE)
+[![GitHub 版本](https://img.shields.io/github/v/release/YE4IM/magpie-ducoro)](https://github.com/YE4IM/magpie-ducoro/releases/latest) [![MIT 许可证](https://img.shields.io/github/license/YE4IM/magpie-ducoro)](./LICENSE)
 
 [快速开始](#快速开始)
 
@@ -14,9 +16,11 @@
 
 *Ducoro 的同步设置页，使用示例数据。*
 
+[安装](#安装) · [用法](#用法) · [配置](#配置) · [故障排除](#故障排除) · [变更日志](#变更日志)
+
 ## 概述
 
-让 Ducoro 跟随 Magpie 的默认模型，或为不同 Bot 单独配置。保存前可以预览变更，保存后可核对 Ducoro 的写入、读回和会话加载状态。
+在 Magpie 的 Ducoro 插件页面管理同步。保存前可核对资源分配及撤销范围，保存后可查看 Ducoro 的写入、读回和会话加载状态。
 
 ## 环境要求
 
@@ -39,9 +43,10 @@ magpie plugin add github:YE4IM/magpie-ducoro#v0.4.11
 1. 在 Magpie 的「Agent」页面连接 Ducoro 并选好模型，再从侧边栏打开「Ducoro」。
 2. 在「同步设置」中检查连接标识、启用的资源类型和目标 Bot。需要单独分配时，打开「Bot 资源」。
 3. 点击「预览变化」核对新增项、撤销原因和首次创建网关连接的操作。再点击「预览并保存」并确认。保存设置后会启动同步。
-4. 在「同步状态」中查看已保存、已写入、已读回和会话加载结果，并检查待核实项。
+4. 在「同步状态」中核对写入和读回结果。要确认 Ducoro 已加载新配置，请在目标 Bot 中开始新会话，再查看会话加载状态。
 
-本次发布未在已配置的 Magpie 和 Ducoro 环境中验证安装及端到端同步。
+> [!NOTE]
+> 本次整理验证了诊断命令的入口。当前环境的插件实时诊断服务不可用，安装、首次同步及新会话加载尚未实测。
 
 ## 用法
 
@@ -96,7 +101,7 @@ npm run state:compact -- /absolute/path/to/state.json
 
 ## 变更日志
 
-[版本历史](./docs/CHANGELOG.md) · [最新发布说明](./docs/RELEASE-NOTES.md) · [GitHub Releases](https://github.com/YE4IM/magpie-ducoro/releases)
+[版本历史与各版发布说明](./docs/CHANGELOG.md) · [最新发布说明](./docs/RELEASE-NOTES.md) · [GitHub Releases](https://github.com/YE4IM/magpie-ducoro/releases)
 
 ## 许可证
 

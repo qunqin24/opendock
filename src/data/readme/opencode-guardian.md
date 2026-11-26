@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: V2 (>=2.3.0)](https://img.shields.io/badge/OpenCode-V2%20(%3E%3D2.3.0)-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
 [![V2 host baseline](https://img.shields.io/badge/Host%20baseline-v2.4.1%20verified-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v2.md)
-[![Tests: 913/913 Passing](https://img.shields.io/badge/Tests-913%2F913%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
+[![Tests: 965/965 Passing](https://img.shields.io/badge/Tests-965%2F965%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,17 +21,17 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> Guardian **v0.18.0** was verified on **25 November 2026** against live **OpenCode v2.4.1** on Node **26.13.1** and Bun **1.4.4**.
+> Guardian **v0.18.5** was verified on **26 November 2026** against live **OpenCode v2.4.1** on Node **26.13.1** and Bun **1.4.4**.
 
-- **Current Automated Verification:** **913 / 913** unit, security, mesh interoperability, project scope isolation, toast notification, and regression tests passing.
+- **Current Automated Verification:** **973 / 973** unit, security, mesh interoperability, project scope isolation, toast notification, and regression tests passing across 23 test files (`80` suites).
 - **Sandbox Scenarios:** **21 / 21** end-to-end multi-turn agent failure, combined multi-rule batching, and recovery scenarios verified.
-- **Live V2 Host Acceptance:** **10 / 10** real-host checks verified (packed `.tgz` in Node 26.13.1 + Bun 1.4.4, full V2.4.1 server hooks + `./rpc` + TUI slots/commands, and live `opencode v2.4.1` CLI host) plus **21 / 21** live real-LLM scenarios across all 14 rules, preflight, secret redaction, and multi-rule batching.
-- **Static Analysis:** standard and strict TypeScript gates pass (`--strict --exactOptionalPropertyTypes`); Oxlint reports **0 warnings / 0 errors** across 65 files.
+- **Live V2 Host Acceptance:** **10 / 10** real-host checks verified (packed `.tgz` in Node 26.13.1 + Bun 1.4.4, full V2.4.1 server hooks + `./rpc` + TUI slots/commands, and live `opencode v2.4.1` CLI host), plus live `opencode.db` replay across real V2 worker & manager sessions (`0` false positives across 31 live worker sessions) and **21 / 21** live real-LLM scenarios across all 14 rules, preflight, secret redaction, and multi-rule batching.
+- **Static Analysis:** standard and strict TypeScript gates pass (`--strict --exactOptionalPropertyTypes`); Oxlint reports **0 warnings / 0 errors** across 75 files.
 - **Low-I/O & Zero-Pollution Telemetry Architecture:** Default `violations` mode eliminates 90–95% of disk syscalls while tracking live in-memory inspection and secret-redaction counters, caching directory verification and nanosecond file stats (`statusFileCache`), bounding logs to 512 KiB, and isolating per-project audit logs in `~/.local/state/opencode-guardian/projects/<projectHash>/guardian-events.jsonl` (or `$XDG_STATE_HOME/opencode-guardian/...`) without polluting project `.opencode/` directories.
 
 Read the comprehensive [V2 Acceptance Report](docs/acceptance-v2.md) and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
-See the [0.18.0 release notes](CHANGELOG.md) for comprehensive R1–R5 security & lifecycle hardening, provider-agnostic dynamic MCP inspection, lease-token & per-round subagent capability enforcement, credentialed URL & object-key secret redaction, snapshot/overlap verification accuracy, remote TUI RPC status/reset resilience, and **21 / 21** live OpenCode `v2.4.1` verification across all 14 disciplines.
+See the [0.18.5 release notes](CHANGELOG.md) for the live production false-positive closure across compound/piped/heredoc verification evidence (`echo TC=$?`, `PIPESTATUS[0]`, clean `tail -N`), porcelain `git status --short` parsing, scoped subset test & subagent verification relay handling, balanced guard-clause test assertions, and structured tool retry/policy-refusal resolution in `task/completion-gate`.
 
 ## ✨ Key Highlights
 
@@ -176,7 +176,7 @@ In OpenCode V2, terminal UI widgets are automatically discovered from the packag
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.18.0
+▶ Guardian                 v0.18.5
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -190,7 +190,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.18.0
+▼ Guardian                 v0.18.5
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -494,7 +494,7 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the **v0.18.0** pure OpenCode V2 (`>=2.3.0`) runtime, wired via `setup(ctx)` hooks (`session.hook("prompt")`, `session.hook("context")`, `session.hook("experimental.idle")`, `tool.hook("execute.before")`, `tool.hook("execute.after")`, `shell.hook("create.before")`, `stream.hook`, `event.subscribe`), typed `./rpc` intervention endpoints (`opencode-guardian/rpc`), `opencode-mesh.state` RPC (`src/bridge.ts`), and `session.fork` / `session.forked` root-session isolation. Strict preflight is **opt-in** and evaluates recognized or configured tools and shell creations; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. Supported whole-file writes also use before/after observations for advisory content-loss detection; missing before hooks cannot reconstruct old file content. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the **v0.18.5** pure OpenCode V2 (`>=2.3.0`) runtime, wired via `setup(ctx)` hooks (`session.hook("prompt")`, `session.hook("context")`, `session.hook("experimental.idle")`, `tool.hook("execute.before")`, `tool.hook("execute.after")`, `shell.hook("create.before")`, `stream.hook`, `event.subscribe`), typed `./rpc` intervention endpoints (`opencode-guardian/rpc`), `opencode-mesh.state` RPC (`src/bridge.ts`), and `session.fork` / `session.forked` root-session isolation. Strict preflight is **opt-in** and evaluates recognized or configured tools and shell creations; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. Supported whole-file writes also use before/after observations for advisory content-loss detection; missing before hooks cannot reconstruct old file content. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
 For delegated `subagent` work, Guardian preserves capability-aware remediation isolation: synchronous write-capable subagents retain bounded remediation before parent release, read-only subagents avoid synthetic remediation loops, background subagents (`background === true`) are isolated from the foreground handoff barrier so sibling background subagents are never starved, and per-rule fingerprints distinguish substantive errors. Teardown remains idempotent across `AbortController` signals and LIFO hook rollback; background polling/cleanup intervals call `.unref?.()`, while active one-shot coalesce and retry timers keep the event loop alive until completion or abort.
 

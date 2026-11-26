@@ -1,6 +1,6 @@
 # agent-steward
 
-> OpenCode V1 (≥ 1.18.29) and V2 plugin for scheduling and orchestrating AI agent jobs — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. Runs on Windows, macOS and Linux. Free and open source (MIT).
+> Local-first agent orchestration framework with an OpenCode V1 (≥ 1.18.29)/V2 plugin as its current entry point — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. The same core is also available via MCP, CLI and standalone mode. Runs on Windows, macOS and Linux. Free and open source (MIT).
 
 [![CI](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/agent-steward/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/agent-steward.svg)](https://www.npmjs.com/package/agent-steward)
@@ -78,7 +78,7 @@ originals.
 
 ## Install
 
-Requires OpenCode V1 ≥ 1.18.29 or V2, and Node.js 22.22+ (node:sqlite and chokidar 6 require Node.js 22.22+). See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for version support and the V1/V2 surface (GUI and RPC are V2-only; TUI works on both).
+Requires OpenCode V1 ≥ 1.18.29 or V2, and Node.js 26.4+ (the `@opentui/core` 0.9.0 dev dependency requires Node.js 26.4+; node:sqlite and chokidar 6 need 22.22+). See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for version support and the V1/V2 surface (GUI and RPC are V2-only; TUI works on both).
 
 The config key differs between lines:
 
@@ -179,6 +179,8 @@ Agent jobs run with `opencode run --auto`, so their tool policy must be explicit
 | `legacy` | all ten actions | — |
 
 `deniedTools` always wins. A non-empty `allowedTools` is an allowlist for non-read-only actions: read, glob, grep and skill are added automatically (PL-133), so to forbid them you must list them explicitly in `deniedTools`. It can also explicitly re-enable an action denied by the policy (for example `shell`). `legacyShell: true` re-enables `shell` only under `hybrid`, for tasks migrated from older versions.
+
+Scope: the table above governs the **scheduled agent run**. The plugin's own tools (`schedule_task`, `run_task_now`, …) are not covered by `defaultPolicy` — `qualityGate`, `beforeScript` and `afterScript` run as shell commands in the wrapper whatever the policy says. A no-shell setup therefore has to restrict the plugin tools themselves through OpenCode tool permissions, not only the policy.
 
 Blocked actions are written to the audit journal as `tool.blocked` with `reason: "default-policy"` and a `hint`, and each run logs the active policy.
 
@@ -289,7 +291,7 @@ Tasks are **interactive only** by default: Task Scheduler starts them only while
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 128 test suites, 600+ checks
+npm test             # 131 test suites, 600+ checks
 npm run test:en      # same suites with the English locale
 ```
 
@@ -317,6 +319,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [docs/VERIFIED-CHAT.md](docs/VERIFIED-CHAT.md) — answers only with objective gate/source proof (S-5).
 - [docs/SCAFFOLD.md](docs/SCAFFOLD.md) — one-command scaffolding from gate-passed recipes (S-6).
 - [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
+- [docs/mcp-setup.md](docs/mcp-setup.md) — MCP stdio adapter, 34 tools plus `batch_call`.
+- [docs/ROUTER.md](docs/ROUTER.md) — routing, escalation and capability map.
+- [docs/OPEN-SPEC.md](docs/OPEN-SPEC.md) — open specification of the execution contract.
+- [docs/portability.md](docs/portability.md) — portable builds and cross-platform checks.
+- [docs/NATIVE-SCHEDULER.md](docs/NATIVE-SCHEDULER.md) — native scheduler integration mode.
+- [docs/EXECUTION-LOOP.md](docs/EXECUTION-LOOP.md) — execution loop internals.
+- [docs/SAFETY.md](docs/SAFETY.md) — safety policies and diagnostics channels.
 - [Documentation site (GitHub Pages runbook)](docs/FEATURES.md#documentation-site-github-pages) — how the docs are built and published.
 
 Translations: [Русский](docs/README.ru.md) · [中文](docs/README.zh.md).
@@ -339,6 +348,9 @@ File (`file`), git (`git`) and MCP-event (`mcp-event`) triggers are watched by t
 
 **Do jobs run when nobody is logged on?**
 On Windows, only if you opt in with `runWhenLoggedOff: true`: the task is then registered as `schtasks /ru SYSTEM` and runs in session 0 without your profile, mapped drives or saved credentials. The default is interactive only — the job runs while the user is logged on. Linux crontab always runs without a login; a macOS launchd agent runs only inside a user session.
+
+**Task creation fails with “Access is denied” on Windows?**
+Some machines (hardened OEM images, a revoked “Log on as a batch job” right) refuse task registration to a non-elevated process — both `schtasks.exe` and the COM API. The plugin then retries the same command with a Windows elevation prompt: you confirm once per operation, and OpenCode itself keeps running without admin rights. The retry covers only commands that change the scheduler (`/create`, `/delete`, `/change`, `/run`, `/end`), is skipped where no prompt could be shown (services, session 0) and is switched off with `AGENT_STEWARD_NO_UAC=1` (CI, headless). Declining the prompt leaves the original error text untouched. `cmd.exe` is not involved and the prompt is readable: it shows `schtasks.exe` (“Task Scheduler Command Line”) with the full arguments of the operation, so you confirm a specific scheduler change, not an opaque script. The elevated process's text output is not captured (ShellExecute has no pipes); failures are explained from the exit code. If the dialog goes unanswered for 2 minutes the retry gives up; a non-elevated process cannot close an elevated dialog, so dismiss it manually.
 
 **Which platforms are supported?**
 Windows (Task Scheduler), macOS (launchd) and Linux (crontab). Backend differences are documented in [CROSS_PLATFORM.md](CROSS_PLATFORM.md).

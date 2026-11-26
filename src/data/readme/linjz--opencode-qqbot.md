@@ -312,6 +312,15 @@ The QQ bridge is an adapter from "OpenCode interaction events" to "QQ interactio
 
 Principle: unsupported types always get explicit copy + desktop guidance, never silent drops; enhancements like the per-field wizard land with minimal intrusion.
 
+## Compliance, trademarks, and data responsibility
+
+- **Independent project**: this is an independent open-source project, not an official product of Tencent, QQ, or OpenCode. It is not sponsored, certified, or endorsed by them. References to official APIs, SDKs, semantics, or quota alignment describe platform documentation or behavioral alignment only.
+- **Platform rules**: deployers and users must review and comply with the applicable QQ Open Platform and OpenCode agreements, API terms, bot rules, content-safety requirements, and laws. Do not bypass authentication, access controls, quotas, permission approvals, content review, or sandbox and production restrictions. Feature availability depends on current platform rules and account permissions.
+- **Trademarks**: QQ, Tencent, OpenCode, and related marks belong to their respective owners. They are used only to identify compatibility and interoperability, not to imply official status, sponsorship, or endorsement. Do not use official logos or certification imagery without authorization.
+- **Data and AI output**: deployers must inform affected users how messages, voice, images, files, sessions, and logs are collected, transmitted, processed, and retained, and must obtain any required authorization or have another lawful basis. Avoid unnecessary sensitive personal information, credentials, or confidential content. AI output may be incorrect and must be reviewed, especially for approvals, dangerous actions, and professional matters. See [PRIVACY.md](./PRIVACY.md).
+- **License and liability**: this project is provided under the MIT License; the license and disclaimer in [LICENSE](./LICENSE) govern. Deployers remain responsible for their configuration, data processing, content, and use. Nothing in this section limits the rights granted by the MIT License or excludes liability that cannot be excluded by applicable law.
+- **Third-party notices**: upstream and bundled third-party attributions are preserved in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), including the derived reply-limiter implementation, QQ upstream projects, and bundled `ws` code.
+
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE) for the complete license and disclaimer.

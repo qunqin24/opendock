@@ -71,6 +71,11 @@ deepaicode/gpt-6-astra            # 仅 Responses 通道
 | `secretDir` | `""` | 桌面端凭据目录（留空自动探测） |
 | `lang` | `zh` | 界面语言（`zh` \| `en`） |
 | `debug` | `false` | 输出详细日志——只记录字段**名**，不记录值 |
+| `maxInputBytes` | `0`（关闭） | 可选护栏：外发请求 JSON 的 UTF-8 字节上限（按整形后实发计，含指令、历史、工具与图片）。超限本地返回 `400 context_length_exceeded`——不截断、不打上游、不触发车道探测。针对上游超长输入静默丢上下文的保守本机防线（[#11](https://github.com/aqiu817/magpie-deepaicode/issues/11)）；字节数不是 token 数，护栏不修复上游、也不压缩会话。 |
+
+例如 `magpie plugin options deepaicode '{"maxInputBytes":100000}'` 可启用保守的
+本机保护。超长输入上游可能静默压缩（头尾存活、中段丢失）；护栏把这种静默丢失
+变成显式的本地失败。
 
 ## 排查
 

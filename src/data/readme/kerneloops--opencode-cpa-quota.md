@@ -11,9 +11,12 @@ inference or changes CLIProxy configuration.
 
 - Every account in CLIProxy's `auth-files` inventory, including disabled
   accounts, unknown providers and accounts with no quota observations yet.
-- For each account: provider, a short pseudonymous ID (the shortest unique
-  SHA-256 prefix of CLIProxy's `auth_index`, at least four characters), status,
-  cooling/retry time and the number of model cooldowns.
+- For each account: provider, a short label from the auth file's e-mail (first
+  two letters of the local part and of the domain, e.g. `ma@ke`, with `·` and a
+  key prefix added if two accounts of one provider clash), status, cooling/retry
+  time and the number of model cooldowns. Without a usable e-mail the label is
+  the short pseudonymous ID (`#` plus the shortest unique SHA-256 prefix of
+  CLIProxy's `auth_index`, at least four characters).
 - Quota bars per window (for example **5 hour**, **7 day**, **7 day Opus**), with
   the percentage **remaining** and the time until reset. Expired windows are
   hidden rather than shown as full.
@@ -116,8 +119,9 @@ fields are ignored and a malformed window does not discard valid ones.
 
 ## Privacy
 
-The terminal receives only: pseudonymous account IDs, provider names (ASCII
-allowlist), status, cooldown counts and quota windows. E-mail addresses, file
+The terminal receives only: pseudonymous account IDs, four-character e-mail
+abbreviations (`[a-z0-9]` only), provider names (ASCII allowlist), status,
+cooldown counts and quota windows. Full e-mail addresses, file
 names, labels, tokens, account claims, raw response bodies and upstream error
 text stay on the server and are never displayed or logged. The IDs are
 pseudonyms, not a strong anonymity guarantee.

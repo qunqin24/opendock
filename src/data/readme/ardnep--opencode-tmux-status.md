@@ -25,8 +25,14 @@ Requires OpenCode V2, tmux, and a Nerd Font with Material Design icons.
    For Catppuccin, add these lines to your tmux config before the theme loads:
 
    ```tmux
-   set -g @catppuccin_window_number '#{?@opencode_status,#{@opencode_status},}'
-   set -g @catppuccin_window_current_number '#{?@opencode_status,#{@opencode_status},}'
+   set -g @opencode_unseen '#{&&:#{!=:#{@opencode_attention},},#{e|<=:#{@tab_last_visit},#{@opencode_attention}}}'
+   set -g @catppuccin_window_number '#{?@opencode_status,#[push-default]#[fg=#{?#{E:@opencode_unseen},#{E:@thm_red},default}]#{@opencode_status}#[default]#[pop-default],}'
+   set -g @catppuccin_window_current_number '#{?@opencode_status,#[push-default]#[fg=#{?#{E:@opencode_unseen},#{E:@thm_red},default}]#{@opencode_status}#[default]#[pop-default],}'
+
+   # Skip these if your config already has these visit-counter hooks.
+   if-shell -F '#{==:#{@tab_visit_counter},}' 'set -g @tab_visit_counter 0'
+   set-hook -g session-window-changed[90] 'set -gF @tab_visit_counter "#{e|+:#{@tab_visit_counter},1}" ; set -wF @tab_last_visit "#{@tab_visit_counter}"'
+   set-hook -g client-session-changed[90] 'set -gF @tab_visit_counter "#{e|+:#{@tab_visit_counter},1}" ; set -wF @tab_last_visit "#{@tab_visit_counter}"'
    ```
 
    This replaces the window number with the status icon. A terminal icon is shown when no status is set.
@@ -53,6 +59,13 @@ Requires OpenCode V2, tmux, and a Nerd Font with Material Design icons.
 - Stopped (pause)
 
 The indicator clears when OpenCode is idle or on its home screen.
+
+Completion, questions/permissions, failures and interruptions turn only the
+glyph red (using the tmux theme's `@thm_red`, not ANSI red) when they happen in a
+background tab. Visiting that tab restores its
+normal theme colour (black with the usual Catppuccin setup). Switching away
+doesn't turn it red again; a new attention state does. Updates in the currently
+viewed tab are already acknowledged. Tab names and backgrounds are unchanged.
 
 ## Preview and tests
 
