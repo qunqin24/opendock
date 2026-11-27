@@ -1,605 +1,157 @@
 <p align="center">
-  <img src="assets/hero.jpg" width="820" alt="Vitruvius — the engineering research agent">
+  <img src="assets/hero.jpg" width="820" alt="Vitruvius — engineering research that shows its work">
 </p>
 
 <h1 align="center">Vitruvius</h1>
 
+<p align="center"><strong>Engineering research that shows its work.</strong></p>
+
+<p align="center">
+  An open-source toolkit for coding agents that turns engineering questions into
+  evidence-backed briefs: sources opened, artifacts anchored, claims checked,
+  and uncertainty recorded.
+</p>
+
 <p align="center">
   <a href="https://adeerkhan.github.io/vitruvius/"><strong>Website</strong></a>
+  ·
+  <a href="ABOUT.md"><strong>About</strong></a>
+  ·
+  <a href="COMMANDS.md"><strong>Commands</strong></a>
+  ·
+  <a href="docs/EVIDENCE.md"><strong>Evidence</strong></a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/skills-27-green" alt="27 skills">
+  <img src="https://img.shields.io/badge/commands-27-green" alt="27 commands">
   <a href="https://github.com/adeerkhan/vitruvius/actions/workflows/ci.yml"><img src="https://github.com/adeerkhan/vitruvius/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/adeerkhan/vitruvius/actions/workflows/security-scan.yml"><img src="https://github.com/adeerkhan/vitruvius/actions/workflows/security-scan.yml/badge.svg" alt="Security Scan"></a>
 </p>
 
-<p align="center">
-  The engineering research agent. Named for Marcus Vitruvius Pollio, the Roman architect-engineer who wrote <em>De Architectura</em> — the first surviving treatise to treat architecture, civil engineering, machines, and materials as one discipline.
-</p>
+---
 
-<p align="center">
-  <strong>5 disciplines. 27 skills. Blind verification with a scored benchmark.</strong>
-</p>
+## Start with a decision
 
-<p align="center">
-  Verifier benchmark (20 adversarial cases + 5 deterministic PASS scoring fixtures, 5 disciplines): the latest checked-in adversarial run reports <strong>80% correct verdicts, 0 false approvals, 0 false blocks, and 1 conservative overcall</strong>; the scoring fixtures score <strong>5/5</strong>. The scorer now fails closed on missing, malformed, duplicate, or unknown results. Per-case variance remains material, so these are reported measurements, not certification (<a href="tasks/benchmark/RESULTS.md">RESULTS.md</a>). The latest pressure artifact reports <strong>4/5 held with one false approval</strong>; no false-block guarantee is claimed. The numbers are ours, weaknesses included — that is the point.
-</p>
+Ask a question that needs evidence:
 
-<!-- Demo GIF slot: record a real research run end-to-end before publishing — no fabricated demos. -->
-
-## Why Vitruvius?
-
-Vitruvius is an **engineering research agent** that runs a **discover → read → synthesize → verify → review** loop over engineering questions and artifacts — with auditable provenance throughout.
-
-Unlike generic web search, Vitruvius:
-- **Reads sources directly** — never infers from titles or memory
-- **Never fabricates** — every claim traces to a checkable source
-- **Records provenance** — research outputs are intended to have schema-validated `.provenance.md` sidecars; the current validator covers selected root/plan/draft paths, while nested and method-specific sidecars remain a known gap
-- **Flags uncertainty** — distinguishes `verified`, `inferred`, `blocked`, `unverified`
-- **Is measured** — the verifier runs against a scored adversarial benchmark plus deterministic PASS controls; the numbers are published even when unflattering
-- **Learns deliberately** — Habit captures only explicit, user-approved research preferences in a project-local store; it never silently rewrites agent instructions
-
-## Research Loop
-
-Every Vitruvius skill runs the same shared method:
-
-```mermaid
-flowchart LR
-    Plan --> Scale
-    Scale --> Gather
-    Gather --> Draft
-    Draft --> Cite
-    Cite --> Review
-    Review --> Deliver
-    Deliver --> Provenance[".provenance.md"]
+```text
+/engineering-research "Does this beam connection satisfy the governing shear check?"
 ```
 
-| Phase | What happens |
-|-------|--------------|
-| **Plan** | Define key questions, evidence needed, scale decision |
-| **Scale** | Direct search (simple) or subagent decomposition (complex) |
-| **Gather** | Read sources directly, record exact provisions |
-| **Draft** | Synthesize findings with inline citations |
-| **Cite** | Sweep every claim against sources |
-| **Review** | Blind verifier checks claim vs evidence (8 adversarial checks) |
-| **Deliver** | GOAL-CHECK gate (every ask re-derived from the original question, default NOT-DONE) → final output + provenance sidecar |
+Vitruvius opens the governing sources and your project artifacts, drafts a
+decision-first brief, runs an independent verification pass, and writes:
 
-## Measured Verification
+- `outputs/<slug>.md` — the brief, with findings and next actions;
+- `outputs/<slug>.provenance.md` — what was checked and what remains uncertain;
+- `outputs/<slug>-problem-anchor.json` — the hash-pinned link between claims,
+  artifacts, decisions, and negative coverage.
 
-The verifier is benchmarked, not asserted. Its checked-in results are on-disk, re-runnable artifacts with known control and variance limitations:
+If the evidence does not settle the question, the output says so.
 
-| Check | Result | Where |
-|-------|--------|-------|
-| Verdict correctness (20 adversarial cases × 5 disciplines) | Latest checked-in run: 80% correct, 0 false approvals, 0 false blocks, 1 conservative overcall; flaw-type accuracy is reported separately; variance is material | [RESULTS.md](tasks/benchmark/RESULTS.md) — residuals and limitations, not hidden |
-| PASS scoring fixtures (5 disciplines) | 5/5 parser/scorer fixtures; these are not independent verifier runs | [control cases](tasks/benchmark/controls/cases) |
-| Benchmark integrity | Missing, malformed, duplicate, and unknown result files fail closed | [benchmark scorer](scripts/benchmark-scoring.mjs) |
-| Integrity under persuasion (5 pressure cases: authority, sunk cost, time, reframe, pedantry) | Latest artifact: 4/5 held with one false approval; no false-block guarantee is claimed | [pressure suite](tasks/benchmark/pressure/README.md) |
-| Skill routing (28 baseline prompts, 4 E1 positives, 4 owner-negatives, 10 must-not-fire) | 28/28 rank-1, 4/4 top-k, 4/4 owner-negative, 10/10 must-not-fire | [routing evals](tests/routing/eval-routing.mjs) |
-| E1 evaluation pilot | 4 fixture-backed priority skills; positive top-k 4/4 and owner-negative 4/4; full 27-skill coverage remains open | [evals/catalog.json](evals/catalog.json) |
-| C1 fixed-case pilot | 3 local-only cases, 3 fresh subagent runs, independent review 3/3; host model cost unavailable | [evals/results/manifest.json](evals/results/manifest.json) |
-| GC1 GOAL-CHECK contract | deterministic positive/omitted-ask/repeated-gap fixtures; valid `NOT-DONE` is not promotable | [goal-check-contract.mjs](scripts/goal-check-contract.mjs) |
-| PR1 artifact closure | nested final/provenance, stale-byte, orphan, and path-escape fixtures | [artifact-closure.mjs](scripts/artifact-closure.mjs) |
-| V1 field-pilot contract | format and refusal tests only; no real external-source result claimed | [field-pilot README](evals/field-pilot/README.md) |
-| Baseline comparison (Vitruvius vs plain prompt, 10 cases) | fail-closed contract, deterministic scorer, and an isolated prompt/isolation runner; 1-case pilot flagged `shared-harness`; the 10 cases remain unmeasured | [baseline README](evals/baseline/README.md) |
-| Content trust | instruction-like source text is flagged; the isolated baseline runner refuses a contaminated directory | [content-trust.mjs](scripts/content-trust.mjs) |
-| Problem-anchor contract | anchors resolve to non-blank lines on disk; unanchored `repo` claims, uncited anchors, decisions with no finding, and empty negative coverage all fail closed | [problem-anchor-contract.mjs](scripts/problem-anchor-contract.mjs) |
-| Read-depth contract | `metadata`/`snippet` sources cannot support a `verified` claim; claims are capped by the section/page actually read; an unread portion makes an absence check `unverified` | [evidence-ledger.mjs](skills/engineering-research/scripts/evidence-ledger.mjs) |
-| Scholarly synthesis | consensus, disagreements, trajectories, records/reports/studies, and publication/retraction status are part of the output, not an optional appendix | [scholarly-synthesis.md](references/scholarly-synthesis.md) |
-| Structural contract (27 skills) | enforced in CI | [validate-contract.mjs](scripts/validate-contract.mjs) |
-| Provenance schema (selected sidecars, `inferred` derivation traces) | selected root/plan/draft checks plus deterministic generic closure fixtures; legacy local closure remains opt-in | [validate-artifacts.mjs](scripts/validate-artifacts.mjs) |
-| External comparison yardstick (into-the-unknown, 15 research tasks) | Referenced by pinned commit; no local run executed — requires model credentials (agent runs plus a GPT-6-Astra judge) | [into-the-unknown](https://github.com/prometheus-eval/into-the-unknown) (pinned commit) + Recording comparison work note below |
+## Why it is different
 
-Repository-only assets (not in the npm package): `outputs/`, `evals/` run
-records and `tasks/benchmark/results/`. These are development artefacts;
-run `npm run check:local-artifacts` against a clean outputs tree to reproduce.
+A general research assistant returns a plausible summary. Vitruvius returns a
+trail you can check.
 
-Reproduce:
+- **Read the source, not the snippet.** A claim is capped by how much of its
+  source was actually read.
+- **Ground repository claims in real bytes.** A `repo` finding resolves to a
+  hash-pinned `path:line`; an absence claim cannot hide behind an unrelated line.
+- **Verify independently.** The writer does not grade its own work; a blind
+  verifier checks the conclusion against the gathered evidence.
+- **Keep uncertainty visible.** `verified`, `partial`, `blocked`, `unverified`,
+  and `inferred` mean different things.
+- **End with a decision.** Every finding names what to change, what to measure,
+  what to defer, or why it is background.
 
-```bash
-# Run fresh blind cases; the runner exits nonzero if any expected verdict is missing
-bash tasks/benchmark/run-benchmark.sh
+## The research loop
 
-# Score checked-in results and deterministic PASS controls
-node scripts/score-benchmark.mjs tasks/benchmark/results tasks/benchmark/cases
-node scripts/score-benchmark.mjs tasks/benchmark/controls/results tasks/benchmark/controls/cases
-
-# Optional certification gate: also fail on any false approval or false block
-node scripts/score-benchmark.mjs --strict-quality tasks/benchmark/results tasks/benchmark/cases
-
-# Majority-of-N certification: aggregate independent runs and publish variance
-npm run benchmark:majority -- tasks/benchmark/results tasks/benchmark/results tasks/benchmark/results
-
-# Deterministic contract checks; these do not call a model
-npm run test:evals
-npm run test:goal-check
-npm run test:artifacts
-npm run test:field-pilot
-npm run test:problem-anchor
-npm run test:package-contract
-npm run test:package-consumer
-npm run test:input-gate
-npm run test:node
-npm run test:artifact-paths
-npm run test:docs
-npm run test:rejected-changes
-npm run test:majority
-node tests/routing/eval-routing.mjs
-node scripts/fixed-case.mjs case evals/cases/local-evidence-suite.json
-node scripts/fixed-case.mjs results evals/results/manifest.json evals/results
+```text
+Plan → Gather → Synthesize → Verify → Review → Goal-check → Deliver
 ```
 
-The E1/C1 subagent runs are on-demand evidence and are not part of `npm test`; the checked-in C1 bundle records their artifact hashes and independent grades. GC1, PR1, and V1 are deterministic contract checks; V1 still requires a real pilot record before any outcome claim. The problem-anchor contract is also deterministic: it proves a report is bound to the artifacts it studied, not that its claims are correct. When installed as a package, the same validators are available as `vitruvius-goal-check`, `vitruvius-artifact-closure`, `vitruvius-field-pilot`, and `vitruvius-problem-anchor`; `test:package-consumer` proves that by installing the packed tarball into a clean consumer. `test:input-gate` proves every standalone research skill declares the shared gate in `references/input-gate.md`. `test:majority` scores the verifier benchmark across independent runs, takes the per-case majority verdict, and publishes agreement and per-run residuals (`benchmark:majority` runs it on real result directories); a majority false approval fails the strict gate. OpenCode role adapters are rendered from `agents/*.md` by `installer/render.mjs`, so they cannot drift from the role contracts.
+1. **Plan** the question, artifacts, decisions, and evidence needed.
+2. **Gather** sources and record exact read depth and contradictory evidence.
+3. **Synthesize** a decision-first brief with inline citations and one lead
+   finding.
+4. **Verify** claims through a blind, fail-closed verifier.
+5. **Review** the verified artifact adversarially and re-check every original ask.
+6. **Deliver** the brief, provenance, and problem-anchor record.
 
-**Recording comparison work.** A local run used for comparison work against
-the empirical study records both references alongside the run — the paper
-([arXiv:2605.20668](https://arxiv.org/pdf/2605.20668)) and the benchmark
-repository
-([prometheus-eval/into-the-unknown](https://github.com/prometheus-eval/into-the-unknown)),
-pinned by commit — so a comparison result is attributed to a method revision
-instead of being reconstructed from memory later. The benchmark clone is
-fetched and pinned at commit `119415510777efabeb6d633c7eb17ff163e6b1e2`;
-tasks download with `python prepare_tasks.py` in that clone. No local
-comparison run has been executed — it requires model credentials (agent runs
-on the 15 tasks plus a GPT-6-Astra judge) — so the row above records the
-yardstick, not a result.
+The craft pass runs before delivery. It removes template prose and tests whether
+the report could have been written about any system, without changing claims.
 
-## Worked Examples
+## Install
 
-Three real runs — including one that ends in an honest **BLOCKED** — in
-[notes/examples.md](notes/examples.md), each grounded in artifacts you can
-open and re-check.
-
-## What's Included
-
-### Discipline Skills
-
-Run the shared research loop with domain-specific evidence landscapes:
-
-| Command | Discipline |
-|---------|------------|
-| `/mechanical` | Mechanical: design, thermal, fluids, materials, manufacturing |
-| `/software` | Software: architecture, frameworks, protocols, security, benchmarks |
-| `/civil` | Civil / structural: buildings, bridges, steel, concrete, geotech, loads |
-| `/electrical` | Electrical / electronics: power, electronics, controls, EMC |
-| `/architectural` | Architectural: building science, facades, codes, performance |
-
-### Research Workflow Skills
-
-Named engineering jobs over the shared loop:
-
-| Command | What it does |
-|---------|--------------|
-| `/gap-analysis` | Systematic literature gap identification via triangulation (OpenAlex, arXiv, web) |
-| `/evidence-ranking` | Rank and score engineering evidence by quality using the tier system |
-| `/design-alternatives` | Generate and compare 3+ engineering approaches with scored trade-off matrices |
-| `/fmea-brainstorm` | FMEA-style failure mode brainstorming with S/O/D ratings and RPN ranking |
-| `/hypothesis-generation` | Freeze rival hypotheses with dated evidence boundaries and discriminating tests |
-| `/peer-review` | Severity-graded adversarial peer review with a revision plan |
-| `/engineering-research` | Shared research method: discover → read → synthesize → verify → review, with a read-depth contract and a craft pass that removes template prose and tests whether the report could be about any system |
-| `/verifier` | Blind subagent verdict on a claim with evidence trail (8 adversarial checks) |
-| `/compare` | Standards/designs/products into a source-grounded comparison matrix |
-| `/review` | Severity-graded adversarial review of an artifact |
-| `/audit` | Claim-vs-implementation (paper-vs-code, spec-vs-design) |
-| `/summarize` | Faithful structured digest of a standard, spec, or paper |
-| `/research-to-post` | Turn a PDF or GitHub repo into 2–3 catchy hook posts plus a copy-first card with the best source image |
-| `/eli5` | Plain-language engineering explanation |
-| `/simplified-technical-english` | Write, rewrite, and check technical text in Simplified Technical English (ASD-STE100) |
-| `/artifact-reading` | Anchored extraction from PDFs, drawings, specs |
-| `/scholarly-research` | Academic literature evidence layer (OpenAlex, arXiv, Semantic Scholar) with need-based routing modes, code prior-art search, page-anchored open-access PDF reading, a read-depth contract, and consensus/disagreement/trajectory synthesis with source status; synthesis goes to `/engineering-research` |
-| `/standards-lookup` | Engineering standards: AISC, ACI, ASCE, IEEE, Eurocode |
-| `/habit` | Extract explicit research preferences, validate them, and activate only human-approved rules in a project-local store |
-
-`/engineering-research` and the discipline skills default to **thorough**
-research. Pass `--deep` to force multi-agent coverage, `--quick` for an explicit
-fast lookup, or `--turns N` / `--budget N` (or plain language like "run ~200
-turns") to set your own effort ceiling. With no budget, the run continues while
-new grounded evidence is still arriving.
-
-### Research to post
-
-`/research-to-post` turns a paper or repo into **2–3 catchy hook posts** and a
-copy-first HTML card at `outputs/<slug>-post.html`. It converts a PDF to
-Markdown first (`pdftotext -layout`), extracts the figures with `pdfimages`, and
-picks the one that carries the hook; a GitHub repo or project page supplies its
-best screenshot, GIF, or video. The card is the posts, Copy and Copy all posts
-buttons, the one best image, and the source link: no claim ledger and no
-verification section. Before writing, it asks for your own reaction and offers
-2–3 lenses; the markdown keeps the source, your thought, the lens, the draft, and
-the final wording separate. The link post uses 🌐 for a repo or link and 📰 for a
-research paper; other emojis are optional and at most one per post. It drafts and previews; it never posts, schedules,
-scrapes X, or calls a platform API, and it does not promise virality.
-
-## Grounding: keeping a report about your problem
-
-A fully cited literature review that never opens the codebase it was commissioned
-about passes every citation check and answers nobody. Vitruvius closes that with
-rules, not exhortation:
-
-1. **Name the artifacts before searching** — the files, repos, or documents the
-   run studies, plus the commit. The record hash-pins the files, so the snapshot
-   is the hash set; the commit is recorded for the reader.
-2. **`repo` claims carry an anchor** — a claim about the artifact under study
-   resolves to `path:line` on disk. You cannot assert a codebase does, lacks, or
-   needs something without opening it.
-3. **Every finding names its landing site** — `change`, `measure`, `defer`,
-   `product-decision`, or `background`. A finding with no landing site is
-   background or a product decision and has to say which.
-4. **Every decision gets a position** — a report may not list a decision and
-   then ignore it.
-5. **Silence is not a finding** — record what you searched for, did not find, and
-   the search boundary.
-6. **Weight follows evidence** — an impact or priority claim states the evidence
-   behind it and the cost of being wrong.
-
-`/scholarly-research` is the evidence layer and does not write the report;
-/`/engineering-research` owns these rules and writes the deliverable. The
-deterministic half is machine-checked:
+Any Agent Skills host:
 
 ```bash
-node scripts/problem-anchor-contract.mjs <record.json>
-```
-
-The record binds the run to the artifacts it studied, requires every declared
-decision to reach a finding, resolves every `repo` anchor against real
-non-blank bytes, and requires the report to actually cite them. It does **not**
-read the claim: an anchor that resolves but says the opposite still passes, so
-rules 2 and 3 are narrowed, not closed. See
-[the contract reference](skills/engineering-research/references/problem-anchor-contract.md).
-
-`npm run check:local-artifacts` is the opt-in check over your local `outputs/`
-tree. Research deliverables written before this contract predate its three
-grounding checks and will be reported; that is expected local debt, the same
-way legacy closure debt is.
-
-## Habit Learning
-
-Habit is an explicit, review-gated preference loop for research conventions—not passive memory and not model training:
-
-1. `/habit` captures a bounded run window and asks the read-only habit role for candidates.
-2. The lead validates user-only evidence, stable ids, scope, expiry, duplicates, and secret redaction.
-3. The user approves or rejects candidates explicitly.
-4. Approved rules enter the project-local `outputs/.habits/active.json` store.
-5. A later unrelated run can load scoped rules with `node scripts/habit-ledger.mjs load --scope <scope>`.
-6. Rules expire, can be superseded through an explicit relationship, and can be revoked without deleting the audit trail.
-
-The store contains the rule and evidence ids, not the raw transcript window. Habit never scans messages automatically, never writes `AGENTS.md`, and never creates a hidden cross-project memory store. The ledger and activation require provenance sidecars.
-
-Useful commands:
-
-```bash
-node scripts/habit-ledger.mjs redact-file <brief> --output <brief>
-node scripts/habit-ledger.mjs validate <ledger>
-node scripts/habit-ledger.mjs approve <ledger> --id h1 --by user
-node scripts/habit-ledger.mjs activate <ledger> --store outputs/.habits/active.json
-node scripts/habit-ledger.mjs load --scope research
-node scripts/habit-ledger.mjs revoke --store outputs/.habits/active.json --id h1
-```
-
-Activation requires the ledger’s colocated `.provenance.md` sidecar. The CLI
-refuses paths outside the project root and refuses to write `AGENTS.md`.
-
-The default store is project-local and ignored with `outputs/`; pass an explicit `--store` when a different project-local location is intended.
-
-### Application Skills
-
-End-to-end workflows for specific tasks:
-
-| Command | What it does |
-|---------|--------------|
-| `/proposal` | Intended targeted Ph.D./Masters proposal workflow; local text intake is executable, PDF extraction uses optional tooling, URL/image inputs require explicit recorded fetch/transcription, and a named lab gets its publication corpus reviewed by trajectory rather than author prestige |
-
-## Choose Your Starting Point
-
-| I want to... | Start here |
-| --- | --- |
-| Research a mechanical engineering question | `/mechanical` |
-| Find research gaps in my field | `/gap-analysis` |
-| Compare design alternatives | `/design-alternatives` |
-| Generate a PhD proposal | `/proposal` |
-| Verify a claim or calculation | `/verifier` |
-| Look up an engineering standard | `/standards-lookup` |
-| Brainstorm failure modes | `/fmea-brainstorm` |
-
-## Quick Reference
-
-| You type | What happens |
-|----------|--------------|
-| `/mechanical "research question"` | Runs research loop with mechanical engineering evidence landscape |
-| `/software "research question"` | Runs research loop with software engineering evidence landscape |
-| `/civil "research question"` | Runs research loop with civil/structural evidence landscape |
-| `/electrical "research question"` | Runs research loop with electrical/electronics evidence landscape |
-| `/architectural "research question"` | Runs research loop with architectural evidence landscape |
-| `/gap-analysis civil FRP-bonding` | Finds research gaps via OpenAlex + arXiv triangulation |
-| `/evidence-ranking "question"` | Ranks and scores evidence by quality tier |
-| `/design-alternatives "problem"` | Compares 3+ engineering approaches with scored trade-off matrix |
-| `/fmea-brainstorm "system"` | Brainstorms failure modes with S/O/D ratings and RPN ranking |
-| `/hypothesis-generation "observation"` | Freezes rival hypotheses with dated evidence boundaries |
-| `/peer-review <artifact>` | Severity-graded adversarial peer review with a revision plan |
-| `/engineering-research "question"` | Runs the shared research method directly |
-| `/verifier "claim"` | Verifies a claim against authoritative sources (blind subagent) |
-| `/compare "A vs B"` | Source/standard/design comparison matrix |
-| `/review <artifact>` | Severity-graded adversarial review |
-| `/audit <code-vs-paper>` | Claim-vs-implementation mismatch audit |
-| `/summarize <document>` | Faithful structured digest of a standard, spec, or paper |
-| `/research-to-post <pdf-or-repo>` | Drafts 2–3 catchy hooks and a copy-first card with the best source image |
-| `/eli5 "topic"` | Plain-language engineering explanation |
-| `/simplified-technical-english <text>` | Rewrites technical text in Simplified Technical English (ASD-STE100) |
-| `/artifact-reading <file>` | Anchored extraction from PDFs, drawings, specs |
-| `/scholarly-research "topic"` | Academic literature evidence layer (OpenAlex, arXiv, Semantic Scholar) with routing modes, code prior art, and page-anchored PDF reading; synthesis goes to `/engineering-research` |
-| `/standards-lookup AISC 360` | Looks up AISC 360 provisions by section |
-| `/habit` | Extracts explicit research preferences for validation and human approval |
-| `/proposal --posting X --cv Y` | Intended PhD-proposal workflow; local text intake is executable, PDF extraction uses optional tooling, URL/image inputs require explicit recorded fetch/transcription, and a named lab gets its publication corpus reviewed by trajectory |
-
-## Installation
-
-### Claude Code
-
-```bash
-# Install via npx (recommended)
 npx skills add adeerkhan/vitruvius
-
-# Or copy manually
-git clone https://github.com/adeerkhan/vitruvius ~/.claude/skills/vitruvius
 ```
 
-### Cursor
+OpenCode:
 
 ```bash
-# Copy skills to Cursor's skills folder
-cp -r skills/ ~/.cursor/skills/vitruvius
-cp -r references/ ~/.cursor/skills/vitruvius/references
-```
-
-### Codex
-
-```bash
-# Install via npx
-npx skills add adeerkhan/vitruvius --agent codex
-
-# Or copy manually
-cp -r skills/ ~/.codex/skills/vitruvius
-```
-
-### Command Code
-
-```bash
-cmd skills add adeerkhan/vitruvius --global   # install all 27 skills
-npx @adeerkhan/vitruvius --host commandcode      # render the slash-command mod
-```
-
-### OpenCode
-
-```bash
-# Install Vitruvius's OpenCode adapters into a project (writes .opencode/):
 npx @adeerkhan/vitruvius --target . --host opencode
-
-# Or run inside the cloned repo, which installs all host adapters first:
-git clone https://github.com/adeerkhan/vitruvius && cd vitruvius
-node installer/install.mjs --target . --all && opencode
-
-# The plugin entry (opencode.json) points at the source file:
-# { "plugin": ["./path/to/vitruvius/installer/hosts/opencode/plugins/vitruvius.mjs"] }
 ```
 
-The same installer projects the other hosts too (`--host claude`, `--host
-cursor`, ...); run `npx @adeerkhan/vitruvius --help` for the list.
+Restart the host, then run `/vitruvius-help`. Claude Code, Codex, Cursor, Pi,
+Command Code, and global installs are covered in the
+[installation guide](docs/INSTALL.md).
 
-### Pi
+## Choose a starting point
 
-```bash
-pi install git:github.com/adeerkhan/vitruvius
-```
+| You need to... | Start with |
+| --- | --- |
+| Research an engineering question | `/engineering-research` or a discipline skill |
+| Check a claim or calculation | `/verifier` |
+| Look up a governing provision | `/standards-lookup` |
+| Compare design alternatives | `/design-alternatives` |
+| Audit a document against implementation | `/audit` |
+| Review academic literature | `/scholarly-research` |
+| Read a PDF, drawing, or specification | `/artifact-reading` |
+| See every command | [COMMANDS.md](COMMANDS.md) or `/vitruvius-help` |
 
-### Other Harnesses (global install)
+## Evidence and measurement
 
-The installer ships the Agent Skills bundle and ruleset into each harness's
-global config root, so the same skills load without a project checkout:
+Vitruvius publishes its checks and its weaknesses. Current checked-in results:
 
-```bash
-npx @adeerkhan/vitruvius --global --all
-npx @adeerkhan/vitruvius --global --host hermes --host grok --host deepseek
-```
+| Check | Result |
+| --- | --- |
+| Verifier adversarial — single-run corpus | 16/20 = 80% correct verdicts, 0 false approvals, 0 false blocks, 1 conservative overcall |
+| Verifier adversarial — majority-of-3 certification | 18/20 = 90% correct verdicts, 0 false approvals, 0 false blocks, 2 conservative overcalls |
+| PASS scoring controls | 5/5 deterministic parser/scorer fixtures; not independent verifier runs |
+| Integrity under persuasion | 4/5 held with one false approval; no false-block guarantee is claimed |
+| Skill routing | 28/28 baseline rank-1; 4/4 E1 top-k; 4/4 owner-negative; 10/10 must-not-fire |
+| Baseline comparison | Isolated runner and scorer tested; the 13 cases remain unmeasured |
 
-| Harness | Root |
-|---------|------|
-| Kilo | `~/.kilo/skills` |
-| VS Code / Copilot | `~/.copilot/skills` |
-| Prime Agent | `~/.prime/agent/skills` |
-| Oh My Pi | `~/.omp/agent/skills` |
-| DeepSeek Harness | `~/.dsh/skills` |
-| Hermes Agent | `~/.hermes/skills` |
-| Grok Build | `~/.grok/skills` |
-| Reasonix | `~/.reasonix/skills` |
+These are measurements, not certification. The underlying artifacts, limits,
+and reproduction commands live in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
-The same installer also covers Claude Code, Codex, and OpenCode globally (see
-[installer/README.md](installer/README.md) for the env overrides).
+## Boundaries
 
-### Any Agent Skills Host
-
-Copy the `skills/` and `references/` directories into your agent's skills folder. The proposal skill carries its own parser runtime; copy `scripts/habit-ledger.mjs` as well when using the Habit CLI, and `scripts/extract-document.mjs` plus `scripts/extract-pdf.mjs` when using the standalone artifact-reading command. Preserve repository-relative paths when copying helpers:
-- `.claude/skills/` (Claude Code)
-- `.commandcode/skills/` (Command Code)
-- `.agents/skills/` (Agents)
-- `.opencode/skills/` (OpenCode)
-- `.cursor/skills/` (Cursor)
-- `.codex/skills/` (Codex)
-
-Proposal scripts write under the active working directory by default. Set `VITRUVIUS_PROJECT_ROOT` when the project workspace differs from that directory; the proposal skill remains self-contained when only `skills/proposal/` is copied.
-
-> **Restart your harness after installing new skills.** The skill catalogue is built at startup; new skills won't be routable until the next session.
-
-## Proposal Skill
-
-The intended proposal workflow generates targeted Ph.D./Masters research proposals by parsing position postings, researching the professor/lab, identifying lab-specific gaps, and producing a humanized proposal with deep fit analysis. The deterministic parser commands provide local text/Markdown/JSON intake and auditable extraction records; an isolated research step must verify and structure those fields before downstream work. PDF extraction uses optional tooling, while URLs and images require an explicit, recorded fetch/transcription before they can enter intake.
-
-### Inputs
-
-```
-/proposal --posting <path> --cv <path> [--statement <path>] [--sample <path>]
-```
-
-- `--posting` — Local text/Markdown/JSON or text-layer PDF path; fetch URLs and transcribe images explicitly first
-- `--cv` — Local text/Markdown/JSON or text-layer PDF path
-- `--statement` — Personal statement (optional, used for voice matching)
-- `--sample` — Separate writing sample (optional, used for voice matching)
-
-### CLI vs Desktop
-
-The intended proposal workflow is designed for CLI and desktop harnesses. Local text/Markdown/JSON paths are executable; PDF extraction uses optional tooling. URLs and images must be fetched/transcribed explicitly and recorded before intake:
-
-- **CLI**: Provide file paths as arguments
-- **Desktop apps** (Claude Desktop, Cursor, Windsurf): Attach files via the harness UI. The harness makes attached files available as readable paths.
-
-### Workflow
-
-```mermaid
-flowchart TD
-    Input["Position Posting + CV + Statement"]
-    Parse["Parse & Extract"]
-    Research["Research Professor/Lab"]
-    Gap["Gap Analysis"]
-    Verify["Verify Claims"]
-    Write["Write Proposal"]
-    Humanize["Humanize Voice"]
-    Binder["binder.md + appendices"]
-
-    Input --> Parse
-    Parse --> Research
-    Research --> Gap
-    Gap --> Verify
-    Verify --> Write
-    Write --> Humanize
-    Humanize --> Binder
-```
-
-### Output
-
-All artifacts saved to `projects/<your-slug>/`:
-- Raw intake text and a phase-0 provenance ledger with source/intake digests; structured profile/posting fields are added only after verification and are bound to those digests
-- A run manifest/lineage marker prevents stale phase artifacts from being assembled together
-- Professor research, when the posting is sufficiently structured
-- Gap analysis dossier (general + lab-specific gaps) with provenance
-- Evidence ranking table
-- Verifier verdict (binder assembly requires `PASS`)
-- Humanized proposal and explicit voice-sample/baseline record
-- Layered binder with all appendices
-
-## Run Ledger
-
-Research runs can append a validated `run.v1` JSONL entry to `.runs/`:
-
-```bash
-echo '{"skill":"engineering-research","status":"completed","verdict":"verified"}' \
-  | node scripts/log-run.mjs
-```
-
-The logger generates a UUID and UTC timestamp, rejects malformed input and duplicate IDs, and supports `--runs-dir <path>` or `VITRUVIUS_RUNS_DIR` for isolated runs. `VITRUVIUS_PROJECT_ROOT` selects the project root for the default `.runs/` path when the command is run from another directory. With no override, the repository compatibility command preserves its historical repository-local `.runs/` default; the skill-local wrapper defaults to the active project working directory. Concurrent writers wait briefly for the ledger lock. A holder writes a bounded lease (`VITRUVIUS_LOCK_TTL_MS`, default 60s), so an expired lease left by a crashed process is reclaimed automatically while a live lease — or a legacy lock without an expiry — is never stolen. The engineering-research skill carries a self-contained wrapper for copied-skill installations; the repository command remains available at `scripts/log-run.mjs`.
-
-`--begin --run-id <uuid> [--freeze <path>]` records a dispatch marker before evidence gathering: the matching completion entry then carries a measured `wall_ms` and the sha256 of each frozen file (normally the goal-requirements manifest), turning the Step-1 freeze into a gate — a frozen file that changed fails the entry unless `--refreeze` records the change, and a caller-asserted `wall_ms` is refused.
-
-## Evidence Ledger
-
-After the run logger returns a `run_id`, record the run's source, search, and claim mappings as one fail-closed `evidence.v1` document:
-
-```bash
-printf '%s\n' '<evidence_json>' \
-  | node scripts/record-evidence.mjs --run-id <run_id>
-```
-
-The ledger uses stable `SRC-*`, `SEARCH-*`, `CLAIM-*`, `NEG-*`, and `AMB-*` IDs. Each source is a repository-relative artifact with a verified SHA-256 and access date; each search records its screening count; each claim records coverage status and support mappings. The validator refuses unknown IDs, orphan mappings, verified claims without verified support, and missing negative/ambiguous coverage. The writer requires an existing L1 `run.v1` entry, refuses duplicate/overwritten ledgers, and stores `.runs/<run_id>.evidence.json` atomically. Revalidate an existing file with `node scripts/validate-evidence.mjs <path>`. `npm run test:evidence-ledger` runs the pure contract and lifecycle tests without model calls.
-
-## Research Sources
-
-Vitruvius points research at the best free, verifiable layers for the job:
-
-- **Standards and code** (primary): ASME, ASTM, AISC, ACI, ASCE, IEEE, IEC, UL, IBC — cite standard + section + edition
-- **Academic literature**: OpenAlex (primary, keyless), Semantic Scholar, arXiv, alphaXiv fast search
-- **Web search**: Used for non-academic sources and recency (when host exposes the tool)
-
-**Empirical reference (AI reviewers):** Kim, S. et al. (2026), *“On the limits and opportunities of AI reviewers: Reviewing the reviews of Nature-family papers with 45 expert scientists”*, arXiv:2605.20668. https://arxiv.org/pdf/2605.20668 — a 469-hour, 45-scientist expert annotation study of 2,960 review items across 82 Nature-family papers. It is the empirical basis for the reviewer/meta-reviewer prompt, significance-bar, devil’s-advocate, and severity-calibration guidance applied throughout Vitruvius; see the extracted copy in `docs/` (gitignored for local reading) for full details.
-
-**Rejected sources:** Undated blog posts, content aggregators, forum posts without primary links, sources that appear AI-generated.
-
-**Paywalled sources:** Cited from metadata and marked `blocked` — never guessed at.
-
-## The Non-Negotiables
-
-1. **Never fabricate a source.** Every named standard, code, provision, product, material, project, or dataset must have a verifiable reference.
-2. **Never claim something exists without checking.** Before citing a standard or code section, verify it exists and read the actual provision.
-3. **Never extrapolate details you haven't read.** If you have not fetched and inspected a source, you may note its existence but must not describe its contents, numbers, or claims.
-4. **A reference or it didn't happen.** Every claim in an output must trace to a checkable source: standard + section, URL, artifact path, or calculation.
-5. **Read before you summarize.** Do not infer a code provision, a spec value, or a material property from a title, a snippet, or memory when a direct read is possible.
-6. **Mark status honestly.** Distinguish `verified`, `inferred`, `blocked`, and `unverified`. Never smooth over missing checks.
-
-## FAQ
-
-<details>
-<summary><strong>How is this different from generic web search?</strong></summary>
-
-Vitruvius reads sources directly, never fabricates, and records auditable provenance. Generic search returns snippets; Vitruvius returns verified claims with source locations.
-</details>
-
-<details>
-<summary><strong>What if a source is paywalled?</strong></summary>
-
-Cited from search metadata and marked `blocked`. Never guessed at. See [Blocked Access Policy](references/blocked-access-policy.md) for details.
-</details>
-
-<details>
-<summary><strong>Can I use this for non-engineering research?</strong></summary>
-
-Designed for engineering, but `/gap-analysis` and `/proposal` work for any field with academic literature.
-</details>
-
-<details>
-<summary><strong>How does the proposal skill work?</strong></summary>
-
-The intended workflow parses the position posting, verifies and structures its fields, researches the professor/lab website and recent papers, identifies lab-specific gaps, and generates a targeted proposal with deep fit analysis. Humanizes the output to match your writing style. Local text/Markdown/JSON intake is executable; PDF extraction uses optional tooling, while URL/image inputs require an explicit recorded fetch/transcription first.
-</details>
-
-<details>
-<summary><strong>What disciplines are supported?</strong></summary>
-
-Mechanical, civil, electrical, software, and architectural engineering.
-</details>
-
-<details>
-<summary><strong>How do I verify the agent's claims?</strong></summary>
-
-Research outputs are intended to include a `.provenance.md` sidecar recording what was checked and how; the current validator covers selected root/plan/draft paths, while nested and method-specific sidecars remain a known gap. Check the verification status labels: `verified`, `partial`, `blocked`, `unverified`.
-</details>
+Vitruvius is research-only. It is not final engineering sign-off, a code
+compliance certificate, a CAD/BIM/simulation engine, or a substitute for reading
+the governing standard and inspecting the physical system. It does not promise
+that a model will always be right. It makes missing evidence and unresolved
+questions visible early enough to act on them honestly.
 
 ## Documentation
 
-| Doc | What it covers |
-|-----|----------------|
-| [vitruvius.github.io](https://adeerkhan.github.io/vitruvius/) | The project site. Hand-written static HTML in `site/`, deployed to GitHub Pages; `tests/site/test-site.mjs` fails if the site names a command that does not exist or links to a file that was never committed |
-| [AGENTS.md](AGENTS.md) | The always-on repo contract: scope, integrity commandments, provenance, grounding rules, skill frontmatter rules |
-| [notes/agent-portability.md](notes/agent-portability.md) | How the same skills load across Claude Code, Cursor, Codex, Command Code, OpenCode, and Pi |
-| [notes/permissions.md](notes/permissions.md) | Per-host file-write permissions, which every research skill needs in order to persist artifacts |
-| [SECURITY.md](SECURITY.md) | Reporting a vulnerability, what the scanner checks, and the skill security rules |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Local setup and the change workflow |
-| [references/host-rules.md](references/host-rules.md) | The condensed ruleset rendered into `.clinerules/`, `.qoder/rules/`, and `.windsurf/rules/` at install time |
-| [installer/README.md](installer/README.md) | The host packages and the installer that renders `.opencode/`, `.claude/`, `.cursor/`, ... |
-| [agents/README.md](agents/README.md) | The canonical research role definitions |
-
-## Uninstall
-
-| Harness | Command |
-|---------|---------|
-| Claude Code | `rm -rf ~/.claude/skills/vitruvius` |
-| Cursor | `rm -rf ~/.cursor/skills/vitruvius` |
-| Codex | `rm -rf ~/.codex/skills/vitruvius` |
-| Command Code | `cmd skills remove vitruvius` + `cmd mods remove vitruvius` |
-| OpenCode | Remove from `opencode.json` or delete checkout |
-| Pi | `pi uninstall vitruvius` |
-| Manual | Delete copied `skills/` and `references/` from agent folder |
-| Habit data | Delete the project-local `outputs/.habits/active.json` store if you want to remove activated preferences |
+| Document | What it covers |
+| --- | --- |
+| [ABOUT.md](ABOUT.md) | Mission, principles, audience, and boundaries |
+| [COMMANDS.md](COMMANDS.md) | All 27 commands and example usage |
+| [docs/EVIDENCE.md](docs/EVIDENCE.md) | Read depth, grounding, verification, measurements, and limits |
+| [docs/INSTALL.md](docs/INSTALL.md) | Host setup, permissions, verification, and uninstall |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Skills, roles, artifacts, validators, and host adapters |
+| [notes/examples.md](notes/examples.md) | Worked runs, including an honest BLOCKED result |
+| [agents/README.md](agents/README.md) | Canonical research-role definitions |
+| [AGENTS.md](AGENTS.md) | Repository contract and integrity rules |
+| [installer/README.md](installer/README.md) | Host packages and installer internals |
+| [SECURITY.md](SECURITY.md) | Security rules and vulnerability reporting |
 
 ## License
 
-[MIT](LICENSE)
-
-Copyright (c) 2026 [Adeer Khan](https://github.com/adeerkhan)
+[MIT](LICENSE) · Copyright (c) 2026 [Adeer Khan](https://github.com/adeerkhan)

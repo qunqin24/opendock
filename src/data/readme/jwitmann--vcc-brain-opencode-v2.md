@@ -8,11 +8,11 @@
 
 [![npm version](https://img.shields.io/npm/v/@jwitmann/vcc-brain-helper?color=8cdb9f)](https://www.npmjs.com/package/@jwitmann/vcc-brain-helper) [![Node.js 20+](https://img.shields.io/badge/Node.js-%3E%3D20-417e3f?logo=nodedotjs&logoColor=white)](https://nodejs.org/) [![BSD-3-Clause license](https://img.shields.io/badge/License-BSD--3--Clause-22C55E)](./LICENSE) [![CI](https://github.com/jwitmann/vcc-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/jwitmann/vcc-brain/actions)
 
-VCC Brain gives your agent a brain for documenting all their work. As the agent works, it automatically documents within this brain — specs, decisions, standards, research, lessons. Every new session starts knowing everything the last one learned.
+VCC Brain gives your agent a brain for documenting all its work. As the agent works, it automatically documents within this brain — specs, decisions, standards, research, lessons. Every new session starts knowing everything the last one learned.
 
 #### Origin
 
-Originally forked from [aerovato/operator-memory](https://github.com/aerovato/operator-memory); continued here as an independent line with deterministic context management (VCC compaction, lossless trim, recall/search recovery), cache-aware preamble refresh, and the DeepSeek Harness adapter.
+Originally forked from [aerovato/operator-memory](https://github.com/aerovato/operator-memory); continued here as an independent line with context management (lossless trim, recall/search recovery), cache-aware preamble refresh, and the DeepSeek Harness adapter.
 
 #### Features
 
@@ -21,7 +21,8 @@ Originally forked from [aerovato/operator-memory](https://github.com/aerovato/op
 - **Transparent Memory** — Memory is stored as Markdown documents you can read, update, and delete.
 - **Sharable Knowledge** — Track documents with Git and share knowledge with your team.
 - **Zero Infrastructure** — No background agents, no embeddings, no vector database, no model configuration.
-- **Deterministic Context Management** — Reduce what a session resends to the model through deterministic rules (never model judgment), with per-session receipts for everything it does — and compactions shaped so your rules survive them: summaries must reference Brain paths instead of paraphrasing them. Off by default and Brain-gated. [OpenCode](docs/harnesses/opencode-v2.md#context-management) · [DeepSeek](docs/harnesses/deepseek.md#context-management).
+- **Deterministic Compaction (Recommended)** — No-model-call compaction through the standalone VCC engine: transcript-preserving cuts with exact post-cut recall, stamped and tunable. Install the engine for your harness; it owns compaction. See [Pair VCC Brain with deterministic compaction](#pair-vcc-brain-with-deterministic-compaction-recommended).
+- **Context Management (with built-in fallback)** — Trim bulky tool I/O by token arithmetic and shape compactions so your rules survive them: summaries must reference Brain paths instead of paraphrasing them. Off by default. On OpenCode, who compacts depends on the setting: `enabled: true` alone means we do everything — trim, trigger, summarize via the in-tree port, recall — and requires no standalone engine installed; `enabled: true` with `"mode": "vcc"` means we trim and trigger while the standalone VCC engine summarizes and recalls. Never run full mode alongside the engine. [OpenCode](docs/harnesses/opencode-v2.md#context-management) · [DeepSeek](docs/harnesses/deepseek.md#context-management).
 - **Cache-Aware Preamble Refresh** — Re-render the preamble mid-session when the Brain changes, timed to cold prompt-cache moments so it costs nothing. [How it works](docs/harnesses/opencode-v2.md#preamble-refresh).
 - **Brain-Update Nudges** — A quiet reminder to record durable knowledge during long sessions; never an automatic writer. [How it works](docs/harnesses/opencode-v2.md#brain-updates).
 - **Cross-Session Recall** — Search past sessions by keyword and restore full turns, scoped to the current project plus mutual peers (declare peers in `.vcc-brain/config.json`; sharing applies only where both sides list each other). The index is local-only with 30-day retention; title a session `[no-recall]` to opt out. [OpenCode](docs/harnesses/opencode-v2.md#cross-session-recall) · [DeepSeek](docs/harnesses/deepseek.md#cross-session-recall).
@@ -88,7 +89,11 @@ With options (all optional; per-project `.vcc-brain/config.json` overrides them)
   "plugins": [
     {
       "package": "@jwitmann/vcc-brain-opencode-v2",
-      "options": { "vcc-brain": { "contextManagement": { "enabled": true, "ratio": 0.8 } } }
+      // All features are opt-in (off by default). Run full
+      // contextManagement only where no other compaction engine runs
+      // in the same session — alongside an engine, use "mode":
+      // "vcc" instead (see docs/harnesses/opencode-v2.md).
+      "options": { "vcc-brain": { "contextManagement": { "enabled": false, "ratio": 0.8 } } }
     }
   ]
 }
@@ -118,9 +123,11 @@ Setup is a conversation with your agent. Run each command in a new conversation.
 2. In each new project: `/vcc-brain:project-init` — scaffold VCC Brain, migrate existing documents, and index the repo.
 3. Start a new conversation and do normal work.
 
-#### For the best long-session results
+When starting cold on an existing project, expect a sparse brain at first; ask the agent to write the first specifications for the modules you work on. Once those documents exist, later sessions maintain them as part of ordinary work.
 
-Long sessions must compact, and a plain summarizer rewrites your rules in the process. Pair VCC Brain with deterministic compaction:
+### Pair VCC Brain with deterministic compaction (Recommended)
+
+Long sessions must compact, and a plain summarizer rewrites your rules in the process. VCC Brain relies on deterministic compaction for its best long-session results — install the engine for your harness alongside the Brain plugin:
 
 - On DeepSeek Harness, install the VCC engine alongside the VCC Brain plugin — without it, compaction falls back to the host's LLM summarizer:
 
@@ -134,13 +141,13 @@ dsh plugin --profile <profile-name> add dsh-compaction-vcc
 opencode plugin add opencode-vcc-compaction
 ```
 
+Then stand our own context management down: either disable it entirely (`vcc-brain.contextManagement.enabled: false`) or switch it to `"mode": "vcc"` (`vcc-brain.contextManagement` — trim, triggers, and omission recovery stay ours; the engine summarizes and recalls). Exactly one compaction provider may own a session — two active stacks register competing recall tools with incompatible checkpoint shapes.
+
 - On Pi, pair VCC Brain with the third-party deterministic compactor [pi-tuck](https://github.com/galyavin/pi-tuck) — the same no-model-call idea (transcript-preserving cuts plus exact post-cut recall), maintained outside this project. No adapter wires the two together yet; someone with Pi needs to write it:
 
 ```sh
 pi install npm:pi-tuck
 ```
-
-When starting cold on an existing project, expect a sparse brain at first; ask the agent to write the first specifications for the modules you work on. Once those documents exist, later sessions maintain them as part of ordinary work.
 
 <p align="center"><big><strong>New to VCC Brain? Read the <a href="docs/getting-started.md">Getting Started guide</a>.</strong></big></p>
 
@@ -170,7 +177,7 @@ When project truth changes, the agent updates the canonical file instead of addi
 
 1. Give the agent normal development work.
 2. The agent automatically consults existing knowledge: index for navigating code, specs for module contracts, guides for third-party integration details.
-3. The agent automatically updates existing knowledge: When project truth changes, the relevant documents are automatically updated.
+3. The agent automatically updates existing knowledge: when project truth changes, the relevant documents are automatically updated.
 4. The next session continues from the updated knowledge.
 
 Sometimes agents hesitate to create, consolidate, or split documents. In that case, steer the agent towards making larger architectural decisions:

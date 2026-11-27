@@ -4,7 +4,7 @@
 
 **你的開發工具、你的 Gemini 訂閱帳戶、零依賴原生 HTTP/2。**
 
-透過免伺服器的獨立 In-Process 插件，或支援多帳戶池化與原生 `POST /mcp` 的純 Node.js 閘道，將你合資格的 Google Gemini 帳戶直接接上 **Pi**、**OpenClaw**、**OpenCode**、**Claude Code**、**Cursor**、**Cline**、**Roo Code**、**Codex CLI**、**MCP 客戶端**與官方 OpenAI SDK。
+透過免伺服器的獨立 In-Process 插件／CLI，或支援多帳戶池化與原生 `POST /mcp` 的純 Node.js 閘道，將你合資格的 Google Gemini 帳戶直接接上 **Pi**、**OpenClaw**、**OpenCode**、**Claude Code**、**Cursor**、**Cline**、**Roo Code**、**Codex CLI**、**MCP 客戶端**、**獨立命令列（CLI）**與官方 OpenAI SDK。
 
 [![CI](https://github.com/ShawTim/gemini-app2api/actions/workflows/ci.yml/badge.svg)](https://github.com/ShawTim/gemini-app2api/actions/workflows/ci.yml)
 [![pi-gemini-app on npm](https://img.shields.io/npm/v/pi-gemini-app?logo=npm&label=pi-gemini-app)](https://www.npmjs.com/package/pi-gemini-app)
@@ -13,6 +13,7 @@
 [![openclaw-gemini-app on ClawHub](https://img.shields.io/badge/ClawHub-openclaw--gemini--app-F97316)](https://clawhub.ai/shawtim/plugins/openclaw-gemini-app)
 [![opencode-gemini-app on npm](https://img.shields.io/npm/v/opencode-gemini-app?logo=npm&label=opencode-gemini-app)](https://www.npmjs.com/package/opencode-gemini-app)
 [![mcp-gemini-app on npm](https://img.shields.io/npm/v/mcp-gemini-app?logo=npm&label=mcp-gemini-app)](https://www.npmjs.com/package/mcp-gemini-app)
+[![gemini-app-cli on npm](https://img.shields.io/npm/v/gemini-app-cli?logo=npm&label=gemini-app-cli)](https://www.npmjs.com/package/gemini-app-cli)
 ![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)
 ![Zero Runtime Dependencies](https://img.shields.io/badge/runtime%20dependencies-0-0A84FF)
 ![Docker Ready](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
@@ -30,20 +31,21 @@
 <a id="quick-start"></a>
 ## 快速開始
 
-### 路線 A — 獨立原生插件（免啟動閘道伺服器）
+### 路線 A — 獨立原生插件與 CLI（免啟動閘道伺服器）
 
-![gemini-app2api —— 零依賴原生擴充套件（Pi、OpenClaw、OpenCode 與 MCP）](docs/assets/extensions-overview.jpg)
+![gemini-app2api —— 零依賴原生擴充套件（Pi、OpenClaw、OpenCode、MCP 與 CLI）](docs/assets/extensions-overview.jpg)
 
-<a id="pi-extension"></a><a id="openclaw-plugin"></a>
+<a id="pi-extension"></a><a id="openclaw-plugin"></a><a id="cli-package"></a>
 
-| 客戶端 | 安裝／執行指令 | 登入與查詢配額 | 套件連結與說明 |
+| 客戶端 | 安裝／執行指令 | 登入與常用指令 | 套件連結與說明 |
 |---|---|---|---|
 | **Pi / GooeyPi** | `pi install npm:pi-gemini-app` | `/login gemini-app` · `/gemini-quota` | [npm](https://www.npmjs.com/package/pi-gemini-app) · [Pi Packages](https://pi.dev/packages/pi-gemini-app?name=pi-gemini-app) · [說明](extensions/pi/README.md) |
 | **OpenClaw** | `openclaw plugins install openclaw-gemini-app` *（或 `npm:openclaw-gemini-app`）* | `openclaw models auth login --provider gemini-app` · `/usage` | [npm](https://www.npmjs.com/package/openclaw-gemini-app) · [ClawHub](https://clawhub.ai/shawtim/plugins/openclaw-gemini-app) · [說明](extensions/openclaw/README.md) |
 | **OpenCode** | V2：`opencode plugin add opencode-gemini-app`（V1：於 `opencode.json` 加入 `"plugin": ["opencode-gemini-app"]`） | `/connect`（`gemini-app`） | [npm](https://www.npmjs.com/package/opencode-gemini-app) · [說明](extensions/opencode/README.md) |
 | **獨立 MCP（stdio）** | `npx -y mcp-gemini-app` | `npx -y mcp-gemini-app login` · `quota` | [npm](https://www.npmjs.com/package/mcp-gemini-app) · [說明](extensions/mcp/README.md) |
+| **獨立 CLI** | `npm i -g gemini-app-cli` *（或 `npx -y gemini-app-cli ask "..."`）* | `gemini-app login` · `ask` · `search` · `--schema` · `--tools readonly` | [npm](https://www.npmjs.com/package/gemini-app-cli) · [說明](extensions/cli/README.md) · [SKILL](extensions/cli/SKILL.md) |
 
-全部獨立擴充套件均在進程內直連原生 HTTP/2（`15s` PING 保活、`HTTPS_PROXY` 支援、256 工具宣告、並行多圖上載、免費帳號自動切換 `gemini-auto`）。
+全部 5 個獨立套件均在進程內直連原生 HTTP/2（`15s` PING 保活、`HTTPS_PROXY` 支援、256 工具宣告、並行多圖上載、免費帳號自動切換 `gemini-auto`）。獨立 CLI（`gemini-app-cli`）專為單次 pipeline、CI 與支援 bash 的 Coding Agent 設計，提供經校驗的 JSON Schema 結構化輸出（`--schema`）、本機檔案／多圖附加（`-f`/`-i`），以及可選的唯讀工作區分析迴圈（`--tools readonly`，支援 `read`/`grep`/`find`/`ls`，零寫檔、零 shell 執行）。
 
 ### 路線 B — 自架 OpenAI 相容與 MCP 閘道伺服器
 
@@ -208,6 +210,7 @@ Gemini AI Pro 帳戶實測 `GetUsageInfo` 參考數據（`neon_pro_policy`，非
 | [OpenClaw 插件（`extensions/openclaw/README.md`）](extensions/openclaw/README.md) | 適用於 OpenClaw 與 ClawHub 的獨立 `openclaw-gemini-app` Provider 插件 |
 | [OpenCode 插件（`extensions/opencode/README.md`）](extensions/opencode/README.md) | 適用於 OpenCode（Bun 與 Node）的獨立 `opencode-gemini-app` 原生 Provider 插件 |
 | [MCP 伺服器（`extensions/mcp/README.md`）](extensions/mcp/README.md) | 獨立 stdio MCP 伺服器（`ask_gemini`、`gemini_search`、`gemini_quota`） |
+| [獨立 CLI（`extensions/cli/README.md`）](extensions/cli/README.md) | 非互動式 Unix CLI（`gemini-app-cli`），支援 `--schema`、`-f`/`-i`、`search`、唯讀 `--tools readonly` 與附包 [SKILL.md](extensions/cli/SKILL.md) |
 | [API 支援規格（`docs/API_SUPPORT.md`）](docs/API_SUPPORT.md) | 端點、工具、結構化輸出、圖片、`native_search` 與錯誤代碼 |
 | [維運指南（`docs/OPERATIONS.md`）](docs/OPERATIONS.md) | `.env` 設定、Docker Compose、TLS 反向代理、`launchd` 與疑難排解 |
 | [完成與失敗語義（`docs/COMPLETION_CONTRACT.md`）](docs/COMPLETION_CONTRACT.md) | 部分輸出保留、零輸出 `GENERATION_FAILED` 與 Agent 迴圈安全 |

@@ -3,7 +3,7 @@
 [![CI](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/actions/workflows/ci.yml?query=branch%3Amain)
 [![npm](https://img.shields.io/npm/v/opencode-azure-devops-pr-review)](https://www.npmjs.com/package/opencode-azure-devops-pr-review)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Tested with OpenCode 2.3.2](https://img.shields.io/badge/OpenCode-2.3.2%20tested-blue)](docs/VALIDATION.md)
+[![Tested with OpenCode 2.4.1](https://img.shields.io/badge/OpenCode-2.4.1%20tested-blue)](docs/VALIDATION.md)
 
 **Review Azure DevOps pull requests from a URL. No checkout required.**
 
@@ -71,7 +71,7 @@ the review duration.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.5.0
+   opencode plugin add opencode-azure-devops-pr-review@0.5.1
    ```
 
 2. In OpenCode's terminal UI, type `/pr-setup`. Dialogs ask for your Azure
@@ -435,7 +435,7 @@ models and runs.
 
 | Component | Tested target |
 | --- | --- |
-| OpenCode | **OpenCode CLI 2.3.2** (`@opencode/cli`; V2 plugin API). On another OpenCode 2.x, `/pr-check` shows an OpenCode WARNING row and reviews still run. OpenCode 1.x is not supported. |
+| OpenCode | **OpenCode CLI 2.4.1** (`@opencode/cli`; V2 plugin API). On another OpenCode 2.x, `/pr-check` shows an OpenCode WARNING row and reviews still run. OpenCode 1.x is not supported. |
 | Operating system | **Ubuntu 22.04** (validation environment: WSL2). Other operating systems are not yet validated. |
 | Azure | **Azure DevOps Services**, REST API **7.1**. Azure DevOps Server is not supported by the current URL handling. |
 | Installation | OpenCode's plugin manager with the npm package or the versioned Git package, or the source installer with POSIX `sh` and Python 3; no plugin build step or npm dependencies. |
@@ -483,7 +483,7 @@ comments, and what is kept on your machine.
    Passes do not see each other's work. A shard that fills its model context
    is split in half and run again instead of failing. Reviewer sessions never
    compact: AZPR also refuses OpenCode's background summary in them
-   (`compaction.background`, on by default in 2.3.2;
+   (`compaction.background`, on by default from OpenCode 2.3.1 on;
    `experimental.background_compaction` in earlier releases) before anything
    is sent, and that refusal ends nothing.
 3. **The runtime's checks.** The runtime checks the form and the source of
@@ -528,6 +528,24 @@ at least one pass, and those reviewed in every pass. A pass that fails costs
 depth, which the second number and a warning show; a file is unreviewed only
 when no pass reviewed it.
 
+**Your local project's instructions are not a review's.** OpenCode adds to
+every request what it collects for a conversation's directory: instruction
+files (`AGENTS.md`, `CLAUDE.md`, configured ones) and what MCP servers,
+references and skills say of themselves. AZPR keeps all of that out of its
+private sessions, which get AZPR's own instructions and OpenCode's date and
+environment; your own conversations are not touched. With a `claude-agent`
+model that holds for what OpenCode hands the Claude Code program: the date
+and the environment are then Claude Code's own, and whether that program
+reads a `CLAUDE.md` of the working directory by itself was not tried with
+the real program. A reviewer can still read
+the instruction files of the PR's repository with AZPR's tools, at the
+reviewed commit, and local files on purpose. Where AZPR cannot tell these
+parts of a request apart (another plugin rewrote them, or a later OpenCode
+builds them another way), it sends them as it received them, with whatever
+of your local instructions they hold, and the stage's
+[debug record](docs/DEBUGGING.md) counts the request; see
+[what the selected model receives](docs/ENTERPRISE.md#what-the-selected-model-receives).
+
 `/pr-quick` and `/pr-deep` run this same review with the models listed for
 them (`models.quick.reviewers`, `models.deep.reviewers`). An empty list leaves
 the command off, and no mode falls back to another mode's models. `/pr-quick`
@@ -563,14 +581,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.5.0
+opencode plugin add opencode-azure-devops-pr-review@0.5.1
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.5.0'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.5.1'
 ```
 
 Add only one of them. OpenCode (2.3.0 and later) loads the plugin into a
@@ -585,7 +603,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.5.0",
+    "package": "opencode-azure-devops-pr-review@0.5.1",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -596,6 +614,21 @@ can keep using `install.sh --replace`. To move one to the native package,
 copy its settings to the external configuration path with owner-only
 permissions, archive the old installation with its uninstaller, then add the
 package. Keep the PAT file and private state directory in place.
+
+**Install an exact version, as the commands above do.** OpenCode 2.4.0 and
+later update a plugin entry that follows a version by themselves
+(`…@latest`, a range such as `^0.5.0`, a Git branch, a `#semver:` range), when
+the service starts and every 24 hours, and load the new version at once: a
+review that is running ends as `CANCELLED`, and coming from 0.4.x AZPR then
+waits for the [settings update](#upgrading-from-04x). An exact version and a
+Git tag are never changed that way.
+
+OpenCode also loads AZPR again whenever a plugin that is loaded before it
+changes, another plugin's automatic update included, and that ends a running
+review the same way. Local plugins in the configuration directory's `plugin/`
+and `plugins/` folders are loaded first, by path, then the entries of the
+`plugins` list in their order: list AZPR first there, and do not edit a local
+plugin while a review runs.
 
 ### Upgrading
 
@@ -611,7 +644,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.5.0 &&
+opencode plugin add opencode-azure-devops-pr-review@0.5.1 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -644,8 +677,10 @@ version afterwards, remove the settings that version does not know: it names
 the first one (`Unknown setting settings.terminalPanel`) instead of starting. `opencode plugin list` should then
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
-Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.5.0 release notes](docs/releases/v0.5.0.md) for what changed, the
+Exact versions stay pinned: `opencode plugin update` leaves them unchanged,
+and so do OpenCode's automatic plugin updates (2.4.0 and later).
+See the [0.5.1 release notes](docs/releases/v0.5.1.md) for the move to OpenCode 2.4.1, the
+[0.5.0 release notes](docs/releases/v0.5.0.md) for review passes in place of roles, the
 [0.4.6 release notes](docs/releases/v0.4.6.md) for one comment for a defect at several places, the
 [0.4.5 release notes](docs/releases/v0.4.5.md) for stopping a run from the panel, the
 [0.4.4 release notes](docs/releases/v0.4.4.md) for the steps at the panel's foot, the
@@ -723,8 +758,8 @@ says so, and `/pr-setup` then updates it as above.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.5.0 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.5.0.tar.gz)
-and extract it, or check out tag `v0.5.0`. The installer needs POSIX `sh` and
+Download the [v0.5.1 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.5.1.tar.gz)
+and extract it, or check out tag `v0.5.1`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -1013,12 +1048,16 @@ How to choose the lists:
   that need it.
 - **More passes mainly cost more.** They run side by side, within
   `workflow.parallelSessions`.
-- **`claude-agent` models need memory.** On OpenCode 2.3.2, each session of
-  OpenCode's `claude-agent` provider keeps a local process until OpenCode
-  exits (for the background service: until `opencode service restart`). A
-  review starts one session per pass and shard, plus its duplicate checks,
-  its rating and its comment planning, so many passes over many shards add
-  up.
+- **`claude-agent` models need memory.** Each session of OpenCode's
+  `claude-agent` provider has a local `claude` process of about 200 MB, which
+  ends five minutes after the session's last turn. OpenCode 2.4.0 and later
+  also end it when the session is deleted, so after a run whose sessions AZPR
+  deleted only the session that holds the report still has one. Where the
+  sessions stay (`debug.enabled`, `deletePrivateSessions: false`, or a run
+  whose stop OpenCode did not confirm), each keeps its process for those
+  five minutes. A review starts one session per pass and shard, plus its
+  duplicate checks, its rating and its comment planning, and they run side
+  by side: leave memory for them.
 
 What was measured about these choices, with which models, judge and version,
 is in the [validation record](docs/VALIDATION.md).
@@ -1090,7 +1129,7 @@ restart the OpenCode service.
 | `returnReport` | `receipt`; `full` also encloses the rendered report in the receipt. |
 | `outputLanguage` | `en`; used by reviews, the report and comments. `zh-TW` for Traditional Chinese. |
 | `runTimeoutSeconds` | `null` (no whole-command timer); an integer 10–7200 enables one. |
-| `shell` | `deny`: private reviewers cannot run shell commands (the tool is hidden). `ask`: each command needs your approval in OpenCode. `inherit`: host permissions decide. |
+| `shell` | `deny`: private reviewers cannot run shell commands (the tool is hidden). `ask`: each command needs your approval in OpenCode; the request is the reviewer session's, and one that nobody answers stops the stage after `workflow.stageIdleSeconds`. `inherit`: host permissions decide. A command that goes on in the background (OpenCode 2.3.1 and later move one there when its timeout runs out, after 120 seconds by default) tells its reviewer when it has ended, and the pass goes on. One that ends after the reviewer's session has gone idle is not waited for; one that ends right after the answer, while the session is still at work, is still handed to the reviewer, which may answer once more. A mode in which reviewers run code in an isolated sandbox was prototyped and measured with two models; it changed neither recall nor the share of valid findings measurably, so there is none ([validation](docs/VALIDATION.md#reviewers-running-code-in-a-sandbox-2026-11-25-and-26)). |
 | `progressNotices` | `true`: short PROGRESS notices in the invoking conversation. |
 | `deletePrivateSessions` | `true`: when a command ends, AZPR deletes its private reviewer sessions except the one that holds the review's report (see [retention](#retention-and-privacy)); `false` keeps every session. |
 | `terminalPanel` | `auto`: the [terminal panel](#terminal-panel) opens by itself when a review or comment run starts and when a report or preview arrives.<br>`manual`: it opens only with `/pr-panel`. |
@@ -1105,9 +1144,9 @@ restart the OpenCode service.
 | `azure.caFile` | `""`. The absolute path of a PEM file with CA certificates AZPR trusts in addition to the built-in roots, for a proxy that inspects HTTPS. |
 | `azure.verifyTls` | `true`. `false` skips certificate checks for AZPR's Azure DevOps calls (like `curl -k`), so anyone who can intercept the connection can read the PAT; prefer `azure.caFile`. `/pr-check` warns while it is off. |
 | `workflow.shardFiles` | `25` (1–1000) changed files per reviewer session. A shard that fills its model context is split in half. |
-| `workflow.parallelSessions` | `8` (1–16) private sessions at once within a command. Every pass of every shard shares it, so two passes over one shard run side by side. Lower it, to `4` for example, when the provider limits your request rate. It limits how many sessions run at once, not how many a review starts: with OpenCode's `claude-agent` provider each session keeps a local process until OpenCode exits (observed on OpenCode 2.3.2; about 200 MB per process was measured on OpenCode 2.2.4), so a review with many passes and shards needs that memory whatever this setting is. Comment planning runs at most two pages at once (one when this is `1`). |
+| `workflow.parallelSessions` | `8` (1–16) private sessions at once within a command. Every pass of every shard shares it, so two passes over one shard run side by side. Lower it, to `4` for example, when the provider limits your request rate. It limits how many sessions run at once, not how many a review starts: with OpenCode's `claude-agent` provider each session has a local process of about 200 MB that outlives its last turn by five minutes (OpenCode 2.4.0 and later end it when AZPR deletes the session), so a review with many passes and shards can need more memory than this setting suggests. Comment planning runs at most two pages at once (one when this is `1`). |
 | `workflow.repairAttempts` | `2` correction turns when an answer breaks the output contract. A reviewer's one follow-up turn for unfinished work uses the same budget. |
-| `workflow.stageRetries` | `1` new-session retry after a transient failure (provider 429/5xx, an interrupted stream that OpenCode did not recover by itself) or an inactivity stop. While the provider's host cannot be reached (no DNS answer, no route), OpenCode 2.3.0 retries the request by itself for up to an hour; AZPR allows that, so the review waits instead of failing, and `/pr-stop` ends it. A used-up usage or spend limit (provider quota, ChatGPT or OpenCode Go usage limit, OpenCode free-model or spend limit) is named and not retried, whatever its status, and AZPR refuses OpenCode's own retries of it. |
+| `workflow.stageRetries` | `1` new-session retry after a transient failure (provider 429/5xx, an interrupted stream that OpenCode did not recover by itself) or an inactivity stop. While the provider's host cannot be reached (no DNS answer, no route), OpenCode 2.3.0 retries the request by itself for up to an hour; AZPR allows that, so the review waits instead of failing, and `/pr-stop` ends it. A used-up usage or spend limit (provider quota; a ChatGPT usage limit, also the one a workspace's admin sets; an OpenCode Go usage limit; an OpenCode free-model or spend limit) is named and not retried, whatever its status, and AZPR refuses OpenCode's own retries of it. |
 | `workflow.stageIdleSeconds` | `600` (`0` turns it off, otherwise 60–7200): a reviewer stage that shows no activity this long while it waits on OpenCode (the model stream, a tool or the host stopped responding) is stopped with `failure=idle` and an error naming its last activity, then retried in a new session. Every model request, streamed chunk of output, tool start or end and announced host retry restarts the window, so a stage that keeps working, including a long answer that keeps streaming, is never cut. With shell allowed, an approval or a command that takes longer counts as inactivity. |
 | `debug.enabled` / `debug.directory` / `debug.keepRuns` | `false` / `""` / `20` run directories kept (`0` keeps all); see [debugging](docs/DEBUGGING.md). |
 
@@ -1524,6 +1563,14 @@ every later run. While debug is enabled every session is kept until its
 review is evicted, so turn `debug.enabled` off for everyday use if the list
 gets long. A review that an OpenCode restart interrupts leaves its sessions in
 the list; delete those yourself. Your own conversations are never deleted.
+With a `claude-agent` model, Claude Code also keeps a transcript of every
+session under its own configuration directory (`~/.claude/projects/` by
+default), with what AZPR sent, source excerpts of the PR included. Deleting
+the OpenCode session does not delete it: Claude Code's cleanup does (after 30
+days by default). The folder of a working directory there also holds the
+transcripts of your own Claude Code conversations in that directory, so do
+not delete it to be rid of a review's; the
+[team guide](docs/ENTERPRISE.md#local-records-and-cleanup) says what can be done sooner.
 A conversation nobody named yet, which OpenCode lists as **New session**, is
 named after the PR when its first check or review starts
 (`AZPR: PR #123 (repository)`): an AZPR command never makes the conversation's
@@ -1578,8 +1625,8 @@ dependency and is not built on your machine.
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.5.0` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.5.0'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.5.1` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.5.1'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -1592,7 +1639,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.5.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.5.0)
+release scope, [v0.5.1](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.5.1)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 the [demo page](docs/DEMO.md) for the recordings and the version each was made
 with, and [releasing](docs/RELEASING.md) for the release process.

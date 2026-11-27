@@ -37,11 +37,13 @@ Availability and billing depend on the environment. Under the [official source r
 
 **DSH image generation (off by default, plugin 0.2.9+):** Chat-only users, including those on 0.2.4, don't need to change anything.
 
-1. For image generation only, create a separate event function named `generateImage` in the same environment (Node.js 20, entry point `index.main`, recommended timeout 600 seconds), then upload the [ZIP with dependencies](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/v0.2.10/generateImage-with-deps.zip) and deploy directly. Do **not** overwrite `aiProxy` or change the login's function name.
+1. **New installations need just one function.** Upload the [unified chat + image ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/v0.2.11/aiProxy-unified-with-deps.zip) to the `aiProxy` event function (Node.js 20, `index.main`, disable automatic dependency installation; allow 600 seconds for images). Test with `{"action":"checkImage","prompt":"A banner, aspect ratio 5:2"}`: expect `requestedSize: "1600x640"` and `modelCalled: false`. Images default to `1024x1024` without an explicit canvas ratio.
 2. Enable **Image generation** in the Magpie plugin options. In DSH select `cloudbase/hy-image-v3.5-preview` and send a text prompt.
 3. From 0.2.10, new DSH web replies show the image inline with an **打开原图** (open original) link. If you still get a bare URL, enable **Always show image previews** in Magpie and save. This requests Markdown for all image clients using that configuration, even without a DSH identifier. It doesn't change chat or previous replies. Leave it off for non-DSH clients expecting a bare HTTPS URL.
 
-**Optional image labeling:** Set `IMAGE_FOOTNOTE_MODE` on `generateImage`: `empty` (default) sends an empty string, `space` sends one space, and `omit` leaves out the field as in 0.2.9. After saving, test with `{"action":"check"}` to read `footnoteMode` without calling the model. In live tests, new originals had a visible AI label with `empty`, but not with `space`. [CloudBase documents custom labels](https://docs.cloudbase.net/ai/image-model/custom-watermark), not a guaranteed opt-out. Follow the [content-labeling terms](https://cloud.tencent.com/document/product/301/97822) when distributing images. No function redeployment is needed for inline previews alone.
+**No migration required.** After a successful ping, 0.2.11 uses the configured chat function if it advertises image support, otherwise the separate `generateImage` function. A failed probe generates nothing; a submitted image request is never retried against another function. Keep `generateImage` while any 0.2.9/0.2.10 clients still use it. The Magpie option is not an access control: callers authorized to invoke the unified function directly can also generate images.
+
+**Optional image labeling:** Set `IMAGE_FOOTNOTE_MODE` on the function that actually generates images; `aiProxy` does not inherit settings from `generateImage`. `empty` (default) sends an empty string, `space` sends one space, and `omit` leaves out the field. Check `footnoteMode` without calling the model: `{"action":"checkImage"}` on the unified function, `{"action":"check"}` on the standalone one. [CloudBase documents custom labels](https://docs.cloudbase.net/ai/image-model/custom-watermark), not a guaranteed opt-out. Follow the [content-labeling terms](https://cloud.tencent.com/document/product/301/97822) when distributing images.
 
 Download the image before the link expires. Each prompt requests a new image; history, reference images and tools are not sent. Avoid automatic routing, background tasks and model tests here: each invocation can incur charges.
 
@@ -55,7 +57,7 @@ Download the image before the link expires. Each prompt requests a new image; hi
 
 ## Deploy aiProxy
 
-Full steps (console upload, CLI, common pitfalls) live in [`cloudfunctions/aiProxy/README.md`](cloudfunctions/aiProxy/README.md). Quick CLI version:
+For chat **and** image generation, use the [unified ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/v0.2.11/aiProxy-unified-with-deps.zip) above. **The following CLI deploys only chat and image input; do not run it over the unified ZIP.** [Chat function guide](cloudfunctions/aiProxy/README.md):
 
 ```bash
 cp cloudbaserc.example.json cloudbaserc.json   # set envId to yours

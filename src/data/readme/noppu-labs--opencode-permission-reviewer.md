@@ -44,8 +44,8 @@ on Noppu Labs' AI Toolkit site.
 ## Requirements
 
 - [Bun](https://bun.sh) >= 1.3.14
-- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (tested with 1.18.35) or V2 `>=2.0.22 <3`
-  (tested with 2.0.26)
+- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (tested up to 1.19.6) or V2 `>=2.0.22 <3`
+  (tested up to 2.4.2)
 - `git` on `PATH`, used only for read-only Git enrichment. Without it, the reviewer gets no Git
   snapshot.
 - A reviewer model: either a model configured in OpenCode that follows JSON schemas reliably, or

@@ -2,11 +2,16 @@
 
 **Local-first, automatic persistent memory plugin for OpenCode**: recalls relevant facts and session summaries on every turn, stores decisions and preferences as local markdown with CPU embeddings, checkpoints session compactions, and provides a zero-token Memory Manager in the TUI and OpenCode Desktop.
 
-![opencode-local-memory TUI preview](./assets/screenshot.png)
+| OpenCode Desktop | OpenCode TUI |
+| :---: | :---: |
+| [![opencode-local-memory Desktop preview](./assets/screenshot.png)](./assets/screenshot.png) | [![opencode-local-memory TUI preview](./assets/screenshot-tui.png)](./assets/screenshot-tui.png) |
+| [View full size](./assets/screenshot.png) | [View full size](./assets/screenshot-tui.png) |
+
+*Note: Previews were rendered in headless Chromium via Playwright from the plugin's actual Desktop (`dist/gui-experimental.cjs`) and TUI (`tui.ts`) UI code using synthetic fixture data and a simulated host frame, rather than captured from a live OpenCode window or terminal.*
 
 ## OpenCode Desktop Support
 
-**Now available in OpenCode Desktop as well as the TUI.** The persistent Memory side panel lets you search stored memories, add and edit facts, pin or unpin core memories, delete entries, import history, and resync the index without a model turn. Press `Ctrl+Shift+M` to open or focus the panel, or `Ctrl+Alt+M` to toggle it. When no session is active, the manager opens in a fallback dialog.
+**Now available in OpenCode Desktop as well as the TUI.** The persistent Memory side panel (side-by-side at 640px and wider, or list-to-detail with a `Back` button in narrow panels) lets you search stored memories, add and edit facts, pin or unpin core memories, delete entries, import history, and resync the index without a model turn. Press `Ctrl+Shift+M` to open or focus the panel, or `Ctrl+Alt+M` to toggle it. When no session is active, the manager opens in a fallback dialog.
 
 One global OpenCode V2 plugin entry loads the server, TUI, and Desktop integration together. Both interfaces use the same local memory files and index; see [Installation](#installation) for setup.
 
@@ -38,31 +43,21 @@ This plugin started as a folder of markdown files and CLI scripts wired together
 
 ## Installation
 
-### Option 1: One-Command Install (Recommended)
+### Option 1: OpenCode Plugin CLI (Recommended)
 
-Run the built-in installer to automatically register the server and TUI plugins in `~/.config/opencode/opencode.jsonc` and `~/.config/opencode/cli.json` (preserving existing comments and settings), create `~/.config/opencode/memory`, and pre-warm the local embedding model:
-
-```sh
-npx @nandoblanco/opencode-local-memory install
-```
-
-Or specify a custom memory folder:
-
-```sh
-npx @nandoblanco/opencode-local-memory install --dir ~/my-memory
-```
-
-You can also install directly with OpenCode's native plugin CLI (because `package.json` exports both `.` and `./tui`, OpenCode loads both the server plugin and TUI popup automatically):
+Install with OpenCode's native plugin CLI. OpenCode downloads the package from npm (or GitHub) into its own cache automatically and adds one entry to `~/.config/opencode/opencode.jsonc` that loads the server hooks, agent tools, `/memory` TUI popup, and Desktop panel together (and scaffolds `~/.config/opencode/memory` automatically on first run):
 
 ```sh
 opencode plugin add @nandoblanco/opencode-local-memory
-# or directly from GitHub:
+# Auto-update on startup and every 24 hours:
+opencode plugin add @nandoblanco/opencode-local-memory@latest
+# Or install directly from GitHub:
 opencode plugin add github:nandoblanco/opencode-local-memory
 ```
 
 ### Option 2: Manual Configuration
 
-Add `@nandoblanco/opencode-local-memory` to the global `~/.config/opencode/opencode.jsonc`. OpenCode V2 loads its server, TUI, and Desktop parts from this single entry. The installer also writes `cli.json` for its TUI setup; a separate manual entry there is not required:
+Add `@nandoblanco/opencode-local-memory` to `"plugins"` in the global `~/.config/opencode/opencode.jsonc` (or project `./opencode.jsonc` / `./.opencode/opencode.jsonc`). OpenCode fetches the npm package automatically and loads its server, TUI, and Desktop parts from this single entry (no manual `npm install` or separate `cli.json` entry is required):
 
 ```jsonc
 {
@@ -80,9 +75,19 @@ Add `@nandoblanco/opencode-local-memory` to the global `~/.config/opencode/openc
 }
 ```
 
-### From a Local Directory
+### Option 3: Built-in CLI Helper (`npx`)
 
-For development, use Node.js 26.4 or newer to meet the OpenTUI dependency's declared minimum. Clone this repository, run `npm ci` and `npm run build:gui`, then run `node ./index.js install` or reference the package directory in the global `opencode.jsonc`. The root `overrides` pin patched `glob` and `minimatch` versions for this repository's development dependencies; they do not alter the OpenCode host application's dependencies:
+Run the package CLI once via `npx` to register the plugin in `~/.config/opencode/opencode.jsonc`, scaffold a custom memory folder, optionally import existing `AGENTS.md` / `opencode.db` data, and pre-warm `vectors.json`:
+
+```sh
+npx @nandoblanco/opencode-local-memory install
+# Or specify a custom memory folder:
+npx @nandoblanco/opencode-local-memory install --dir ~/my-memory
+```
+
+### Option 4: From a Local Directory
+
+For development, use Node.js 26.4 or newer to meet the OpenTUI dependency's declared minimum. Clone this repository, run `npm ci` and `npm run build:gui`, then reference the package directory in `opencode.jsonc` (or place the directory inside `~/.config/opencode/plugins/` or `.opencode/plugins/`). The root `overrides` pin patched `glob` and `minimatch` versions for this repository's development dependencies; they do not alter the OpenCode host application's dependencies:
 
 ```json
 {
@@ -133,11 +138,11 @@ Type filters inline in the search bar or toggle them with clickable filter pills
 
 | Syntax | Description | Example |
 | :--- | :--- | :--- |
-| `term1 term2` | Hybrid semantic (`Xenova/all-MiniLM-L6-v2`) + lexical search | `winnipeg velocity cards` |
+| `term1 term2` | Hybrid semantic (`Xenova/all-MiniLM-L6-v2`) + lexical search | `storefront grid cards` |
 | `/pattern/i` or `re:pattern` | Regular expression match across ID, tags, fact, and file path | `/dec-01[0-9]/i` |
 | `type:topics` / `type:sessions` / `type:all` | Filter to atomic topic facts (`topics/*.md`) or session checkpoints (`sessions/*.md`) (`type:facts`, `in:topics`, `in:sessions` also work) | `type:sessions plugin` |
 | `topic:<slug>` | Filter to a specific topic file (`topics/<slug>.md`) | `topic:decisions self-contained` |
-| `project:<slug>` | Filter to a specific project scope (`global`, `cms/<client>`, `git/<repo>`, or repo name) | `project:butte calendar` |
+| `project:<slug>` | Filter to a specific project scope (`global`, `cms/<client>`, `git/<repo>`, or repo name) | `project:acme calendar` |
 | `core:true` or `is:core` | Filter to pinned core memories (`core: true`) | `is:core` |
 
 ## Keyboard Shortcuts (`/memory`)
@@ -295,7 +300,7 @@ Each entry in `topics/<topic>.md` uses a clean, human-editable block format:
 ## CLI Commands
 
 ```sh
-# One-command setup: updates opencode.jsonc + cli.json, scaffolds memory/, and warms vectors.json
+# Optional CLI setup: updates opencode.jsonc, scaffolds memory/, and warms vectors.json
 npx @nandoblanco/opencode-local-memory install [--dir /path/to/memory] [--import]
 
 # Import existing AGENTS.md/CLAUDE.md rules and compacted session summaries from opencode.db
@@ -322,7 +327,7 @@ npx @nandoblanco/opencode-local-memory maintain [--dir /path/to/memory] [--prune
 
 ## Configuration Options
 
-Options can be passed in `~/.config/opencode/opencode.jsonc` and `~/.config/opencode/cli.json` or via environment variables:
+Options can be passed in `~/.config/opencode/opencode.jsonc` or via environment variables:
 
 ```jsonc
 {
@@ -346,6 +351,7 @@ Options can be passed in `~/.config/opencode/opencode.jsonc` and `~/.config/open
 | `minScore` | *(none)* | `0.38` | Minimum hybrid similarity score (`0.0`-`1.0`) for per-prompt auto-recall injection |
 | `topK` | *(none)* | `6` | Maximum auto-recalled facts injected per turn |
 | `dialogWidth` | `OPENCODE_MEMORY_DIALOG_WIDTH` | `"80%"` | Width of the centered `/memory` TUI modal (`"80%"` or column count like `120`; also respects `OPENCODE_DIALOG_WIDTH`) |
+| `umbrellaDirs` | `OPENCODE_MEMORY_UMBRELLA_DIRS` | `[]` | Extra parent folder names (array or comma-separated env var) treated as umbrella workspace roots alongside defaults (`git`, `clients`, `projects`, `repos`, `workspace`, `code`, `dev`, `src`) |
 
 ## License
 

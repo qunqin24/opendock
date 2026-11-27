@@ -599,6 +599,29 @@ Numbers stay fixed to the last listing. Built-in checks are not covered. See
 [configuration](./docs/configuration.md)
 for details.
 
+### Acknowledging a block
+
+When the opt-in enforce mode blocks a turn, you can accept that `FAIL` for the unit and
+let the gate stop blocking it. Only you can do it, from an interactive terminal.
+
+```sh
+# units a FAIL could block, newest first, numbered
+jevguard ack
+
+# acknowledge one, after an explicit confirmation
+jevguard ack 1
+```
+
+The acknowledgement is local and content-free: it keeps the unit code, the blocking
+rule IDs (at most 32) and the timestamp in `enforce-acks.jsonl` next to the review
+history. The gate reads it before waiting for a review: an acknowledged unit is never
+blocked again and the hook records `ENFORCE_ACKED` without waiting. The numbers come
+from the current history read, and an acknowledged unit leaves the listing. It changes nothing in the review,
+the rule or the finding — `jevguard feedback` remains the way to say a `FAIL` was
+wrong. Only `jevguard ack <number>` requires an interactive terminal (listing runs
+anywhere) and it has no flag that skips the confirmation, so an agent shell can never
+acknowledge a unit for you.
+
 ## Diagnose your setup
 
 `jevguard doctor` checks your local setup without touching the network or changing
@@ -765,7 +788,8 @@ Enforce is accepted ([ADR 0022](./docs/adr/0022-enforce-fail-via-stop-hook.md)) 
 implemented behind the user's own opt-in: Claude Code only, opt-in in the user's
 `claude-code.yaml`, interactive sessions only, `error` rules from the user's allowlist
 (the pilot uses `SECRETS-001` and `DESTRUCTIVE-001`), one block per unit, an 8 s budget,
-never a built-in, coexisting with remediation delivery, and `jevguard ack` as the
+never a built-in, coexisting with remediation delivery (`delivery: agent` included,
+neither suppressing the other), and `jevguard ack` as the
 user's per-unit override (that command is the remaining piece). The `Stop` hook now
 applies the decision: it waits, at most the budget and never past its own allowance, for
 the review the worker records for the closing unit, and a review that does not settle,

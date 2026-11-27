@@ -209,7 +209,7 @@ the decision client and the plugin securing every task:
      session allowed. Without a local name detector, `cloud` costs you a confirmation round trip per call, which can be
      worse than `local` plus the one question a low-confidence decision asks.
    - **Guards.** A check looks at each delegation, at web content and at workers' permission requests. Keys and
-     tokens are masked. The guards — injection, harmful, sensitive — run on this machine in both modes unless the
+     tokens are masked. The guards — injection and sensitive — run on this machine in both modes unless the
      session's user explicitly let them go.
    - **Private data stays here.** Every request to a model — the micromanager's, a worker's, a helper's, the
      summarizer's and the decision client's — has its private data swapped for placeholders first: keys and tokens

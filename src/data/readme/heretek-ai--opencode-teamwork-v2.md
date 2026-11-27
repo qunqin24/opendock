@@ -533,7 +533,7 @@ The engine contract is tested against the real host, not only against a shim:
 | Layer | What it proves |
 | --- | --- |
 | L0 | `npm test`: engine logic, crypto envelopes, containment primitives, catalog, verifier, security |
-| L1 | The plugin loads in OpenCode 2.4.1 (in memory and from a local directory): 26 `teamwork_*` tools, `codemode:false`, schemas, 7 commands, permission hook, storage namespacing, agent decoding, result shape |
+| L1 | The plugin loads in OpenCode 2.4.1 (in memory and from a local directory): 27 `teamwork_*` tools, `codemode:false`, schemas, 7 commands, permission hook, storage namespacing, agent decoding, result shape |
 | L2 | Real sessions and KV: plan/manifest v5, claims and recovery, handoff→report→victory binding, approvals |
 | L3 | Full workflows in real git worktrees: standard and strict gates, victory rejection and resume, limits, a two-process claim race, and the verifier CLI |
 

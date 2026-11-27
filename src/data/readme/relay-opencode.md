@@ -4,12 +4,12 @@
 
 <table>
   <tr>
-    <td valign="top"><img src="docs/images/relay-panel.png" width="360" alt="The Relay panel: Plan and Execute, each with two models, their effort, price, intelligence index and a use-it-for line"></td>
-    <td valign="top"><img src="docs/images/model-table.png" width="360" alt="Adding a model: a searchable table of the models OpenCode offers, with price, context and intelligence index, sorted by index"><br><br><img src="docs/images/recent-choices.png" width="360" alt="Recent choices: each decision with its mode, model, how sure the decider was, and what the reply took"></td>
+    <td valign="top"><img src="docs/images/relay-panel.png" width="360" alt="The Relay panel as a strip board: the decider, the 7-day cost strip, and Plan and Execute bays, each model a strip with its slot, price, index, context, effort and use-it-for line"></td>
+    <td valign="top"><img src="docs/images/model-table.png" width="360" alt="Adding a model: a searchable rack of the models OpenCode offers, with price, intelligence index and context, sorted by index"><br><br><img src="docs/images/recent-choices.png" width="360" alt="Recent choices: one line per decision with its time, mode, model, how sure the decider was, and what the reply cost"></td>
   </tr>
 </table>
 
-<sub>The Relay panel with example settings and example Recent choices. The models, prices and index numbers are what OpenCode and Relay listed on 18 Nov 2026.</sub>
+<sub>The Relay panel with sample settings and sample Recent choices (26 Nov 2026). The models, prices and index numbers are shaped like what OpenCode and the public lists showed that day.</sub>
 
 > Relay is early. It is built for OpenCode 2.3 and runs in OpenCode Desktop 2.4.1 on Windows. See [what has been tested](docs/status.md).
 
@@ -28,20 +28,22 @@ You need OpenCode 2.3 or newer: OpenCode Desktop or the terminal app.
 1. Run:
 
    ```sh
-   opencode plugin add relay-opencode@0.2.1
+   opencode plugin add relay-opencode@0.2.2
    ```
 
-   It downloads Relay from npm and adds it to the `plugins` list of your global config, keeping the plugins already there. Use the newest version, which `npm view relay-opencode version` prints. With OpenCode Desktop only, run Desktop's own command-line binary the same way: on Windows `%APPDATA%\ai.opencode.desktop\cli\<version>-x64\opencode-cli.exe plugin add relay-opencode@0.2.1`.
+   It downloads Relay from npm and adds it to the `plugins` list of your global config, keeping the plugins already there. Use the newest version, which `npm view relay-opencode version` prints. With OpenCode Desktop only, run Desktop's own command-line binary the same way: on Windows `%APPDATA%\ai.opencode.desktop\cli\<version>-x64\opencode-cli.exe plugin add relay-opencode@0.2.2`.
 2. Quit OpenCode completely and open it again.
 3. Type `/` in a chat. `/relay` should be in the list.
 
-Or add it by hand: in OpenCode's global config file (`~/.config/opencode/opencode.json`; on Windows `C:\Users\<you>\.config\opencode\opencode.json`; or `opencode.jsonc` if that is the one you have), add `"relay-opencode@0.2.1"` to the `plugins` list, keeping any plugins already in it:
+Or add it by hand: in OpenCode's global config file (`~/.config/opencode/opencode.json`; on Windows `C:\Users\<you>\.config\opencode\opencode.json`; or `opencode.jsonc` if that is the one you have), add `"relay-opencode@0.2.2"` to the `plugins` list, keeping any plugins already in it:
 
 ```json
 {
-  "plugins": ["relay-opencode@0.2.1"]
+  "plugins": ["relay-opencode@0.2.2"]
 }
 ```
+
+Then quit OpenCode completely and open it again. Added by hand, Relay is downloaded on that first start and loaded on the next, so if `/relay` is not listed yet, wait a minute, then quit and open OpenCode once more (OpenCode 2.4.2, 26 Nov 2026). `opencode plugin add` downloads it at once, so one restart is enough there.
 
 Other ways to install, from source or as a fixed copy, are in the [guide](docs/guide.md#install-from-source).
 
@@ -78,7 +80,7 @@ Follow these steps in order. Stop and ask the user when a step says so. Never pr
       - The key is `plugins` (plural): never add a second `plugins` key or a singular `plugin` key, and do not touch any other key, such as `permissions`.
 6. **Check the file.** For `.json`, it must parse: `node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" <path>`. For `.jsonc`, a strict JSON check fails even on a good file, so check instead that the comments are still there and the brackets balance, or use a JSONC parser. If the file is broken, restore the backup and stop.
 7. **Restart OpenCode.** Ask the user to quit OpenCode completely and open it again; if you run inside OpenCode yourself, or are not sure, do not restart it yourself. Do not end OpenCode's processes yourself.
-8. **Verify** after the restart. The first start downloads Relay, which can take a minute or two.
+8. **Verify** after the restart. After `plugin add`, Relay is already downloaded. After an edit by hand, the first start only downloads it (a minute or two) and the next start loads it: if Relay is not loaded after the first restart, ask the user to quit and open OpenCode once more.
    - In OpenCode's log (`~/.local/share/opencode/log/opencode.log`; Windows: `%USERPROFILE%\.local\share\opencode\log\opencode.log`) there is a `loading plugin` line naming `relay-opencode`, and no `failed to load plugin` line for it.
    - Or ask the user to type `/` in a chat: `/relay` is listed.
 9. **Tell the user what to do next.** Relay's settings are made in OpenCode Desktop's Relay panel, and an agent cannot click there:
@@ -94,8 +96,8 @@ To remove Relay, run `opencode plugin remove relay-opencode@<version>` (or delet
 - **Installed from npm:** remove the old version and add the new one, then quit and reopen OpenCode:
 
   ```sh
-  opencode plugin remove relay-opencode@0.2.0
-  opencode plugin add relay-opencode@0.2.1
+  opencode plugin remove relay-opencode@0.2.1
+  opencode plugin add relay-opencode@0.2.2
   ```
 
   `plugin add` on its own adds a second entry next to the old one. By hand, change the version in the `plugins` entry instead.

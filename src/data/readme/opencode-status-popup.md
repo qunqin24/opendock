@@ -50,7 +50,7 @@ The popup appears as soon as OpenCode loads the plugin — idle until a session 
 
 ### Requirements
 
-- **OpenCode V2**
+- **OpenCode 2.2 or newer** (developed and tested against 2.4.1). The 0.3.x line still supports OpenCode 2.0/2.1.
 - **Windows**: the popup is a small PowerShell process (WPF for the pill, WinForms for the tray icon) that uses the `pwsh.exe` or `powershell.exe` already on the machine.
 
 ## The five states
@@ -180,7 +180,7 @@ OpenCode server
                         (named mutex per state dir) aggregates them and paints
 ```
 
-- **Busy detection** uses the public event stream: `session.status` (`busy`/`retry`/`idle`), `session.execution.started/succeeded/failed/interrupted`, `session.idle`, streaming deltas and tool activity. Prompts waiting for you come from `permission.asked` / `permission.replied` and from `form.created` / `form.replied` / `form.cancelled` — OpenCode 2 asks questions through a form, with the question text as the detail. Located events are matched against the plugin's own location, so a busy session in another project does not light up your pill; events that carry no location are accepted.
+- **Busy detection** uses the public event stream: `session.status` (`busy`/`retry`/`idle`), `session.execution.started/succeeded/failed/interrupted`, `session.idle`, streaming deltas and tool activity. Prompts waiting for you come from `permission.asked` / `permission.replied` and from `form.created` / `form.replied` / `form.cancelled` — OpenCode 2 asks questions through a form, with the question text as the detail. On OpenCode 2.2+ the subscription asks the host for exactly those types, so unrelated events are not delivered to the plugin. Located events are matched against the plugin's own location, so a busy session in another project does not light up your pill; events that carry no location are accepted.
 - **Multiple instances** (several OpenCode windows, several projects on one server) each write their own presence file. The host shows the union and the `Show details` balloon lists the project names.
 - **State directory**: next to the presence files it holds `host.json` (the running host: pid, renderer and the settings it renders, rewritten as a heartbeat), `mode.json` (the renderer chosen at runtime, shared by every instance), `mode.request` (a switch waiting for the next server tick), `idle-static.json` (the tray idle chosen at runtime, shared by every instance), `idle-static.request` (a toggle waiting for the next server tick), `position.json` (the configured corner the host applies when it places the pill), `window.json` (where the pill was last placed) and the two logs, `plugin.log` and `host.log` — each rotates to a `.1` copy at its cap (512 KiB and 256 KiB), so the newest lines are the ones kept. The preview harness adds a fake `state\preview.json` of its own while it runs.
 - **Crash safety**: presence files expire after `freshSeconds`, a session that sends no event for 45 minutes is dropped, and the host exits by itself when nothing is fresh. The plugin also restarts the host if it died or if the options changed. Files a killed instance left behind are reaped on the next setup and again before the last instance decides to stop the host.
@@ -197,7 +197,7 @@ $env:SMOKE=1; npm run smoke     # loads the plugin, drives it with events, spawn
 
 ### Install from a checkout
 
-Point `plugins` at the **directory**. A configured plugin path has to be a directory and is loaded through its `index.ts` — the `exports` field of the package is not what a directory plugin resolves to, which is why this repository ships a root `index.ts` that re-exports the real entry point:
+Point `plugins` at the **directory**. OpenCode 2.2+ loads a local directory whose `package.json` declares `name` and `exports` through those exports, exactly like an installed package. On OpenCode 2.0/2.1, use the 0.3.x line, which ships the root `index.ts`/`tui.ts` shims:
 
 ```jsonc
 {

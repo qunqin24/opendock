@@ -1,10 +1,6 @@
 # opencode-forge
 
-Single general-purpose **forge** agent + two orthogonal harnesses for
-[opencode](https://opencode.ai) ≥ 1.18: a **plan harness** (decide first,
-execute later) and a **goal harness** (arm an objective, let the loop drive
-itself to a host-verified finish). They share nothing but a safety interop;
-OpenSpec spec workflows remain a third, separate lane.
+Single general-purpose **forge** agent for [opencode](https://opencode.ai), with three file-backed harnesses: plan, goal and crew. OpenSpec workflows remain separate. This README describes the in-progress runtime retirement, not a released or live-host-verified replacement.
 
 ```
 /plan fix login timeout   → read-only recon → plan_write (draft, writes denied)
@@ -12,7 +8,7 @@ OpenSpec spec workflows remain a third, separate lane.
                            → plan_approve (user dialog = final gate) on explicit go-ahead
                            → execute task by task, plan_tick on each (timestamped audit)
                            → all ticked → per-criterion self-check → plan_close
-                             (user dialog = completion gate) → done
+                             (plugin re-runs the FROZEN checks, fail-closed, no dialog) → done
 /plan                     → list in-progress plans with progress
 /plan resume              → continue the most recent unfinished plan
 /plan discard             → abandon the current plan (abandoned, writes restored)
@@ -43,101 +39,145 @@ OpenSpec spec workflows remain a third, separate lane.
   counts read the Task List only — and a superseded plan's Task List
   stays the frozen decision snapshot: closure IS the supersession, and
   crew/goal results never tick it.
-- While a plan is in draft, `write` / `edit` / `bash` are **denied at the
-  permission layer** — including your own `allow` config, and for every agent
-  in that session (the draft protects shared session state; see Agent
-  partition below) — and `task` is **shape-gated**: dispatch to an
-  effective-readonly forge scout passes, every other target is denied (see
-  Design stance). The only exits are approval and discard. This is deliberate;
-  see Design stance.
-- `plan_approve` / `plan_close` are pinned to a confirmation dialog: the
-  model can never flip the state itself.
+- Draft plans restrict writes for the session. The intended native dispatch policy admits only eligible readonly scouts with shell explicitly denied; actual native admission remains to be verified. Approval or discard ends the draft.
+- `plan_approve` is pinned to a confirmation dialog: the model can never
+  flip itself into execution. `plan_close` has **no dialog** — the
+  completion gate is plugin-verified: plans that declare Verification
+  Checks (`plan_write {checks: [...]}`, goal-harness-shaped) get the frozen
+  set re-executed on the host at close, fail-closed (a failing check
+  refuses the close, records the run in the plan's `## Check Log`, and the
+  plan stays approved); plans without declared checks keep the
+  per-criterion self-check gate. Both paths append an evidence summary the
+  user reviews asynchronously; `plan_reopen` (done → approved, explicit
+  user instruction only) is the rollback window.
+- **Confirmation gates are time-boxed (gated-ask watchdog)**: every
+  confirmation gate (`plan_approve` / `goal_write` arm /
+  `goal_complete` / `goal_resume` / `goal_discard` / `crew_close`) is
+  wrapped by a watchdog — when no answer arrives within the window (default
+  300 s, `FORGE_GATE_ASK_WATCHDOG_MS`, 0 disables), the gate resolves as a
+  DISCLOSED REJECTION: the awaiting tool call fails with a finding that
+  names the gate, the timeout, the fail-closed posture (state unchanged,
+  nothing approved — the invariant survives verbatim) and the retry
+  contract (re-run when the dialog is actually visible; a late click on the
+  stale dialog cannot approve the refused call). The plugin NEVER
+  auto-approves. This exists because of a real incident: a TUI wedge where
+  the dialog never rendered and `goal_write` hung forever.
+- **A confirmation dialog reaches the session that asked (hosts with more
+  than one directory)**: an opencode v2 host runs one instance per project
+  directory, each with its own pending-permission table, and a terminal
+  reads and answers a session's requests only through that session's own
+  directory. The plugin's tools confirm through the interface of the
+  plugin initialization that registered them — the one of the session's
+  directory — never through a shared one. With several directories loaded
+  at once (several TUI tabs, a pooled worktree, a second project) the
+  dialog shows up where the call was made **and the answer given there
+  reaches it**, and the host evicting one directory's idle instance does
+  not break the gates of any other. (Before 0.34.1 one
+  shared interface filed every directory's requests in the table of the
+  directory initialized last: the dialog still popped up — a terminal
+  hears of a new request through a host event — but the answer could not
+  find the request, the dialog vanished and the gate waited out its
+  watchdog.) A door whose directory has no confirmation interface refuses
+  by name (fail-closed: nothing is approved, nothing executes).
 - Goal files: `.opencode/goal/<date>-<slug>.md`, state machine
   `queued → active ⇄ paused → completed / abandoned`, one live goal per
   session plus a workspace queue. Completion is **verified by the plugin**,
   not attested by the model: `goal_complete` re-executes every check itself
   and refuses (fail-closed) on any failure.
-- The native `build` / `plan` agents **stay installed and independent**:
-  forge coexists with them in the Tab cycle. The plugin hard-partitions the
-  two worlds (see Agent partition below) instead of hiding anything; plan
-  and goal files are never deleted on uninstall.
+- Plan, goal and crew records are user data and remain on disk when Forge is disabled or removed.
 
-## Agent partition (who sees what)
+## Agent surface
 
-The plugin draws a hard line between two agent families, enforced at the
-tool layer (verified against the host's `tools` filter):
+Native host tools are the intended execution and dispatch surface. Harness state changes remain forge-primary-only. Pool and draft restrictions are intended runtime gates, not permission grants; native host admission still requires verification. Explicit user configuration takes precedence over picker/default transforms.
 
-| | **forge family** — `forge` + your forge.json `forge-*` workers | **everyone else** — native `build` / `plan` / `general` / `explore` and your own agents |
-| --- | --- | --- |
-| exec surface | `forge_shell` / `forge_jobs` only; builtin `shell`/`bash` hidden (unconditional, probe-independent; covers user-defined `agent.forge` entries too) | builtin `shell`/`bash`, fully native |
-| forge tools (`plan_*`, `goal_*`, `crew_*`, `forge_shell`, `forge_jobs`, `forge_grep`, `forge_glob`) | `forge` sees all; `forge-*` workers only `forge_shell` + `forge_jobs` + the search pair (`forge_grep`/`forge_glob`) | none visible |
-| dispatching `forge-*` via `task` | allowed | refused at the tool layer |
-| writing `.opencode/plan/` / `.opencode/goal/` | allowed (state machine governs) | refused at the tool layer (reads stay open) |
-| forge system prompts (job guidance, plan/goal notices) | injected | never injected — zero forge text |
-| watchdog (stuck builtin shell) | governed | untouched — no markers, no kills |
-
-Escape hatches: `jobs.keepBuiltinShell: true` gives the forge family the
-builtin shell back; `jobs.mode: "native"` retires `forge_shell`/`forge_jobs`
-entirely (the hide is withdrawn in the same stroke). The forge family is
-prompted to route every shell command through `forge_shell` — on hosts that
-ignore injected tools maps the builtin tool stays visible but is refused at
-call time, and the channel mandate is what keeps the model from trying it
-first (the belt refusal remains the backstop). On such unfiltered hosts the
-fallback belt family is a three-part enumeration of hard refusals at the
-tool layer: a forge-family builtin `shell`/`bash` call is refused with a
-pointer to `forge_shell`; a non-forge agent's call of any forge tool is
-refused with the partition guidance; and a `forge-*` worker (any family
-member whose agent name is not exactly `forge`) calling a harness state tool
-(`plan_*`, `goal_*`, `crew_begin`, `crew_close`) is refused as primary-only.
-That refusal fires before any execution or user confirmation dialog, so a
-worker's state-tool call never reaches a gate, and the error names the way
-out: report findings back to the orchestrating session — the primary forge
-agent alone calls the state tools. Mixed sessions (Tab
-between agents in one session): harness state (plans/goals) stays
-session-bound, tool surfaces follow the current speaker, and the goal loop
-parks instead of driving a non-forge turn. One deliberate exception: a
-draft-phase write ban binds the **session** (protecting shared state), so a
-non-forge agent is write-blocked until the draft is approved or discarded in
-forge. Running `/plan` `/goal` `/crew` under a non-forge agent redirects to
-forge instead of executing.
-
-**Default subject.** The host otherwise defaults new sessions to `build`
-once a build agent exists — the plugin pins `default_agent: "forge"`
-automatically (a `default_agent` you set yourself always wins), so bare
-runs and fresh sessions still land on forge under coexistence.
 
 ## Install
 
-Requires opencode ≥ 1.18 (v1 hosts) or ≥ 2.0 (v2 hosts). Same install
-commands on both — the plugin ships both entries and the host picks one.
+The current 0.34.1 development candidate is v2-only. The v1 entry and package subpath have been removed. The planned 0.35.0 release is not yet released or accepted.
 
 ```bash
 # npm (recommended)
-opencode plugin @sorenllm/opencode-forge --global
+opencode plugin add @sorenllm/opencode-forge
 # or GitHub source
-opencode plugin github:ChengZiiii/opencode-forge --global
+opencode plugin add git+https://github.com/ChengZiiii/opencode-forge.git
 ```
 
-Local development: add `"file:///<repo abs path>"` to the `plugin` array in
-your opencode config. Single-file install: copy `dist/index.js` to
-`~/.config/opencode/plugin/forge.js` — it is fully self-contained (the plan
-discipline rides inside the /plan command template; there is no separate
-skill file).
+Local development uses a directory package reference (`file:///<repo abs path>`)
+in the host plugin configuration, with its package manifest and built dist
+present. The v2 loader does not accept the old single-file installation.
+CLI `plugin add` accepts npm registry or Git package specifiers; directory
+loading is a configuration mechanism, not a CLI install recipe.
 
 Note: do not enable opencode's experimental plan mode
 (`OPENCODE_EXPERIMENTAL_PLAN_MODE`) together with forge — two plan mechanisms
 would overlap.
 
-### Upgrading (verified installer behavior)
+### Upgrade notes — planned 0.35.0 (breaking changes)
+
+These are the approved runtime-retirement decisions for the intended release,
+not a release announcement or a claim of new live-host verification.
+The old shell/job and dispatch engine code and the v1 `server` entry/export
+are retired in the current working tree. Same-name search enhancement is now
+implemented, as is native cancellation. The fixed e3ec development bundle has partial live-host stop evidence; full native admission, cancellation, search, activation/removal and final-package verification remain pending.
+
+**Before upgrading:** confirm your host is opencode 2.x (`^2.0.0`). The
+intended release removes the v1 `server` entry and `./server` export; v1
+will no longer be supported. While still on the old plugin, review surviving
+and background jobs, queued dispatches and in-flight children. Decide whether
+to wait or stop them using the old version's controls, and confirm their
+disposition before upgrading. Do not upgrade with that check outstanding.
+Back up recipes, generated definitions and historical harness records.
+
+| Previous behavior | Intended release |
+| --- | --- |
+| `forge_shell`, `forge_jobs`, job supervisor, process fence and stuck-shell watchdog | Removed. Use builtin `shell` and the host Shell panel; no plugin job list/poll/kill, survivor adoption, idle/success-pattern early return or process-lifecycle guarantee. |
+| `cwd:` in command results; forced noninteractive editor/pager | No plugin guarantee. The host determines working directory, timeouts and editor/pager behavior. |
+| Command-level readonly seal | Removed. Readonly workers retain shell by default; file-write restrictions are not a readonly shell sandbox. Explicit recipe denies still apply. Draft recon requires eligible readonly workers with shell explicitly denied. |
+| Plugin `task` dispatch engine | Removed without fallback. Use native `subagent`: background only, no plugin concurrency limit, queue, per-call permissions, retries, restart adoption, logs, report files, progress or supplemental wakes. |
+| Dispatch results and cancellation | See host child-session records/transcripts and completion messages. `/forge stop` requests cancellation of confirmed native descendants and their owned background commands; a request is not confirmed termination, cancellation is not task success, and parent interruption alone does not guarantee children stop. Host notification and restart behavior belong to the host. |
+| `forge_grep` / `forge_glob` | Removed. Current source enhances builtin `grep` / `glob` under the same names via `editor.update`, defaulting `follow` and glob `hidden` to true for all agents where supported; unsupported host contexts retain native behavior. Isolated staged-host execution has been reported, but final-package, authorization-equivalence and uninstall E2E verification remain pending. |
+| Agent-family tool hiding | No longer hides Forge tools from other agents. Harness state tools remain forge-primary-only; session/pool and draft gates still govern dispatch while Forge is enabled. |
+| `agent["forge"].disable` whole-plugin switch | Retired in the working tree. The host owns plugin activation; agent disable affects the agent only. The native activation/removal matrix remains blocked. |
+
+Plan, goal and crew retain their file formats and disciplines. Their runtime
+checks, gates and continuation require a loaded Forge plugin. Worker questions
+default to denied; explicitly allowing `question` can leave a background child
+waiting for an answer that never reaches it.
+
+Old `dispatch`, `jobs.*`, `watchdog.*` and `FORGE_DISPATCH_*` settings are
+ignored with bounded diagnostics, not rewritten. The confirmation
+door timeout `FORGE_GATE_ASK_WATCHDOG_MS` remains. The retired runtime's
+job/watchdog files and dispatch logs are neither read nor deleted by the new
+runtime. Historical paths include `<tmp>/opencode-forge/jobs/`,
+`<tmp>/opencode-forge/watchdog/`, `<tmp>/opencode-forge/dispatch/` and
+`<project>/.opencode/forge/dispatch-log.jsonl`. After confirming no old jobs
+need them, manually remove specific old files only if you no longer need
+their history.
+
+Generated definitions must match current compiled content/contract even if
+recipe timestamps are unchanged. Incompatible worker projections are not
+silently accepted for dispatch/recon/crew. Use `/forge sync` from the forge
+primary or existing `sync: "auto"` opt-in; without authorization no rewrite.
+Builtin overrides have their own independent compilation rules; handwritten
+same-name files are protected. A broken workspace pool remains exclusive (no
+global fallback); host-wide visibility does not grant cross-pool dispatch.
+
+**Rollback is not lossless.** Reinstalling an older version with authorization
+and restoring backups or explicitly syncing definitions for that version does
+not guarantee recovery of old job lifetimes, pending work, notifications or
+terminal states. Preserved plan/goal/crew records do not themselves resume
+or reconcile live work.
+
+### Upgrading (previously verified installer behavior)
 
 `opencode plugin add` APPENDS — it never replaces an existing entry for the
-same plugin id, so a bare `opencode plugin @sorenllm/opencode-forge --global`
+same plugin id, so a bare `opencode plugin add @sorenllm/opencode-forge`
 over an existing install fails with `Duplicate plugin ID: forge`. The
-verified upgrade path:
+historical installer evidence suggests this upgrade sequence; current-candidate removal and activation are not yet verified:
 
 1. Remove the old entry first (uninstall step 1 below: edit the `plugin`
    array in `~/.config/opencode/opencode.json`).
-2. Install the new source: `opencode plugin @sorenllm/opencode-forge --global`.
+2. Install the new source: `opencode plugin add @sorenllm/opencode-forge`.
 3. Smoke-check (`opencode agent list` shows forge + forge-* workers), then
    clean the stale store dir (uninstall step 2) if you switched sources.
 
@@ -145,171 +185,140 @@ Also verified on the 2.x installer: `remove` only removes the config entry
 of its own registered source; the `npm:` prefix is not accepted by `add`
 (use the bare package name); and the store path is derived from the
 specifier spelling, so switching between npm and github sources leaves both
-store dirs behind — delete the stale one.
+store dirs behind — isolate only the identified stale copy if cleaning up.
 
-### v2-host notes (opencode 2.x)
+### v2-host notes
 
-Full feature parity with v1 (agents, tools, permission belt and gates,
-session hooks, commands, goal/job engines), with two documented drifts:
+Native worker Markdown is the default v2 materialization. Picker/default transforms are runtime-only; explicit user configuration wins. The global recipe option `hideNativeAgents: false` retains visible native primaries. Disabling the plugin must not remove agent files or user settings.
 
-- **Model pins are v1-only.** A `forge.json` worker's `model` field is
-  honored on v1 hosts; on v2 hosts the pin is skipped (any model spelling
-  on the v2 agent draft breaks the host's agent registry). The
-  `thoughtLevel` pin works on both (it rides the runtime chat.params
-  lookup, not the agent record).
-- **`/plan` `/goal` `/crew` are execute-based commands on v2** (the
-  template text is sent into your session when you invoke them) and there
-  is no create-only guard — forge's `/goal` replaces the built-in one.
-  v2 hosts have no default per-turn auto-continue, so nothing fights the
-  goal loop; the plan/goal briefs survive compaction via the compaction
-  hook either way.
+See the activation/removal boundary below. Earlier development-package probes are historical evidence only, not acceptance of the current candidate.
 
-#### v2 single-agent surface (hide natives, forge default, no builtin shell)
-
-On a v2 host the plugin additionally delivers the single-agent surface as
-**pure runtime agent-layer state**:
-
-- The native `build` and `plan` primaries are **hidden** (never removed —
-  sessions referencing them keep working; no other field is touched), so
-  the agent picker offers `forge` as the visible primary. `general`,
-  `explore`, and host-internal agents stay untouched.
-- New sessions **default to `forge`** where the host's agent draft editor
-  exposes a default setter (2.3.2 does). An explicit `default_agent` in
-  your opencode config still wins — the host merges user config agent
-  entries after plugin transforms.
-- Every forge-family record (the `forge` primary and each materialized
-  `forge-*` worker) carries a deny permission
-  (`{action:"shell", resource:"*", effect:"deny"}`), so the model-facing
-  tool surface never offers the builtin shell to the forge family. The
-  permission-belt refusals remain underneath as belt-in-depth.
-
-**Zero pollution:** none of this is written to your opencode config or any
-file outside the plugin's own domain — uninstall the plugin and the next
-agent-layer rebuild restores the native primaries and the default subject,
-byte-identical, with zero residue.
-
-Opt-out (keep the native `build`/`plan` primaries visible) — the plugin's
-own config file, the GLOBAL forge.json layer (`~/.config/opencode/forge.json`
-on POSIX, `%USERPROFILE%\.config\opencode\forge.json` on Windows):
-
-```jsonc
-{
-  "hideNativeAgents": false
-}
-```
-
-`agent.forge.disable = true` remains the whole-plugin off switch. A user's
-explicit `agent.build.hidden: false` in opencode config also wins on 2.3.2
-(config merge runs after plugin transforms).
-
-#### v1-host config recipe (hide the extra primaries manually)
-
-The v1 loader cannot touch native agent records (the config hook returns
-its own entries only). If you want the same single-agent picker on a v1
-host, hide the natives yourself — your config, your files:
-
-```jsonc
-{
-  "agent": {
-    "build": { "hidden": true },
-    "plan": { "hidden": true }
-  },
-  "default_agent": "forge"
-}
-```
-
-`hidden` is a first-class, hot-reloadable field on opencode 2.3.x — the
-picker updates without a restart. Remove the lines to restore the natives.
+Global workers and built-in overrides use `$OPENCODE_CONFIG_DIR/agent` when that directory is configured, otherwise `~/.config/opencode/agent/`. Workspace workers remain in the workspace `.opencode/agent/` directory. Historical generated files at the previous global location are not automatically removed.
 
 ## Configuration
 
-Everything works with zero config. Optional knobs (your config, your files —
+Optional configuration (your config, your files —
 the plugin never writes them):
 
 ```jsonc
 {
   "agent": {
     "forge": {
-      "model": "provider/model",   // pick any model for forge
-      "disable": true              // one-knob return to native: no forge,
-                                   // no injections at all, no tools/commands
+      "model": "provider/model"    // pick any model for forge
     }
-  },
-  // per-plugin options ride the plugin entry as a [spec, options] tuple
-  "plugin": [
-    ["@sorenllm/opencode-forge", {
-      "jobs": {
-        "mode": "auto",              // "auto" (default) | "forge" — equivalent, both keep the partition
-                                     // | "native" — retire the supervisor, builtin shell returns
-        "keepBuiltinShell": false    // true: give the forge family the builtin shell back (the one exec escape hatch)
-      },
-      "watchdog": {
-        "mode": "kill",              // "kill" (default) | "dry-run" | "off" — forge-family sessions only
-        "stallMs": 600000            // stall threshold, min 60000
-      },
-      "search": {
-        "rgPath": ""                 // optional explicit ripgrep binary path for forge_grep/forge_glob;
-                                     // default resolution: this override (when it exists) → rg on PATH
-                                     // → the plugin's bundled JS engine (disclosed by a trailing engine line)
-      }
-    }]
-  ]
+  }
 }
 ```
 
 If you already have a `command.plan` or `command.goal` of your own, it wins
-and the plugin's command of that name is not registered.
+in the effective host command registry. OpenCode v2.4.0 reapplies user command
+configuration after plugin registration.
 
-## Uninstall (four steps, restores native opencode)
+## Disabling and re-enabling Forge (planned 0.35.0)
 
-1. Remove the plugin entry from the `plugin` array in
-   `~/.config/opencode/opencode.json` (global installs).
-2. Delete the package store dir:
-   `~/.cache/opencode/packages/@sorenllm/opencode-forge/` (npm installs,
-   scope-dir layout; for github installs it is
-   `~/.cache/opencode/packages/github_ChengZiiii/opencode-forge/`).
-3. Delete the `agent["forge"]` block from your config if you added one
-   (otherwise the name lingers in the agent list).
-4. Done — all runtime injections (agents, tool hiding, commands) are gone
-   with the plugin; nothing was ever written to your config
-   (the hide was runtime-only). Your `.opencode/plan/`, `.opencode/goal/`,
-   and `.opencode/crew/` files are yours; delete them yourself if you want.
- 5. Optional runtime debris: delete `<tmp>/opencode-forge/` (job logs, the
-    job registry ledger, the watchdog ledger, and any leftover dispatch
-    ledger from older versions — the file ledger table above lists
-    everything).
+Forge no longer has a private whole-plugin disable switch. Disabling just the
+`forge` agent is not unloading Forge. Public v2.4.0 host source describes
+removal selectors (`"-target"`) in `plugins`; CLI help lists `add`, `remove`,
+`list`, `check` and `update`, not a disable command. Earlier development-package
+probes do not establish the current candidate's activation contract. The current
+K matrix is blocked: actual selector resolution, workspace/global precedence,
+restart/restore, multi-directory lifecycle and uninstall behavior have not been
+accepted. This is a mechanism description, not a tested operational recipe.
+Preserve other plugin entries and review effective scope before making changes.
+
+In the intended unloaded state, Forge's runtime registrations, picker/default transforms,
+harness tools and commands, prompt injections, tool/permission hooks,
+pool/draft/dispatch gates, goal/crew continuation and builtin search
+updates are absent. Host/user configuration governs the remaining registry
+and builtin tools. Do not rely on Forge runtime protections while disabled.
+Re-enabling is intended to restore runtime contributions subject to host configuration,
+recipe compatibility and authorized sync rules.
+
+### Independently loaded agent files
+
+Disabling or uninstalling the plugin must **not** hide, rewrite or remove
+native Markdown definitions already on disk. The host can still load the
+workers and builtin overrides without Forge's runtime gates or injections.
+The override files have their own lifecycle, independent of namespaced
+worker definitions. To return to native-only behavior, explicitly review
+these files as well as your own opencode configuration:
+
+| Scope | Candidate generated files |
+| --- | --- |
+| Each workspace/pool, including applicable ancestor directories | `<project>/.opencode/agent/forge-<ns>-<id>.md` |
+| Global fallback workers | `<global agent dir>/forge-global-<id>.md` |
+| Global builtin overrides (independent of workers) | `<global agent dir>/general.md`, `<global agent dir>/explore.md` |
+
+The global agent directory for both workers and overrides is `$OPENCODE_CONFIG_DIR/agent` when configured,
+otherwise `~/.config/opencode/agent/` (Windows: `%USERPROFILE%\.config\opencode\agent\`).
+Inspect the actual effective host search paths for each workspace and any previous global
+directory that remains in use. Forge does not silently move or remove files at the older recipe-sibling path.
+
+1. Inventory and back up the individual candidate files outside all host
+   agent scan paths, preserving their original paths.
+2. Inspect each file: confirm both the expected filename and its in-content
+   ownership marker `<!-- GENERATED BY forge_sync`. A filename or prefix
+   alone never establishes ownership. Preserve handwritten same-name,
+   unmarked, unknown or ambiguous files; never clean by wildcard or prefix.
+3. If desired, manually move the confirmed generated files out of all host
+   scan paths or remove them individually after backup. Reload/restart and
+   inspect the resulting agent registry; files left there may remain active.
+4. For recovery, restore individual backups to their original paths without
+   overwriting user files, or re-enable Forge and explicitly run `/forge sync`
+   from the primary agent (or use the existing `sync: "auto"` opt-in).
+   Restored definitions must satisfy the target version's compatibility rules;
+   builtin overrides use their own global recipe entries and sync rules.
+
+Review any explicit `default_agent`, `agent["forge"]` and native `hidden`
+settings yourself; they are user-owned and are not automatically undone.
+Historical `.opencode/plan/`, `.opencode/goal/`, `.opencode/crew/` and
+workspace/global `forge.json` remain untouched by enable/disable or uninstall.
+
+## Uninstall
+
+1. First resolve old live jobs as described in the upgrade notes. Remove the
+   plugin entry from the applicable host config (global installs previously
+   used `~/.config/opencode/opencode.json`). Check for multiple sources, including historical single-file installs. CLI help
+   exposes `opencode plugin remove <configured package specifier>` for global
+   configuration; actual scope and removal behavior for this candidate remain unverified.
+2. The historical package store locations are
+   `~/.cache/opencode/packages/@sorenllm/opencode-forge/` (npm) and
+   `~/.cache/opencode/packages/github_ChengZiiii/opencode-forge/` (GitHub).
+   If cleaning the store, identify and isolate only the old package copy.
+3. Review independently loaded agent files and user configuration using the
+   preceding steps; restart the host. Runtime removal alone does not
+   restore all native definitions or stop old jobs.
+4. Retain historical records and recipes. Old job/watchdog and dispatch
+   debris is optional manual cleanup only after checking job disposition.
 
 ## File ledger
 
-What this plugin touches, exhaustively:
+Retained records and artifacts (legacy files are covered in the upgrade notes):
 
 | Where | What | Lifetime |
 | --- | --- | --- |
 | `<project>/.opencode/plan/*.md` | plan files | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/goal/*.md` | goal files (contract, Check Log, Turn Ledger) | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/crew/*.md` | crew records (declared plan + arm/convert/abandon/close history; written at `crew_begin` registration, appended at each transition; record-only — never a resume mechanism) | user data — kept forever, uninstall never deletes |
-| merged config object (RAM only) | forge agent, static `forge-<ns>-<id>` subagents (every pool family namespaced; the global fallback family `forge-global-<id>`), tool-partition injections (forge family shell hide, non-forge forge-tool hide, native build/plan/general/explore minimal entries), `command.plan`, `command.goal`, `command.crew`, `command.forge`, goal permission keys, `permission.forge_shell`, `permission.crew_close` | vanishes when the plugin is removed; nothing is written to disk |
-| `<tmp>/opencode-forge/jobs/<jobId>.log` | job output tee (full output; oldest rotated out above 50 files) | runtime debris — delete freely, also after uninstall |
-| `<tmp>/opencode-forge/jobs/ledger.jsonl` | job registry ledger (bounded: 1 MB reset, 200 entries) | runtime debris — delete freely, also after uninstall |
-| `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
-| `<tmp>/opencode-forge/watchdog/log.jsonl` | watchdog interventions ledger (bounded: 200 entries, oldest rotated) | runtime debris — delete freely, also after uninstall |
+| runtime registry (RAM only) | Forge agents, harness tools and commands, runtime gates | absent when unloaded; no user configuration rewrite |
 | `<tmp>/opencode-forge/session-anchors.jsonl` | session-anchor ledger — persisted evidence of the pooled worktrees where live activity bound sessions (pooled binds only, FIFO-capped to 200, fail-soft IO); a restart-resumed session whose record is pool-less and whose in-memory map is empty re-binds its OWN pool from here, only while the recorded pool file still exists on disk | runtime debris — delete freely; losing it only costs the restart-resume own-pool re-bind (sessions re-learn their pool from live activity) |
-| `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (dispatch records — including async orphans — live in the jobs ledger; this separate file dates from the retired `forge_dispatch` tool) | runtime debris — delete freely |
-| `<project>/.opencode/forge/dispatch-log.jsonl` | dispatch journal (fold E) — append-only per-workspace record of every async dispatch state transition (`dispatched` / `queued` / `started` / `retry-pending` / `terminal`); bounded by `FORGE_DISPATCH_JOURNAL_MAX` (default 200, terminal-first rotation); prompt text retained while a record is non-terminal, redacted on terminal; corrupt lines skipped. This is what restart recovery replays — a live child re-arms, a finished-while-down child wakes its owner exactly once, queued wishes re-enter the queue, retry chains resume | runtime data — deleting it only loses cross-restart recovery for in-flight dispatches; uninstall leaves it behind (add `.opencode/forge/` to your ignore file if you don't want it versioned) |
-| `<project>/.opencode/agent/forge-<ns>-<id>.md` | compiled native agent files — `forge_sync` output on v2 native mode (GENERATED header, `forge-` prefix + marker; GC'd by sync when the recipe entry disappears; a transient `forge-*.md.new` temp lives microseconds during atomic writes and is best-effort cleaned on failure) | compiled artifacts — version them: they travel with the workspace (a fresh machine pulling the project needs no init) |
-| `<home>/.config/opencode/agent/forge-global-<id>.md` | compiled GLOBAL-roster agents — when (and only when) a global `~/.config/opencode/forge.json` exists, `forge_sync` also compiles its fallback family into the host's own global agent dir (same GENERATED header + marker + GC discipline; non-forge files there are never touched) | compiled artifacts — delete freely; with the plugin gone the host simply loses those extra global agents |
-| `<global agent dir>/general.md`, `<global agent dir>/explore.md` | built-in override artifacts (0.31.0) — `forge_sync` output when the GLOBAL forge.json's `override` node activates an entry. No `forge-` prefix (the lowercase id stem IS the override key — case-sensitive); GC keys on the in-content GENERATED marker, so re-commenting the entry removes the file; a hand-written file of the same name is never overwritten (sync refuses + discloses). Global agent dir: `OPENCODE_CONFIG_DIR/agent` when set, else `~/.config/opencode/agent/` | compiled artifacts — delete freely; with the plugin gone the built-ins return to official behavior |
+| `<project>/.opencode/agent/forge-<ns>-<id>.md` | compiled native agent files — `forge_sync` output on v2 native mode (GENERATED header, `forge-` prefix + marker; GC'd by sync when the recipe entry disappears; a transient `forge-*.md.new` temp lives microseconds during atomic writes and is best-effort cleaned on failure) | compiled artifacts — version them: they travel with the workspace (compatibility still requires current compiled content) |
+| `<global agent dir>/forge-global-<id>.md` | compiled GLOBAL-roster agents — when (and only when) a global `~/.config/opencode/forge.json` exists, `forge_sync` also compiles its fallback family into the host's own global agent dir (same GENERATED header + marker + GC discipline; non-forge files there are never touched) | compiled artifacts — independently loaded by host; disabling/uninstalling does not remove them; manage individually as above |
+| `<global agent dir>/general.md`, `<global agent dir>/explore.md` | built-in override artifacts (0.31.0) — `forge_sync` output when the GLOBAL forge.json's `override` node activates an entry. No `forge-` prefix (the lowercase id stem IS the override key — case-sensitive); GC keys on the in-content GENERATED marker, so re-commenting the entry removes the file; a hand-written file of the same name is never overwritten (sync refuses + discloses). Global agent dir: `OPENCODE_CONFIG_DIR/agent` when set, else `~/.config/opencode/agent/` | compiled artifacts — independently loaded by host; disabling/uninstalling leaves overrides in place; manage individually as above |
 | `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
 | `~/.cache/opencode/packages/...` | installed package copy | written by the `opencode plugin` installer, not the plugin |
 | `~/.config/opencode/opencode.json` | `plugin` array entry | written by the installer |
 
-Nothing is written outside the table above, with two disclosed
+Other disclosed
 transients: the microsecond `forge-*.md.new` temp of an atomic sync
 write (best-effort cleaned on failure — a target file is never
 half-written) and the `FORGE_GOAL_PROBE=1` env opt-in continuation
 diagnostics in the OS temp dir for debugging.
 
 ## Goal mode (autonomous, host-verified objectives)
+
+The existing confirmation and completion contracts remain. Native activity
+and waiting-state accounting are incomplete; no new autonomy is asserted.
 
 Three orthogonal workflows — pick per task, they never bind to each other:
 
@@ -352,14 +361,15 @@ a `stop_reason` in the frontmatter — on: budget exhaustion, two consecutive
 no-progress continuation turns, three consecutive transport failures, or a
 live draft plan appearing in the session (the only plan/goal interop: a draft
 plan's write ban would wall the loop off, so the goal pauses instead of
-burning turns against it). Activity scoring is verification-honest: a turn
-that ran `goal_check` OR executed verification commands through
-`forge_shell`/`shell`/`bash` scores as active (a turn re-running the
-contract's checks is never mis-scored as no-progress); the continuation
-brief states the same per-turn discipline (land a verification command or a
-write — read-only turns are ledgered as no-progress). `/goal pause` (or
-`goal_pause` with a blocker description) pauses by hand; `/goal resume`
-re-arms through another confirmation dialog.
+burning turns against it). Meaningful read-only investigation, review, real
+changes, commits and checks with new evidence are productive work; a write,
+shell command or git diff is not required each turn. Repeating a check with
+the same input and complete result without other new evidence is not progress.
+Unknown or truncated results do not prove equality. Genuine observed host
+waiting is not an empty work turn; it should not trigger repeated continuation
+prompts. Native activity accounting and live waiting coverage are still incomplete.
+`/goal pause` (or `goal_pause` with a concrete blocker description) records a
+persistent pause; `/goal resume` re-arms through another confirmation dialog.
 
 **Completion is fail-closed.** `goal_complete` re-executes every check itself
 at the gate — results recorded in the Check Log never substitute for the
@@ -384,232 +394,51 @@ They are drafted by the model from your objective. Read them in the dialog
 before allowing the arm; `--contains` contracts are strictly
 workspace-relative (path escape is refused).
 
-## Job supervisor (a shell that can never hang the session)
+Verification uses the platform interpreter chain when the public plugin interface
+has no initial merged shell setting (as observed in the v2.4.0 interface):
+Windows prefers pwsh, PowerShell, then git-bash, with COMSPEC as a capability
+fallback; POSIX uses the available login shell, bash, then /bin/sh.
+This does not guarantee that verification uses a user's customized native shell.
+Forge does not independently merge host configuration.
 
-The builtin `shell` tool treats closed stdio pipes as completion — a
-detached grandchild holding them open suspends the call indefinitely (the
-multi-hour agent hangs behind upstream issues #47350 / #50316 / #49169).
-Subagents have it worse: the native task tool has no timeout at all.
-`forge_shell` is the replacement exec surface for the forge agent.
+## Search tools
 
-**`forge_shell`** completes on the FIRST of four conditions, and only the
-exit condition is bound to the actual exit event (structural immunity to
-the stdio-EOF bug):
+Use builtin `grep` and `glob`. Current source uses `editor.update` to enhance those same names for all agents on supported local hosts: `follow` defaults to `true`, as does glob `hidden`. Unsupported host contexts or unavailable definitions retain native behavior.
 
-| condition | knob | on trigger | completion behavior |
-| --- | --- | --- | --- |
-| process exit | — | final; exit code + output tail returned | **terminal evidence** — output delivered in full; the job self-clears from the registry (no wake, no clear needed) |
-| `success_pattern` regex matches new output | opt-in | completes as success; process kept alive by default (server semantics), `keep_alive: false` kills its tree | kept alive → later exit still wakes (the server dying is real news); killed inline → self-clears |
-| `idle_ms` with no new output | default 60000 | early return `still-running` + `jobId`; process stays alive | later exit queues a wake — unless a poll has already read the terminal state (a terminal poll consumes the entry); stays listed until then |
-| `max_wait_ms` hard cap | default 120000, max 600000 | early return `still-running`; never kills | same as idle |
-
-`run_in_background: true` skips all waiting and returns
-`{jobId, logPath}` immediately. Every run pops one permission dialog
-(`permission.forge_shell = "ask"`; an explicit `deny` in your config wins).
-Every result form carries `cwd:` — the absolute directory the command
-actually ran in. When the agent's narrative about the working directory
-disagrees with that line, the line wins.
-
-**Interpreter selection.** Commands run under the host-aligned shell —
-the same interpreter the host's builtin shell tool uses — never under
-Node's `shell: true` default (cmd.exe / plain sh). On Windows the chain
-is `pwsh → powershell → git-bash → %COMSPEC%` (cmd.exe only as a
-machine-level capability fallback); on POSIX the login shell with bash
-preferred and `/bin/sh` as the fallback. PowerShell-family shells are
-invoked directly (`<shell> -NoProfile -Command <command>` plus an
-exit-code guard, so a native command's exit status propagates as the
-job's exit status) — which means you write PowerShell syntax in
-`forge_shell` on Windows: `echo $env:USERNAME` expands, quoted-exe
-invocations use the call operator (`& "C:\path with spaces\tool.exe" args`).
-The tool description states the interpreter family, and there is no
-configuration knob: the interpreter follows the host, by design.
-Goal-harness verification checks run through the same resolver, so a
-check drafted under the model's shell expectations behaves identically
-at the completion gate.
-
-**`forge_jobs`** manages the registry: `list` / `poll {jobId, waitMs≤30s}`
-(bounded wait for new output or exit, drains it) / `log {jobId, offset?,
-limit?}` (line paging over the on-disk log) / `kill` (whole process tree) /
-`clear` (drop a finished entry — only early-returned/background jobs need
-this; synchronously consumed jobs self-clear at completion) / `handoff`
-(rebind ownership to the root session so a subagent's job survives the
-subagent). Delegated agents are instructed to poll their jobs before
-yielding a conclusion.
-
-**Exit wakes.** A job whose caller last saw it before completion —
-`run_in_background` starts and `still-running`/kept-alive `success` early
-returns — queues a single `[forge:job-complete]` message when it finishes,
-delivered into the owning session via `promptAsync` the next time it goes
-idle (exactly once; `notify: false` opts out per job). A foreground call
-resolved on the exit event is terminal evidence: the caller already holds
-the complete output, so no wake fires and the registry entry self-clears —
-a stale `poll`/`kill`/`clear` on such an id answers "already consumed"
-instead of "unknown job". The same consumption applies to a poll that
-observes a finished job: the poll itself delivered the exit status and the
-drained output, so the queued wake is dropped and the entry self-clears —
-no duplicate notification, no manual clear. Wakes fire only for
-completions that were never read.
-
-**Ownership.** Jobs belong to the session that created them. Session
-deleted → its live session-scoped jobs are killed and the event is recorded
-in a bounded ledger (`handoff` beforehand survives). Plugin unload disposes
-everything it still owns.
-
-### Host exit cleans up on every path (0.3.1)
-
-Background jobs used to survive the opencode process as broken zombies (the
-host's stdout pipe died with it, so per-request writers broke on the next
-write). Jobs now die with the host on every exit path, layered:
-
-1. **stdio is file-backed.** Job stdout/stderr ARE the log file (inherited
-   fd) — the host holds no job pipes at all, so nothing can break, and a
-   `survive` job (below) stays genuinely healthy after the host is gone.
-2. **JS exit matrix.** `SIGINT` / `SIGTERM` / `process exit` /
-   `uncaughtException` / `unhandledRejection` / plugin dispose all force-kill
-   every live non-survive job (synchronous `taskkill /T /F` — fast enough to
-   finish before the OS terminates the host; dispose gets a graceful pass
-   with a 3s grace window first).
-3. **OS fence (Windows).** One lazily-started PowerShell watcher holds a Job
-   Object with `KILL_ON_JOB_CLOSE` around every spawned tree (periodic
-   process-table sweep adopts late-born grandchildren). Host dies ANY way —
-   including `taskkill /F`, where no JS handler can run — the watcher's stdin
-   pipe dies with it, the handle closes, and the kernel kills the whole tree
-   (~sub-second measured). POSIX has no kernel equivalent here (PDEATHSIG
-   was rejected for its parent-thread pitfalls): process groups + the exit
-   matrix carry it, and the next start's registry scan reports orphans.
-
-Known boundaries: a host killed within ~1s of a job's start can leak that
-job's grandchild (the fence watcher is still compiling); Chromium-family
-processes that explicitly break away from the job object escape the fence
-(deliberate: `BREAKAWAY_OK` is not set). Both are recorded in the ledger
-when observable.
-
-**Survive mode (explicit opt-out of death).** `forge_shell { survive: true }`
-starts a job that OUTLIVES the host: it is recorded in
-`<tmp>/opencode-forge/jobs/registry.json` (pid + command + log path), gets no
-fence and no exit kill, and the NEXT opencode run adopts it automatically —
-`forge_jobs list` shows it as `previous-run`, and poll/log/kill work on it
-as usual. Config `jobs.survive: "always"` flips the per-call default; config
-`jobs.survive: "deny"` disables survival entirely and a per-call
-`survive: true` against it is an error (the explicit deny wins). Survivors
-whose pid died are detected at next start, ledgered as orphans, and dropped
-from the registry. Stop survivors explicitly — nothing else will.
-
-### Mode matrix (supervisor lifecycle)
-
-The old three-stage capability probe is retired: the forge-side partition
-holds regardless of what the host's builtin shell can do, so `auto` and
-`forge` are equivalent. Only the manual `native` mode retires the
-supervisor:
-
-| mode | how you get there | builtin shell (forge family) | forge_shell / forge_jobs |
-| --- | --- | --- | --- |
-| auto (default) / forge | nothing to do | hidden — the exec surface is forge_shell, always | registered |
-| native | manual only: `jobs.mode: "native"` | restored | retired; calls throw with a pointer to the native parameter |
-
-`jobs.keepBuiltinShell: true` gives the forge family the builtin shell back
-in any mode (the watchdog keeps governing those calls).
-
-### Artifacts and uninstall additions
-
-Job output lands in `<tmp>/opencode-forge/jobs/<jobId>.log` (the file IS the
-job's stdout/stderr; oldest rotated out above 50 files; reads are windowed to
-8 MB). Registry events append to
-`<tmp>/opencode-forge/jobs/ledger.jsonl` (bounded, 1 MB reset, 200 entries),
-and surviving jobs persist in `<tmp>/opencode-forge/jobs/registry.json`
-(bounded to 100 entries; a stale `registry.json.lock` breaks itself after 5s).
-These are runtime debris, not data — with ONE caveat: **if you uninstall with
-`survive` jobs still running, killing them is on you** (`taskkill /PID <pid>
-/F /T`, or just reboot); deleting the directory afterwards is safe and
-complete.
-
-## Search tools (`forge_grep` / `forge_glob`)
-
-rg-backed search for the forge family — same interface and output format as
-the builtin `grep`/`glob` pair, but **`follow` and `hidden` default to TRUE**:
-workspace content behind symlinks/junctions and inside dot-directories (which
-the builtin pair silently misses) is in scope by default. `**/.git/**` is
- always excluded. The builtin pair stays visible — the forge family is
-instructed to prefer `forge_grep`/`forge_glob` first and use builtin
-`grep`/`glob` as fallback only; the standing worker mandate reads:
-
-> Run every search through the forge_grep/forge_glob tools first — the
-> builtin grep/glob tools are fallback only. forge_grep/forge_glob see
-> through symlinks/junctions and dot-directories because follow and hidden
-> are on by default.
-
-- **Params**: `pattern` (required); `path` (optional — defaults to the session
-  worktree; a file path targets that file); `include` (forge_grep file
-  filter); `follow` / `hidden` (optional booleans, both default `true`).
-- **Output parity**: `Found N matches` with `path: Line n:` blocks
-  (forge_glob: a plain path list) — the same shapes as the builtin pair.
-  Results truncate at 100 with a truncation notice advising a narrower
-  path or pattern.
-- **Follow dedupe**: a file reachable through its real path AND a link path
-  reports ONCE (lexicographically first path kept); when any dedupe occurred
-  the output ends with a `+N duplicate paths merged` line.
-- **Outside-workspace links**: followed, with the resolved target disclosed
-  in the result.
-- **Readonly by construction**: ripgrep is spawned directly with a fixed
-  argument vector — no shell, no redirection surface. The tools carry no
-  permission ask-gate and are not subject to the readonly exec seal, so
-  explicit-readonly workers search without friction.
-
-**Engine chain — never a dead tool.** No binary is bundled; instead the
-tools ship a **bundled pure-JS search engine** inside `dist/index.js`. The
-engine resolves as: `search.rgPath` config override (when it exists on
-disk) → `rg` on PATH → **bundled JS engine**. A configured-but-broken rg
-(spawn failure) also falls through to the JS engine. Every call is served
-on every machine — the missing-ripgrep case returns live results, never a
-guidance error. Whenever the JS engine serves a call, the output ends with
-an engine-disclosure footnote (after the dedupe footnotes):
-
-> (engine: builtin-js — ripgrep not found; install ripgrep or set
-> search.rgPath for the faster engine)
-
-- **Glob dialect subset** (JS engine only): `*` (within segment), `**`
-  (crosses separators), `?`, `[class]` (with negation), `{a,b}` alternates.
-  Exotic rg-glob constructs simply fail to match (under-match, no error) —
-  this is the documented common subset, not parity.
-- **Bounded walk, disclosed**: the JS engine caps its walk at 200000
-  entries and per-file scanning at 8 MiB. Hitting a cap appends a
-  truncation-style notice — `(js engine: walk capped at 200000 entries —
-  narrow the path)` / `(js engine: skipped N files over 8 MiB)` — same
-  voice as the 100-result cap. The rg engine has no such caps and stays
-  preferred whenever it resolves.
-- **JS-regex dialect note** (JS engine only): `pattern` compiles as a
-  JavaScript `RegExp`. A pattern that fails to compile returns one honest
-  error line naming the dialect difference and the ripgrep remedy (install
-  ripgrep or set `search.rgPath` for full rg-pattern support) — no partial
-  results.
-- **Explicit `path` anchors pattern and output** (both engines,
-  identically): when `path` points at a directory, glob patterns and grep
-  `include` filters match against paths relative to that directory and
-  results are reported relative to it. The default (no-`path`) root stays
-  worktree-relative; a file `path` keeps its given shape. (rg 15.2.0 lifts
-  glob anchoring to the whole path when hidden/follow meet an absolute root —
-  the tools serve directory targets through a `.`-rooted cwd so both engines
-  anchor identically.)
+Earlier staged-host evidence reports real `grep` / `glob` execution on an isolated host with a staged build, demonstrating hidden-file inclusion, junction traversal and duplicate-path merging. The coordinating session also relays real-host execution-time denials for a specific grep pattern (`Permission denied:grep`) and an explicit external root (`Permission denied:external_directory`). These staged runs used differing hashes during concurrent work, not one final package. These are partial evidence only; current search verification is blocked. Final-package verification, full host availability and authorization equivalence (including external link targets), and disable/uninstall restoration E2E remain pending. Mock tests and staged evidence do not establish those gates or a published release.
 
 ## Forge subagents (static worker agents in forge.json)
 
-Forge subagents are **static, user-authored worker agents**: each forge.json
-entry is either **pinned** (a model + a reasoning depth, bound at
-materialization) or an **Auto worker** (no model — it inherits the parent
-session's model at dispatch), materializes as a native `forge-<ns>-<id>`
-subagent — EVERY pool family is namespaced, no exceptions (see
-*Pools on a shared host* below) — and is dispatched through the **`task`
-tool, which the plugin owns**: forge's SDK dispatch engine is registered
-under the native tool NAME `task` (an OMO-proven shadow), so every dispatch
-— forge-* targets AND any other host agent — renders in the TUI's native
-live task panel and drives a REAL SDK child session on the same host, with
-an async mode (`run_in_background`) the native tool does not have. There is
-exactly ONE dispatch surface; the old `forge_dispatch` tool is retired.
-There is still no configuration invitation anywhere: the session AI
-never writes your config.
+Forge subagents are static user-authored workers, pinned or Auto (parent model), materialized under namespaced IDs `forge-<ns>-<id>`. Native `subagent` is the intended dispatch surface. The session AI never writes your config without explicit user authorization.
 
-No forge.json? Nothing happens — the plugin registers nothing and the native
-subagent behavior is untouched. Onboarding is this README, for you the human.
+
+### Slash commands — the roster levers
+
+ONE roster command on the supported v2 host:
+
+- **`/forge <argument>`** — the router, four forms:
+  - **`sync`** — force a roster sync NOW (`forge_sync`) and show the full
+    diff. The manual force/debug lever; the default staleness-gate posture
+    and `sync:"auto"` are unchanged.
+  - **`init`** — draft THIS workspace's `.opencode/forge.json` in-band
+    (interview or infer, show, write only on your explicit go-ahead; refuses
+    and reviews when one already exists).
+  - **`init global`** — same drafting flow for the GLOBAL
+    `~/.config/opencode/forge.json`, with the built-in override entries
+    (`general`/`explore`) shipped commented out (inert until you fill one).
+  - **`stop`** — directly requests cancellation of confirmed native children and their owned background commands (see [Native dispatch](#native-dispatch)).
+
+On v2 hosts typed arguments are composed into the delivered prompt by the
+plugin (the host does no `$ARGUMENTS` substitution for plugin commands).
+The hyphenated family (`/forge-sync`, `/forge-init`, `/forge-init-global`,
+`/forge-cancel`) is RETIRED — one command, four argument forms, the
+smallest collision surface. On v2.4.0, the host's command editor is add-only;
+user-configured commands are applied after plugin commands and win same-name
+collisions in the registry (verified with an isolated marker plugin). Forge
+does not rewrite or delete user command files. The primary identity guard
+applies except to stop (live host identity lookup coverage remains incomplete).
+The command router never writes files itself — every write goes through
+`forge_sync` or the normal write tool on your explicit go-ahead, transcript-visible.
 
 ### forge.json — the configuration
 
@@ -670,7 +499,7 @@ order is deterministic — families ordered lexicographically by absolute
 pool-file path — and that same order governs cross-family materialized-id
 collisions: the earlier pool's agent wins, the colliding later agent is
 skipped with an error finding naming both files. Every materialized agent's
-task-vocabulary **description carries its pool provenance**: its namespace,
+native dispatch vocabulary **description carries its pool provenance**: its namespace,
 its origin forge.json path, and — for every family except the global
 fallback — that it is dispatchable only from sessions whose workspace pool
 is that file; the global family names the global fallback layer as its
@@ -678,9 +507,9 @@ origin. The same static text ships to every session — the dispatch gate
 (below) is the dynamic authority, the description is the honest label.
 
 **Dispatch is gated to the session's own pool.** Materializing every pool
-host-wide is a vocabulary necessity (the task tool's agent list is
+host-wide is a vocabulary necessity (the native subagent tool's agent list is
 host-level); what a given session may actually DISPATCH is scoped
-session-locally: a task call targeting an agent whose pool belongs to
+session-locally: a subagent call targeting an agent whose pool belongs to
 ANOTHER workspace is refused with a finding naming the target's origin
 pool path, stating it is *not dispatchable from this session*, and the
 exits — open a session in that workspace, or configure the role into this
@@ -712,13 +541,11 @@ real host agent files — `.opencode/agent/forge-<ns>-<id>.md` — instead of
 injecting drafts at runtime. The workspace recipe compiles into the
 project's `.opencode/agent/`; the GLOBAL recipe's fallback family
 (`forge-global-*`) compiles into the host's own global agent dir
-(`~/.config/opencode/agent/`) so those workers are machine-wide — a
+(`$OPENCODE_CONFIG_DIR/agent` when set, otherwise `~/.config/opencode/agent/`) so those workers are machine-wide — a
 write that only ever happens on machines where a global forge.json
 actually exists. The recipe stays the **sole semantic
 authority** (pools, session-domain gating, crew rosters, compliance keep
-reading forge.json); the native files are only its projection. **v1 hosts
-stay on the runtime path forever** (behavior byte-equal — the knob is
-pinned by host generation); on v2, `"materialize": "runtime"` in the
+reading forge.json); the native files are only its projection. On v2, `"materialize": "runtime"` in the
 GLOBAL forge.json is the escape hatch back to draft materialization.
 
 Compilation happens through the **`forge_sync` tool** — the forge agent
@@ -726,7 +553,7 @@ calls it in-band (every effect transcript-visible), it writes atomically
 (temp+rename), garbage-collects files whose entries left the recipe, and
 discloses the full diff (created/updated/GC'd). The host **hot-applies**
 the files — no restart. **Staleness gate**: `crew_begin` refuses
-registration while the compiled artifacts are older than the recipe (or
+registration while the compiled artifacts are incompatible with current content (or
 missing), with the one-step fix *call forge_sync now*; a plain dispatch
 against a missing worker on a native host surfaces the same guidance.
 `"sync": "auto"` in a pool file opts that pool into silent regeneration
@@ -739,38 +566,7 @@ nested workspaces. This is a disclosed difference from the recipe's
 nearest-exclusive pool scoping; dispatch gating still follows the
 recipe, so visibility never grants cross-pool dispatch.
 
-**Worker shell rescue (v2 hosts)**: opencode 2.x evaluates a plugin
-tool's permission assert at the *plugin host's* location, while native
-worker files register at the *project* location — so a worker calling
-`forge_shell` used to hit the host's missing-agent fallback, a literal
-deny-all that short-circuits before any configured rule, saved
-approval, or ask (bare `Permission denied: forge_shell`, nothing in the
-logs; source-verified on 2.3.2 — see
-`reports/research-plugin-tool-permission.md`). The plugin therefore
-maintains a rescue through the host's **own documented session-rule
-surface**: forge-family sessions carry one appended session rule
-`{action: "forge_shell", resource: "*", effect: "allow"}` — seeded on
-the forge primary (worker children inherit session rules at creation)
-and belt-injected on a worker session at its first `forge_shell`. The
-rule restores the documented default-open posture in exactly that
-geometry and is scoped to the `forge_shell` action alone (it can never
-affect a builtin tool or another plugin). It is host state, not a
-file — the plugin's filesystem ledger does not grow. An **explicit
-`deny` always wins** and disables the rescue entirely, in either config
-shape:
-
-```jsonc
-// v2 (opencode.jsonc)
-{ "permissions": [ { "action": "forge_shell", "resource": "*", "effect": "deny" } ] }
-// legacy v1 shape
-{ "permission": { "forge_shell": "deny" } }
-```
-
-If the session-rule surface is unavailable, a belt lets worker calls
-through the bare fallback deny with a one-per-session
-`[forge:session-rescue]` disclosure (diagnostics + the tool call's
-title); primary sessions never take that belt — their agent resolves,
-so a bare deny there is a real deny.
+Native shell permission evaluation remains to be verified. Readonly workers deny the native file-write family and code-mode `execute`, but retain native shell by default; shell is not a readonly sandbox. Explicit permissions can override shape defaults, and named workers deny recursive `subagent` and default to denying `question`. Draft scouts additionally need shell explicitly denied.
 
 **Recipe field reference** (per agent entry):
 
@@ -779,8 +575,8 @@ so a bare deny there is a real deny.
 | `model` | `"provider/model"` — the pinned brain | pairs with `thoughtLevel`; both absent = Auto worker |
 | `thoughtLevel` | depth word (`none minimal low medium high xhigh max`) | `low`/`medium`/`high` compile into the model string as a variant (`model#low`); the other words ride the per-spawn chat.params injection |
 | `prompt` | role text (1–2 sentences) | defaults: `research`/`review` built-ins, else a generic worker |
-| `shape` | `"readonly"` or `"write"` | **absent = write** (open); readonly compiles to the native tools seal |
-| `permission` | per-tool overrides (`{"edit":"ask"}`) | merges over the shape face; the recursion ban never lifts |
+| `shape` | `"readonly"` or `"write"` | **absent = write** (open); readonly restricts native file-write tools, not shell |
+| `permission` | per-tool overrides (`{"edit":"ask"}`) | merges over the shape face; explicit denies still apply |
 
 Top-level: `pool` (namespace, required for crew-governed dispatch),
 `shared` (pool-wide prompt base), `materialize` (global layer only),
@@ -793,7 +589,7 @@ layer file only**, see below).
 {
   "pool": "myproj",
   "agents": {
-    // readonly scout: breadth evidence, no write surface at all
+    // readonly scout: file-reading role, not a shell sandbox
     "scout":   { "model": "your-provider/your-model", "thoughtLevel": "low",
                  "shape": "readonly", "prompt": "Search, read, and run read-only checks; report a compact brief with file:line evidence." },
     // write coder: executes scoped implementation tasks
@@ -806,25 +602,8 @@ layer file only**, see below).
 }
 ```
 
-**Hand-writing native agent files? Two traps.** (1) Always write
-`mode: subagent` — the default is `primary`, and a primary worker makes
-task dispatch **silently fall back to a general dispatch** with no error.
-(2) The **host tool vocabulary drifts**: on 2.3.2 the shell channel is
-`execute` (not bash) and the dispatch tool is `subagent` (a
-`tools.task:false` key is host-mapped onto it). The compiler emits from
-one locked vocabulary constant; after a host rename, re-run
-`forge_sync` to re-emit the current names.
+Generated workers use `mode: subagent`. Compatibility requires matching current compiled content, not just timestamps. Keep handwritten files separate and use authorized sync for generated files.
 
-**Cross-machine story (lockfile pattern).** Commit the generated
-`.opencode/agent/forge-*.md` files next to the recipe. A fresh machine
-pulling the workspace needs **zero initialization** — the artifacts
-arrive with the recipe in the same pull, and the staleness check passes
-because both files travelled together (the check is content-based: a
-touched-but-identical recipe is not stale). **Upgrade recipe**:
-`opencode plugin remove opencode-forge` → clear the plugin store
-(`~/.cache/opencode/packages/`) → `opencode plugin "git+file:///<abs
-repo path>" --global` (or the github: form) → run `forge_sync` once per
-workspace if the compiled format changed.
 
 ### Built-in subagent overrides (`general` / `explore`)
 
@@ -848,7 +627,7 @@ How it works, and the honest disclosures:
   `reports/probe-builtin-override.md`): `forge_sync` compiles an active
   entry to a same-name, **non-namespaced** file in the host's global agent
   dir — `general.md` / `explore.md`, GENERATED marker, `mode: subagent`,
-  the same model+variant and tools-face rules as workers. A **capitalized**
+  its independent override compilation rules. A **capitalized**
   file (`General.md`) does **not** override — it creates an ambiguous
   duplicate entry in the agent list; the compiler never emits one, and you
   should never hand-write one.
@@ -879,412 +658,32 @@ How it works, and the honest disclosures:
   `OPENCODE_CONFIG_DIR` set → `$CONFIG_DIR/agent`; unset →
   `~/.config/opencode/agent/`.
 
-### task — the single dispatch surface (native name, forge engine)
+### Native dispatch
 
+Use host-native `subagent` for background dispatch and builtin `shell` for commands.
+Results belong in host child-session transcripts and completion messages. Native
+admission, continuation and completion notification still require full host verification.
 
+`/forge stop` executes directly, without waiting for the model to call a tool.
+A child must have BOTH confirmed ancestry from the invoking session and native
+dispatch evidence; parent ID alone does not qualify. Forge requests termination
+of running background commands only when host metadata confirms their owning
+session is one of those confirmed descendants, then
+interrupts confirmed children and briefly rechecks for revived or newly confirmed
+children. Unknown, ambiguous or unavailable enumeration/ownership is disclosed,
+not used to broaden the scope. The receipt distinguishes requests from confirmed
+terminal evidence, already-idle children from successful tasks, and failed/unknown
+outcomes. Cancellation is not task success. Interrupting a parent alone does not
+guarantee children or their commands stop. Forge does not clear the invoking
+session's queued messages; background command selection follows confirmed child
+ownership as described above. Forge does not intentionally cancel unrelated
+sessions or other host job types; collateral effects of host interruption are
+not globally guaranteed. Child transcripts are retained.
 
-The plugin registers its dispatch implementation under the tool name
-**`task`**, shadowing the native task tool host-wide (removed with the whole
-forge family under `agent["forge"].disable` — the native task tool then
-returns). A dispatch creates a **real child session on the same host server**
-via the SDK (`session.create` with `parentID` linking, the session directory
-of the parent, and the target agent id): the child renders in the host
-session tree exactly like a native task child — the **native live task
-panel**, progress, expandable transcript, **user abort in the TUI** (the
-tool-part metadata mirrors the native shape — `agent`, `sessionId`,
-`taskId`, `run_in_background`, `description`, `prompt` — so the TUI's task
-renderer drives off the same keys). **Any materialized target dispatches
-through it**: a `forge-*` subagent from the pool-gated roster, or any other
-host agent with full native parity (same engine, no forge gates; the
-recursion policy of a non-forge child is that target's own config business).
-
-- **sync (default)** — blocking parity with native task: the call polls the
-  child to a terminal state and returns the child's final assistant message
-  plus the agent identity and child session id. **Questions stay available**
-  (native parity — the user is present at the panel, the child may ask).
-  **Abort parity**: aborting the dispatching turn aborts the child via the
-  SDK and the call resolves with the abort disclosed. A child that never
-  reaches terminal within the poll timeout (default 10 minutes, tunable —
-  see the env knobs below) returns an **honest timeout finding naming the
-  child session id** — the child stays a real session the user can inspect
-  or abort natively. There is no auto-convert of the call (the finding
-  stays a throw — the dependency structure did not change), but before the
-  finding is returned the plugin **arms completion tracking** for the
-  already-running child: exactly one `[forge:dispatch-complete]` wake
-  carrying the final report arrives when the child eventually finishes
-  (self-healing — the result is never orphaned; do not poll or re-dispatch
-  in the meantime). The arming is unconditional: the async concurrency cap
-  governs new dispatch decisions, not an already-running child.
-- **`run_in_background: true` (async)** — the call returns a task handle
-  immediately (task id, agent, child session id); when the child finishes,
-  **exactly one `[forge:dispatch-complete]` message carrying the child's
-  final report** (bounded to the final 2500 characters — the full transcript
-  lives in the child session, natively inspectable) is
-  injected into the dispatching session through the same job-supervisor
-  completion-wake discipline as `[forge:job-complete]` (idle-only injection,
-  at-most-once, delivery window with ledger overflow). The tool description
-  teaches the model to END ITS TURN after an async dispatch and never poll —
-  and the per-session concurrent async cap is **3** (a fourth is refused with
-  the in-flight task ids and sync guidance). Async children **survive turn
-  aborts** by design (session-scoped); when the dispatching session ends,
-  its live children are aborted via the SDK and recorded as orphans in the
-  diagnostics ledger.
-
-**Long children are never dropped.** The completion tracker (async and
-sync-armed alike) has no wall-clock deadline: however long the child runs,
-the single `[forge:dispatch-complete]` wake with the final report arrives at
-true terminal. While the child runs past each notification interval
-(default 10 minutes, tunable — see the env knobs below), a non-terminal
-`[forge:dispatch-progress]` notice keeps the owner informed — informational
-and idle-only, it never replaces or consumes the completion wake.
-
-**Dispatch outcome honesty (three outcome classes).** Every dispatch
-settles as exactly one of `completed` (exit 0, the real final report),
-`failed` (exit 1, an explicit error or a deliberate stale/abort action), or
-`stream-lost/unknown` (exit-null settle — the dispatch VIEW broke before a
-final report arrived: the poll view was unreadable for a sustained streak,
-or the result stream ended without a final report across a full
-notification interval). A stream-lost outcome NEVER files a death
-certificate: the wake and the ledger say "result stream lost; child state
-UNKNOWN (possibly still running)" and name the agreed report file — the
-child stays inspectable and natively abortable in the host TUI, and the
-journal records `stream-lost/unknown` with the last-observed activity
-timestamp.
-
-**Sync handoff presentation.** A sync dispatch whose child outlives the
-wait budget does not fail: the handoff surfaces as a normal informational
-notice — "sync wait budget ended — the dispatch continues in the
-background; collect with `forge_jobs`" — carrying every retrieval pointer
-(task id, child session, the agreed report path) plus the armed-wake
-contract. The error channel is reserved for genuine failures: gate/pool
-refusals and evidence-backed worker errors render as errors exactly as
-before.
-
-**Report-file delivery contract.** Every dispatch prompt carries a standing
-line naming the agreed report path `reports/<task-id>-report.md`
-(workspace-relative); workers with write access write their final report
-there in addition to replying on the result stream (readonly workers skip
-it — the reply is the report). When a view is lost, that file is the
-ground-truth recovery channel: read it (its mtime shows whether the worker
-landed its report) BEFORE considering a re-dispatch.
-
-**Dispatch poll env knobs** (read at call time; invalid values fall back to
-the default):
-
-| Knob | Default | Effect |
-| ---- | ------- | ------ |
-| `FORGE_DISPATCH_POLL_TIMEOUT_MS` | `600000` | The SYNC WAIT window in ms — a sync dispatch whose child does not finish within it gets the honest timeout finding with the armed completion wake. It does NOT bound the async/armed completion tracker (never-die tracking — see below). Clamped to `3600000` (1 h). |
-| `FORGE_DISPATCH_NOTIFY_INTERVAL_MS` | `600000` | The `[forge:dispatch-progress]` notification interval for the async/armed completion tracker, in ms — one informational notice per interval while the child runs; also the textless-idle floor window. Clamped to `3600000` (1 h). |
-| `FORGE_DISPATCH_POLL_INTERVAL_MS` | `1000` | Poll interval for the sync loop and the async completion poller's slices, in ms. |
-| `FORGE_DISPATCH_POLL_SLICE_MS` | `5000` | Length of one async poller watch slice, in ms (registry kills take effect at slice boundaries). |
-| `FORGE_DISPATCH_STALE_MS` | `2700000` | The activity-stale reap threshold, in ms — a RUNNING dispatch child whose `session.get` `time.updated` has not advanced for this long past the 60 s runtime floor is reaped (`kill` mode aborts it with the honest `stale: aborted after N min without activity` wake). Values below the 60 s floor clamp UP to it; invalid values fall back to the default. (The runtime floor itself is fixed at 60 s; `FORGE_DISPATCH_STALE_FLOOR_MS` overrides it for tests.) |
-| `FORGE_DISPATCH_STALE_MODE` | `kill` | `kill` aborts a stale child (honest terminal wake); `observe` emits ONE `[forge:dispatch-progress]` notice per threshold crossing and never aborts. Anything unrecognized falls back to `kill`. |
-| `FORGE_DISPATCH_MAX_ATTEMPTS` | `2` | Total attempts per dispatch (1 original + N-1 automatic retries). A child that dies in a RETRYABLE error (transient transport/5xx/overload/rate-limit) respawns after a fixed 10 s backoff with the original prompt plus an inspect-then-continue resume preamble; deterministic errors (provider config/auth/model-not-supported/contract — and anything unrecognized), stale kills, user aborts, and floor findings NEVER retry. Invalid or sub-1 values fall back to the default; ceiling 10. (`FORGE_DISPATCH_RETRY_BACKOFF_MS` overrides the backoff for tests.) |
-| `FORGE_DISPATCH_DEBUG` | unset | When `1`, the sync dispatch wait emits `[forge-dbg]` diagnostic lines to stderr (slice status, stale probes with anchor values, resolved thresholds and sweep decisions). Diagnostics only — never changes behavior. |
-| `FORGE_DISPATCH_QUEUE_MAX` | `10` | Per-session FIFO queue bound (fold D): a wish that arrives while the dispatch cap (3) is full queues instead of refusing; beyond this bound the call is refused listing every in-flight AND queued task id. Queued wishes spawn FIFO as slots free; an owner session that ends flushes its queue without spawning (honest aborted records). Invalid or sub-1 values fall back to the default. |
-| `FORGE_DISPATCH_JOURNAL_MAX` | `200` | Per-workspace dispatch journal bound (fold E): the append-only `.opencode/forge/dispatch-log.jsonl` rotates by compacting TERMINAL records oldest-first; non-terminal records (running/queued/retry-pending) are never dropped — all-live overflow beats the bound. This journal is what restart recovery replays: a child that finished while the host was down wakes its owner exactly once with the fetched report, a still-running child re-arms, a queued wish re-enters the queue for a live owner, a retry-pending chain resumes while attempts remain. Invalid or sub-1 values fall back to the default. |
-
-**Exec posture pass-through + non-interactive hygiene
-(shell-defang-default-open).** The plugin performs NO command classification
-on the `forge_shell` posture path and injects NO default permission rule —
-full omo parity, the plugin is not smarter than the host. With no explicit
-permission configured, `forge_shell` behaves exactly like the native shell
-tool in every mode (TUI, serve, `opencode run`): **any command runs without
-a plugin-added confirmation** — this default-open surface is the documented,
-accepted product decision. An explicit user value stands verbatim for the
-host to resolve: `allow` runs without the ask everywhere; `deny` refuses
-everywhere; `ask` asks exactly like the native tool's ask in that mode (TUI
-dialog / run-mode auto-reject / a pending ask on serve that you answer via
-the host API — **if you run serve and want confirmations, answer asks over
-the API or don't configure ask**; the plugin adds no rescue). The
-`readonly-exec-seal` (below) remains the ONLY plugin-side exec refusal and
-is posture-independent. The 7 user-confirmation doors (`plan_approve`,
-`plan_close`, `goal_write (arm)`, `goal_complete`, `goal_resume`,
-`goal_discard`, `crew_close`) are **never** auto-resolved in any mode — they
-remain real dialogs.
-
-**Non-interactive exec hygiene (the omo port, forge-improved).** Every
-`forge_shell` spawn merges a defang env set into the child process —
-`GIT_EDITOR=:`, `EDITOR=:`, `GIT_PAGER=cat`, `PAGER=cat`,
-`GIT_MERGE_AUTOEDIT=no` (injection at spawn time; the command string is
-never rewritten, and a value you pass explicitly still wins) — so no
-command can hang on an editor or pager prompt, git or not. Commands
-matching an enumerated known-interactive list (package/platform logins like
-`npm login`/`docker login`/`gh auth login`, identity prompts like
-`sudo`/`ssh`/`passwd`, primary full-screen programs like `vim`/`less`/`man`)
-attach a **non-blocking** `[forge:interactive]` warning line to the tool
-result naming the match; the warning never refuses, never retries, and
-never mutates the command — the permission posture and the seal are the
-only refusers.
-
-**Question policy is mode-keyed.** Sync dispatches keep questions available
-(native parity — the user is watching the panel). Async dispatches create
-the child with the **question-deny seal**:
-`permission: [{permission: "question", action: "deny", pattern: "*"}]` — an
-unattended child can never block on human input; it proceeds and reports
-honestly. A **permission ask nobody answers degrades to the honest
-poll-timeout finding** (child session id disclosed, natively abortable) —
-that is the accepted fail-closed posture for unattended dispatches,
-contained by the permission map, the seal, the concurrency cap, and
-owner-death harvest. Write workers remain dispatchable in both modes —
-write authority is the target's **materialized permission map**, not a mode
-gate.
-
-**Gates.** For `forge-*` targets the session-domain pool gate (cross-pool
-targets refused with the `not dispatchable from this session` finding and
-its exits), the crew pending/compliance gates, the plan-draft interop
-(readonly targets pass as reconnaissance in BOTH modes during a draft; write
-targets are refused in BOTH modes until approval), and the primary-only rule
-(forge-* workers cannot dispatch — their materialized permission carries a
-permanent `task: "deny"` recursion ban) all apply through the SAME
-predicates as the execute-before belt. Non-forge targets dispatch with
-native parity; an unknown target is refused honestly (`Agent not found`).
-
-> **Breaking note — do not co-install with oh-my-opencode.** Both plugins
-> shadow the `task` tool name; registration order would decide whose engine
-> answers. Choose ONE orchestration layer per host.
-
-| axis | follows | survives restart? |
-| --- | --- | --- |
-| pools (the `forge-*` vocabulary) | workspaces — sole ownership + global fallback | the workspace registry re-seeds from the spawn anchor only |
-| session artifacts (plan/goal/crew records) | the session's own workspace | files on disk are the source of truth |
-
-A forge.json in a workspace this host has never been initialized in is NOT
-silently ignored: `/crew` names it as the residual mismatch and tells you
-a host re-initialization in that workspace materializes it (or move the
-agents into the global layer).
-
-**Id naming**: use plain role words (`research`, `coder`, …) — the plugin
-materializes every id as `forge-<ns>-<id>` under its family's namespace
-(never a plain `forge-<id>`; pool-less workspaces get the fixed `global`
-namespace). A `forge-`-prefixed id in the file would double up
-(`forge-coder` → agent `forge-<ns>-forge-coder`); the loader auto-strips the
-prefix (all repetitions) with a warning so existing files keep working, but
-rename the entries to silence it. The namespace infix is never parsed back
-out of a materialized id.
-
-```jsonc
-{
-  // OPTIONAL editor support: point $schema at the published copy for
-  // completion/validation of the fields below.
-  // "$schema": "https://unpkg.com/@sorenllm/opencode-forge@latest/dist/forge.schema.json",
-  // local install form (same file, no network): pin the major you run.
-  // "$schema": "./node_modules/@sorenllm/opencode-forge/dist/forge.schema.json",
-  // namespace for this pool's ids (forge-<ns>-<id> — EVERY pool is
-  // namespaced; declare it instead of riding the directory name).
-  // Short, stable, [a-z0-9-] up to 24 chars — ids survive directory renames.
-  // REQUIRED for crew-governed dispatch (the /crew compliance gate: no
-  // valid declared `pool` → `crew_begin` refuses and crew `forge-*`
-  // dispatches are blocked until the field is added). Invalid values
-  // degrade to a warning + the directory-derived namespace.
-  // "pool": "aa",
-  // OPTIONAL pool-level shared prompt segment — written ONCE at the top of
-  // the file, inherited by EVERY agent this file materializes (project
-  // conventions, repo layout, standing rules). A plain string, no
-  // interpolation. See "Pool-level shared prompt segment" below.
-  // "shared": "Project X conventions: use bun; cite file:line evidence.",
-  "agents": {
-    // PINNED worker: model + thoughtLevel form an ATOMIC PAIR — set BOTH
-    "research": {
-      "model": "zai-coding-plan/glm-5.3", // exact "provider/model" string
-      "thoughtLevel": "low",              // none/minimal/low/medium/high/xhigh/max, or any word — write lowercase
-      // "prompt": "short role description — explicit prompts fully override the built-ins (only research/review ids have them; any other id without a prompt gets a generic one-liner)",
-      // "shape": "readonly", // absent shape defaults to WRITE (open
-                               // permissions); "readonly" is the explicit seal
-                               // denying write/edit/bash + the patch family
-                               // (patch/applypatch/apply/multiedit)
-      // "permission": { "bash": "deny" } // optional override; "task" is ALWAYS denied
-    },
-    // AUTO worker: set NEITHER — inherits the parent session's model at
-    // dispatch (snapshot semantics: later primary model switches affect only
-    // future dispatches), runs at the provider's default depth
-    "scout": {}
-  }
-}
-```
-
-**The atomic pair — the one rule that matters:**
-
-> **`$schema` editor support:** the two commented lines at the top of the
-> snippet are optional — the plugin silently tolerates the `$schema` key (and
-> any unknown key) in both parse paths. One editor-side caveat: forge.json is
-> a JSONC file with a `.json` extension, so comments and trailing commas draw
-> squiggles from the editor's *own* plain-JSON association (unrelated to the
-> schema). A one-line file association fixes both validation and the
-> squiggles: `"files.associations": { "**/.opencode/forge.json": "jsonc" }`
-> (schema validation works under a jsonc association too).
-
-| `model` | `thoughtLevel` | result |
-| --- | --- | --- |
-| set | set | pinned worker (brain + depth bound at materialization) |
-| — | — | **Auto worker** (inherits the parent session's model; provider-default depth) |
-| set | — | ✗ rejected: entry skipped, error finding names the missing `thoughtLevel` |
-| — | set | ✗ rejected: entry skipped, error finding names the missing `model` |
-
-A rejected entry costs only itself — its siblings materialize normally.
-
-- **The plugin only ever reads this file.** It never creates, writes, or
-  migrates it. The old AI-authored onboarding path (seed placeholder +
-  error recipe) is gone: an unconfigured host is inert and silent, and the
-  session AI is never invited to touch config. The ONE exception is the
-  `/crew` initialization gate (below), where AI-assisted configuration is
-  offered to YOU and happens only on your explicit go-ahead.
-- **Parsing is field-level fail-soft** (ZCode-style): a semantically bad
-  agent entry is skipped with an error finding while its siblings apply; a
-  mistyped optional field is ignored with a warning (and counts as absent
-  for the atomic pair — so a pinned `model` with a typo'd `thoughtLevel`
-  skips the whole entry); a syntactically broken file empties the agent set
-  with one parse-location error. There is no seed in any failure path.
-  Findings surface in the plugin diagnostics log.
-- **`depths` is deprecated**: the array is ignored with a warning finding.
-  Pin ONE `thoughtLevel` per agent instead.
-- **Pool-level `shared` prompt segment**: an optional top-level `"shared"`
-  string — the pool's common base, written once and inherited by EVERY agent
-  the file materializes (no per-agent opt-out; an agent that must escape it
-  gets its own pool file). The layering contract is a strict prepend: the
-  materialized role prompt = `shared` + a blank line + the EXISTING
-  three-layer chain (explicit `prompt` > built-in `research`/`review`
-  defaults > generic one-liner), byte-for-byte unchanged beneath it —
-  `shared` never suppresses and never overrides anything, and an explicit
-  per-agent prompt keeps its priority over role defaults. Validation is
-  field-level fail-soft: a non-string or whitespace-only `shared` records
-  exactly ONE warn finding (`shared-invalid`, naming the file) and is
-  ignored — every agent of the pool still materializes with the unshared
-  chain. Scope is PER FILE: agents from two different pool files each get
-  their OWN file's `shared` (no cross-pool bleed), and the GLOBAL fallback
-  file's `shared` inherits to its family normally — the rule that ignores
-  the global file's `pool` namespace field does not extend to `shared`
-  (content is not namespace). Hot-apply rides the existing mtime cache:
-  editing `shared` re-materializes at the next config hook exactly like any
-  pool edit. With no `shared` declared anywhere, materialized prompts are
-  byte-identical to the pre-`shared` build.
-- Each agent materializes as `forge-<ns>-<id>` — a subagent-mode agent
-   visible in the task tool's vocabulary (never hidden), whose description
-   names its **pool provenance** (namespace + origin forge.json path +
-   dispatchability scope; the global family names the global fallback
-   layer), carrying the pinned `model`
-  (pinned workers) or NO model key at all (Auto workers — the description
-  says "inherits the parent session's model" instead of naming a brain),
-   the worker discipline (workspace-relative paths only, verbatim reporting
-   of tool refusals, evidence-bearing conclusions, search through
-   `forge_grep`/`forge_glob` first with builtin `grep`/`glob` as fallback
-   only) around its role prompt,
-   and a deny-style permission: an ABSENT `shape` defaults to WRITE (open
-   permissions — the compatibility-preserving default for existing pools);
-   an explicit `shape: "readonly"` denies
-   the full mutating-tool family — `write`/`edit`/`bash` plus the host's
-   patch family (`patch`/`applypatch`/`apply`/`multiedit`) — `shape:
-   "write"` allows them (same as absent), an explicit `permission` map overrides the shape
-   default (lifting ANY member of that family off `deny` forfeits the
-   draft-phase readonly exemption) — and `task` is ALWAYS
-   denied (recursive spawning stays physically impossible). Readonly is a
-   restriction you ask for explicitly, never a surprise default — new pools
-   should give every agent an explicit `shape` (the `/crew` initialization
-   gate teaches the AI author exactly this).
-
-> **Upgrading from ≤ 0.5.0 (breaking):** agent entries that pinned `model`
-> without `thoughtLevel` used to be accepted; they are now SKIPPED with an
-> error finding naming the missing half. Fix per entry: add the missing
-> `thoughtLevel`, or delete `model` to make it an Auto worker.
-
-> **BREAKING — every materialized id is now namespaced.** The
-> first-registered pool's plain-id privilege is gone: existing plain ids
-> (`forge-coder`) no longer exist, and there are **no compat aliases** —
-> deliberately, because an alias layer would resurrect the two-ids-one-agent
-> ambiguity this change kills (crew records and docs referencing old ids
-> are history artifacts). Migration:
->
-> - **Single-pool workspaces**: add a short stable top-level `"pool"` field
->   to your forge.json (`[a-z0-9-]`, 1–24 chars) and dispatch
->   `forge-<pool>-<id>` from now on.
-> - **Pool-less workspaces** (global fallback roster): dispatch
->   `forge-global-<id>` — the global layer materializes under the fixed
->   namespace `global`.
-> - **New crew-governed pool-compliance gate**: `crew_begin` refuses to
->   register, and every `task` dispatch of a `forge-*` worker from a
->   crew-governed session is refused, while the workspace pool file lacks a
->   valid declared top-level `pool` field. The fix is one line — add the
->   field (the refusal suggests a namespace) — and the gate lifts
->   hot-apply: the next resolve after the repair admits registration and
->   dispatch with no host restart. Global-fallback sessions are exempt.
->   Per-agent fail-soft findings never make the file non-compliant.
-
-**What applies when** — only a real materialization re-reads the pool
-files into the `forge-*` vocabulary. Materialization triggers (2026-10-01
-live finding): host boot (a freshly started CLI process reads the files as
-they are), the FIRST config build for a directory on this host, and
-opencode config file reloads. A NEW session on a long-lived shared host
-(serve-type) does NOT re-materialize:
-
-| change | needs a host restart? |
-| --- | --- |
-| `thoughtLevel` on an existing agent | no (applies to NEW sessions of that agent; running sessions keep their frozen depth) — depth lookups resolve the pool files fresh at every dispatch, independent of materialization |
-| agent added / removed / edited, any pool file created or deleted | no restart — but not at the next session either: the materialized `forge-*` set rebuilds only at the next REAL materialization (host boot, opencode config reload, or a first config build); on a long-lived shared host pool changes wait for that rebuild or a restart. The crew gate, the session-domain dispatch gate, and depth lookups resolve the pool files fresh regardless — a DELETED pool file un-materializes at that next resolve |
-| a NEW directory joining the host (the first session of another project on the shared host) | no restart — that first config build itself re-initializes the plugin and registers that workspace and its pool (existing pools never flip — every family namespaces by its own `pool` field or directory name, so ids never depend on arrival order) |
-
-### Dispatching
-
-Say "dispatch a subagent..." in a forge session and the model calls the
-`task` tool (ours): a configured `forge-*` agent whose description matches
-runs on its pinned brain; any other host agent dispatches through the same
-call with native parity. Blocking dispatch is the default (sync);
-async dispatch is `run_in_background: true`. During a plan draft dispatch is
-gated by the dispatch target's effective readonly shape:
-readonly scout dispatch passes as reconnaissance (breadth evidence without
-burning the planning session's context), write-shaped workers and native
-agents are denied with the dispatchable roster and the two exits.
-
-**Known pitfall — keyless endpoints × readonly agents**: free/keyless
-providers can return a deterministic EMPTY response for any toolset-reduced
-(readonly) agent. On the native task channel this now surfaces as a visible,
-attributable task failure; the mitigation is unchanged — use
-`shape: "write"` for such endpoints, or a keyed provider.
-
-### Readonly exec seal (the sealed supervised-exec channel)
-
-The readonly shape used to seal only the TOOL face (write/edit/bash + the
-patch family) — a readonly worker could still mutate the world through its
-exec channel (`forge_shell`). The exec seal closes that hole: a session whose
-running `forge-*` worker has an **explicit** `shape: "readonly"` (an absent
-shape defaults to write and is **never** sealed) has its `forge_shell` calls
-classified BEFORE spawn by a pure string classifier (`src/exec-classify.ts`,
-no fs access at classify time). READ-CLASS commands (inspection, search,
-read-only evals — `rg`, `git log`/`status`/`diff`, `node -e`/`python -c`
-read evals, version/help queries) flow normally; **WRITE-CLASS commands are
-denied** with a bounded finding (once per session per indicator class) that
-names the readonly shape, names the classified write indicator, and points
-at the remedy: `"shape": "write"` on that agent when its job legitimately
-mutates. The worker is told to report the refusal verbatim, not work around
-it. The primary forge session is never sealed; a session whose agent cannot
-be resolved fails open (one-time disclosure). The seal composes with — never
-replaces — the draft-phase ask/deny posture on the channel.
-
-Covered WRITE-CLASS indicators:
-
-| indicator | covers |
-| --- | --- |
-| `redirect` | output redirection to files — `>` `>>` and fd forms (`2>`, `1>`, `*>`); the PowerShell family uses the same operators |
-| `mutating-cmdlet` | `Set-Content`, `Out-File`, `New-Item`, `Remove-Item`, `Move-Item`, `Copy-Item`, `Add-Content`, `Clear-Content` |
-| `git-mutation` | `git add/commit/push/reset/checkout/rebase/merge/clean/rm` |
-| `pkg-mutation` | `npm publish`, `npm install` (incl. `npm i`/`ci`/`add`), `bun add`/`install`, `pip`/`pip3 install` |
-| `workspace-write` | output-target flags (`--out`, `--output`, `--out-file`/`--outfile`/`--outFile`, `--dest`, `--destination`, `-o`) whose parsed value is a workspace-relative path, or an absolute path under the session workspace — the short `-o` counts only when the head binary is a known `-o` writer (`gcc`, `g++`, `cc`, `c++`, `clang`, `clang++`, `ld`, `rustc`, `go`, `curl`, `sort`, `psql`, `dotnet`); on every other binary it flows |
-
-**Honest positioning — this is belt-in-depth, NOT a sandbox.** A command
-that fails to classify is treated as READ-CLASS (fail-open on the channel,
-the same posture as every refusal belt). The known bypass surface, verbatim:
-**indirect writes** (a script that writes internally — `node build.js` with
-no redirect is indirection the classifier does not model), **`Start-Process`
-writers** (spawning a writer process is explicitly out of scope), and
-**encoded payloads** (`powershell -EncodedPayload …`, base64 blobs) are NOT
-covered; they flow on the readonly channel. The short `-o` on a writer
-binary outside the known set flows (fail-open, disclosed). The seal narrows
-the exec hole
-from "completely open" to "explicitly constructed indirection" — a true OS
-level seal (write-time redirection, shadow copies, containers, win32+POSIX
-dual implementations) was evaluated and rejected as a disproportionate
-rewrite (see `openspec/changes/readonly-exec-seal/design.md`, option D3).
-The tool-face deny remains the first belt; this is the second.
-
+Partial live evidence on the 0.34.1 e3ec bundle shows a target child interrupted,
+a cancelled completion notification and its background shell absent from the
+running list, with unrelated/preflight shells still running. That is not a complete
+cancellation, ownership or collateral matrix, nor final-package acceptance.
 
 ### The thoughtLevel word
 
@@ -1343,6 +742,10 @@ running session).
 
 ## Crew workflow (`/crew`)
 
+The file-backed discipline remains. Native dispatch admission, wave settlement
+and activity accounting are still being migrated; this describes the intended
+harness contract, not a claim of verified host behavior.
+
 `/crew <objective>` is the third state-activation command next to `/plan` and
 `/goal`: it enters crew orchestration discipline for the session. The macro
 contract above the crew may come from an approved plan, an OpenSpec change, or
@@ -1370,11 +773,11 @@ requires a plan. The flow:
     pool file must declare a valid top-level `pool` namespace — a
     non-compliant file refuses the registration outright (see the BREAKING
     note above; global-fallback sessions are exempt), and while a crew
-    governs the session every `forge-*` task dispatch re-checks the same
+    governs the session every `forge-*` subagent dispatch re-checks the same
     compliance (a file degraded mid-crew blocks further crew dispatches
     until repaired — the fix is the one `"pool": "<suggested>"` line, and
-    it lifts hot-apply). Reconnaissance task calls are free BEFORE registration.
-2. **The pause is mechanical**: while the crew pends, every `task` dispatch is
+    it lifts hot-apply). Reconnaissance remains subject to applicable approvals and gates.
+2. **The pause is mechanical**: while the crew pends, every `subagent` dispatch is
    refused by an interception belt. The user chooses:
    - **supervised waves now** — `crew_begin {execution: "waves"}` lifts the
      belt and the wave discipline runs;
@@ -1383,9 +786,8 @@ requires a plan. The flow:
      (arm=true) folding the declared subtasks into criteria/checks; the arm
      dialog is the user's gate;
    - **standby** — no call; the crew waits until armed or abandoned.
- 3. **Execute in waves** (armed crews only) of parallel native `task` calls
-    (results return in-turn; the next wave launches only after the previous
-    wave's results). GUI / computer-use subtasks are mutually exclusive within
+ 3. **Execute in waves** (armed crews only) of parallel native `subagent` calls
+    (background children; the next wave waits for verified settlement of the previous wave). GUI / computer-use subtasks are mutually exclusive within
     a wave (the desktop is a singleton; non-GUI subtasks still parallelize
     freely), and GUI walkthroughs use the `computer` tool rather than DIY
     shell screenshot pipelines.
@@ -1396,19 +798,19 @@ requires a plan. The flow:
     waves advance autonomously until `crew_close`. A PENDING crew is never
     auto-continued (that pause is the user's decision seam), a goal-governed
     session belongs to the goal engine exclusively, and a non-forge speaker is
-    never continued. The engine keeps its OWN activity counter (task
+    never continued. The engine keeps its OWN activity counter (dispatch
     dispatches and write-family calls count); after 3 consecutive
     activity-free continuation turns it STOPS with one bounded console
     disclosure — the crew itself stays registered (no auto-abandon, no
     auto-close; nudge, close, or re-shard), and repeated transport failures
     stop it the same way. A fresh `crew_begin` clears the stall; no disk
     state is added (the crew record is unchanged).
- 5. **Missing role?** Run the subtask through a native task call anyway and
+ 5. **Missing role?** Run the subtask through a native subagent call anyway and
     tell the user — suggest configuring the missing role.
  6. **Native fallback lane** (crew-native-fallback): when the pool offers no
     forge worker fitting a subtask, or `forge-*` dispatch is blocked by a
     degraded (non-compliant) pool file, the armed crew dispatches the subtask
-    through the NATIVE task channel (e.g. the `general` subagent) with the
+    through the native subagent channel (e.g. the `general` subagent) with the
     SAME relay contract as a forge dispatch — the change/artifact path for
     authoritative guides, the scoped task prompt, and the evidence demands.
     The fallback is recorded, never silent: the crew record's wave notes name
@@ -1416,11 +818,7 @@ requires a plan. The flow:
     (free text — the close gate's cross-check is unchanged; titles, verdicts
     and evidence statements govern exactly as before, no new field). The
     mid-crew compliance refusal names this exit while the pool is repaired —
-    the belt gates `forge-*` dispatch only. No guard changed: the
-    registration pre-flight still refuses a non-compliant pool outright
-    (D3), cross-pool refusals keep their copy, the pending belt stands, and
-    native targets were never refused for forge-family sessions and still
-    are not.
+    the belt gates `forge-*` dispatch only. Existing approvals, pending gates, pool restrictions and host permissions still govern; native fallback is not a permission grant.
  7. **Verify** each subtask against its acceptance-evidence statement;
     retry a failure at most once.
  8. **Close** with `crew_close` — a hard, ask-gated gate cross-checking the
@@ -1474,168 +872,22 @@ workspace registers that workspace and its pool automatically (a new
 session in an existing workspace does not re-read the files — see the
 apply-timing table above).
 
-### Debris note
-
-The old dispatch suite's ledger at `<tmp>/opencode-forge/dispatch/` is no
-longer written. If it exists on your machine it is inert runtime debris —
-delete the directory freely, also after uninstalling.
-
-## Hang watchdog (a stuck builtin shell unblocks itself)
-
-`forge_shell` is structurally immune to the stdio-EOF hang, but the builtin
-`shell`/`bash` tool can still hang outside it — under `jobs.mode: "native"`
-or `jobs.keepBuiltinShell: true`, forge-family sessions carry it again. The
-watchdog is the independent backstop for those paths, in **forge-family
-sessions only** (primary and delegated forge-* workers alike) — non-forge
-agents' builtin shells are entirely native: no markers, no timing, no kills:
-
-1. The host's shell environment hook stamps each builtin shell call's
-   process with a plugin-namespaced marker (`FORGE_WATCHDOG_MARK`), and the
-   call is timed from start to end.
-2. At 80% of the stall budget: a diagnostic entry (the session is busy —
-   injecting a message would just queue, so nothing is sent to it).
-3. At `watchdog.stallMs` (default 600000): the call's process tree is
-   located and **killed** — the pipes hit EOF and the pending tool call
-   resolves immediately with whatever output was captured.
-4. If the call still hasn't returned after the kill, or no matching
-   process exists (a hang with nothing to kill): an honest
-   diagnostics-only `unresolved` report.
-
-Location is exact where foreign process environments are readable (POSIX
-`/proc/*/environ` marker match). On Windows they are not readable, so the
-watchdog infers in two guarded waves, both restricted to processes created
-during the stalled call: wave 1 matches descendants of the opencode host
-process or processes whose command line carries the stalled call's own
-command text; wave 2 — only when wave 1 found nothing, or killed and the
-call still didn't return within the observation window — additionally
-matches processes whose command lives in the stalled command's own
-directory, which is exactly where the detached stdio holders of the
-exit-with-inherited-stdio hang class sit. The locator never targets its
-own probe processes, console hosts (`conhost.exe`), or anything created
-before the call's time window. If the shell environment hook itself ever
-stops firing (host API drift), the watchdog detects the missing marker and
-degrades itself to dry-run instead of killing by inference alone.
-
-**Modes** (`watchdog.mode`, default `kill`): `dry-run` records the exact
-process list it *would* terminate and kills nothing — recommended for a
-first observation round on a new host; `off` disables timing entirely.
-`watchdog.stallMs` is clamped to a 60 s protection floor. Invalid option
-values fall back to the defaults and the fallback is ledgered.
-
-**Known trade-off.** The builtin shell exposes no output visibility, so
-the watchdog cannot tell "hung" from "quietly working" — a legitimate
-silent command longer than the threshold will be killed. That is the
-deliberated price of stopping multi-hour hangs; the guidance layer already
-routes legitimate long-running work to `forge_shell`, which has real idle
-detection. On Windows, concurrent builtin shell calls started inside the
-same window are inferred together (the rare case) — `dry-run` makes the
-exact blast radius auditable before you trust `kill`.
-
-**Retiring it.** When upstream ships exit-based completion for the builtin
-shell, switch `watchdog.mode` to `dry-run` for an observation round, then
-`off`.
-
-### Watchdog ledger
-
-Every intervention (warn / kill / dry-run candidate / unresolved /
-config fallback) appends to `<tmp>/opencode-forge/watchdog/log.jsonl`
-(bounded: 200 entries, oldest rotated out). Deleting the directory after
-uninstall is safe and complete.
-
-## Design stance (read before filing "bash is blocked" issues)
-
-During a plan's draft phase every mutating tool — `bash` included — is
-denied, and an `allow` in your config does not override it. Reconnaissance is
-read/grep/glob; if you genuinely need a shell command to decide the plan,
-approve the plan first (revising after approval is allowed via a new `/plan`).
-The escape hatches are `plan_approve` and `/plan discard`, by design.
-
-One carve-out, keyed on the target rather than the tool: during a draft the
-`task` tool (ours — in BOTH modes, through the same predicate) is gated by
-the dispatch target's **effective readonly shape**. A
-dispatch to a forge worker whose shape is EXPLICITLY `readonly` AND whose
-permission
-overrides do not lift `write`/`edit`/`bash` — nor any host patch-family tool
-(`patch`/`applypatch`/`apply`/`multiedit`) — off `deny` (`ask` counts as
-lifted — fail-closed) passes as a reconnaissance dispatch: readonly scouts
-may be spawned both before and during the draft, so breadth
-evidence-gathering does not burn the planning session's context. A worker
-with NO shape field is not exempt (absent defaults to write). Every other
-target — write-shaped and shape-less workers, native agents, absent or
-unresolvable targets
-(including resume calls that carry no target) — is denied like any write-class
-tool. The refusal names the currently dispatchable effective-readonly roster,
-points to defining a readonly worker in forge.json (explicit
-`"shape": "readonly"`) when the roster is empty
-(an unconfigured host stays fully denied — same behavior as before, just more
-actionable wording), and names the two exits (`plan_approve`, `/plan
-discard`). Invariant strength is unchanged: the scout's materialized
-permission hard-denies the mutating-tool family — write/edit/bash and the
-patch family (and `task`, always — no chained
-spawning), the scout's own session is ambient-bound to the same draft write
-ban, and its `forge_shell` calls ride the same per-call ask gate the primary
-agent faces. The `permission.ask` belt does not follow the exemption: on a
-host configured with `task: "ask"` a draft-phase dispatch is still denied
-(fail-closed degradation by design — the side belt does not resolve target
-shapes).
-
-Separately, the builtin shell is hidden on the forge agent on purpose —
-`forge_shell` is the exec surface there (see Agent partition and the job
-supervisor chapter above). The hide is unconditional: it covers a
-**user-defined** `agent.forge` entry too. The escape hatches are
-`jobs.keepBuiltinShell: true` (builtin shell back on the forge family) and
-`jobs.mode: "native"` (supervisor retired entirely).
-
-### The exec channel is final for this plugin-API generation (2026-09-28)
-
-The four layers — tools-map hide, prompt mandate, belt refusal, `forge_shell`
-itself — are the ceiling of what the current opencode plugin API can express,
-and the design is closed deliberately:
-
-- **Not expressible**: `tool.execute.before` can only mutate `args` or throw.
-  There is no tool-name rewrite, no executor replacement, no result injection —
-  "transparently reroute a builtin bash call through the job runner" cannot be
-  written. Registering a plugin tool named `bash` collides globally: tool
-  registration is not per-agent, and the per-agent mechanism is exactly the
-  tools map some hosts ignore.
-- **Prior art ships a subset**: OMO (oh-my-opencode-slim / oh-my-openagent,
-  the largest opencode plugin ecosystem) pairs a permission-deny boundary with
-  a prompt channel mandate and does not hide the builtin shell at plugin level
-  either — their models also see bash and pay one denial round.
-- **The residual is bounded and accepted**: on hosts where the hide does not
-  hold, a first bash attempt costs one round-trip per session — the belt
-  refuses pre-execution (~2 ms, the command never runs), the message names
-  `forge_shell`, and models re-issue once and stay on-channel. Field data
-  (2026-09-28): zero duplicate executions attributable to the belt.
-- **Reopen on upstream movement**: hosts honoring injected tools maps (the
-  belt becomes pure insurance), a tool-execute replacement hook (transparent
-  rerouting becomes expressible), or exit-based builtin-shell completion (the
-  watchdog retirement path above applies).
-
-A process restart forgets the session binding: the write-ban soft-disables
-(safety over strictness) and the next session's system notice + `/plan
-resume` re-bind from the plan file on disk, which is the source of truth.
-
 ## Development
 
 ```bash
 npm install
 bun run typecheck     # tsc --noEmit
-node --test tests/*.test.mjs
+node --import ./tests/lib/test-runtime-namespace.mjs --test tests/*.test.mjs   # (= npm test; keeps test artifacts off the host's)
 bun run bundle        # rebuild self-contained dist/index.js (committed)
 ```
 
-Architecture: `plugin.ts` (dual entry — v1 `server` full-featured + v2
-`setup` defensive forward-compat; the /plan and /goal command templates each
-carry their own full discipline, hermes-style: the entry turn is the
-rulebook) + `src/plan-file.ts` / `src/goal-file.ts`
-(pure document cores, unit-tested, no opencode imports) + `src/run-check.ts`
-(shell/file-contract runner with tree-kill timeouts and a workspace path
-guard) + `src/proc.ts` (shared spawn/tree-kill muscle) + `src/job-manager.ts`
-(job registry, ownership, wake queue — pure logic) + `src/job-runner.ts`
-(four-condition race, pipe capture, log tee). Behavioral changes go through the
-OpenSpec workflow in `openspec/` — see AGENTS.md. Common pitfalls live in
-`../opencode-plugin-dev-pitfalls.md`.
+The preload sets `FORGE_TEST_RUNTIME_DIR` to a private runtime directory.
+`FORGE_TEST_FORGE_HOME` is the test home alias for config discovery.
+
+Architecture: `plugin.ts` exposes v2 `setup` only. The file-backed Plan, Goal
+and Crew harness cores remain in `src/`,
+with host verification checks in `src/run-check.ts`. Behavioral changes
+go through OpenSpec; see AGENTS.md.
 
 ## License
 

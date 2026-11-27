@@ -94,6 +94,8 @@ The plugin handles the Anthropic Messages API (`POST …/messages`), OpenAI Chat
 
 ## Install
 
+Requires OpenCode V2 2.0.22 or later. Tested with OpenCode 2.4.2.
+
 ### Via CLI
 
 ```sh

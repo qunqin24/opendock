@@ -51,7 +51,7 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
 - **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。複数の辺ではみ出す場合は辺ごとに 1 件返す。親が JSON に無い場合、自己参照（`parent` がそのノード自身）の場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前二者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／自己参照／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。`w`/`h` が 0 のノードのみ検査対象外で、Web ノードが 1 件もない、または検査対象がすべて `w`/`h` = 0 の場合も `mismatch` です。負の `w`/`h` と必須キー欠落（`width`/`height` など）は入力エラーで、この mismatch にはなりません。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` = 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`max_details` で切り詰めたときは `issues_omitted` も返す。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`max_details` で切り詰めたときは `issues_omitted` も返す。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `duplicate_web_selectors` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
 意図的な横スクロール領域（カルーセル、`overflow-x: auto` の表、マーキーなど）では、スクロールコンテナ自身はビューポート内に収まっていても、子要素のボックスが `viewport_width` を越えると `viewport_overflow_x` として検出されます。これは崩れではないため CSS で「直す」対象ではなく、`ignore_nodes`（例: `.carousel-*`）や `ignore_region` で明示的に除外し、除外が効いたかは `unmatched_ignores` / `unmatched_ignore_regions` で確認してください（除外がすべて一致していればこれらのフィールドは出ません）。
 
@@ -147,7 +147,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 | フィールド | 型 | 必須 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `selector` | string | ○ | 要素識別子（CSS セレクタ等）。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。同一 `selector` が複数ある場合、親参照インデックスは先勝ち（最初のノード）を使い、応答に `duplicate_node_identifiers` が付く（`status` / `match_rate` は変えない）。 |
+| `selector` | string | ○ | 要素識別子（CSS セレクタ等）。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。同一 `selector` が複数ある場合、親参照インデックスは先勝ち（最初のノード）を使い、応答に `duplicate_node_identifiers` と `duplicate_web_selectors`（接頭辞なしの selector 一覧）が付く（`status` / `match_rate` は変えない）。 |
 | `x` / `y` / `w` / `h` | number | ○ | 要素の BoundingBox（**絶対 CSS px**。ドキュメント／ページ共通の座標空間。キー名は `w` / `h` であり `width` / `height` ではない）。 |
 | `parent` | string | — | 親要素の `selector`。省略時は親なしとして扱われる。入力内のどの `selector` にも一致しない場合は絶対座標比較へフォールバックし、応答に `unresolved_parent_refs` が付く。 |
 
@@ -171,7 +171,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 ]
 ```
 
-`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照、および自己参照（`parent` がそのノード自身）は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。同一 Figma `id` / Web `selector` が複数ある場合も `status` / `match_rate` は変えず、親参照は先勝ちのまま `duplicate_node_identifiers`（例: `Figma: '1:23'` / `Web: '.item'`）で通知します。
+`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照、および自己参照（`parent` がそのノード自身）は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。同一 Figma `id` / Web `selector` が複数ある場合も `status` / `match_rate` は変えず、親参照は先勝ちのまま `duplicate_node_identifiers`（例: `Figma: '1:23'` / `Web: '.item'`）で通知します。Web `selector` の重複は接頭辞なしの一覧 `duplicate_web_selectors`（例: `[".item"]`）でも返します。
 
 `id` / `name`（Figma）と `selector`（Web）は空文字を拒否します。`x` / `y` / `w` / `h` はキー欠落を拒否します（明示的な `0` は許可）。欠落や空識別子はツール実行エラーになり、メッセージにノードインデックスとフィールド名が含まれます（例: `Figma layout node at index 1 is missing required field 'w'`）。
 
@@ -229,6 +229,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない、または自己参照の `parent`。 |
 | `duplicate_node_identifiers` | string[] | 非空時のみ | 入力内で重複した Figma `id` / Web `selector`（例: `Figma: '1:23'` / `Web: '.item'`）。親参照インデックスは先勝ちのまま。`status` / `match_rate` は変えない。 |
+| `duplicate_web_selectors` | string[] | 非空時のみ | 入力内で 2 回以上現れた Web `selector`（接頭辞なし、初出順に 1 回ずつ。例: `.card`）。`duplicate_node_identifiers` の Web 側と同じ対象を、`mismatched_pairs` の `web_selector` とそのまま突き合わせられる形で返す。親参照は先勝ちのまま、`status` / `match_rate` は変えない。`layout_integrity` でも同フィールドを返す（`status` / `issue_count` は変えない）。 |
 
 ### `perceptual`
 

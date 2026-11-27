@@ -187,6 +187,10 @@ magpie login aws-quick              # 按提示选择登录方式
   `false` 隐藏。
 - `stableDeviceId`（默认 `true`）：直连会话把按账号固定的设备 ID 作为
   `outpostId` 发送（见上文"设备 ID"）；`false` 改发空值。
+- `toolSpecReanchorTurns`（默认 `6`）：复用 thread 时后续轮次只带简短提醒，
+  小模型会逐渐退化成纯文本回答（agent 端表现为"没工具"）。每经过这么多
+  提醒轮就重发一次完整工具规范重新锚定约定；模型用纯文本回答工具结果时
+  会提前强制重锚。`0` 关闭定期重锚。
 
 ## 常见问题
 
@@ -210,7 +214,10 @@ magpie login aws-quick              # 按提示选择登录方式
   文本约定，由插件解析成标准 `tool_calls` 返回；`tool` 角色的结果渲染为
   `[tool_result …]` 续接同一 thread。完整的工具说明每个 thread 只发一次，
   复用 thread 的后续轮次只带一段简短提醒：消息里的内容都会留在 Quick 的
-  thread 历史里、计入上下文。可靠性取决于模型遵守约定——已实测
+  thread 历史里、计入上下文；每隔几轮（`toolSpecReanchorTurns`）会重发一次
+  完整规范防止约定淡化。解析出的调用会按声明的 schema 校验，违规项随下一轮
+  作为纠正提示发给模型，让它修正参数而不是重复同样的错误。可靠性取决于
+  模型遵守约定——已实测
   `tool_choice:'required'` 下 smart/advanced 均能稳定产出；模型偶尔会先用
   自带工具（如联网搜索）直接作答，此时表现为普通文本回复。若模型改用
   Quick 自己的原生工具通道调用了客户端声明的工具，插件会识别该调用并按

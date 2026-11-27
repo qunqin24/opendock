@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.5`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.7`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,8 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.7 | 9 | 0.40.7 | 0.40.7 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.7 (`hermes-agent` >=0.17.0) |
+| 0.40.6 | 9 | 0.40.6 | 0.40.6 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.6 (`hermes-agent` >=0.17.0) |
 | 0.40.5 | 9 | 0.40.5 | 0.40.5 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.5 (`hermes-agent` >=0.17.0) |
 | 0.40.4 | 9 | 0.40.4 | 0.40.4 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.4 (`hermes-agent` >=0.17.0) |
 | 0.40.3 | 9 | 0.40.3 | 0.40.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.3 (`hermes-agent` >=0.17.0) |
@@ -332,6 +334,27 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.7: bounded dream sweep and restart handling (#808)
+
+- The server processes a due backlog in successive batches and resumes after restart. A weekly sweep revisits older
+  facts even when the fresh queue is empty.
+- Noise-only review remembers unchanged candidates the model keeps and checks edited text again. Synced writes
+  check the expected version inside the transaction.
+- Upgrades from 0.40.6 use fact-base schema 9 and the existing CLI flags.
+
+### 0.40.6: bounded memory capture and noise cleanup (#805)
+
+- Agent/tool `pitfall` and `environment` facts now expire after 30 days by default. Use `-expires` for another review
+  date or `-no-expires` for deliberately durable knowledge. Existing facts keep their expiry; rules, decisions and
+  research shelves are unchanged. Explicit one-off outcomes and resolved current-task incidents are refused at capture.
+- Dream accepts `retire kind="noise"` only for packet-eligible one-off records. `dream -noise` reviews just those
+  candidates without split, duplicate or scope work. Singleton noise retirement is allowed, ordinary groups still keep
+  one fact, and noise-only review does not mark unreviewed durable facts as seen.
+- Model-facing prompts are English. Stored facts and user-facing diagnostics are not translated. `NotePromptVersion`
+  is 2; rerunning note migration remains an explicit action.
+- Update the binary and installed plugins together. The fact-base schema stays at 9; no migration is needed from
+  0.40.5.
 
 ### 0.40.5: retire explicitly resolved pitfalls (#802, #803)
 
@@ -1275,7 +1298,7 @@ by a search that names it; an expired fact only with `-expired`; and at most `-n
 your rules and decisions (`-kind rule,decision`) at the start of a task. `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
-says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
+says otherwise: what happened in one run is not the knowledge a later session needs. An agent/tool `pitfall` or `environment` fact gets a 30-day review expiry; `-expires` chooses another date and `-no-expires` deliberately keeps durable knowledge without one. Expiry hides a fact from ordinary search and automatic repository pitfalls without deleting its history; a later verified use can renew it with `correct -no-expires`. Explicit one-off outcomes, resolved current-task defects and transient state are refused at capture rather than stored as durable knowledge. `add` without `-source` stores
 the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
 showed takes `-source tool`. Facts that carry a `channel` from the dream of 0.28.0 (#625) keep it; nothing reads or
 writes it since the card went:
@@ -1302,7 +1325,8 @@ memcue notes                         # which entries of the built-in memory note
 memcue reindex -dry-run              # index rows against the live facts, and how many lack their number term
 memcue reindex                       # rebuild the index from the live facts (-json for one JSON object)
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
-memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base)
+memcue dream -all -noise -list      # only explicit one-off noise candidates, without split, duplicate or scope work
+memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base; -noise: candidates only)
 memcue dream -apply answer.json      # check and carry out the model's answer to it
 ```
 
@@ -1381,13 +1405,12 @@ In server mode only the server dreams, on a schedule; a client refuses `dream` a
 
 Who runs it:
 
-- **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `24h`, #665) has
-  passed since the last one and some fact is fresh or lacks ordinary search queries. The first check on a machine
-  only marks the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
-  dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
-  in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
-  otherwise. The start is stamped in `dream.started`, so a dream that fails is tried again an interval later, not at
-  every session start; what the dream prints goes to `dream.out`, its record to `dream.log`. A held `dream.lock`
+- **The session start, in the background** (#569). A local dream is due once `MEMCUE_DREAM_EVERY` (default `24h`,
+  #665) has passed since the last one and a fact is fresh. The first check marks the existing facts as seen.
+  `memcue dream -prepare -all` can review them. When due, `session-start` (Claude Code) and `session-card` (Hermes, DSH)
+  start `memcue dream -run -background` in its own session and return at once. The command runs one pass on the
+  endpoint when `MEMCUE_API_URL` is set and on `claude -p` otherwise. It stamps the start in `dream.started` and retries
+  failures after the interval. Output goes to `dream.out` and records go to `dream.log`. A held `dream.lock`
   makes the background run leave quietly, so sessions started together run one dream. `claude -p` runs with the
   environment of the session that started it, so on a machine whose Claude Code login expires the dream fails;
   `MEMCUE_CLAUDE_TOKEN_FILE` names a token from `claude setup-token` for it (#591).
@@ -1397,14 +1420,16 @@ Who runs it:
   prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
   `memcue_dream_apply` (#494). Hermes builds the system prompt once and again after a compression or a reset, so the
   line is as fresh as the last rebuild ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
-- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
-  interval, and the merge sweep, which never runs out of groups, does not keep it going. It uses the endpoint when
-  `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks) otherwise. It stops on
-  the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. With an
-  endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405). Without
-  `-all`, `-run` checks the interval and the facts the session start checks and makes no call when nothing is due
-  (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
-  surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
+- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left. It uses
+  the endpoint when `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks)
+  otherwise. The merge sweep alone does not keep an ordinary `-all` run going. The command stops on the first failed
+  pass or after 200 passes. An ordinary run also stops after three passes that change nothing. A second run resumes.
+  With an endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405).
+  `-noise` saves a separate checkpoint for each reviewed text. An explicit `actions: []` marks the unchanged
+  candidates reviewed. Edited text is eligible again. This applies to `-run -all -noise` and the manual
+  `-prepare -noise` / `-apply` flow. Review the first answers against a live base manually before applying them.
+  Without `-all` or `-noise`, `-run` uses the same schedule as session start. A direct `-run` without `-all` requires
+  `MEMCUE_API_URL`. The local `-background` run can use `claude -p`.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups and the global facts to check the
   scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call
@@ -1415,6 +1440,15 @@ Who runs it:
   call (#643): its task (`review` for the fresh facts and the groups, the merge sweep's counted under `swept`,
   `scope`), the work it was given, how many changes the model proposed, its tokens, its time
   and, on `claude -p`, its cost. An endpoint reports tokens only, so a call there has no `cost_usd`.
+
+- **The server.** In server mode only `memcue server` runs dream. It checks the queue every ten minutes.
+  `MEMCUE_DREAM_EVERY` (default `24h`) controls when routine maintenance starts. A run handles bounded batches
+  immediately, up to four passes before checking the queue again. The server continues while work remains and retries
+  after ten minutes when a model call fails or a pass makes no progress. Separately, a weekly scan revisits older
+  groups even when no fresh facts exist. It records a high-ID boundary and cursor, alternates with fresh work, and
+  resumes after restart. On upgrade, an initialized server starts the first scan at its next check. A new server
+  starts one after seven days. `dream.out` and `dream.log` report completed and remaining work and why the run stopped.
+  Retirement still requires evidence.
 
 A packet holds up to 40 fresh facts, 30 groups and 30 global facts to check the
 scope of. The fresh facts it leaves out are not counted
@@ -1436,11 +1470,15 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
-- **Retire** a fact of a group as a duplicate, as contradicted, or as explicitly resolved. For `duplicate` and
+- **Retire** a fact of a group as a duplicate, as contradicted, as explicitly resolved, or as one-off noise. For `duplicate` and
   `outdated`, name the fact that covers it (`by`). A `resolved` retirement needs no `by` when the fact's own text
-  records the fix; otherwise `by` names the grouped fact supplying that evidence. Of two duplicates the one with the
-  smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same copy and never
-  retire both. Every group keeps at least one fact; a retired fact stays in the history.
+  records the fix; otherwise `by` names the grouped fact supplying that evidence. `noise` is limited to packet-marked
+  candidates whose own text explicitly records task progress, a finished experiment, a rejected candidate, a one-off
+  release or transient state, obsolete installation state, or a context-free fragment. Age, length, missing search
+  usage and a PR number alone are not evidence. Of two duplicates the one with the smaller id stays, whatever the model
+  prefers, so machines dreaming over one shared base keep the same copy and never retire both. Every ordinary group
+  keeps at least one fact; only an eligible singleton noise candidate may leave its group empty. A retired fact stays
+  in the history.
 - **Correct** a fact of a group with text built only from the facts of the group. Only the replacement content is written; it triggers no expansion or translation call.
 
 A duplicate learnt in another project than the fact that stays is kept (#607): a fact that holds in two repositories

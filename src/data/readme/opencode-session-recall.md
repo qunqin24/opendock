@@ -9,7 +9,7 @@
 
 [OpenCode](https://github.com/opencode-ai/opencode) already keeps the full history of every session you've run: messages, tool calls, tool outputs, and reasoning traces. That history covers every project on the machine, and it survives compaction. When compaction trims the context window, the original content stays in the database; the agent just stops being able to see it.
 
-This plugin adds five tools that read that history on demand. To answer in a couple of seconds without pulling gigabytes into memory, it keeps a small derived index alongside opencode's data: one card per session, plus a slim full-text index over the human layer (conversation text, reasoning traces, and the commands tools ran). That index lives in a local SQLite file under `~/.cache/opencode-session-recall/`, built once in the background through the opencode SDK and updated incrementally as sessions change. It is derived and safe to delete at any time; opencode's own database stays the sole source of truth, and the index adds zero npm dependencies because it uses the runtime's built-in SQLite. Embeddings are still an opt-in local layer that stays off by default. You install it, and the agent can search its own past.
+This plugin adds five tools that read that history on demand. It runs on opencode v1 (1.3.4 and later) and on opencode v2 (2.0 through 2.4, checked against 2.4.1); see [Running on opencode v2](#running-on-opencode-v2) for what differs there. To answer in a couple of seconds without pulling gigabytes into memory, it keeps a small derived index alongside opencode's data: one card per session, plus a slim full-text index over the human layer (conversation text, reasoning traces, and the commands tools ran). That index lives in a local SQLite file under `~/.cache/opencode-session-recall/`, built once in the background (through the opencode SDK on v1, by reading opencode's database read-only on v2) and updated incrementally as sessions change. It is derived and safe to delete at any time; opencode's own database stays the sole source of truth, and the index adds zero npm dependencies because it uses the runtime's built-in SQLite. Embeddings are still an opt-in local layer that stays off by default. You install it, and the agent can search its own past.
 
 ## Why you want this
 
@@ -82,6 +82,10 @@ One call returns the matching sessions across all your projects, each with a `hi
 
 ## Install
 
+The same package works on both opencode generations.
+
+**opencode v1:**
+
 ```bash
 opencode plugin opencode-session-recall
 ```
@@ -94,13 +98,31 @@ Or add it to your `opencode.json`:
 }
 ```
 
-That's the whole setup. The agent picks up the tools on the next session and uses them on its own; you don't have to teach it the syntax. To disable cross-project search:
+Options go in a `[name, options]` pair. To disable cross-project search:
 
 ```jsonc
 {
   "plugin": [["opencode-session-recall", { "global": false }]],
 }
 ```
+
+**opencode v2:**
+
+```bash
+opencode plugin add opencode-session-recall
+```
+
+Or list it under `plugins`, with options in an object:
+
+```jsonc
+{
+  "plugins": [{ "package": "opencode-session-recall", "options": { "global": false } }],
+}
+```
+
+v2 also reads the v1 `plugin` form above, so an existing config keeps working.
+
+That's the whole setup. The agent picks up the tools on the next session and uses them on its own; you don't have to teach it the syntax.
 
 ## Getting the agent to actually use it
 
@@ -122,44 +144,68 @@ A search tool only helps if the agent reaches for it. The plugin has three featu
 
 ## Options
 
-| Option             | Type      | Default                    | Description                                                                                                                                   |
-| ------------------ | --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `primary`          | `boolean` | `true`                     | Register tools as primary (available to all agents)                                                                                           |
-| `global`           | `boolean` | `true`                     | Allow cross-project search via `scope: "global"`                                                                                              |
-| `nudge`            | `boolean` | `true`                     | Inject a short system-prompt reminder to use recall for past work                                                                             |
-| `autoRecall`       | `boolean` | `false`                    | On user messages that reference prior work, auto-run a bounded recall and inject the top cited hits                                           |
-| `compactionRecall` | `boolean` | `false`                    | Before compaction, preserve the session's distilled card into the summary                                                                     |
-| `prewarm`          | `boolean` | `false`                    | Deprecated no-op, kept so existing configs don't error; the card store persists across processes                                              |
-| `semantic`         | `boolean` | `false`                    | Enable the opt-in local [semantic layer](#semantic-search-opt-in)                                                                             |
-| `semanticWeight`   | `number`  | `0.35`                     | Blend weight for the semantic signal, clamped to 0.05–0.95                                                                                    |
-| `semanticModel`    | `string`  | `minishlab/potion-base-8M` | Hugging Face model id for the static-embedding model                                                                                          |
-| `summaries`        | `object`  | off                        | Opt-in LLM card summaries: `{ enabled, model: "providerID/modelID", agent?, maxPromptsPerPass? }`. See [LLM summaries](#llm-summaries-opt-in) |
-| `mode`             | `string`  | `"persistent"`             | `"ephemeral"` runs with no store and no on-disk artifacts. See [Ephemeral mode](#ephemeral-mode-opt-in)                                       |
+| Option             | Type      | Default                    | Description                                                                                                                                       |
+| ------------------ | --------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `primary`          | `boolean` | `true`                     | Register tools as primary (available to all agents)                                                                                               |
+| `global`           | `boolean` | `true`                     | Allow cross-project search via `scope: "global"`                                                                                                  |
+| `nudge`            | `boolean` | `true`                     | Inject a short system-prompt reminder to use recall for past work                                                                                 |
+| `autoRecall`       | `boolean` | `false`                    | On user messages that reference prior work, auto-run a bounded recall and inject the top cited hits                                               |
+| `compactionRecall` | `boolean` | `false`                    | Before compaction, preserve the session's distilled card into the summary                                                                         |
+| `prewarm`          | `boolean` | `false`                    | Deprecated no-op, kept so existing configs don't error; the card store persists across processes                                                  |
+| `semantic`         | `boolean` | `false`                    | Enable the opt-in local [semantic layer](#semantic-search-opt-in)                                                                                 |
+| `semanticWeight`   | `number`  | `0.35`                     | Blend weight for the semantic signal, clamped to 0.05–0.95                                                                                        |
+| `semanticModel`    | `string`  | `minishlab/potion-base-8M` | Hugging Face model id for the static-embedding model                                                                                              |
+| `summaries`        | `object`  | off                        | Opt-in LLM card summaries: `{ enabled, model: "providerID/modelID", agent?, maxPromptsPerPass? }`. See [LLM summaries](#llm-summaries-opt-in)     |
+| `mode`             | `string`  | `"persistent"`             | `"ephemeral"` runs with no store and no on-disk artifacts. See [Ephemeral mode](#ephemeral-mode-opt-in)                                           |
+| `opencodeDbPath`   | `string`  | opencode's own resolution  | opencode v2 only: the `opencode.db` to read, overriding the path opencode itself would use. See [Running on opencode v2](#running-on-opencode-v2) |
 
 Advanced limits (all have sensible defaults):
 
-| Option                 | Default                                        | Description                                                                    |
-| ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `storePath`            | `~/.cache/opencode-session-recall/store-v1.db` | Path to the derived SQLite store                                               |
-| `coldPass`             | `true`                                         | Run the background distiller cold pass that builds the store                   |
-| `concurrency`          | `3`                                            | Max concurrent SDK fetches shared by drill and distiller                       |
-| `drillSessions`        | `12`                                           | How many shortlisted sessions a query drills into                              |
-| `semanticSlots`        | `2`                                            | Drill slots reserved for the top pure-semantic cards (semantic on); 0 disables |
-| `drillPageMessages`    | `25`                                           | Messages per page during an untargeted drill                                   |
-| `drillCharsPerSession` | `1,500,000`                                    | Retained-chars budget per drilled session                                      |
-| `drillCharsPerQuery`   | `20,000,000`                                   | Retained-chars budget across all sessions in one drill                         |
-| `deepCharsPerQuery`    | `30,000,000`                                   | Retained-chars budget for one deep (output-inclusive) sweep                    |
-| `cacheMaxChars`        | `24,000,000`                                   | Retained-chars budget for the drilled-session LRU; keeps repeat queries warm   |
-| `distillConcurrency`   | `2`                                            | Sessions the cold pass distills in parallel                                    |
-| `distillDelayMs`       | `25`                                           | Politeness delay between a session's page fetches during distillation          |
-| `ftsRowsPerSession`    | `5000`                                         | Per-session slim-index row cap; giant sessions keep their newest rows          |
-| `inventoryTokens`      | `200`                                          | Card inventory token cap (code anchors plus digest tokens)                     |
-| `maxSessions`          | unlimited                                      | Hard max sessions per search; caps `recall.sessionLimit`                       |
-| `maxResults`           | `50`                                           | Max results per search                                                         |
-| `maxSessionList`       | `100`                                          | Max sessions in a listing                                                      |
-| `maxMessages`          | `50`                                           | Max messages per browse page                                                   |
-| `maxWindow`            | `10`                                           | Max context window size                                                        |
-| `defaultWidth`         | `200`                                          | Default snippet width                                                          |
+| Option                 | Default                                        | Description                                                                                   |
+| ---------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `storePath`            | `~/.cache/opencode-session-recall/store-v1.db` | Path to the derived SQLite store (v2 default: `store-opencode-v2.db`)                         |
+| `coldPass`             | `true`                                         | Run the background distiller cold pass that builds the store                                  |
+| `concurrency`          | `3`                                            | Max concurrent SDK fetches shared by drill and distiller                                      |
+| `drillSessions`        | `12`                                           | How many shortlisted sessions a query drills into                                             |
+| `semanticSlots`        | `2`                                            | Drill slots reserved for the top pure-semantic cards (semantic on); 0 disables                |
+| `drillPageMessages`    | `25`                                           | Messages per page during an untargeted drill                                                  |
+| `drillCharsPerSession` | `1,500,000`                                    | Retained-chars budget per drilled session                                                     |
+| `drillCharsPerQuery`   | `20,000,000`                                   | Retained-chars budget across all sessions in one drill                                        |
+| `deepCharsPerQuery`    | `30,000,000`                                   | Retained-chars budget for one deep (output-inclusive) sweep                                   |
+| `cacheMaxChars`        | `24,000,000`                                   | Retained-chars budget for the drill's cache of fetched pages, which keeps repeat queries warm |
+| `distillConcurrency`   | `2`                                            | Sessions the cold pass distills in parallel                                                   |
+| `distillDelayMs`       | `25`                                           | Politeness delay between a session's page fetches during distillation                         |
+| `ftsRowsPerSession`    | `5000`                                         | Per-session slim-index row cap; giant sessions keep their newest rows                         |
+| `inventoryTokens`      | `200`                                          | Card inventory token cap (code anchors plus digest tokens)                                    |
+| `maxSessions`          | unlimited                                      | Hard max sessions per search; caps `recall.sessionLimit`                                      |
+| `maxResults`           | `50`                                           | Max results per search                                                                        |
+| `maxSessionList`       | `100`                                          | Max sessions in a listing                                                                     |
+| `maxMessages`          | `50`                                           | Max messages per browse page                                                                  |
+| `maxWindow`            | `10`                                           | Max context window size                                                                       |
+| `defaultWidth`         | `200`                                          | Default snippet width                                                                         |
+
+## Running on opencode v2
+
+On opencode v2 (checked against 2.4.1) the plugin registers the same five tools with the same arguments and results, keeps the `nudge` and `primary` behavior, and supports `global`, `mode`, `semantic` and the advanced limits. A few things work differently because v2 is built differently.
+
+**Where history comes from.** v2's plugin API cannot list sessions or page messages, so the plugin reads opencode's own `opencode.db` directly, strictly read-only: it never writes to that file and never holds a read transaction open. It finds the file the way opencode does (`OPENCODE_DB`, the build channel, `XDG_DATA_HOME`); set `opencodeDbPath` to point it somewhere else. Since opencode 2.4 an assistant message's content is stored as separate rows in a `session_part` table. The plugin reads those rows with any inline content, in the order opencode itself reads them. A database from before 2.4 reads as it always did. If the file is missing or unreadable, every response says so in `coverage.source`, `recall_get`, `recall_context` and `recall_messages` return that reason as their error, `recall_sessions` lists from the session cards, and `recall` answers from those cards alone (title and first request) with a warning. Both need cards from an earlier run; without them there is nothing to answer from. The one exception is a path that cannot be resolved at all (`:memory:`, an empty `opencodeDbPath`): then no store is opened and the cards are unavailable too.
+
+**How the index stays current.** v2 events are only a hint, so a background poll keeps the store fresh without them: new messages show up within about 30 seconds, and renames, moves and other metadata-only changes within about 5 minutes. A turn that is still streaming is re-read on every poll until it settles. A change that only rewrites part rows in a settled session shows up in neither poll. A background range check catches it by comparing stored hashes of each session's rows with `opencode.db` and re-indexing a session whose rows changed. It checks one range per poll and only while no tool call is reading history.
+
+**Rebuilding older cards.** Cards built before the plugin read `session_part` miss everything opencode 2.4 stored there. After each cold pass a background repair sweep rebuilds them, sessions with part rows first. A card whose new read looks like it lost content (part rows of a type this version does not know, or a completed assistant message that reads empty despite its part rows) is kept as it was and marked instead of overwritten. Every `recall` response carries `coverage.history` while `opencode.db` can be read. It says what this version found there (whether part rows are read, the newest opencode migration and whether this version was tested against it, unknown history tables and counts of what reads could not project) and, under `repair` and `reconcile`, how far the repair sweep and the range check have got. A warning stays on responses while cards are waiting to be rebuilt or if some could not be.
+
+**A separate store.** The v2 index lives in `~/.cache/opencode-session-recall/store-opencode-v2.db`, next to the v1 `store-v1.db`. Each store records which opencode and which history database it was built from, and refuses to be used by the other, so the two never overwrite each other. One v2 process indexes every project into that one file. If you set `storePath` (or `opencodeDbPath`) on v2, give an absolute path: the plugin runs inside opencode's background service, so a relative path resolves against the service's working directory, not your project.
+
+**What is different.**
+
+- Tool calls show no custom titles in the TUI; v2 has no title channel for plugin tools.
+- `primary` hides the tools from subagents by checking whether the session has a parent session, and refuses them there as well.
+- The distiller always indexes every project. `global: false` only limits what queries can reach to the current project.
+- The distiller also indexes archived sessions, so `recall` searches them too. Archiving hides a session from opencode's list but keeps its history. Discovery walks every session in pages by id, with no overall cap.
+- `autoRecall`, `compactionRecall` and `summaries` are not available on v2 yet. Turning one on logs a line and changes nothing.
+- v2 discards plugin console output. Set `RECALL_DEBUG=1` in the environment of the opencode service to log to `~/.cache/opencode-session-recall/recall.log` (size-capped, one rotation).
+
+**Resetting the store.** If the v2 store is refused (the log says `store refused (<reason>)`), quit every opencode v2 process, including the background service (`opencode service stop`), delete `~/.cache/opencode-session-recall/store-opencode-v2.db`, and start opencode again. The store rebuilds in the background.
 
 ## Recall is not memory
 
@@ -179,13 +225,15 @@ The sections above describe 2.0. This one explains what it replaced, and why the
 
 The retrieval contract changed with the architecture. 1.x promised exhaustive scanning; 2.0 promises bounded, precision-first retrieval with honest coverage reporting, so a response says how many sessions it actually drilled and what it skipped instead of implying it read everything. Tool outputs are searched inside the sessions a query drills into, not swept across all of history on every call, because that tier is roughly 88% of the corpus and mostly low-signal build logs. When you truly need an output that lives only in a session nothing else points at, `deep: true` runs that sweep within an explicit scope.
 
-The store is derived and disposable. Delete the file and the distiller rebuilds it in the background; nothing you can lose lives only there. opencode's own database stays the sole source of truth, reached only through the SDK, never by a direct query. Several opencode processes can run against one store at once without corrupting it: a schema stamp fences out any build that would misread the format, persisted vectors carry a write generation so an older build cannot downgrade a newer one, and a single-writer lease keeps exactly one distiller writing at a time.
+The store is derived and disposable. Delete the file and the distiller rebuilds it in the background; nothing you can lose lives only there. opencode's own database stays the sole source of truth. On v1 it is reached only through the SDK, never by a direct query; on v2, whose plugin API cannot page history, it is read directly and only ever read-only. Several opencode processes can run against one store at once without corrupting it: a schema stamp fences out any build that would misread the format, persisted vectors carry a write generation so an older build cannot downgrade a newer one, and a single-writer lease keeps exactly one distiller writing at a time.
 
 The rest of this document is reference material. The agent gets the full parameter and response schema from each tool's own description at runtime, so you don't need to read it to use the plugin.
 
 ## Tools
 
 Five tools, designed around how agents navigate conversation history.
+
+Every tool keeps its result within what OpenCode passes to the model whole (2,000 lines and 50 KiB). A result that would not fit in 40 KiB and 1,900 lines comes back with `trimmed: true` and a `continuation` string, both written ahead of the records so even a cut-off reader sees them. Pass the `continuation` back as the tool's `cursor` argument, with the same other arguments, to get the rest from exactly where it stopped. Each tool accepts only its own continuations. When what a continuation points at has changed in the meantime (new results, a changed listing, a message that moved), the tool refuses it with an error that says to start again without `cursor`, rather than skipping or repeating anything. A part cut inside one of its text fields carries `cutAt`. The part that resumes it carries `resumedAt`.
 
 ### `recall` (search)
 
@@ -221,19 +269,28 @@ Narrowing to `human` alone also skips child sessions during normal ranked select
 
 Optional filters are forgiving: blank values are ignored, and malformed time filters are dropped or normalized with a warning rather than failing the search. Expansion is bounded; if it would exceed the message or character budget, `recall` returns the base hits plus as much expansion as fits and notes the cap in `warnings` instead of erroring out. Within the expansion budget each part is also capped individually (6,000 chars), so one giant tool dump can't starve its sibling messages, and when the matched part itself is truncated the region around the match is kept rather than blindly keeping the head.
 
-Output-shape note for anyone parsing responses across versions: the top-level `scanned`, `loadErrorCount`, and `loadErrors` fields are gone (use `coverage.sessionsSearched` and `coverage.loadErrors`), `directoryRelevance` lives only under `why`, and `degradeKind: "budget"` no longer exists. Coverage now also carries a `cards` block (store totals and freshness) and, for a deep sweep, a `deep` block (sessions covered, partial, remaining) alongside the top-level `nextCursor`. See the [changelog](CHANGELOG.md) for the full list.
+When a `recall` output is trimmed, the results come first and the expansions after them, so expansions are cut before results. Its continuation re-runs the search with the time bounds the first call resolved (a relative `since: "7d"` does not move between calls) and resumes at the result, or inside the expansion, where the output stopped. Passing it with different arguments is refused. A deep sweep's continuation re-runs the same sweep, so if that sweep reaches a different point the continuation is refused and you search again.
+
+`coverage` counts the drilled messages three ways. `messagesFetched` is how many messages the drill read, from history or from its cache. `messagesCandidate` is how many of those produced at least one searchable candidate. `messagesEligible` is how many still had one after the query's filters, which is what the match path searched. `coverage.sessionStops` lists the first 10 target sessions in drill order, with the total in `count`, each with the same three counts and the reason the drill stopped reading it. The reasons are `end` (the whole session was read), `anchor` (a later page matched none of the query's anchors), `sessionBudget` and `queryBudget` (a char budget ran out), `targetsCut` (the session budget ran out before every point lookup the slim index asked for), `loadError` and `aborted`, plus `budget` and `wallClock` for a deep sweep. A session read entirely from the drill cache also carries `cached: true`.
+
+Each warning names content a search may have missed. On opencode v2 a response warns when the history database holds content this version cannot read (unknown history tables, missing columns, part rows of unknown types or that do not decode, assistant messages that read empty although they have part rows). It warns while cards built before the plugin read part rows are still being rebuilt or if some could not be rebuilt. It also warns when a result session was indexed with messages cut short, which `recall_get` reads in full. An opencode migration this version was not tested against shows in `coverage.history` without a warning on its own. On v1, `coverage.limitedBy` gains `"providerLimit"`, with a warning, only when session discovery stopped at its limit, so older sessions may not be indexed.
+
+Output-shape note for anyone parsing responses across versions: the top-level `scanned`, `loadErrorCount`, and `loadErrors` fields are gone (use `coverage.sessionsSearched` and `coverage.loadErrors`), `directoryRelevance` lives only under `why`, and `degradeKind: "budget"` no longer exists. Coverage now also carries a `cards` block (store totals and freshness) and, for a deep sweep, a `deep` block (sessions covered, partial, remaining) alongside the top-level `nextCursor`. `coverage.messagesSearched` is gone too, replaced by `messagesFetched`, `messagesCandidate` and `messagesEligible`. The warning that the card store held the maximum discoverable sessions no longer exists. `recall`'s own `truncated` still means more results exist and is unrelated to `trimmed`. See the [changelog](CHANGELOG.md) for the full list.
 
 ### `recall_get` (retrieve)
 
 Get the full content of a specific message, including all parts. Tool outputs are returned in their original form, even if they were pruned from context. Use after `recall` finds something interesting.
 
+A large message comes back trimmed. Its `continuation`, passed as `cursor`, returns the rest. On opencode v2 a message too large for one history read (over 4 MiB with its parts, or more than 2,000 part rows) also carries `partial` with `omittedParts` and `omittedBytes`. Following the continuations reads every remaining part.
+
 ```
 recall_get({ sessionID: "ses_abc", messageID: "msg_def" })
+recall_get({ sessionID: "ses_abc", messageID: "msg_def", cursor: "..." })
 ```
 
 ### `recall_context` (expand)
 
-Get a window of messages around a specific message. After `recall` finds a match, see what was asked before it and what happened after. Supports symmetric and asymmetric windows, and reports `hasMoreBefore`/`hasMoreAfter` at boundaries. The window is assembled from bounded newest-first pages, never a whole-session load, so it stays cheap even on a huge session.
+Get a window of messages around a specific message. After `recall` finds a match, see what was asked before it and what happened after. Supports symmetric and asymmetric windows, and reports `hasMoreBefore`/`hasMoreAfter` at boundaries. The window is assembled from bounded newest-first pages, never a whole-session load, so it stays cheap even on a huge session. A trimmed window continues with `cursor` and the same arguments. On opencode v2 a message in the window that its history read cut short carries `partial` with a `cursor` for `recall_get`, which reads the rest of it.
 
 ```
 recall_context({ sessionID: "ses_abc", messageID: "msg_def", window: 3 })
@@ -243,6 +300,8 @@ recall_context({ sessionID: "ses_abc", messageID: "msg_def", before: 1, after: 5
 ### `recall_messages` (browse)
 
 One bounded page of a session's messages, newest first. Pass `cursor` from a prior page's `nextCursor` to walk further back; `limit` sets the page size. Optional `role` and `query` filter within the returned page. Defaults to the current session.
+
+`pagination.nextCursor` is an opaque `rc.` token. On a trimmed page it equals the `continuation` and resumes inside the page at the message where the output stopped. Otherwise it reads the next page. A raw page cursor from an earlier version is still accepted and reads that page from its start. As in `recall_context`, a message its history read cut short carries `partial` with a `cursor` for `recall_get`.
 
 ```
 recall_messages({ limit: 5, role: "user" })
@@ -260,9 +319,13 @@ recall_sessions({ scope: "global", search: "deployment", since: "7d" })
 recall_sessions({ parentID: "current" })
 ```
 
-`parentID` switches the tool to a live parent/child lookup: it lists the direct children (subagent sessions) of the given parent, with `"current"` as sugar for the calling session. The listing comes straight from the server, not the search index, so it finds cancelled or in-flight subagents the index has not caught up to — the recovery path when a Task tool returns "Task cancelled" without a `task_id`. From the listed IDs, `recall_messages` reads each child's tail state. Only direct children are returned (not grandchildren), and the response uses `scope: "children"` with a `parentID` echo and a `childCount`; `childCount > returned` means the `limit` truncated the listing. A malformed (non-string) `parentID` degrades to an ordinary listing, so check `scope === "children"` to discriminate. Rows whose content is not yet distilled into the search index carry `distilled: false`; rows backed by a fully distilled card omit the field.
+`parentID` switches the tool to a live parent/child lookup: it lists the direct children (subagent sessions) of the given parent, with `"current"` as sugar for the calling session. The listing comes straight from the server, not the search index, so it finds cancelled or in-flight subagents the index has not caught up to — the recovery path when a Task tool returns "Task cancelled" without a `task_id`. From the listed IDs, `recall_messages` reads each child's tail state. Only direct children are returned (not grandchildren), and the response uses `scope: "children"` with a `parentID` echo and a `childCount`, the total number of children across all pages. Every page carries the same `childCount`, the last one included, so check for `nextCursor` to know whether another page follows. On opencode v2 the children are read in pages by session id, up to 10,000 of them, so a child updated during the walk is neither skipped nor listed twice. A parent with more children than that gets `truncated: true` and a `note`. `childCount` then covers only the children read. A malformed (non-string) `parentID` degrades to an ordinary listing, so check `scope === "children"` to discriminate. Rows whose content is not yet distilled into the search index carry `distilled: false`; rows backed by a fully distilled card omit the field.
 
 When a `since` filter selects nothing and the lower bound is newer than the newest indexed session, the tool falls back to a live listing for that window (marked with a `note`), so index lag never silently hides brand-new sessions.
+
+A listing longer than `limit` comes in pages. A page that does not hold every matching session carries `truncated: true` and a `nextCursor`. Passed back as `cursor` with the same arguments, `nextCursor` returns the next `limit` sessions. A page over the output budget is trimmed as well. Its `nextCursor` then equals its `continuation` and returns the rest of that page first. A listing bounded to the newest `limit` live sessions (the staleness fallback, or a `since`/`until` filter without a card store) is a single page. Listings served from the session cards report `archived` from the card.
+
+Each call builds the listing again, so a cursor resumes only while nothing changed among the sessions already shown or the ones after them that the previous call read. If a session was updated, added or removed in between, the tool refuses the cursor and you list again without it.
 
 ## Match modes
 
@@ -287,18 +350,18 @@ All four modes work in every scope: `"session"`, `"project"`, and `"global"`.
 
 Compaction in OpenCode doesn't delete anything. Tool outputs get a `compacted` timestamp and are swapped for placeholder text in the model's context, and messages before a compaction boundary are skipped when the context is rebuilt, but in both cases the original rows stay in the database.
 
-This plugin reads them back through the OpenCode SDK:
+This plugin reads them back, through the OpenCode SDK on v1 and from opencode's database, read-only, on v2:
 
-- No direct database queries. All access goes through the SDK; opencode's database stays the sole source of truth.
+- On v1, no direct database queries: all access goes through the SDK. On v2, whose plugin API cannot page history, the plugin opens `opencode.db` read-only and never writes to it. Either way opencode's database stays the sole source of truth.
 - One derived index, built in the background and safe to delete. There is nothing for you to set up or sync. ([Ephemeral mode](#ephemeral-mode-opt-in) skips the index entirely.)
-- Every message fetch is bounded and paginated. A search never pulls a whole session into memory, and a background distiller never competes with a live query. (Metadata listings, like the parent/child lookup, are single bounded-in-practice calls.)
+- Every message fetch is bounded and paginated. A search never pulls a whole session into memory, and a background distiller never competes with a live query. (Metadata listings are bounded too. On v2, discovery and the parent/child lookup page through sessions by id. On v1 the parent/child lookup is a single bounded-in-practice call.)
 - Long-running work respects abort signals.
 - Cross-project search is on by default; disable it with `global: false`.
 - All four match modes work in every scope: session, project, and global.
 
 ### The derived store
 
-Everything in this section describes the default persistent mode; [ephemeral mode](#ephemeral-mode-opt-in) opts out of all of it. A background distiller reads history through the SDK once and writes a compact index to a local SQLite file (`~/.cache/opencode-session-recall/store-v1.db`). The first cold pass walks every session one at a time, distills each into a card plus a set of slim index rows, and checkpoints as it goes; after that, opencode's `session.idle` and related events drive incremental updates, so the store stays current without polling. It is derived and versioned: delete the file and it rebuilds itself in the background, and a store written by a newer build than yours makes the plugin fall back to a degraded metadata-only mode rather than misread it. Multiple opencode processes share the file safely through a single-writer lease. The store uses the runtime's built-in SQLite (`bun:sqlite`, with `node:sqlite` for tests), so it adds no npm dependency; if neither driver is available, the plugin degrades to in-memory metadata cards with no persistence.
+Everything in this section describes the default persistent mode; [ephemeral mode](#ephemeral-mode-opt-in) opts out of all of it. A background distiller reads history once and writes a compact index to a local SQLite file (`~/.cache/opencode-session-recall/store-v1.db` on v1, `store-opencode-v2.db` on v2). The first cold pass walks every session one at a time, distills each into a card plus a set of slim index rows, and checkpoints as it goes. After that, on v1, opencode's `session.idle` and related events drive incremental updates, so the store stays current without polling. On v2, a poll of `opencode.db` does that job (about every 30 seconds for new messages, every 5 minutes for metadata-only changes), and events only make it sooner; each card records the tail of its session, so a rewritten or reverted session is re-read in full rather than appended to. It is derived and versioned: delete the file and it rebuilds itself in the background, and a store written by a newer build than yours makes the plugin fall back to a degraded metadata-only mode rather than misread it. The same fence applies when you downgrade the plugin: the older build runs degraded against a store the newer one upgraded, until you reset it (quit every opencode process sharing the store, delete the file, restart). The fence takes effect when a process opens the store, so after upgrading the plugin restart every opencode process that shares it. A process that was already running keeps writing as the older version until it restarts. Multiple opencode processes share the file safely through a single-writer lease. The store uses the runtime's built-in SQLite (`bun:sqlite`, with `node:sqlite` for tests), so it adds no npm dependency; if neither driver is available, the plugin degrades to in-memory metadata cards with no persistence.
 
 ### Two tiers: cards and the slim index
 
@@ -317,7 +380,7 @@ The one thing tiers 1 through 2 cannot serve is a needle that exists only in a t
 
 ### Degraded modes
 
-The plugin always answers something. With no SQLite driver, it serves metadata-only cards built from the session list. While the cold pass is still running, it serves whatever is distilled so far and reports the distilled fraction in `coverage.cards`. A schema newer than the running build, or a corrupt file, triggers a background rebuild while the degraded path serves in the meantime.
+The plugin always answers something. With no SQLite driver, it serves metadata-only cards built from the session list. While the first cold pass is still building the store, it serves whatever is distilled so far, reports its progress in `coverage.cards.indexing` (`indexed`: sessions with a card, `examined`: sessions the current pass has checked, `known`: sessions discovered), and warns that older history may be missing; `recall_sessions` adds the same note to listings it selects from the index (a `since`/`until` filter). Every opencode process sharing the store reports the running pass. If no pass has made progress for 5 minutes, the warning says the index is incomplete and not being built right now, and the progress carries `stalled: true`. Once a pass has indexed every session (nothing waiting for a retry, and no session skipped after repeated fetch failures without a card), the pass that re-checks the store on each restart reports nothing. While skipped sessions remain, another pass tries them after 10 minutes, then with the wait doubling up to 1 hour while none heals, until they heal, are deleted or leave the session list. A store the plugin refuses also gets the metadata-only path: one with a schema newer than the running build, one owned by another opencode host or distilled from a different history database, or one that errors while being opened, checked or migrated. The plugin logs one `store refused (<reason>)` line. Refusing a newer, foreign-host or foreign-source store writes nothing to the file; an error rolls back whatever migration it interrupted. If the store opens but cannot be switched to SQLite's WAL journal mode, the plugin still uses it, just without WAL's concurrency benefit. A file with no schema stamp or an unrecognized layout, and no other host's stamp, is not refused: the store is derived data, so it is dropped and rebuilt. To reset a refused store, quit every opencode process sharing it, delete the file, and restart.
 
 ### Ephemeral mode (opt-in)
 

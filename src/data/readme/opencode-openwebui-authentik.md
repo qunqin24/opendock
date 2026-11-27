@@ -17,7 +17,8 @@ you don't need an Open WebUI API key.
 - Each model request sends `Authorization: Bearer <authentik token>` and
   `X-Open-WebUI-Token: <Open WebUI token>`.
 - The plugin keeps each managed provider's model list in sync with what Open WebUI serves
-  you: right after login and every 5 minutes. Models from `/api/models` that aren't in your
+  you: at startup, right after login and every 5 minutes. Startup waits up to 10 seconds for
+  that first sync, so the first message already sees the served models. Models from `/api/models` that aren't in your
   config are added; configured models that Open WebUI no longer serves are removed. Models
   you configure keep your settings (name, limits), so list a model only to override them.
 - Each added model also gets its context size, output limit and image input from Open WebUI.

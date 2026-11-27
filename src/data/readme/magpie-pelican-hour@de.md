@@ -36,6 +36,10 @@ Die Kalender funktionieren offline. Für Festlandchina gelten die veröffentlich
 
 ## Prüfungen, Vorschau und Speicherort
 
+Wählen Sie ein Konto und „Einmal prüfen“, um auch bei pausiertem Zeitplan eine einzelne Anfrage zu starten. Sie verbraucht Kontingent, berücksichtigt Ruhezeiten und das Parallelitätslimit und behält geplante Termine bei. Mehrfachanforderungen werden bis zum Abschluss der manuellen Prüfung zusammengefasst. Nach Neustart oder Ruhezustand werden verpasste Termine übersprungen.
+
+Der Verlauf zeigt zwölf Einträge je Seite für das gewählte Konto und den Statusfilter. Die Detailansicht enthält den gesendeten Prompt. Die Erfolgsquoten für Modellanfragen und das Speichern von Werken berücksichtigen jeweils abgeschlossene Vorgänge mit bekanntem Ergebnis. Unterbrochene Läufe und unklare Altdaten entfallen im jeweiligen Nenner. Gezielte Unterbrechungen erfassen Ruhezeiten und das ausdrückliche Stoppen des Plugins. Beschädigte Einträge bleiben auf dem Datenträger erhalten. Das Dashboard zeigt ihre relativen Pfade an.
+
 Das lokale Magpie-Gateway sendet die feste Aufgabe in der Sprache des Prüflaufs für das jeweilige Konto an `gpt-6.2-astra` mit der Denkstufe `xhigh`. Bis zu drei Konten können gleichzeitig laufen. Die Laufdetails enthalten die ursprüngliche Antwort, das HTML-Dokument, die extrahierte SVG-Datei und die Vorschau. Aus der Modellantwort führt **Zurück zu den Laufdetails** wieder zum Eintrag. Auch ein vollständiges HTML-Dokument in einer JSON-Zeichenkette wird erkannt.
 
 Die Vorschau startet, sobald das Vorschaubild sichtbar ist. Fehlt eine Aufnahme, spielt die Galerie die gespeicherte HTML-Vorschau in einer Sandbox ab. Das gilt auch für ältere Werke. Findet das Plugin Chrome oder Chromium und FFmpeg, zeichnet es Werke mit Skripten als stumme Videos mit 60 Bildern pro Sekunde auf. Für Browser mit eingeschränkter automatischer Wiedergabe speichert es animierte PNGs mit 30 Bildern pro Sekunde. Eigene Programmpfade lassen sich über `CHROME_PATH` und `FFMPEG_PATH` festlegen.

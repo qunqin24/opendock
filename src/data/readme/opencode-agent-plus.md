@@ -48,8 +48,10 @@ The plugin has no build step and no own dependencies (the `peerDependencies` are
    Name the package `opencode-agent-plus-<version_number>.tgz`, where `<version_number>` is the `version` in `package.json`:
 
    ```bash
-   tar czf opencode-agent-plus-<version_number>.tgz -C <REPO_DIR> --exclude=.git --exclude=node_modules --exclude=local --exclude=screenshot.png .
+   COPYFILE_DISABLE=1 tar czf opencode-agent-plus-<version_number>.tgz --no-mac-metadata --exclude=.git --exclude=node_modules --exclude=local --exclude=screenshot.png --exclude=.DS_Store -C <REPO_DIR> .
    ```
+
+   (`COPYFILE_DISABLE=1` and `--no-mac-metadata` keep macOS from adding `._*` files and extended attributes; macOS ships a `tar` that supports the flag.)
 
 2. On the offline machine, extract into `~/.config/opencode/plugins/opencode-agent-plus/`.
 

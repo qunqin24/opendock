@@ -21,7 +21,7 @@ and QA gates — then deploys them into any project.
 
 - **OpenCode V2** (`opencode --version` >= 2.0.29). The harness ships V2 plugins
   and does not run on V1.
-- **Node.js >= 20** and **git**.
+- **Node.js >= 20.19** and **git**.
 - The default model routing targets the `opencode-go` provider. If you use a
   different provider, edit the `model:` lines in `.opencode/agents/*.md` and
   `opencode.json` after `init`; the routing policy is documented in
@@ -58,12 +58,13 @@ npx opencode-agent-harness init --target . --dry-run
 | `AGENTS.md` | always-loaded project instructions (OpenCode V2 reads `AGENTS.md`; the V1 `instructions` key is ignored) | harness (overwrite) |
 | `BACKLOG.md` | canonical task list (Open / In progress / Frozen / Archive / Not tracking) | **project** (create-if-missing) |
 | `.opencode/agents/*.md` | 15 persona subagent defs (native V2 frontmatter: `model: provider/model#variant`, `permissions`, `steps`, `hidden`) | harness (overwrite) |
-| `.agents/AGENTS.md` | full canonical operating rulebook (V2 auto-discovers it as you work under `.agents/`) | harness (overwrite) |
+| `.agents/AGENTS.md` | tiny auto-injected shim pointing to the canonical rulebook | harness (overwrite) |
+| `.agents/rulebook.md` | full canonical operating rulebook (read explicitly when needed) | harness (overwrite) |
 | `.agents/rules/00-operating.md` | expanded operating rules (referenced from `AGENTS.md`; V2 ignores the `instructions` config key) | harness (overwrite) |
 | `.agents/skills/*/SKILL.md` | persona instruction skills (V2 also discovers `.agents/skills/` as skills) | harness (overwrite) |
 | `.agents/features/INDEX.md` | pointer to `BACKLOG.md` (per-feature doc tree root) | **project** (create-if-missing) |
 | `opencode.json` | main model + `agents` defaults (small-model on `title`, opportunistic `explore`) + the `permissions` baseline | harness (**merged**, see below) |
-| `scripts/qa/*` | dispatch preflight/tier/log tooling plus `test:dispatch` / `test:governance` / `test:qa-plan` / `test:prefix` gates + QA-script wiring check | harness (overwrite) |
+| `scripts/qa/*` | dispatch preflight/tier/log tooling, the `outline` CLI, and `test:dispatch` / `test:governance` / `test:qa-plan` / `test:prefix` gates + QA-script wiring check | harness (overwrite) |
 | `scripts/backlog.js` | deterministic `BACKLOG.md` editor (list/add/take/archive/freeze) | harness (overwrite) |
 | `.opencode/plugins/backlog.ts` | `backlog_*` custom tools the LLM calls (V2 plugin registering the tools; shells out to the CLI) | harness (overwrite) |
 | `.opencode/plugins/backlog-notify.ts` | structured log whenever an agent mutates the board | harness (overwrite) |
@@ -75,6 +76,7 @@ npx opencode-agent-harness init --target . --dry-run
 | `scripts/checkpoint.js` | deterministic checkpoint write/replace/read for one session handoff (no timestamps, `unknown` for absent state) | harness (overwrite) |
 | `scripts/ship.js` | deterministic branch lander (`npm run ship`): rebase on `origin/main`, branch gates, direct fast-forward push of `HEAD:main`, then wait for green CI on the landed SHA | harness (overwrite) |
 | `scripts/qa/check-prefix-stability.js` | `test:prefix` gate — fails a volatile value (clock timestamp, machine path, session id) in the always-loaded prompt prefix | harness (overwrite) |
+| `scripts/qa/prefix-audit.js` | `audit:prefix` — observed session-start floor (input + cache read) plus auto-loaded instruction split and derived system/tool share (`prefix-audit/1`) | harness (overwrite) |
 | `.github/workflows/{ci,deploy-uat,uat-health}.yml` | CI gate, CI-triggered artifact deploy, health probe — the self-contained release cycle `ship` drives | **project** (create-if-missing) |
 | `.husky/pre-push` | pre-push battery (harness process gates + project test gates) | **project** (create-if-missing) |
 | `.vercelignore` | keeps worktree symlinks (`node_modules`, `prisma/generated`) out of the remote build | **project** (create-if-missing) |
@@ -482,7 +484,8 @@ so agents see complete descriptions.
   (T1/T6/T9) — the measured bug where 22 tests finished in 76 ms but the process
   exited 60.4 s later. Tune with `--max-linger <sec>` / `--ratio <x>`.
 - `npm run test:prefix` — **cache-prefix stability gate**: the always-loaded
-  prefix (root `AGENTS.md`, the rulebook, `00-operating.md`, and the session-start
+   prefix (root `AGENTS.md`, the nested `.agents/AGENTS.md` shim, `00-operating.md`,
+   and the session-start
   memory reads) must carry no per-run content — clock timestamps, machine-specific
   absolute paths, or session ids — because one changing byte breaks prompt-cache
   locality for every later turn. Bare historical dates are fine; `BACKLOG.md`,

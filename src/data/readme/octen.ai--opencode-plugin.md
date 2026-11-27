@@ -2,7 +2,7 @@
 
 Official TypeScript SDK for the [Octen](https://docs.octen.ai) search and extract API. Zero runtime dependencies, ships ESM, CommonJS and type declarations.
 
-It covers eleven endpoints: Web Search, Web Search Premier, Broad Search, News Search, Business Search, Pulse Search, Place Search, Image Search, Video Search (invite-only beta), Design Search and Extract.
+It covers thirteen endpoints: Web Search, Web Search Premier, Broad Search, News Search, Business Search, Pulse Search, Place Search, Image Search, Video Search (invite-only beta), Design Search, Extract, Embedding and VL Embedding.
 
 - [Install](#install)
 - [Quick start](#quick-start)
@@ -181,11 +181,30 @@ for (const item of pages.data?.results ?? []) {
   else console.log(item.url, 'failed:', item.error_message);
 }
 console.log(pages.meta?.usage?.successful_by_mode); // { standard_urls, advanced_urls }: what the call is billed for
+
+// Embedding: POST /embedding (1 to 1000 texts per call)
+const emb = await client.embedding.create({
+  input: ['What is vector search?', 'Vector databases store embeddings.'],
+  model: 'octen-embedding-4b', // or 'octen-embedding-0.6b' / 'octen-embedding-8b'
+  dimension: 1024, // optional, up to the model's maximum
+  input_type: 'query', // or 'document'
+});
+for (const r of emb.data?.results ?? []) console.log(r.index, r.embedding?.length);
+
+// VL Embedding: POST /vl-embedding (text, images and a video; one vector per item, or one fused vector)
+const vl = await client.vlEmbedding.create({
+  model: 'octen-vl-embedding', // or 'octen-vl-embedding-large'
+  input: { contents: [{ text: 'Outdoor tent, 3-4 person' }, { image: 'https://example.com/tent.jpg' }] },
+  enable_fusion: true, // one vector for all items; false or unset gives one per item
+});
+console.log(vl.data?.results?.[0]?.type, vl.data?.results?.[0]?.embedding?.length); // 'fusion'
 ```
 
 `searchPremier` takes the same body as `search` (there is no `topic`) and returns the same response shape. `result_type` works the same on `search`, `searchPremier` and, inside `search_options`, on `broadSearch`; `'standard'` returns results as your parameters specify, while with `'dynamic'` only relevant results come back, so `count` is a maximum (fewer, possibly none, can come back) and `highlight.max_tokens` is a cap that Octen may adjust per result. Video Search is an invite-only beta: contact Octen to request access. In Design Search, `images` options apply to the image results and `web_search` options to the web results only; turn off what you do not need with `images: { design_facts: false, snippet: { enable: false } }`, `images: { enable: false }` or `web_search: { enable: false }`. `design_facts` and `group.master` are free-form objects whose keys vary by image.
 
 Extract notes: each URL gets its own result with a `status`, so a call can succeed while some URLs fail (`status: 'failed'` with an `error_message`); failed URLs are not billed. Match results to your input by `url` rather than by position. With `query`, each result carries `highlights` instead of `full_content`. `mode` is `standard` (the default), `advanced` (slower, more expensive, for pages that are hard to reach) or `auto` (picks one per URL); each result's `resolved_mode` is the mode that URL is billed at, and `meta.usage.successful_by_mode` counts them. The body's `timeout` (1 to 60 s, default 30) bounds each URL on the server; it is not the SDK's HTTP timeout, which Extract derives from it (see [Request options](#request-options)). `page_structure` and `category` can be `null` when the server cannot determine them.
+
+Embedding notes: `data.results[i].index` is the position in `input`. `input_type: 'query'` adds a retrieval prompt (counted in `input_tokens`); use `'document'` or leave it out for the texts you index. Texts longer than 10,000 characters are cut by the server, which says so in `meta.warning`. VL Embedding: `image` takes a public URL or base64 data, `video` a public URL; the server must be able to fetch the URL, otherwise it answers with a 400 (`OctenBadRequestError`). A long video can take longer than the default 30 s timeout: pass a larger `timeout` for that call. Each result's `type` is `vl` or `fusion`.
 
 `BusinessEntity` note: the TypeScript type lists the two variants that exist today, `company` and `person`, so `entity.type === 'company'` narrows the type. The server can add new `type` values at any time and the SDK returns them unchanged at runtime, so always keep a `default` branch like the one above.
 
@@ -199,8 +218,10 @@ The required input, checked with `field` naming the offending path:
 - `imageSearch` and `videoSearch`: `inputs` must hold exactly one input (`inputs`), of a type the endpoint takes: `text` or `image` for Image Search, `text` for Video Search (`inputs[0].type`). A `text` input needs a non-empty `data` (`inputs[0].data`) and takes no `url` (`inputs[0].url`); an `image` input needs exactly one of `url` or `data` (base64), not both (`inputs[0]`).
 - `designSearch`: `query` must be a non-empty string unless `images.group_id` is set; an empty or blank `group_id` counts as not set (`query`).
 - `extract`: `urls` must be an array of 1 to 20 URLs (`urls`), each a non-empty string (not only whitespace) of at most 2048 characters (`urls[1]` names the offending item).
+- `embedding.create`: `input` must be an array of 1 to 1000 strings (`input`), none empty or only whitespace (`input[2]` names the offending item). The server would accept a blank item and bill it.
+- `vlEmbedding.create`: `model` must be a non-empty string (`model`; its value is checked by the server), and `input.contents` must hold 1 to 20 items (`input.contents`), each with exactly one of `text`, `image` or `video` set to a non-empty string (`input.contents[0]`), as the API reference says.
 
-Other lengths are not checked locally: a `query` over 500 characters comes back as a 400. For Extract, an out-of-range `include_links.max_links` or `query`, or an unknown `mode`, `format` or `scope`, comes back as a 400; the server adjusts an out-of-range `timeout` or `max_age_seconds` to the nearest bound instead.
+Other lengths are not checked locally: a `query` over 500 characters comes back as a 400. For Embedding and VL Embedding, a `dimension` above the model's maximum, more than 5 images or more than 1 video, or an `fps` outside 0 to 1 comes back as a 400. For Extract, an out-of-range `include_links.max_links` or `query`, or an unknown `mode`, `format` or `scope`, comes back as a 400; the server adjusts an out-of-range `timeout` or `max_age_seconds` to the nearest bound instead.
 
 ## Request options
 
@@ -318,7 +339,7 @@ For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Ser
 
 ## Differences from the Python SDK
 
-Compared with `octen-py` 0.13.0:
+Compared with `octen-py` 0.13.1:
 
 | Area | `octen-py` | `@octen.ai/sdk` |
 |---|---|---|
@@ -340,6 +361,11 @@ Compared with `octen-py` 0.13.0:
 | Extract local checks | `urls` (1 to 20, each non-empty and at most 2048 characters), `query` length, `timeout` (1 to 60), `max_age_seconds` (not negative), `include_links.max_links` (1 to 1000) and the `mode`, `format` and `scope` values | `urls` only (1 to 20, each non-blank and at most 2048 characters); the rest is left to the server, which rejects or adjusts it as described above |
 | Extract HTTP timeout | The client's timeout (30 s by default) unless `request_timeout=` is passed; the docs suggest raising it for `advanced` / `auto` | Derived from the per-URL `timeout`: 120 s by default, 150 s with `timeout: 60`, unless a client or per-request `timeout` is set |
 | Extract response | `items` parses each result into a model (and raises on a malformed row); helpers such as `successful_by_mode`, `standard_urls`, `advanced_urls` | The parsed JSON body, typed; read `data.results` and `meta.usage` directly |
+| Embedding call | `client.embedding.create(input=..., ...)` takes a single string or a list; also accepts `truncation`, which is not in the API reference and which the server ignores (sent only when passed); helpers `embed_query`, `embed_documents` and `get_embeddings()` | `client.embedding.create({ input: [...], ... })` with the request body as in the API reference; `input` is always an array; no helpers |
+| Embedding local checks | Non-blank items, the `model` and `input_type` values, `dimension` at least 1 | `input` only (1 to 1000 non-blank items) |
+| VL Embedding call | `client.vl_embedding.create(model=..., contents=[...], ...)`, with `contents` at the top level | `client.vlEmbedding.create({ model, input: { contents: [...] }, ... })` as in the API reference |
+| VL Embedding local checks | One of text, image or video per item, 1 to 20 items, at most 5 images and 1 video, the `model` value, `dimension` against the model's maximum, `fps` 0 to 1 | A non-blank `model` and the items (1 to 20, each with exactly one non-blank text, image or video); the model name, counts and ranges are checked by the server |
+| VL result `type` | `vl` or `fusion`; any other value fails validation | Returned as given |
 
 ## Integrations
 
@@ -360,7 +386,7 @@ OCTEN_LIVE=1 OCTEN_LIVE_VIDEO=1 OCTEN_API_KEY=... npm run test:live   # also Vid
 npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 ```
 
-`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the eleven endpoints' schemas change upstream; it never rewrites the snapshot.
+`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the thirteen endpoints' schemas change upstream; it never rewrites the snapshot.
 
 **Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds, runs `test:e2e` and publishes with npm provenance through OIDC trusted publishing (no token stored). `prepublishOnly` also runs typecheck, tests and build before any `npm publish`.
 

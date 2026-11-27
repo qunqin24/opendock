@@ -226,6 +226,25 @@ Per-skill gating is available through the host's permission system
 | merged config object (RAM only) | `permission.computer` default | vanishes with the plugin |
 | one child process per opencode run | `cua-driver mcp --direct` | killed on plugin dispose |
 
+## Troubleshooting
+
+- **`session_ended` refusal** ("this session has ended; call start_session
+  explicitly to reuse its label"). The driver ended the lifecycle session
+  while its child process stayed alive (seen after a long idle period). The
+  next call heals itself ONCE: the plugin re-attaches with `start_session`
+  under the same run label, drops every address minted under the ended session
+  (sticky target, element tokens, zoom context), and repeats the SAME call with
+  the SAME arguments — nothing is delivered twice, because a refusal performs
+  nothing. The result carries `restarted: true` with a `restart_note` ("the
+  driver-side session had ended and was re-attached; prior element references
+  and the sticky target are invalid — capture again before any input"). A
+  `session_ended` on that retry is NOT retried again: the call fails naming
+  the code and the driver's message. That is an upstream driver fault to
+  report (trycua/cua), not a reason to restart the host.
+- **`authorization_revoked` / `authorization_suspended`** are never healed
+  past: they stay hard failures exactly as before (the user or the runtime
+  withdrew consent).
+
 ## Status
 
 0.5.0 — opencode v2 support (same package, dual-host entry

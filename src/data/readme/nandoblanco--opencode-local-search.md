@@ -2,13 +2,18 @@
 
 **Local-first, zero-token interactive session search plugin for OpenCode**: indexes local SQLite session history, previews matching messages, tools, and files as you type, and opens matching conversations from the TUI or OpenCode Desktop.
 
-![opencode-local-search TUI preview](./assets/screenshot.png)
+| OpenCode Desktop | OpenCode TUI |
+| :---: | :---: |
+| [![opencode-local-search Desktop preview](./assets/screenshot.png)](./assets/screenshot.png) | [![opencode-local-search TUI preview](./assets/screenshot-tui.png)](./assets/screenshot-tui.png) |
+| [View full size](./assets/screenshot.png) | [View full size](./assets/screenshot-tui.png) |
+
+*Note: Previews were rendered in headless Chromium via Playwright from the plugin's actual Desktop (`dist/gui-experimental.cjs`) and TUI (`src/tui.ts`) UI code using synthetic fixture data and a simulated host frame, rather than captured from a live OpenCode window or terminal.*
 
 ## OpenCode Desktop Support
 
 **Replaces OpenCode Desktop's built-in session search.** The titlebar, vertical-tabs (`Search`), Home session search, and built-in Search sessions dialog route into this plugin's `Search` interface.
 
-**Now available in OpenCode Desktop as well as the TUI.** Search local conversation history in a persistent `Search` side panel, sort sessions by recency, relevance, creation time, title, context size, or total tokens, preview matching messages and file/tool details, and open matching sessions without a model turn. Press `Ctrl+Shift+F` to open or focus the panel, or `Ctrl+Alt+F` to toggle it. When no session is active, search opens in a fallback dialog.
+**Now available in OpenCode Desktop as well as the TUI.** Search local conversation history in a persistent `Search` side panel (side-by-side at 640px and wider, or list-to-matches with a `Back` button in narrow panels), sort sessions by recency, relevance (auto-selected while typing unless manually overridden), creation time, title, context size, or total tokens, hide the current session with `Hide this session`, preview matching messages and file/tool details, and open matching sessions without a model turn. Press `Ctrl+Shift+F` to open or focus the panel, or `Ctrl+Alt+F` to toggle it. When no session is active, search opens in a fallback dialog.
 
 **In the CLI/TUI, search is an additional tool rather than a replacement.** Open it with `/search` or the command palette. The built-in `/sessions` picker remains available.
 
@@ -43,25 +48,21 @@ This project started as a small local CLI script wired to a custom `/search` com
 
 ## Installation
 
-### Option 1: One-Command Install (Recommended)
+### Option 1: OpenCode Plugin CLI (Recommended)
 
-```sh
-npx @nandoblanco/opencode-local-search install
-# or directly from GitHub:
-npx github:nandoblanco/opencode-local-search install
-```
-
-Or install with OpenCode's native plugin CLI:
+Install with OpenCode's native plugin CLI. OpenCode downloads the package from npm (or GitHub) into its own cache automatically and adds one entry to `~/.config/opencode/opencode.jsonc` that loads the server RPC bridge, `/search` TUI popup, and Desktop panel together:
 
 ```sh
 opencode plugin add @nandoblanco/opencode-local-search
-# or directly from GitHub:
+# Auto-update on startup and every 24 hours:
+opencode plugin add @nandoblanco/opencode-local-search@latest
+# Or install directly from GitHub:
 opencode plugin add github:nandoblanco/opencode-local-search
 ```
 
 ### Option 2: Manual Configuration
 
-Add `@nandoblanco/opencode-local-search` to the global `~/.config/opencode/opencode.jsonc` (or `$XDG_CONFIG_HOME/opencode/opencode.jsonc`) to load the server RPC bridge, TUI, and Desktop parts together:
+Add `@nandoblanco/opencode-local-search` to `"plugins"` in the global `~/.config/opencode/opencode.jsonc` (or project `./opencode.jsonc` / `./.opencode/opencode.jsonc`). OpenCode fetches the npm package automatically and loads the server RPC bridge, TUI, and Desktop parts from this single entry (no manual `npm install` or separate `cli.json` entry is required):
 
 ```json
 {
@@ -76,9 +77,19 @@ Add `@nandoblanco/opencode-local-search` to the global `~/.config/opencode/openc
 }
 ```
 
-### From a Local Directory
+### Option 3: Built-in CLI Helper (`npx`)
 
-For development, use Node.js 26.4 or newer to meet the OpenTUI dependency's declared minimum. Clone this repository, run `npm ci` and `npm run build` to build the Desktop bundle, then reference the directory in the global `opencode.jsonc`. TUI-only use does not need the GUI build. The root `overrides` pin patched `glob` and `minimatch` versions for this repository's development dependencies; they do not alter the OpenCode host application's dependencies:
+Run the package CLI once via `npx` to register the plugin in `~/.config/opencode/opencode.jsonc`:
+
+```sh
+npx @nandoblanco/opencode-local-search install
+# Or directly from GitHub:
+npx github:nandoblanco/opencode-local-search install
+```
+
+### Option 4: From a Local Directory
+
+For development, use Node.js 26.4 or newer to meet the OpenTUI dependency's declared minimum. Clone this repository, run `npm ci` and `npm run build` to build the Desktop bundle, then reference the directory in `opencode.jsonc` (or place the directory inside `~/.config/opencode/plugins/` or `.opencode/plugins/`). TUI-only use does not need the GUI build. The root `overrides` pin patched `glob` and `minimatch` versions for this repository's development dependencies; they do not alter the OpenCode host application's dependencies:
 
 ```json
 {
@@ -106,7 +117,7 @@ For development, use Node.js 26.4 or newer to meet the OpenTUI dependency's decl
 
 Run `/search [query]` or press `Ctrl+Shift+F` (`Cmd+Shift+F` on macOS) to open and focus the persistent `Search` side panel. `Ctrl+Alt+F` (`Cmd+Option+F`) toggles it. Without an active session, these commands open a dialog. The plugin also intercepts the built-in titlebar, vertical-tab (`Search`), and home-session search entry points.
 
-Desktop requests use a 16 ms debounce, a centered loading spinner overlay, and a sequence counter to discard stale responses. They call `SearchRpc.query` on the server, which prewarms the SQLite session index on startup and returns up to 60 session results with message snippets, token/context metadata, and file/tool details. The TUI continues to query SQLite locally. Exact-message scrolling in the TUI uses the render-tree traversal described below; Desktop uses its own session navigation path.
+Desktop requests use a 16 ms debounce, a centered loading spinner overlay, and a sequence counter to discard stale responses. They call `SearchRpc.query` on the server, which loads and caches the SQLite session index on demand and returns up to 60 session results with message snippets, token/context metadata, and file/tool details. The TUI continues to query SQLite locally. Exact-message scrolling in the TUI uses the render-tree traversal described below; Desktop uses its own session navigation path.
 
 ## TUI Query Syntax (`/search`)
 
@@ -239,17 +250,17 @@ Every operation in `opencode-local-search` uses zero LLM tokens:
 
 ## Configuration Options
 
-Configure the package in the global `opencode.jsonc` for all interfaces. `dialogWidth` controls the TUI popup only; Desktop uses its panel or dialog layout. TUI-specific options can also be passed in `cli.json`:
+Configure the package in the global `~/.config/opencode/opencode.jsonc` for all interfaces. `dialogWidth` controls the TUI popup only; Desktop uses its panel or dialog layout:
 
 ```json
 {
 	"plugins": [
-		[
-			"@nandoblanco/opencode-local-search",
-			{
+		{
+			"package": "@nandoblanco/opencode-local-search",
+			"options": {
 				"dialogWidth": "80%"
 			}
-		]
+		}
 	]
 }
 ```

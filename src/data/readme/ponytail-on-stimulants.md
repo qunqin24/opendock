@@ -71,6 +71,13 @@ Send these as two separate prompts:
 
 Trust the plugin hooks when prompted, then start a new session.
 
+### Slow-turn retro
+
+Claude Code and Codex run `slow-turn-retro` on Stop when Python 3.10+ is
+available. An interactive turn with ten active minutes can get one bounded
+pass to fix a recurring bottleneck. See [timing, replay, and local
+telemetry](docs/slow-turn-retro.md).
+
 ---
 
 | After install | Command |

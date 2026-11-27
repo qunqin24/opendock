@@ -95,6 +95,17 @@ type = "markdown"                     # a Markdown vault: frontmatter title, ali
 root = "~/notes"
 ```
 
+Words that mean the same go in an `[aliases]` table: each entry is a long form and its other forms, and a search
+for any one of them also finds text that only has another, in both directions. The query's meaning vector is made
+from the query plus those forms too, since a short token like `ds` carries almost no meaning alone. The search's
+JSON summary lists the aliases a query used (`summary.aliases`).
+
+```toml
+[aliases]
+deepseek = ["ds"]
+kubernetes = ["k8s", "kube"]
+```
+
 `rummage sources` lists the configured sources, the agent histories it finds on this machine, and the source types
 installed. A source can be switched off with `enabled = false` and keep its settings.
 

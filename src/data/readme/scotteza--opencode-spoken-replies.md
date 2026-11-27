@@ -77,7 +77,7 @@ Or add it to the `plugins` array in your OpenCode `opencode.json` or `opencode.j
 | Shortcut | Action |
 | --- | --- |
 | `F5` | Open assistant-message history. |
-| `F6` | Pause or resume speech; replay the latest reply when idle. |
+| `F6` | Stop the current speech without disabling future speech. |
 | `F7` | Replay the latest reply from the beginning. |
 | `F8` | Turn automatic speech on or off. |
 | `Ctrl+F6` | Slow speech by 0.25x. |

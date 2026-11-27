@@ -36,8 +36,7 @@
 
 ## Get started
 
-**Requires OpenCode V2.** Check [compatibility](#compatibility) if your server
-runs on Windows.
+**Requires OpenCode V2.** If you use Windows, check [compatibility](#compatibility).
 
 <a id="1-add-the-plugin"></a>
 
@@ -116,7 +115,7 @@ The standard install does not update automatically. To update it, run
 `opencode plugin update opencode-predictions`.
 
 Replace `opencode-predictions` in the install command or `plugins` array with
-`opencode-predictions@0.4.4` to pin that release, or
+`opencode-predictions@0.5.0` to pin that release, or
 `github:fcoouto/opencode-predictions#main` to follow the development branch.
 
 </details>
@@ -222,8 +221,8 @@ for more detail.
 ## Predictions Setup
 
 Open **Predictions Setup** from the command palette in Desktop or CLI.
-Desktop also has **Settings → Predictions**. The optional
-[standing context file](#global-standing-context) is set on the server, not here.
+Desktop also has **Settings → Predictions**. You can turn on the optional
+[context file](#global-standing-context) under **Advanced** in either place.
 
 ### What you can change
 
@@ -232,7 +231,8 @@ Desktop also has **Settings → Predictions**. The optional
 
 - **Models:** Choose a model and optionally [add a backup](#model-groups).
 
-- **Advanced:** Change the timeout, how much recent chat to use, or debug notices.
+- **Advanced:** Change the timeout, how much recent chat to use, the
+  [context file](#global-standing-context), or debug notices.
   [GitHub PR context](#linked-github-pr-context) is off by default. Before enabling
   it, check what it can share from private PRs.
 
@@ -256,8 +256,8 @@ server.
 even when you edit different settings.
 
 **Discard changes** restores the last saved settings. To start over, choose
-**Reset to defaults**, then **Save changes**. Reset leaves the server's standing
-context file setting intact.
+**Reset to defaults**, then **Save changes**. Reset leaves the
+[context file](#global-standing-context) setting as it is.
 
 Setup, match previews, and saving do not call a prediction model, look up GitHub
 credentials, or fetch PRs.
@@ -287,13 +287,16 @@ It does not edit `opencode.json(c)`, other plugins, or credentials.
 | --- | --- |
 | macOS / Linux default | `~/.config/opencode/predictions.json` |
 | Absolute `XDG_CONFIG_HOME`, on any platform | `$XDG_CONFIG_HOME/opencode/predictions.json` |
-| Windows path convention (see [server limits](#compatibility)) | `%APPDATA%/opencode/predictions.json` |
+| Windows default (see [compatibility](#compatibility)) | `%APPDATA%\opencode\predictions.json` |
 
-An explicitly empty/relative `XDG_CONFIG_HOME`, or missing/nonabsolute Windows `APPDATA`, is refused. A trusted configuration-directory symlink is resolved on the server; symlinked active files, hard links, unsafe ownership/write permissions, and unsupported ACLs are refused.
+An explicitly empty or relative `XDG_CONFIG_HOME` is refused. Without an override, Windows requires an absolute `APPDATA`. Windows paths must be on a local NTFS drive; network shares, junctions, and symlinks are refused. On Unix, the server can resolve a trusted configuration-directory symlink. Both refuse symlinked active files, hard links, unsafe ownership or write permissions, and unsupported ACLs.
+
+On Windows, Save checks that existing files are unencrypted and match the plugin's private file permissions. A readable file with other permissions stays readable, but Save is disabled. An existing backup must also pass the check. Save does not guarantee preservation of audit rules the server cannot inspect. Do not change permissions while Save is running: the checks are best-effort, and concurrent changes to an existing file can be overwritten. When creating the preferences file or backup, Save will not overwrite a file that appears after its check.
 
 `predictions.json` is the only prediction settings source. Missing fields use
-built-in defaults; explicit `false` stays false. `contextFile` can only be set by
-editing the file on the server, not through Desktop or CLI settings.
+built-in defaults; explicit `false` stays false. Settings can turn the
+[context file](#global-standing-context) on or off. You can also set `contextFile`
+by hand.
 
 The strict JSON format is:
 
@@ -336,8 +339,8 @@ Omitting `models` or setting it to `null` leaves no prediction models configured
 <summary><strong>Move settings from older plugin options</strong></summary>
 
 The plugin ignores old `options` in `opencode.json(c)` and does not import them.
-Set those values again in **Predictions Setup**. If you set a `contextFile`, use
-the [standing context instructions](#global-standing-context). Remove the old
+Set those values again in **Predictions Setup**. If you used a `contextFile`, see
+[Global standing context](#global-standing-context). Remove the old
 `options` key but keep the plugin entry. Existing `predictions.json` settings
 still apply. If you use a remote server, update both the client and the server
 before saving from Setup.
@@ -353,7 +356,7 @@ before saving from Setup.
 
 - **What gets sent:** Every provider tried receives recent user and assistant
   text, plus an earlier user request when needed.
-  If enabled, [a standing context file](#global-standing-context) or
+  If turned on, [the context file](#global-standing-context) or
   [linked GitHub PR details](#linked-github-pr-context) can also be sent,
   including private PR descriptions.
 
@@ -373,15 +376,16 @@ before saving from Setup.
 Long conversation text may be shortened with marked excerpts. The standing
 context file is never silently cut off. OpenCode stores plugin code in its
 package cache (`~/.cache/opencode/npm/` by default, or under `XDG_CACHE_HOME`).
-Settings stay in `predictions.json` on the server. The optional model-pilot tool
+Settings stay in `predictions.json` on the server. A context file turned on in
+Settings is `predictions-context.md` in the same folder. The optional model-pilot tool
 writes a JSON report only when run, under `.test-artifacts/` or to `--output`.
 
 </details>
 
 ## Settings
 
-Use [Predictions Setup](#predictions-setup) for everyday changes. Set a
-[standing context file](#global-standing-context) directly in `predictions.json`.
+Use [Predictions Setup](#predictions-setup) for everyday changes, including the
+[context file](#global-standing-context).
 
 <details>
 <summary><strong>JSON fields and defaults</strong></summary>
@@ -393,7 +397,7 @@ These fields live under `settings` in `predictions.json`.
 | `models` | unset | Required. Selector text for one ranking group, or an ordered array of selector groups. |
 | `timeoutMs` | `30000` | Maximum wait per model attempt, in milliseconds. |
 | `contextTurns` | `3` | Recent interactions to consider, from `1` to `5`. The latest eligible human request is also retained when absent from that window. |
-| `contextFile` | unset | Optional absolute or `~/` path to one shared UTF-8 text/Markdown file on the OpenCode server. Maximum `8192` bytes. |
+| `contextFile` | unset | Set by **Use a context file** in Settings, or by hand as an absolute or `~/` path to one shared UTF-8 text/Markdown file on the OpenCode server. Maximum `8192` bytes. |
 | `includeGithubPRContext` | `false` | Opt in to sending bounded metadata from linked public and accessible private GitHub PRs to prediction models. |
 | `automatic` | `true` | Predict after a completed response. Set `false` for manual requests only. |
 | `escalation` | `"manual"` | Choose whether to try another model [on request, automatically, or not at all](#progress-and-alternative-predictions). |
@@ -407,10 +411,21 @@ These fields live under `settings` in `predictions.json`.
 **Do not include secrets. Every attempted model receives this file, including
 fallback and paid models.**
 
-1. If `predictions.json` does not exist, save your model in **Predictions Setup**
-   first.
+1. Open **Advanced** in **Predictions Setup**. On Desktop, this is
+   **Settings → Predictions → Advanced**. Select **Context file**, then
+   **Use a context file**.
 
-2. Create a text or Markdown file on the OpenCode server. For example:
+2. Select **Save changes**. Save puts `predictions-context.md` in the same folder
+   as `predictions.json` on the OpenCode server. The default folder is
+   `~/.config/opencode/` on macOS and Linux, and `%APPDATA%\opencode\` on Windows.
+   An absolute `XDG_CONFIG_HOME` moves the folder on any platform.
+
+   Save creates an empty file only when none exists. If `predictions-context.md`
+   already exists and passes the safety checks below, Save reuses it, and its
+   current text is sent with every prediction.
+
+3. Open the file on the server and write your notes. Check the file first if it
+   already has text, because all of it is sent. For example:
 
    ```markdown
    For inventory reports, prefer XLSX.
@@ -418,22 +433,58 @@ fallback and paid models.**
    Do not suggest publishing or deployment unless I explicitly request it.
    ```
 
-3. Add `contextFile` under `settings` in `predictions.json`. Keep your other
-   settings. Use an absolute path or `~/` for the server user's home:
+4. Select **Check again** in Settings. The row shows the path, the size against
+   the 8,192-byte limit, or what is wrong with the file.
 
-   ```json
-   "contextFile": "~/.config/opencode/predictions.md"
-   ```
+The file applies across projects. Use UTF-8 text, up to **8192 bytes**. Empty
+files add nothing.
 
-The file applies across projects. Use UTF-8 text, up to **8192 bytes**. To stop
-sharing it in new predictions, remove `contextFile` from `settings`.
+On Desktop, **Open file** and **Show in Finder** (**Show in File Explorer** on
+Windows, **Show in Folder** on Linux) appear when the server runs on this
+computer. Remote servers show the path and status only. For a
+[hand-set path](#hand-set-path), **Open file** appears only when the name ends in
+`.md`, `.markdown` or `.txt`; other files can only be shown in their folder.
+
+To stop sharing it in new predictions, select **Stop using**, then **Save
+changes**. The file stays on disk. If you turn it on again later with **Use a
+context file** and **Save changes**, the same text is sent again.
+
+### Hand-set path
+
+If you set `contextFile` by hand in `predictions.json`, Settings shows that path
+and its status. Use an absolute path or `~/` for the server user's home:
+
+```json
+"contextFile": "~/.config/opencode/predictions.md"
+```
+
+To switch to `predictions-context.md`, select **Stop using**, then **Save
+changes**. Then select **Use a context file** and **Save changes** again. Selecting
+an action only changes the draft until you save.
+
+If the hand-set path is missing, the row offers **Use
+predictions-context.md instead**. Select it, then **Save changes**. This replaces
+the hand-set path.
+
+Stopping a hand-set path does not remember it. **Use a context file** selects
+`predictions-context.md`, not the old path. To use the old path again, edit
+`predictions.json` by hand and add `contextFile` back.
 
 <details>
 <summary><strong>File rules and when edits take effect</strong></summary>
 
 The plugin does not discover project files, read `AGENTS.md`, or merge global
-and project context. Project-relative paths and URLs are rejected. If you use
-`XDG_CONFIG_HOME`, point to your chosen file explicitly.
+and project context. Project-relative paths and URLs are rejected. If you set the
+path by hand and use `XDG_CONFIG_HOME`, point to your chosen file explicitly.
+
+**Existing file.** If `predictions-context.md` already exists, Save uses it without
+changing it, but only when it is a regular file, has one link, belongs to the
+server user, and is not writable by others. Otherwise Save stops with a message
+such as **predictions-context.md exists but is not safe to use**. Fix or remove the
+file, then save again. Save never overwrites or truncates an existing file.
+
+**Older servers.** If the server runs an older plugin version, the row asks you to
+update the plugin on the server. It offers no file actions until you do.
 
 The path must point to a regular file with no binary control characters.
 Empty or whitespace-only files add nothing.
@@ -677,10 +728,13 @@ task, it favors a short contextual reply instead of repeating the proposal.
   including shared-service and standalone setups. Prediction behavior was
   also tested on Desktop `2.2.7`. These are tested versions, not minimums.
   See the [qualification record](docs/research/2026-11-18-predictions-preferences-qualification.md).
-- **Server limits:** The plugin requires Unix file ownership checks to load
-  or save preferences. A native Windows server cannot do that. This
-  restriction is on the server, not the client. Linux file and permission
-  behavior has not been tested on a native host.
+- **Tested on Windows:** Loading and saving preferences with OpenCode `2.2.6`
+  on local NTFS, including `%APPDATA%` and `XDG_CONFIG_HOME`. Use the npm release,
+  which includes the required verifier. Native ARM64 and Git installs without
+  the verifier cannot load or save preferences. The tests covered preferences,
+  not the Windows Desktop UI. See the
+  [Windows qualification record](docs/research/2026-11-26-windows-preferences-qualification.md).
+- **Linux:** File and permission behavior has not been tested on a native host.
 - **Node.js:** The npm package declares Node.js `>=22`. Contributors use
   Node.js `26` to run the tests.
 

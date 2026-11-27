@@ -311,6 +311,7 @@ the provider.
 | `nativeActivity` | `"text"\|"off"` | `"text"` | Native tools (Task/Agent, WebSearch, Skill, NotebookEdit…) leave a `⚙ …` line in the answer, with the result of Task / WebSearch / Skill. That way it stays in OpenCode's history, and any model that continues the session sees it. |
 | `nativeActivityChars` | `number` | `2000` | Cap on the native result written into that line. |
 | `smartRevert` | `boolean` | `true` | On a revert, forks the Claude session right before the reverted message (`resumeSessionAt`, located in its transcript) instead of starting a new session with a replay. If that isn't possible, it falls back to the replay. |
+| `splitReplay` | `boolean` | `true` | When a new session has to replay a long history (≥ `splitReplayMinChars`, default 20 000), it goes as a hidden context-only turn followed by the prompt, so reverting that prompt later forks instead of replaying again. |
 | `maxLiveSessions` | `number` | `6` | Conversations kept open at once (each is a `claude` process). The oldest idle ones are closed. |
 | `idleSessionTtlMs` | `number` | `900000` (15 min) | Idle time after which a session is closed. It's resumed on the next message; coming back only costs starting the process, and Anthropic's cache lasts ~1 h on the subscription. |
 | `childSessionTtlMs` | `number` | `120000` (2 min) | Same for OpenCode subagent sessions. |

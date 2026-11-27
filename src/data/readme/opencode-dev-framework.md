@@ -27,6 +27,8 @@ These principles guide every mechanism in this plugin:
 - **Reveal, don't sanitize.** Audit trails over hidden rewrites — what happened stays inspectable.
 - **No bypass-required measures.** Nothing that fights legitimate use; if a control needs a workaround, it's the control that's wrong.
 - **Bounded and loud.** Enforcement budgets are explicit and stand-down is announced, never a quiet pass.
+- **Evidence over heuristics.** The gate reads tool exit codes and reviewer judgment — it never scans agent prose for forbidden phrases. A duty stated positively ("run the suite, write the review") has no wording to false-positive on.
+- **One job.** This plugin enforces dev discipline: verification, review, guardrails. It runs your tools instead of replacing them, and leaves unrelated concerns (like secret handling) to dedicated plugins. Every control family bundled into one engine is a new family of false positives.
 
 ## Quickstart
 

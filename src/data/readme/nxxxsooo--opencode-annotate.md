@@ -1,67 +1,102 @@
-# OpenCode Annotate
+# Open Annotate
 
-**Review OpenCode AI replies, Markdown documents, and webpages — send annotated feedback to the originating session.**
+English · [简体中文](https://github.com/nxxxsooo/open-annotate/blob/main/README.zh-CN.md)
 
-[![npm](https://img.shields.io/npm/v/@nxxxsooo/opencode-annotate)](https://www.npmjs.com/package/@nxxxsooo/opencode-annotate)
-[![CI](https://github.com/nxxxsooo/opencode-annotate/actions/workflows/ci.yml/badge.svg)](https://github.com/nxxxsooo/opencode-annotate/actions/workflows/ci.yml)
+Review AI replies, local documents, and webpages, then send numbered feedback back to the originating agent session.
+
+[![npm](https://img.shields.io/npm/v/@nxxxsooo/open-annotate)](https://www.npmjs.com/package/@nxxxsooo/open-annotate)
+[![CI](https://github.com/nxxxsooo/open-annotate/actions/workflows/ci.yml/badge.svg)](https://github.com/nxxxsooo/open-annotate/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-[Website](https://mjshao.fun/opencode-annotate/) · [Install](#install) · [Workflows](#workflows) · [Browser review](#browser-review-optional) · [Configuration](#configuration)
+[Website](https://mjshao.fun/open-annotate/) · [Install](#install) · [Workflows](#workflows) · [Herdr](#herdr) · [AGY](#antigravity-agy-support) · [Browser review](#browser-review-optional) · [Configuration](#configuration)
 
-This **unofficial OpenCode plugin** bundles the native [terminal reviewer](tui/README.md) — no separate reviewer install is required. The optional [browser companion](#browser-review-optional) adds Chrome delivery and Safari copy-only review. Published on npm as `@nxxxsooo/opencode-annotate`.
+This unofficial OpenCode plugin bundles a native Rust [terminal reviewer](tui/README.md) from `tui/`, so no separate reviewer install is needed. It works for OpenCode users, Antigravity CLI (AGY) users, Herdr and Herdr.app panes, and optional Chrome or Safari webpage reviews. Published on npm as `@nxxxsooo/open-annotate`.
 
-| Surface | Reviews | Entry point |
-|---|---|---|
-| Terminal (bundled TUI) | AI replies, Markdown, plain text | `/annotate` |
-| Chrome (optional) | Webpages, local HTML | `/annotate <url-or-html>` or extension |
-| Safari (optional, copy-only) | Webpages | `/annotate <url-or-html>` or extension |
+| Host | Reviews | Entry point | Start here |
+|---|---|---|---|
+| OpenCode (bundled TUI) | AI replies, Markdown, text and config files | `/annotate`, `/annotate-file`, `/annotate-pick`, `/annotate-selection` | [OpenCode install](#opencode) |
+| Antigravity CLI (AGY) | AGY replies, Markdown, webpages | `/annotate` (hook or `annotate` skill), `agy-annotate` | [AGY install](#antigravity-cli-agy) |
+| Herdr / Herdr.app | Agent replies, files, pane terminal output | `prefix+a` (`annotate.review`), `annotate-tui herdr`, Herdr.app peek or pane | [Herdr](#herdr) |
+| Chrome (optional) | Webpages, local HTML (direct delivery) | `/annotate <url-or-html>`, `agy-annotate web`, `Alt+Shift+A` | [Browser install](#local-browser-enabled-installation) |
+| Safari (optional) | Webpages, local HTML (copy to clipboard only) | `/annotate <url-or-html>` (`"browser": "Safari"`), `Option+Shift+A` | [Safari](#safari-copy-only) |
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nxxxsooo/open-annotate/main/docs/assets/cover-dracula-full-20261116.webp" alt="Real OpenCode Annotate 0.17.0 capture in Ghostty using the Dracula theme, showing two annotations and the reaction toolbar on a synthetic document" width="720">
+</p>
+
+Real 0.17.0 capture in Ghostty (Dracula theme) on a synthetic document, showing two annotations and the reaction toolbar. [Capture details](https://github.com/nxxxsooo/open-annotate/blob/main/docs/assets/README.md).
 
 ## Install
 
-Requires **OpenCode 2.2.0+**. The npm package includes **Annotate TUI**, built from [`tui/`](tui/README.md) for macOS arm64/x64, Linux arm64/x64 and Windows x64. See its [platform requirements](tui/README.md#source-and-build). The OpenCode terminal handoff has been tested on macOS; Windows handoff has not yet been verified.
+### OpenCode
+
+Requires OpenCode 2.2.0+. The npm package includes `annotate-tui` binaries built from [`tui/`](tui/README.md) for macOS arm64/x64, Linux arm64/x64 (Ubuntu 22.04 / glibc 2.35+), and Windows x64. See [source and build](tui/README.md#source-and-build). OpenCode terminal handoff is verified on macOS; Windows handoff is not yet verified.
 
 ```sh
-opencode plugin add @nxxxsooo/opencode-annotate@latest
+opencode plugin add @nxxxsooo/open-annotate@latest
 ```
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/nxxxsooo/opencode-annotate/main/docs/assets/terminal-review.gif" alt="Bundled terminal reviewer selecting a passage in a Markdown plan and saving an inline comment" width="720">
-</p>
-
-The real bundled reviewer, using a synthetic Markdown plan. [Capture details](https://github.com/nxxxsooo/opencode-annotate/blob/main/docs/assets/README.md).
-
-OpenCode loads the server tools and TUI commands from one entry in your global **`opencode.json`** or **`opencode.jsonc`**. Run `/reload` if the command list has not refreshed.
-
-Manual configuration, preserving other entries:
+OpenCode loads server option sync and TUI commands from one entry in global `opencode.json` or `opencode.jsonc`. Run `/reload` if commands have not refreshed. Manual configuration, preserving other entries and `options`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@nxxxsooo/opencode-annotate@latest"]
+  "plugins": ["@nxxxsooo/open-annotate@latest"]
 }
 ```
 
-`@latest` selects the current npm release when installing or updating; publishing a release does not itself replace an installed copy. Keep your existing plugin `options`.
+`@latest` selects the current npm release when installing or updating. Publishing a release does not automatically replace an installed copy. If you only use OpenCode, jump to [First review in 3 steps](#first-review-in-3-steps); AGY, Herdr, and browser setup below are optional.
+
+### Antigravity CLI (AGY)
+
+AGY does not require OpenCode. Install the package globally (`npm install -g @nxxxsooo/open-annotate`, under `npm root -g`) or build a checkout (`npm run build:tui`), then:
+
+1. Link the package's `agy/skills/annotate` directory to `~/.agents/skills/annotate`.
+2. Merge the `agy-annotate` entries from `agy/hooks.json` (`SessionStart`, `PreInvocation`, `Stop`) into `~/.gemini/config/hooks.json`, replacing `./hooks.mjs` in all three commands with the absolute path to `agy/hooks.mjs` from that same installation.
+3. For the Herdr TUI only, complete the [manifest and keybinding setup](tui/README.md#herdr) using `annotate-tui` and `agy-annotate` from that same installation. Herdr.app needs no manifest.
+
+### Herdr and Herdr.app
+
+- **Herdr.app (`herdr-core`)**: uses `hc` and `herdr-app` directly and needs no Herdr TUI plugin manifest. For AGY inside Herdr.app, complete steps 1 and 2 under [Antigravity CLI (AGY)](#antigravity-cli-agy), then see [Herdr.app](#herdrapp) and [Antigravity (AGY) support](#antigravity-agy-support).
+- **Herdr TUI on macOS** (tested with Herdr 0.9.5): save `herdr-plugin.toml` in a plugin directory using paths from one installation, run `herdr plugin link /absolute/path/to/plugin-directory`, and bind `prefix+a` to `annotate.review` in Herdr's `config.toml`. See [manifest and keybinding setup](tui/README.md#herdr).
+
+### Local browser-enabled installation
+
+Browser review is optional and installs separately from the plugin. It requires macOS, Chrome 116+ or Safari 18+, and Node 22+ for the Chrome native host.
+
+1. Run `/annotate <url-or-html>` in OpenCode or `agy-annotate web [url-or-html]` in AGY. If Annotate is missing or disabled in Chrome, the command copies the unpacked `browser/` path, reveals it in Finder, and prints setup steps (or names Chrome profiles where Annotate is enabled).
+2. In your review Chrome profile, open `chrome://extensions`, turn on Developer mode, click Load unpacked, press `⌘⇧G`, and paste the path (or turn Annotate on if listed). You can also clone this repository and load its `browser/` directory. Under Details, enable Allow access to file URLs for local HTML.
+3. OpenCode registers the Chrome native host (`fun.mjshao.annotate`, fixed extension ID, absolute Node path, starts on demand with no HTTP port) and active sessions automatically on macOS. If you use AGY without OpenCode or automatic setup reports an error, run `npm run install:bridge` in the installed package or checkout.
+4. Open the page and press `Alt+Shift+A` (or click the extension icon) to open the side panel.
+
+Safari builds from a checkout with Xcode (`npm run build:safari`, `npm run install:safari`) and supports copying notes only. See [Safari (copy-only)](#safari-copy-only).
 
 ## First review in 3 steps
 
-1. **Open the reviewer** — run `/annotate` in any session to review the last completed assistant reply.
-2. **Select and comment** — drag to select text (or press `v` and move), then press `c` to comment. Press Enter to save the note.
-3. **Send** — press `q` to send your annotations back to the session. The feedback is submitted as a prompt to the originating conversation, resuming it for the assistant to act on.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nxxxsooo/open-annotate/main/docs/assets/terminal-review-dracula-20261116.gif" alt="Real OpenCode Annotate 0.17.0 Ghostty recording in Dracula theme selecting passages, adding a reaction and a typed comment, and showing Send 2 back (q)" width="720">
+</p>
 
-Empty and cancelled reviews submit nothing. Opening a review makes no model call.
+Real 0.17.0 Ghostty recording (Dracula theme) on a synthetic document: select, react, select, type a comment, save, and prepare `Send 2 back (q)`. [Capture details](https://github.com/nxxxsooo/open-annotate/blob/main/docs/assets/README.md).
 
-**`Ctrl+S`** saves the current comment and sends in one step. The header's **Send N back (q)** button does the same as `q`. **`Ctrl+C`** returns without sending, and OpenCode asks whether to send. `E` and `S` send as well, following any `[keys]` rebinding. Confirmed text and browser sends continue the captured session with `steer` / `resume: true`, including while a turn is running.
+1. **Open the reviewer**: run `/annotate` in any session to review the last completed assistant reply, or `/annotate path/to/file.md` for a document.
+2. **Select and comment**: drag to select text (or press `v` and move), press `c` to write a note, and press Enter to save.
+3. **Send**: press `q` (or click **Send N back (q)** in the header) to submit numbered feedback to the originating session and resume it.
+
+- `Ctrl+S` saves an open comment and sends in one step. `E` and `S` also send, following `[keys]` rebindings.
+- `Ctrl+C` closes the reviewer. OpenCode then asks whether to send saved notes; AGY closes without sending.
+- Opening a review makes no model call, and empty or cancelled reviews submit nothing.
+- In OpenCode, confirmed text and browser sends continue the captured session with `steer` / `resume: true`, including while a turn is running.
 
 <a id="what-it-reviews"></a>
 
 ## Workflows
 
-### Annotate AI responses
+### Annotate AI replies
 
-`/annotate` opens the last completed reply. `/annotate-pick` chooses from recent replies and progress updates. `/annotate-selection` opens the message containing your last transcript selection. Reasoning, tool-call commentary, and in-progress messages are excluded.
-
-For a selection that spans messages, `/annotate-selection` reviews just the selected text.
+- `/annotate` opens the last completed reply, including turns interrupted while waiting on a question tool. Real failures, streaming replies, content-filtered replies, reasoning, and tool-call commentary are excluded.
+- `/annotate-pick` chooses from up to 30 recent replies and mid-turn progress updates.
+- `/annotate-selection` opens the message containing your last transcript selection, or reviews just the selected text when a selection spans messages.
 
 ### Review text and config files
 
@@ -70,31 +105,25 @@ For a selection that spans messages, `/annotate-selection` reviews just the sele
 /annotate "docs/release plan.md"  # Path with spaces
 /annotate ~/Documents/notes.txt   # Plain text
 /annotate-file                    # Pick a file from this session's directory
-/annotate-file settings          # Narrow the file search
+/annotate-file settings           # Filter the file search
 ```
 
-`/annotate-file` uses OpenCode's `@` file search in the session's directory and its subdirectories, then lets you filter the results in the picker. You can also pass a supported path directly to `/annotate`.
+`/annotate-file` uses OpenCode's `@` file search in the session directory and subdirectories (up to 200 matches, symlink-checked inside the session root) and opens a picker. You can also pass a supported path directly to `/annotate`.
 
-Supported files include Markdown, plain text, CSV, logs, JSON, YAML, TOML, XML, and common config files such as `.editorconfig`, `.gitignore`, `Dockerfile`, and `Makefile`. Files must be local UTF-8 and no larger than 2 MiB. `.env` and credential-looking names are excluded. Relative paths resolve against the captured session's working directory; absolute and `~/` paths work too.
-
-The reviewer reads a fixed snapshot and does not edit the original file. Feedback includes the original path and snapshot hash, with instructions to re-read the current file before applying suggestions. Document review works even before the session has an assistant reply.
+- **Supported formats**: `.md`, `.mdx`, `.markdown`, `.txt`, `.rst`, `.adoc`, `.org`, `.tex`, `.csv`, `.tsv`, `.log`, `.json`, `.jsonc`, `.json5`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`, `.conf`, `.properties`, `.xml`, `.plist`, `.editorconfig`, `.gitignore`, `.gitattributes`, `.dockerignore`, `Dockerfile`, and `Makefile`.
+- **Limits and exclusions**: non-Markdown files open inside fenced code blocks with formatting intact. Files must be local UTF-8, at most 2 MiB, and free of binary bytes; `.env` and credential-looking filenames are excluded.
+- **Paths and snapshots**: relative paths resolve against the session's working directory; Unix-style absolute paths and `~/` paths also work. The reviewer reads a fixed snapshot without editing the original file. Feedback includes the file path and SHA-256 hash so the assistant re-reads the file before editing. File review works before the first assistant reply.
 
 ### Browser webpage feedback
-
-Open the extension panel on any webpage and choose an automatically registered OpenCode session. Select text or pick an element, write notes across pages, and send the grouped round to that destination. `/annotate` can also open an explicit browser target:
 
 ```text
 /annotate page.html               # Review a local HTML file
 /annotate https://example.com     # Review a webpage
 ```
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/nxxxsooo/opencode-annotate/main/docs/assets/browser-review.png" alt="Chrome extension panel with a saved webpage comment and an explicit Send 1 note button" width="440">
-  <br>
-  <em>Real v0.13.0 extension panel with synthetic feedback; captured in an isolated headless tab. The current panel adds cross-page rounds and a destination picker.</em>
-</p>
+Open the Chrome side panel (`Alt+Shift+A`) on any page and choose an automatically registered OpenCode or AGY session, or start from OpenCode home to create an empty session without starting a model turn. Safari supports local notes and copying only.
 
-Browser setup is separate from the plugin install. Safari supports local notes and copying only; see [Browser review](#browser-review-optional) below.
+Plain `/annotate`, `/annotate-file`, `/annotate-pick`, `/annotate-selection`, and text or config paths use the TUI. The browser workflow accepts explicit URLs (`http:`, `https:`, `file:` HTML) and `.html`/`.htm` paths; HTML links or code fences in a reply do not change routing. See [Browser review](#browser-review-optional).
 
 ## Command reference
 
@@ -106,26 +135,51 @@ Browser setup is separate from the plugin install. Safari supports local notes a
 /annotate-file [query]            Choose a text or config file in the session directory
 /annotate-pick                    Choose a recent reply or mid-turn progress update
 /annotate-selection               Review the message containing your last transcript selection
-/annotate page.html              Review local HTML in the configured browser
-/annotate https://example.com    Review the specified webpage
+/annotate page.html               Review local HTML in the configured browser
+/annotate https://example.com     Review the specified webpage
 ```
 
-Numbered `/annotate N`, `/annotate-last` and `/annotate-web` are retired. Use `/annotate-pick` for earlier text, `/annotate` for the latest reply, and `/annotate <url-or-html>` for a page. Browser connection controls live in the extension's destination menu.
+Numbered `/annotate N`, `/annotate-last`, and `/annotate-web` are retired. Use `/annotate-pick`, `/annotate`, and `/annotate <url-or-html>`. Browser connection controls live in the extension's destination menu.
+
+## Review and send
+
+- **Select**: drag to select text, or press `v` and move. Without a selection, `c` comments on the current block.
+- **Annotate**: press `c` to comment, `w` for `what?` ([what? notes](#what-notes)), `a` to approve, or `d` to request deletion.
+- **Comment box**: Enter saves, `Ctrl+S` saves and sends, and Esc cancels editing. Use `Shift+Enter` for a new line where the terminal reports it, or `Alt+Enter` or `Ctrl+J` as fallbacks. The top border shows save and send hints; the bottom border shows cancel and newline hints.
+- **React or copy**: With a selection waiting, Enter records **Done** and `g` records **Get**. Esc dismisses the selection, and `y` copies the selected source without overwriting the clipboard on select.
+- **Toolbar**: the compact toolbar shows approve, comment, **Done**, and **Get**. `w`, `d`, and `y` are keyboard-only. For user-supplied PNG toolbar artwork in Kitty-graphics terminals, see [local image-toolbar configuration](tui/README.md#local-image-toolbar-trial); unconfigured terminals keep Unicode icons.
+- **Finish**: press `q` to send and return. While browsing, `Ctrl+C` closes the reviewer; OpenCode asks whether to send saved notes, and AGY closes without sending. `E` and `S` also send per `[keys]`. In OpenCode, confirming sends a normal user prompt and resumes the original session even if you switch tabs.
+
+### Chinese and other input methods
+
+An input method holds plain letters while composing, swallowing review keys such as `e`, `q`, `s`, and OpenCode permission shortcuts.
+
+- With [Slash Saver](https://github.com/nxxxsooo/slash-saver) 1.1+ installed in `/Applications`, the plugin switches to Slash Saver's ASCII source while browsing a review or answering permission prompts.
+- Comment and edit boxes switch back to your writing source while open, and your previous source is restored afterwards.
+- Set `"inputSource": false` in plugin `options` to turn this off, or set a path to another helper supporting `input-source current|select|ascii`.
+- `Ctrl+E` also edits when an input method is active.
 
 ## Herdr
 
-Bind **prefix, then `a`** (`Ctrl+B`, then `a` by default) to
-`annotate.review` using the [manifest and keybinding setup](tui/README.md#herdr).
-In AGY this opens a floating Markdown reviewer without starting a model turn.
-Send starts a turn if AGY is idle or done, or queues feedback if it is working.
-Press `q` to send pending notes and close, or `Ctrl+C` to close without
-sending. Claude, Codex, Pi, and OpenCode use the existing `herdr last`
-route. With the AGY hooks installed, `/annotate` can open the same popup before
-the model runs; the skill remains available as a fallback.
+### Herdr.app
 
-Run the bundled `annotate-tui` directly from a Herdr pane. Herdr needs an enabled
-`annotate` plugin with a `doc` pane entrypoint; see the [TUI setup](tui/README.md#herdr).
-OpenCode's `/annotate` keeps its own session delivery, even when OpenCode runs in Herdr.
+Herdr.app (`herdr-core`) uses `hc` and `herdr-app` directly and needs no Herdr TUI plugin manifest.
+
+- **Placement**: a focused calling pane gets a floating peek (`terminal.peek`). Otherwise, the reviewer opens as a pane in the caller's tab, or in its host pane's tab for a sub-agent, without stealing focus.
+- **Slash hook**: with AGY hooks installed, `/annotate` and `/annotate <local-document>` work in AGY panes and sub-agents. If the hook cannot verify the conversation or open the reviewer, it ends the turn with a visible reason and makes no model call.
+- **Sending**: `Ctrl+S`, Send, or `q` with pending notes sends feedback (`q` with no notes just closes; `Ctrl+C` or closing the pane sends nothing).
+  - Hook-opened reviews submit via `hc send` when AGY is `idle` or `done`, queue for the AGY hooks when `working`, and send nothing when `blocked`, unknown, or changed.
+  - Skill-opened reviews queue feedback for AGY's lifecycle hooks.
+
+### Herdr TUI
+
+Bind `prefix+a` (`Ctrl+B` then `a` by default) to `annotate.review` using the [manifest and keybinding setup](tui/README.md#herdr).
+
+- **AGY panes**: `prefix+a` opens a 90% x 90% floating Markdown popup (`agy-popup`) without starting a model turn. Send starts a turn when AGY is `idle` or `done`, queues feedback when `working`, and sends nothing when `blocked`, unknown, or changed. Press `q` to send pending notes and close (or close if empty), or `Ctrl+C` to close without sending.
+- **AGY slash hook vs skill**: with AGY hooks installed, `/annotate` and `/annotate <local-document>` in a focused AGY pane open the same popup before the model runs. Otherwise, the `annotate` skill opens an overlay when focused, or a non-focus-stealing split when unfocused.
+- **Other agents**: Claude, Codex, Pi, and OpenCode panes use `herdr last --newest --deliver-to`.
+
+You can also run `annotate-tui herdr` directly from any Herdr pane with an enabled `annotate` plugin providing the `doc` pane entrypoint (see [TUI setup](tui/README.md#herdr)). OpenCode's `/annotate` clears inherited `HERDR_*` variables and keeps its own session delivery.
 
 ```sh
 annotate-tui herdr open docs/plan.md --placement split --deliver-to w1:p2
@@ -135,72 +189,69 @@ annotate-tui herdr terminal --lines 20 --deliver-to w1:p2
 annotate-tui herdr terminal --lines 5 --print
 ```
 
-- `open`, `last` and `terminal` accept `--placement overlay|split|tab|zoomed`. The default is `overlay`.
-- `last` opens a reply picker; add `--newest` to open the newest reply directly. With `--deliver-to`, it reads that pane's agent session.
-- `terminal` reviews recent output from the calling pane, even if feedback goes to a different pane. `--print` writes a fenced Markdown block to stdout instead of opening a reviewer.
-- Replace `w1:p2` with the receiving agent's pane ID. **Send** submits the feedback as a prompt, including Enter. If Herdr reports the agent is blocked at a dialog, no prompt is sent. Annotate keeps the notes pending and tries to copy the feedback to the terminal clipboard; resolve the dialog and retry when ready.
-
-Outside Herdr, use `annotate-tui docs/plan.md` to copy feedback via a terminal that supports OSC 52. `herdr open` requires a Herdr pane.
-
-## Upgrading from the TUI-only package
-
-`opencode-annotate` replaces `opencode-plannotator-tui` (0.4.2 and earlier). To switch, run `opencode plugin remove opencode-plannotator-tui@latest` and then install this package as shown above.
-
-Move its entry from `cli.json` to `opencode.json(c)`, retaining the whole entry and any `options`. Keep one entry so the TUI is loaded once and the server entry can synchronize options.
-
-## Upgrading to 0.16.0
-
-**Breaking:** `/ref` (including `--all` and `--tui`) and the agent session search/read
-tools have moved out of Annotate to Another. Install Another 0.28.0 or later and run
-`another setup` to get its cross-agent `/ref` in OpenCode.
-
-Existing `opencode.json(c)` entries and plugin options keep working. Remove any
-`annotate_session_*` permission rules. Annotate continues to review replies,
-documents and webpages.
+- `open`, `last`, and `terminal` accept `--placement overlay|split|tab|zoomed` (default `overlay`; `popup` is manifest-only).
+- `last` opens a reply picker, or `--newest` opens the newest reply directly. With `--deliver-to`, it reads that pane's agent session.
+- `terminal` reviews recent output from the calling pane even when delivering to another pane. `--print` writes a fenced Markdown block to stdout instead of opening a reviewer.
+- Replace `w1:p2` with the target agent's pane ID. Send submits the prompt including Enter. If Herdr reports the agent is blocked at a dialog, nothing is sent; notes stay pending and Annotate tries an OSC 52 clipboard copy so you can resolve the dialog and retry.
+- Outside Herdr, use `annotate-tui docs/plan.md` to copy feedback via a terminal supporting OSC 52. `herdr open` requires a Herdr pane.
 
 ## Antigravity (AGY) support
 
-In a configured Herdr AGY pane, `/annotate` opens a native overlay before the
-model runs. `prefix+a` opens the latest reply, and `/annotate <local-document>`
-can review a file. Outside Herdr on macOS, the skill opens Ghostty or Terminal
-for text reviews. URL and HTML targets use the browser companion.
+See [AGY install](#antigravity-cli-agy) for skill and hook setup. How AGY reviews open and deliver depends on your terminal:
 
-Set up AGY manually from one installed package (`npm install -g @nxxxsooo/opencode-annotate`;
-find the package under `npm root -g`) or a checkout with `npm run build:tui`:
+- **Slash hook**: with AGY hooks installed, `PreInvocation` intercepts `/annotate` and `/annotate <local-document>` before the model runs in a configured Herdr TUI pane or in [Herdr.app](#herdrapp), including AGY sub-agents.
+- **Skill and CLI**: if the Herdr TUI hook declines, the `annotate` skill runs `agy-annotate tui [path]` in an overlay or split. Outside Herdr on macOS, it opens a Ghostty (172x48) or Terminal.app window. Running `agy-annotate tui` directly on an interactive shell TTY opens inline.
+- **Webpages**: explicit URL and HTML targets invoke `agy-annotate web` to pair the session and open the browser companion.
+- **Sending**: `Ctrl+S` or the Send button returns feedback to the captured AGY conversation; `q` sends pending notes and closes (or closes if empty), and `Ctrl+C` closes without sending. Direct reviews in Herdr TUI or Herdr.app start a turn on `idle` or `done` and queue on `working`; skill-invoked reviews queue for `SessionStart`, `PreInvocation`, and `Stop` hooks.
+- **Logs**: declined slash interceptions and popup outcomes log to `~/.local/share/opencode-annotate/agy-review.log`.
 
-1. Link the package's `agy/skills/annotate` directory as `~/.agents/skills/annotate`.
-2. Merge the `agy-annotate` entries from `agy/hooks.json` into
-   `~/.gemini/config/hooks.json`, replacing `./hooks.mjs` in all three commands
-   with the absolute path to `agy/hooks.mjs` from that installation.
-3. For Herdr, follow the [manifest and keybinding setup](tui/README.md#herdr)
-   using the CLI and native reviewer from the same installation.
+```sh
+npx --package @nxxxsooo/open-annotate@latest agy-annotate status
+npx --package @nxxxsooo/open-annotate@latest agy-annotate tui [path]
+npx --package @nxxxsooo/open-annotate@latest agy-annotate web [url-or-html]
+npx --package @nxxxsooo/open-annotate@latest agy-annotate queue
+```
 
-**Send** (`Ctrl+S` or the Send button) returns feedback to the captured AGY
-conversation. In Herdr it starts a turn if AGY is idle or done, or queues
-feedback for its lifecycle hooks if AGY is working. `q` sends pending notes and
-closes; with no notes it just closes. `Ctrl+C` closes without sending.
-
-- **CLI Commands**:
-  ```sh
-  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate status
-  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate tui
-  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate web
-  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate queue
-  ```
-
-### Match OpenCode's colors
-
-Set `"inheritTheme": true` in the plugin's `options`. The bundled reviewer supports the full palette and `[ui].doc_width` for a readable text column on wide terminals. See [TUI theme integration](docs/tui-theme.md).
-
-Each review uses OpenCode's current resolved colors for the canvas, text, Markdown, borders, highlights, cursor and selection. The plugin asks the chosen binary for its effective configuration, copies it into that review's private directory, and validates the themed copy before taking over the terminal. Your original settings stay intact. Launchers must honor an existing `PLANNOTATOR_TUI_CONFIG`.
+Supported CLI options: `--session <id>`, `--binary <path>`, and `--browser Chrome|Safari`.
 
 ## Browser review (optional)
 
-Requirements: macOS and Chrome 116+ or Safari 18+, plus Node 22+ for the Chrome native host.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nxxxsooo/open-annotate/main/docs/assets/browser-review.png" alt="Real v0.13.0 Chrome extension panel showing a saved webpage comment and Send 1 note button" width="440">
+  <br>
+  <em>Real v0.13.0 <code>panel.html</code> capture with synthetic feedback in an isolated headless Chromium tab (not Chrome's native side-panel frame). Current panels add cross-page rounds, area selection, and a destination picker.</em>
+</p>
+
+### Chrome (direct delivery)
+
+See [Local browser-enabled installation](#local-browser-enabled-installation) to load the unpacked extension and native host.
+
+**Session picker and connection**
+
+- Click the destination beside **To** to filter sessions by title or directory and sort by recent activity, creation, or title. The picker refreshes automatically with current titles.
+- **New session** creates an empty OpenCode session with the chosen OpenCode session's directory and model (or OpenCode home's selection) without starting a model turn.
+- **Disconnect** keeps the target named and notes local; choosing it again reconnects. A disconnected target never silently switches to another session.
+- Restarted receivers reconnect by stable provider/session identity and carry pending retry batches. Switching terminal tabs never changes the captured destination.
+
+**Capturing notes and areas**
+
+- Select text directly, choose **Pick element**, or drag a rectangle with **Select area**, then write a comment or question.
+- Unsent area outlines stay marked on the page: click a dashed outline or badge to activate it, drag to move or resize via handles, and press `Esc` to cancel an adjustment.
+- Area notes record rectangle position, viewport, visible text, and up to five selectors without taking a screenshot.
+- **Add note** (or `Cmd/Ctrl+Enter`) saves locally. **Send N notes & continue** saves open input and sends all pending notes across pages. OpenCode uses `steer` / `resume: true` (idle sessions start immediately; running turns receive feedback at the next boundary). AGY queues notes for its lifecycle hooks. Registering, creating sessions, and saving notes make no model call.
+
+**Managing rounds and reconnection**
+
+- Notes group by page with contiguous numbers matching page markers and delivered Markdown. The delivery bar shows the whole round's count and destination; drafts remain page-local.
+- Click a note's quoted target to reveal it on its page without activating the element; off-page notes open their page. Use **Edit** to change feedback and **Undo** to restore a deleted note.
+- **Clear** in the notes header removes every unsent note in the round, and each page group has its own **Clear**. One **Undo** restores the cleared batch, while drafts, delivered history, and **Restore last round** stay intact. Clearing the whole round drops a pending retry batch only after inline confirmation.
+- Each send closes the global round, and **Restore last round** recovers the most recent round across pages. The last ten rounds are kept.
+- **Send** and **Copy instead** stay separate actions. **Copy instead** copies the grouped Markdown for any agent and closes the round. **More review options** adds non-closing Markdown copy, JSON export, and a round preview.
+- Reloads and same-site navigation reconnect automatically. If Chrome withdraws access on a cross-site move, the panel asks you to click the extension icon once while keeping saved notes.
 
 ### Safari (copy-only)
 
-Build the shared browser sources into a Safari Web Extension app with Xcode installed:
+Build the shared browser sources into `/Applications/annotate.app` from a checkout with Xcode installed:
 
 ```sh
 ANNOTATE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" \
@@ -208,165 +259,112 @@ ANNOTATE_DEVELOPMENT_TEAM="TEAMID" npm run build:safari
 npm run install:safari
 ```
 
-The installer replaces `/Applications/annotate.app` and refreshes its registration. Open that app once, then enable Annotate in Safari > Settings > Extensions. Without signing environment variables the build uses an ad-hoc signature, which Safari may refuse to register. Allow access to the pages you want to review.
+- `npm run install:safari` replaces `/Applications/annotate.app` and refreshes its registration. Open the app once, enable Annotate in Safari > Settings > Extensions, and allow access to the pages you want to review. Builds without signing variables use an ad-hoc signature that Safari may refuse to register.
+- Open the standalone panel from the toolbar button or `Option+Shift+A` (where supported). Safari has no docked side panel; its separate window stays bound to the reviewed Safari window and polls while you work.
+- Because Safari extensions are App-Sandboxed, Safari cannot start the Node bridge, read the session registry, or deliver to sessions directly. It ignores session registration and keeps notes local. Use **Copy notes** to paste into any agent; copying closes the round and **Restore last round** recovers it.
+- Set `"browser": "Safari"` in the plugin's `options` in `opencode.json(c)` or pass `--browser Safari` to `agy-annotate web`. The only public values are `"Chrome"` (default, mapped to Google Chrome) and `"Safari"`. Plain `/annotate` still opens the TUI.
+- After updates, rebuild with signing variables, run `npm run install:safari`, reopen the app, and re-enable if needed. An unpacked Chrome reload does not update the installed Safari app.
 
-Click the Annotate toolbar button, or use Option+Shift+A where Safari supports the extension command, to open its standalone panel. Select text or pick an element, write notes, then **Copy notes** to paste the round into any agent. Notes and drafts stay local; copying closes the round and **Restore last round** recovers it.
+### Safeguards and limitations
 
-Safari requires an App-Sandboxed app extension, so it cannot start the Node bridge or read the session registry. It has no direct session delivery or session chooser; Chrome retains both. Safari also has no docked side panel: its separate window stays bound to the reviewed browser window and keeps polling while you work on the page.
-
-Set the plugin option `"browser": "Safari"` so `/annotate <url-or-html-file>` opens the page in Safari. The only public values are `"Chrome"` (default) and `"Safari"`; Chrome maps to the macOS app Google Chrome. AGY supports the same choice with `agy-annotate web <url> --browser Safari`. Safari ignores session registration and copies notes instead. Plain `/annotate` still opens the text reviewer.
-
-After updates, run `npm run build:safari` with the signing variables again, then `npm run install:safari`. Reopen the app and re-enable the extension if needed. An unpacked Chrome reload does not update the installed Safari app.
-
-### Chrome (direct delivery)
-
-1. Run `/annotate <url-or-html>` in OpenCode or `agy-annotate web [url-or-html]` in AGY. If Annotate isn't enabled in any Chrome profile, the command copies the absolute `browser/` path, reveals it in Finder, and shows the setup steps. If it is enabled in only some profiles, the command names those profiles.
-2. In the Chrome profile you use for reviews, open `chrome://extensions`. Turn on **Developer mode**, click **Load unpacked**, press **⌘⇧G**, and paste the path. If Annotate is already listed, turn it on. Under **Details**, enable **Allow access to file URLs** for local HTML. You can also clone this repository and load its `browser/` directory the same way.
-3. The plugin registers the native host and active sessions automatically when OpenCode starts on macOS. The host allows only this companion's fixed extension ID, resolves Node absolutely, starts on demand and opens no HTTP port. If automatic setup reports an error, run `npm run install:bridge` in the clone to repair it.
-4. Return to the page, press **Alt+Shift+A** (or click the extension icon), and choose a destination in the panel.
-
-Click the destination beside **To** to filter sessions by title or directory and sort by recent activity, creation or title. The picker refreshes automatically and shows current session titles. **New session** creates an empty session with the chosen session's location/model, or the blank OpenCode home's current selection, without starting a model turn. **Disconnect** keeps the destination named and notes local; choosing that session again reconnects. A disconnected destination never silently switches to another session. Restarted receivers reconnect by stable provider/session identity, carrying any retry batch to the replacement.
-
-Choose **Pick element**, drag a rectangle with **Select area**, or select text directly, then write a comment or question. Unsent areas stay marked: click a dashed outline or badge to activate it, drag the rectangle to move it, or drag a handle to resize. Esc cancels an adjustment. Area notes include the rectangle's position, visible text, and element hints, without a screenshot. **Send N notes & continue** saves current feedback and sends all pending notes across pages; **Add note** collects feedback locally. Cmd/Ctrl+Enter adds a note or saves an edit. Confirmed sends use `steer` / `resume: true`: idle sessions start immediately and running turns receive feedback at their next processing boundary. Registering, creating sessions and saving notes make no model call. Switching terminal tabs never changes the captured destination.
-
-The queue groups notes by page, with contiguous numbers matching page markers and delivered Markdown. Click a note's quoted target to show it on its page without activating the element; off-page notes can open their page. **Edit** changes the feedback, and **Undo** restores a deleted note. The delivery bar shows the whole round's count and destination; drafts remain page-local.
-
-**Clear** in the notes header removes every unsent note in the round; each page group has its own **Clear**. One **Undo** restores the whole removed batch. Drafts, delivered history and **Restore last round** stay intact. Clearing the round drops a pending retry batch only after inline confirmation.
-
-Each send closes the global review round: delivered notes leave the list and the panel is ready for the next round. **Restore last round** returns the most recent round's notes across pages; the last ten rounds are kept globally.
-
-**Send** and **Copy instead** remain separate actions. Send requires a live destination; Copy instead copies the grouped round as Markdown for any agent and closes it the same way. If a session drops during Send, notes remain available for retry or copying. **More review options** contains a non-closing Markdown copy, JSON export, and a preview of the current round.
-
-After a page reload or same-site navigation, the panel reconnects its page tools automatically. If Chrome has withdrawn access (for example after moving to another site), the panel asks you to click the extension icon once; saved notes are kept.
-
-### Explicit routing
-
-Plain `/annotate`, `/annotate-file`, `/annotate-pick` and `/annotate-selection` use the TUI; text and config paths do too. Explicit URLs and HTML paths passed to `/annotate` enter the browser workflow. A reply containing HTML links or code fences does not change the default.
-
-### Browser safeguards and limitations
-
-Picking and text selection work inside same-origin iframes, legacy framesets and
-nested frames. Reveal and page markers can find those notes after reload; delivered
-Markdown includes a `Frame:` line for frame context. Cross-origin frames cannot be
-picked and show a clear message.
-
-Written drafts autosave locally and restore after panel reload or a return to the same URL, including SPA routes. Selecting another target with unfinished feedback offers **Add/Save & switch**, **Keep editing**, or **Discard & switch**. Storage failures keep the input and offer a retry; competing panels require an explicit choice of draft. Saved-note revision checks likewise prevent stale tabs overwriting newer feedback. Full JSON/Markdown exports include redacted URLs, exact selected text/context, verified selector hints, styles and accessibility. Missing/changed/ambiguous targets are labeled in the sidebar instead of silently rebound. Comments and drafts live in extension-owned UI/storage; the page receives only selection metadata and numbered markers, not your written feedback.
-
-Native delivery requires an open local TUI and a connected destination. If the receiver closes, feedback stays pending. A failed batch retains its original target and ID for safe retry; if that session is permanently gone, export the notes before starting a new review. **Retry N notes & continue** retries that original batch; newly composed feedback stays local for the next send. Copying a round instead supersedes a failed batch. Clipboard failures expose a selectable preview and keep the round open. Browser-internal pages, PDF, cross-origin iframes, Canvas and remote SSH TUI clients are outside this version's scope. Page Context is retired only after exporting its drafts and verifying this replacement.
-
-See [implementation plan](docs/annotate-html-integration-plan.md) and [shipped-artifact evaluation](docs/annotate-html-evaluation.md), plus [browser provenance](browser/UPSTREAM.md). `npm test`, `npm run test:smoke`, and `npm run test:browser` verify each layer; the browser test uses an existing Playwright installation (`PLAYWRIGHT_MODULE`) and browser executable (`CHROMIUM_PATH`) in an isolated profile.
+- **Frames**: picking and text selection work inside same-origin iframes, legacy framesets, and nested frames, and delivered Markdown includes a `Frame:` line. Cross-origin frames cannot be picked and show a clear message.
+- **Limits and redaction**: rounds accept up to 200 notes and 512 KiB of JSON (4,000-character quotes, 8,000-character comments). URL credentials and sensitive query or hash parameters (tokens, passwords, secrets, signatures, credentials, API keys, `auth`, `code`) are redacted from exported URLs.
+- **Drafts**: drafts autosave per page and restore after a panel reload or return to the same URL, including SPA routes. Switching targets with unfinished input offers **Add/Save & switch**, **Keep editing**, or **Discard & switch**.
+- **Privacy and conflicts**: storage failures keep input for retry, competing panels require an explicit draft choice, and revision checks prevent stale tabs from overwriting newer feedback. Comments and drafts stay in extension storage; the page receives only selection metadata and numbered markers.
+- **Exports and targets**: full JSON and Markdown exports include redacted URLs, exact selected text and context, verified selector hints, styles, and accessibility. Missing, changed, or ambiguous targets are labeled in the sidebar instead of silently rebound.
+- **Delivery**: native delivery requires a running local OpenCode TUI or AGY receiver and a connected destination. If a session drops during Send, notes remain available for retry or copying.
+- **Failed batches**: a failed batch keeps its target and batch ID for **Retry N notes & continue** while new notes stay local; if that session is permanently gone, export the notes before starting a new review. Copying a round supersedes a failed batch, and clipboard failures expose a selectable preview while keeping the round open.
+- **Out of scope**: browser-internal pages, Chrome Web Store URLs, PDFs, cross-origin iframes, Canvas, and remote SSH TUI clients. If migrating from the older Page Context extension, export its drafts and verify this replacement before retiring it.
+- **Docs and tests**: see [implementation plan](docs/annotate-html-integration-plan.md), [shipped-artifact evaluation](docs/annotate-html-evaluation.md), and [browser provenance](browser/UPSTREAM.md). `npm test`, `npm run test:smoke`, and `npm run test:browser` (`PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`) verify each layer.
 
 ### Reload after browser companion updates
 
-Keep **Developer mode** on and update the `browser/` folder that Chrome loaded. An up-to-date native host checks the installed unpacked files when the panel connects. If that copy has a newer manifest version and the review is idle, Annotate reloads once, then you can reopen the panel with the extension icon or **Alt+Shift+A**. Updates wait if notes, drafts, or a retry are pending, or another review panel is open. Finish the review and use **Reload Annotate** when ready.
+Keep Developer mode on and update the `browser/` folder loaded in Chrome. When the panel connects, an up-to-date native host checks installed unpacked manifest versions. If a newer version is on disk and the review is idle, Annotate reloads once; reopen the panel with the extension icon or `Alt+Shift+A`.
 
-A newly opened sidebar can load the updated `panel.mjs` while Chrome still runs an older `worker.mjs`. The panel detects this protocol mismatch and shows **Annotate was updated** with a **Reload Annotate** button. Use it or click **Reload** for **OpenCode Annotate** in `chrome://extensions` to load the first version with automatic reload, or after editing files without a manifest version increase. Saved extension-local notes and drafts survive an extension reload. Reopen OpenCode or run `npm run install:bridge` if the native host also needs updating.
+Auto-reload waits if notes, drafts, or a retry are pending or another panel is open. Finish the review and click **Reload Annotate**.
 
-For diagnosis, compare the running worker's source (DevTools/CDP `Debugger.getScriptSource`) with `browser/worker.mjs` in the loaded checkout. The manifest version alone cannot identify edits to an unpacked extension.
+If a newly opened panel loads an updated `panel.mjs` beside an older `worker.mjs`, the protocol mismatch shows **Annotate was updated** with **Reload Annotate**. Click it, or click **Reload** in `chrome://extensions` (also needed after edits without a manifest version bump, or when upgrading from a version before automatic reload).
 
-## Review and send
-
-1. Run `/annotate` or `/annotate path/to/file.md`.
-2. Select text by dragging, or press `v` and move.
-3. Press `c` to comment, `w` for **what?** ([what? notes](#what-notes)), `a` for "looks good," or `d` to request deletion. Without a selection, `c` comments on the current block. Enter saves a comment; with a selection waiting, Enter records **Done**, `g` records **Get**. Esc dismisses. The compact toolbar shows approve, comment, Done and Get; `w`, `d` and `y` are keyboard-only. Press `y` to copy the selected source.
-4. Press **`q`** to send your notes and return to OpenCode.
-
-For PNG toolbar artwork in a verified Kitty-graphics terminal, see the [local image-toolbar configuration](tui/README.md#local-image-toolbar-trial). Artwork is user-supplied; unconfigured terminals keep Unicode icons.
-
-### Chinese and other input methods
-
-An input method holds plain letters while it composes, so review keys such as `e`, `q` and `s`, and OpenCode's permission shortcuts, do nothing. With [Slash Saver](https://github.com/nxxxsooo/slash-saver) 1.1+ installed in `/Applications`, the plugin selects its configured ASCII source while you browse a review or answer a permission prompt, and restores your source afterwards. The comment and edit boxes switch back to your writing source while open. Set `"inputSource": false` in the plugin's `options` to turn this off, or a path to another helper with the same `input-source current|select|ascii` commands. The reviewer also binds **`Ctrl+E`** to edit, which an input method passes through.
-
-Opening a review makes no model call. Confirming sends a normal user prompt and resumes the **original session**, even if the active tab changes. Empty and cancelled reviews submit nothing.
-
-## Updates and uninstall
-
-`@latest` selects the npm release channel. OpenCode caches installed packages; it does not follow this repository's commits. Update just this plugin with:
-
-```sh
-opencode plugin update @nxxxsooo/opencode-annotate@latest
-```
-
-Run `/reload` if the command list has not refreshed. Check the installed version with `opencode plugin list`.
-
-To remove it:
-
-```sh
-opencode plugin remove @nxxxsooo/opencode-annotate@latest
-```
+Extension-local notes and drafts survive reload. Reopen OpenCode or run `npm run install:bridge` if the native host also changed. To diagnose a mismatch, compare the running worker source (DevTools/CDP `Debugger.getScriptSource`) with `browser/worker.mjs`; the manifest version alone cannot detect unpacked edits.
 
 ## Configuration
 
 ### Automatically review long replies
 
-Enable auto-annotation in the plugin entry in **`opencode.jsonc`** (or `opencode.json`):
+Enable auto-annotation in `opencode.jsonc` (or `opencode.json`), preserving existing options:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "@nxxxsooo/opencode-annotate@latest",
+      "package": "@nxxxsooo/open-annotate@latest",
       "options": {
         "autoAnnotate": true,
-        "autoAnnotateThreshold": 2000, // Open when the reply exceeds this many characters.
-      },
-    },
-  ],
+        "autoAnnotateThreshold": 2000 // Open when trimmed reply exceeds this many Unicode characters.
+      }
+    }
+  ]
 }
 ```
 
-Add these options to your existing entry, keeping any other options. Auto-annotation is **off by default**; set `autoAnnotate` to `false` to disable it. The threshold defaults to **2,000 characters** and accepts a non-negative integer; `0` reviews every non-empty reply. It counts Unicode characters in the trimmed reply text, including Markdown and code, excluding reasoning and tool output. A reply exactly at the threshold does not open.
-
-After a successful turn, a new qualifying reply in the active session opens the normal reviewer once. Progress updates, failed or interrupted turns, historical replies and background sessions do not trigger it. A reply is skipped if another review is open, you switch sessions before it opens, or a new turn starts. Dismissing the reviewer or reloading the plugin does not reopen that reply. Sending remains your explicit action. OpenCode reloads saved configuration automatically; use `/reload` if needed.
+- `autoAnnotate` defaults to `false`. `autoAnnotateThreshold` accepts a non-negative integer and defaults to `2000`.
+- The threshold counts Unicode characters in trimmed reply text including Markdown and code, excluding reasoning and tool output. `0` opens every non-empty reply; a reply equal to the threshold does not open.
+- After a successful turn in an active idle session, a qualifying reply opens once. Progress updates, failed or interrupted turns, historical replies, and background sessions do not trigger it.
+- A reply is skipped if another review is open, you switch sessions before it opens, or a new turn starts. Dismissing or reloading does not reopen that reply, and sending remains explicit. OpenCode reloads saved configuration automatically; use `/reload` if needed.
 
 ### What? notes
 
-A `what?` note stays short in the review. When you send, the feedback adds one instruction after all the notes: explain each marked passage in plain language with more detail and a concrete example where it helps, relate it to the current task, and hold any pending action until you confirm. Change or remove that instruction in `~/.config/opencode-annotate/tui.toml`; an empty string sends the notes alone:
+A `what?` note stays short in the review. When you send, the feedback appends one instruction asking for plain-language explanations with concrete examples where helpful, tied to the current task, while holding pending actions until you confirm.
+
+Change or clear that instruction (`""` sends notes alone) in `~/.config/opencode-annotate/tui.toml` (`%APPDATA%/opencode-annotate/tui.toml` on Windows):
 
 ```toml
 [prompts]
 what = "Explain each passage marked what? in two sentences, then stop."
 ```
 
-If OpenCode has a skill with ID `what`, the plugin attaches it to the sent feedback, the same as mentioning `@what`. That skill can then hold pending work and ask whether to continue. Choose another skill or turn this off with the `whatSkill` plugin option:
+If OpenCode has a skill with ID `what`, the plugin attaches it to the sent feedback like mentioning `@what`, so the skill can hold pending work and ask whether to continue. Choose another skill or disable this with `whatSkill` in `opencode.json(c)`:
 
 ```jsonc
 "options": { "whatSkill": "explain" } // or false
 ```
 
-A missing default `what` skill is skipped. A missing skill that you set yourself stops the send with an error and keeps the draft and `feedback.md`.
+A missing default `what` skill is skipped. A missing custom `whatSkill` stops the send with an error and keeps the draft and `feedback.md`.
 
-### Reviewer binary and layout
+### Theme, layout, and plugin options
 
-The bundled reviewer is selected automatically. Use `binary` only to override it with another locally built Annotate TUI executable:
+Layout and `[keys]` settings live in `~/.config/opencode-annotate/tui.toml` (`%APPDATA%/opencode-annotate/tui.toml` on Windows). Example readable-column layout:
 
-```json
-{
-  "plugins": [
-    {
-      "package": "@nxxxsooo/opencode-annotate@latest",
-      "options": { "binary": "/path/to/annotate-tui" }
-    }
-  ]
-}
+```toml
+[ui]
+horizontal_margin = 2
+max_width = 168
+doc_width = 120
 ```
 
-The adapter launches Annotate TUI in the current terminal. Layout and key settings live in `~/.config/opencode-annotate/tui.toml`; font family and size belong to the terminal. The adapter supplies `PLANNOTATOR_TUI_THEME` to follow OpenCode's light/dark mode. The existing environment and annotation-field names are local protocol identifiers; they do not connect to or install another project.
+Font family and size belong to the terminal. The adapter sets `PLANNOTATOR_TUI_THEME` to follow light/dark mode. `PLANNOTATOR_*` environment and field names are local protocol identifiers and never connect to another project.
+
+Additional `options` in `opencode.json(c)`:
+
+- `inheritTheme`: set to `true` to use OpenCode's resolved colors (canvas, text, Markdown, borders, highlights, cursor, selection). The plugin reads the binary's effective config, writes a validated per-review `PLANNOTATOR_TUI_CONFIG` without altering user files, and takes over the terminal. Launchers must honor `PLANNOTATOR_TUI_CONFIG`. See [TUI theme integration](docs/tui-theme.md).
+- `binary`: path overriding the bundled `annotate-tui` executable with another locally built binary.
+- `browser`: `"Chrome"` (default, mapped to Google Chrome) or `"Safari"`.
+- `inputSource`: `false` to disable automatic input-source switching, or a path to a helper with `input-source current|select|ascii`.
 
 <details>
 <summary id="draft-recovery">Draft recovery</summary>
 
-Each review has its own private temporary source and annotation store. Successful, empty and cancelled reviews are cleaned up. Failures and archived notes retain the store, and a status message gives its directory.
+Each review uses a private temporary directory cleaned up after successful, empty, or cancelled runs. Failures and archived notes retain the directory and print its path.
 
-`review.json` records the session, original source and relative `snapshot` path. `feedback.md` holds exported feedback when available. To recover a retained review:
+`review.json` holds the session, source, and relative `snapshot` path; `feedback.md` holds exported feedback when available. Recover a retained review using the `snapshot` value from `review.json`:
 
 ```sh
 PLANNOTATOR_DATA_DIR="<retained-directory>/data" \
-  npx --package @nxxxsooo/opencode-annotate annotate-tui "<retained-directory>/<snapshot>"
+  npx --package @nxxxsooo/open-annotate annotate-tui "<retained-directory>/<snapshot>"
 ```
 
-Use the `snapshot` value from `review.json`. Press `H` to restore archived notes, then `E` to copy them for pasting into OpenCode. An **E → F** archive is preserved even when `--export` reports "No annotations."
+Press `H` to open the archive, select a note and press Enter to restore it, then `E` to copy feedback for pasting into OpenCode. An `E -> F` archive is preserved even when `--export` reports "No annotations."
 </details>
 
 <details>
@@ -380,29 +378,28 @@ npm run check
 npm run test:smoke
 ```
 
-Rust 1.96+ is needed to build from source. Unit tests use the bundled annotation/export binary, including theme inheritance tests. The optional smoke test also requires Python 3, tmux and OpenCode. It runs a detached terminal, verifies commands and feedback through the actual API, then removes its test session. Its submission uses `resume: false`, so it makes no model call or visible window.
-
-Set `ANNOTATE_TUI_BINARY` to test a custom binary or launcher through the plugin's real configuration path. For a build with a centered 120-column viewport, also set `ANNOTATE_EXPECT_MARGIN=10` to assert blank margins in the 140-column smoke terminal. These variables configure the test, not the shipped plugin.
-
-For development loading, set the plugin entry in `opencode.json(c)` to this checkout's absolute directory, preserving its `options`, and run `/reload`. Remove any duplicate entry in `cli.json`. The older `npm run install:plugin` helper switches **only the TUI** entry in `cli.json`; use it only for TUI-only development.
-
-See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
+- Building from source requires Rust 1.96+ and Node 22+. Unit tests run against the bundled binary, including theme inheritance checks.
+- `npm run test:smoke` also requires Python 3, tmux, and OpenCode. It runs an isolated session with `resume: false`, making no model call or visible window.
+- Set `ANNOTATE_TUI_BINARY` to test a custom binary or launcher through the real config path, and `ANNOTATE_EXPECT_MARGIN=10` to assert centered 120-column margins in the 140-column smoke terminal. These variables configure the test, not the shipped plugin.
+- For development loading in OpenCode, point the plugin entry in `opencode.json(c)` to this checkout's absolute path (preserving `options`), remove any duplicate `cli.json` entry, and run `/reload`.
+- See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 </details>
 
-## 中文速用
+## Updates and uninstall
 
-这是**非官方 OpenCode 批注插件**：文本用本仓库 `tui/` 中的 Annotate TUI，网页用 Chrome 伴随扩展。
+OpenCode caches installed packages and does not follow repository commits. Update or remove the plugin with:
 
-- `/annotate`：批注上一条完整回复。
-- `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
-- `/annotate-file [关键词]`：从当前会话目录及其子目录中选择文本或配置文件。
-- `/annotate-pick`：从最近的回复和运行中的进度说明里选一条批注。
-- `/annotate-selection`：先在会话里拖选文字，再批注包含这段文字的消息。
-- 0.16.0 移除 `/ref` 和代理会话搜索／读取工具，交由 Another 提供跨代理引用：安装 Another 0.28.0 或更高版本并运行 `another setup` 即可。原有插件配置继续有效，请移除 `annotate_session_*` 权限规则。
-- `/annotate 页面.html`、`/annotate https://…`：打开网页批注。Chrome 自动注册主机和会话，扩展目的地菜单可筛选、新建空会话、断开及重连；Safari 保持仅复制。跨页备注汇成一轮，Send 与 Copy instead 分开，确认发送后自动继续原会话。
-- 选中文字 → `c` 写批注 → Enter 保存 → `q` 发送并返回。
-- 写批注中途按 `Ctrl+S`，一步保存、返回并发送（中文输入法开着也有效）；`Ctrl+C` 返回后由 OpenCode 询问。
-- 文档采用独立快照，反馈附原文件路径，确认后发回发起批注的会话。
-- 更新：`opencode plugin update @nxxxsooo/opencode-annotate@latest`，命令未刷新时运行 `/reload`。
+```sh
+opencode plugin update @nxxxsooo/open-annotate@latest
+opencode plugin remove @nxxxsooo/open-annotate@latest
+```
+
+Run `/reload` if commands have not refreshed, and check the installed version with `opencode plugin list`. Browser companions update separately: update the unpacked `browser/` directory in Chrome or rebuild and reinstall the Safari app.
+
+## Upgrade notes
+
+- **From `@nxxxsooo/opencode-annotate`**: replace the package value in `opencode.json(c)` with `@nxxxsooo/open-annotate@latest`, keep your options, then run `opencode plugin list`.
+- **From `opencode-plannotator-tui` (0.4.2 and earlier)**: run `opencode plugin remove opencode-plannotator-tui@latest`, install `@nxxxsooo/open-annotate@latest`, and move the entry from `cli.json` to `opencode.json(c)` keeping its `options` and keeping a single entry so the TUI loads once and server options sync.
+- **To 0.16.0+**: `/ref` (`--all`, `--tui`) and `annotate_session_*` session tools moved to Another. Install Another 0.28.0+ and run `another setup` for cross-agent `/ref`, keep existing `opencode.json(c)` options, and remove any `annotate_session_*` permission rules.
 
 MIT licensed. Original terminal-reviewer copyright notices are preserved in [tui/LICENSE](tui/LICENSE).

@@ -1,16 +1,20 @@
 # Fate Labs Estelle plugins
 
-Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode, Pi, Qwen Code, Gemini CLI, Hermes Agent, mini-swe-agent,
-OpenClaw and fx. Each host has its own package
+Estelle for Claude Code, Codex, Kimi Code, Grok Build, Cursor, OpenCode, Pi, Qwen Code, Gemini CLI, Google Antigravity, Hermes Agent,
+mini-swe-agent, OpenClaw and fx. Each host has its own package
 under `plugins/`. They connect to `https://api.fatelabs.ca/mcp`.
 
-Install your coding host first, with external Node.js 22+. Claude Code needs no key: run `/estelle:login` once
-to connect the tools and record sessions. The other hosts need a valid `ESTELLE_API_KEY` from your Estelle
-account in the actual host process, where hooks and MCP use the same key. GUI apps on macOS and Windows
+Install your coding host first, with external Node.js 22+. Run `/estelle:login` once (`$estelle:login` on Codex,
+`/estelle-login` on Hermes and Antigravity) to sign in through your browser: that one sign-in
+covers hook recall, checkpoints, mail and session capture on every hook host, and on Claude Code it also connects the tools.
+`ESTELLE_API_KEY` is the override: set, it wins. Credential order for hooks: `ESTELLE_API_KEY`, then the plugin sign-in,
+then the key the Estelle CLI stored. MCP still differs by host: Codex, Cursor, Grok and Kimi ship the key header (URL-only
+OAuth is opt-in on Codex, Cursor and Grok); the others use the host's own MCP sign-in. The Gemini CLI, Antigravity, Codex,
+Cursor and Grok sign-ins have not been run signed in against a live host. GUI apps on macOS and Windows
 may not inherit your terminal environment, so quit and reopen them after setting a key. The plugin does
 not install the host or Node, or create an account. No backend clone or Estelle CLI is needed.
 
-Version: `0.0.27`.
+Version: `0.0.30`.
 
 [Release notes](docs/releases/v0.0.19.md)
 
@@ -40,8 +44,8 @@ pi install npm:@fatelabs/pi-estelle
 ```
 
 Pi has no sub-agents, so the four Estelle agents are not part of the Pi package; its commands and skills cover
-the same workflows. In both hosts, `ESTELLE_API_KEY` in the host's environment signs in MCP and the hooks; the
-browser OAuth sign-in path has not been run live in either.
+the same workflows. In both hosts, `ESTELLE_API_KEY` in the host's environment signs in MCP and the hooks, or `/estelle:login` signs in the hooks and the host's own
+OAuth signs in MCP; neither browser path has been run live in either.
 
 Estelle for ChatGPT is a separate package in `chatgpt/estelle/`, prepared for OpenAI review and not yet listed. See [ChatGPT](docs/install/chatgpt.md).
 
@@ -135,3 +139,9 @@ add a missing backend action. Rooms requires server support and this session's v
 
 For development: `npm test`, `npm run build`, `npm run check`. Generated packages contain their
 own runner and keep writable state outside installed files in `~/.estelle-plugins`.
+
+## License
+
+Source available for use with Fate Labs' services only (Eden and Estelle). You may install and run these plugins, unchanged, to connect your coding agent to Fate Labs. No copying, redistribution, resale or use with other services, and no right to the Fate Labs, Eden or Estelle names or logos. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 Honour Systems Inc., doing business as Fate Labs.

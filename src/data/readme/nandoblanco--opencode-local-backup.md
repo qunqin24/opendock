@@ -2,11 +2,16 @@
 
 **Local-first, automatic pre-edit file backup plugin for OpenCode**: snapshots files automatically in the engine pipeline before any edit tool runs, with zero token usage, smart project-root resolution, retention auto-pruning, and an interactive `/backups` diff and restore manager for both OpenCode TUI and OpenCode Desktop.
 
-![opencode-local-backup TUI preview](./assets/screenshot.png)
+| OpenCode Desktop | OpenCode TUI |
+| :---: | :---: |
+| [![opencode-local-backup Desktop preview](./assets/screenshot.png)](./assets/screenshot.png) | [![opencode-local-backup TUI preview](./assets/screenshot-tui.png)](./assets/screenshot-tui.png) |
+| [View full size](./assets/screenshot.png) | [View full size](./assets/screenshot-tui.png) |
+
+*Note: Previews were rendered in headless Chromium via Playwright from the plugin's actual Desktop (`dist/gui-experimental.cjs`) and TUI (`tui.ts`) UI code using synthetic fixture data and a simulated host frame, rather than captured from a live OpenCode window or terminal.*
 
 ## OpenCode Desktop Support
 
-**Now available in OpenCode Desktop as well as the TUI.** Browse snapshots in a persistent Backups side panel, preview unified diffs, and restore files with confirmation, without a model turn. Press `Ctrl+Shift+B` to open or focus the panel, or `Ctrl+Alt+B` to toggle it. When no session is active, the manager opens in a fallback dialog.
+**Now available in OpenCode Desktop as well as the TUI.** Browse snapshots in a persistent Backups side panel (side-by-side at 640px and wider, or list-to-preview with a `Back` button in narrow panels), preview unified diffs, and restore files or prune old snapshots with confirmation, without a model turn. Press `Ctrl+Shift+B` to open or focus the panel, or `Ctrl+Alt+B` to toggle it. When no session is active, the manager opens in a fallback dialog.
 
 One global OpenCode V2 plugin entry loads the server, TUI, and Desktop integration together. Existing automatic pre-edit backups remain available across both interfaces; see [Installation](#installation) for setup.
 
@@ -41,31 +46,21 @@ This plugin started as a PowerShell script (`backup.ps1`) paired with a rule in 
 
 ## Installation
 
-### Option 1: One-Command Install (Recommended)
+### Option 1: OpenCode Plugin CLI (Recommended)
 
-Run the built-in installer to automatically register the server and TUI plugins in `~/.config/opencode/opencode.jsonc` and `~/.config/opencode/cli.json`:
-
-```sh
-npx @nandoblanco/opencode-local-backup install
-```
-
-Or set a custom workspace root directory for `.backups/` discovery during setup:
-
-```sh
-npx @nandoblanco/opencode-local-backup root "/path/to/workspace"
-```
-
-You can also install with OpenCode's native plugin CLI (because `package.json` exports both `.` and `./tui`, OpenCode loads both the server plugin and `/backups` TUI popup automatically):
+Install with OpenCode's native plugin CLI. OpenCode downloads the package from npm (or GitHub) into its own cache automatically and adds one entry to `~/.config/opencode/opencode.jsonc` that loads the server hook, tools, `/backups` TUI popup, and Desktop panel together:
 
 ```sh
 opencode plugin add @nandoblanco/opencode-local-backup
-# or directly from GitHub:
+# Auto-update on startup and every 24 hours:
+opencode plugin add @nandoblanco/opencode-local-backup@latest
+# Or install directly from GitHub:
 opencode plugin add github:nandoblanco/opencode-local-backup
 ```
 
 ### Option 2: Manual Configuration
 
-Add `@nandoblanco/opencode-local-backup` to the global `~/.config/opencode/opencode.jsonc`. OpenCode V2 loads the server, TUI, and Desktop parts from this single entry. The installer also writes `cli.json` for TUI setup; a separate manual entry there is not required:
+Add `@nandoblanco/opencode-local-backup` to `"plugins"` in the global `~/.config/opencode/opencode.jsonc` (or project `./opencode.jsonc` / `./.opencode/opencode.jsonc`). OpenCode fetches the npm package automatically and loads the server, TUI, and Desktop parts from this single entry (no manual `npm install` or separate `cli.json` entry is required):
 
 ```jsonc
 {
@@ -83,9 +78,19 @@ Add `@nandoblanco/opencode-local-backup` to the global `~/.config/opencode/openc
 }
 ```
 
-### From a Local Directory
+### Option 3: Built-in CLI Helper (`npx`)
 
-Clone this repository, run `npm ci` and `npm run build:gui`, then run `node ./index.js install` or reference the package directory in the global `opencode.jsonc`:
+Run the package CLI once via `npx` to register the plugin in `~/.config/opencode/opencode.jsonc` and initialize `~/.config/opencode/auto-backup.json`:
+
+```sh
+npx @nandoblanco/opencode-local-backup install
+# Optionally set a custom workspace root for .backups/ discovery:
+npx @nandoblanco/opencode-local-backup root "/path/to/workspace"
+```
+
+### Option 4: From a Local Directory
+
+Clone this repository, run `npm ci` and `npm run build:gui`, then reference the package directory in `opencode.jsonc` (or place the directory inside `~/.config/opencode/plugins/` or `.opencode/plugins/`):
 
 ```json
 {
@@ -123,9 +128,9 @@ Type search terms in the search bar to filter across all discovered snapshots, o
 
 | Syntax | Description | Example |
 | :--- | :--- | :--- |
-| `term1 term2` | Multi-term AND substring match across relative file path, `.backups` folder path, original path, project root, snapshot ID, and slug | `butte index.html` |
+| `term1 term2` | Multi-term AND substring match across relative file path, `.backups` folder path, original path, project root, snapshot ID, and slug | `storefront index.html` |
 | `<filename>` | Filter snapshots for a specific file name or extension | `tui.ts` |
-| `<project-folder>` | Filter snapshots belonging to a specific project or client subfolder | `winnipeg` |
+| `<project-folder>` | Filter snapshots belonging to a specific project or client subfolder | `storefront` |
 | `auto-edit` / `pre-restore` | Filter snapshots by slug or tool prefix (or press `Ctrl+T` to cycle the `tool:` pill) | `pre-restore` |
 
 ## Keyboard Shortcuts (`/backups`)
@@ -243,7 +248,7 @@ When pruning runs (`pruneOldBackups(rootDir, retentionDays)`):
 4. **OpenCode Desktop GUI & Typed RPC Bridge (`gui.tsx`, `gui.css`, `rpc.js`)**:
    - Registers `BackupRpc` (`list`, `diff`, `restore`, `openFile`, `openDiff`, `prune`, `updateSettings`) on the server plugin (`ctx.rpc.register(BackupRpc, ...)`).
     - Bundles `gui.tsx` and `gui.css` into `dist/gui-experimental.cjs` via `@opencode/plugin/gui/vite` (`npm run build:gui`). `/backups` and `Ctrl+Shift+B` open/focus the persistent side panel; `Ctrl+Alt+B` toggles it. Without an active session, commands open an `x-large` fallback dialog. The GUI registers a `session.panel` menu item and titlebar/vertical-tabs quick buttons.
-    - Desktop `list` requests default to a maximum of 1,000 entries; this is separate from the uncapped default in the underlying `listBackups()` function. RPC methods are separate from the two LLM tools below.
+    - Desktop `list` requests load up to 100,000 snapshots (rendering 200 rows at a time with `Load more`), show the original file folder in each row, and ask for confirmation before pruning snapshot folders (`Prune` / `Ctrl+D`). RPC methods are separate from the two LLM tools below.
 
 ### 7. Agent Tools Registered by the Server Plugin
 
@@ -303,7 +308,7 @@ Each snapshot's `.backup-meta.json` stores the file manifest used by `/backups` 
 ## CLI Commands
 
 ```sh
-# Install into OpenCode server + TUI config
+# Register in ~/.config/opencode/opencode.jsonc and initialize auto-backup.json
 npx @nandoblanco/opencode-local-backup install
 
 # List recent backups in the current project
@@ -328,7 +333,7 @@ npx @nandoblanco/opencode-local-backup prune . 30
 
 ## Configuration Options
 
-Settings are stored in `~/.config/opencode/auto-backup.json` (created automatically with `"retentionDays": 30, "debounceMs": 0, "rootDir": "", "dialogWidth": "80%"`) and can also be passed via `opencode.jsonc` / `cli.json` plugin options or environment variables:
+Settings are stored in `~/.config/opencode/auto-backup.json` (created automatically with `"retentionDays": 30, "debounceMs": 0, "rootDir": "", "dialogWidth": "80%"`) and can also be passed via `opencode.jsonc` plugin options or environment variables:
 
 ```json
 {

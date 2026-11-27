@@ -6,21 +6,31 @@
 [![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](package.json)
 [![license](https://img.shields.io/npm/l/opencode-turnstile)](LICENSE)
 
+**Gates the runtime enforces, not requests the model can ignore.**
+
+Turnstile is an [OpenCode](https://opencode.ai) v2 plugin that runs your work
+through an enforced pipeline: planner → plan-reviewer → executor →
+test-runner → reviewer. Like its namesake, an agent can't proceed until each
+stage pays the toll: a plan, an approval, a green test run. The journal is
+the receipt.
+
 ![turnstile runs the ensemble end to end: planner → plan-reviewer → executor → test-runner → reviewer, with blocked dispatches (red) until VERDICT: APPROVE and verified GATE: PASS evidence flip each gate green, and every decision lands in turnstile.jsonl](docs/images/demo.svg)
 
-**Verify what your agents claim.** An agent that says "tests pass" is asking
-you to trust it. Turnstile checks instead: dispatches that would violate the
-pipeline throw `BLOCKED by turnstile: <reason>` until a real `GATE: PASS` and
-a plan-reviewer `VERDICT: APPROVE` exist, and every decision appends to an
-auditable JSONL journal (`npx opencode-turnstile status` shows the trail).
-Decisions happen in tool and task-dispatch hooks, outside the model loop.
-Zero runtime dependencies, fails open.
+A real run: the two red `BLOCKED by turnstile:` lines flip green once the
+plan approval and verified `GATE: PASS` land. Every decision appends to
+`turnstile.jsonl`.
 
-Turnstile is an [OpenCode](https://opencode.ai) v2 promise-plugin that
-mechanically enforces an agent pipeline: planner → plan-reviewer → executor →
-test-runner → reviewer, with a gate at every hand-off. The orchestrator policy
-is injected at runtime by the plugin; nothing is written to any instructions
-file.
+**What you see:**
+
+```text
+BLOCKED by turnstile: no plan approval for ".opencode/plans/issue-42.md". …
+VERDICT: APPROVE crit=0 high=0 med=2 low=1
+GATE: PASS tests=12 passed=12 failed=0
+```
+
+Blocked (red), then approved (green), then tests pass (green). You never
+type any of this: the markers are the machine's language. Subagents emit
+them, turnstile checks them, and your only vocabulary is plain prompts.
 
 - Quick start: [below](#tldr--try-it-in-two-minutes)
 - The walkthrough: [using it for real work](#using-it-for-real-work)
@@ -57,7 +67,7 @@ You never invoke the pipeline stages directly. Start a task the way you
 already would, and the enforcement wraps it. The one habit to build: open
 with the planner.
 
-![turnstile, the enforced pipeline: planner → plan-reviewer → executor → test-runner → reviewer, with gates blocking every dispatch](docs/images/hero.svg)
+![turnstile, the enforced pipeline: requirements (optional) → planner → plan gate (VERDICT: APPROVE or human approval) → executor (cites chunk-N / AC-n) → test-runner → test gate (GATE: PASS) → reviewer ×2 → review gate (VERDICT: APPROVE ensemble) → landing gate → push](docs/images/hero.svg)
 
 **1. Start a task by invoking the planner.** Paste an issue or a topic into
 your prompt and ask for a plan:
@@ -136,6 +146,7 @@ hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 | Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                     |
 | Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` blocks; a repeat attempt forces the interactive human ask                                                                                                                                                      |
 | Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                     |
+| Question pause         | an executor `QUESTION:` pauses pipeline dispatches for the task until you answer (the next dispatch prompt), cancel with `QUESTION CANCELLED:`, or the configured timeout resolves it (`hold` default)                                                                   |
 | Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors, per-session token/cost usage                                                                                                                                                             |
 | Journal concurrency    | Concurrent OpenCode instances share one journal safely: chained appends and the approval sidecar write under a per-file lock with an in-lock re-read; lock contention degrades to an unlocked write with a journaled `journal-lock:` warning, never blocking enforcement |
 | Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                              |
@@ -264,7 +275,7 @@ no derived value feeds gates.
 ## Markers
 
 Subagents must emit these as the first line of their output. These examples
-are the canonical syntax; CI asserts the parser in `src/markers.ts` accepts
+are the canonical syntax; CI asserts the parser in `src/markers/markers.ts` accepts
 exactly them.
 
 ```
@@ -273,11 +284,14 @@ GATE: FAIL tests=12 passed=10 failed=2
 
 VERDICT: APPROVE crit=0 high=0 med=2 low=1
 VERDICT: BLOCK crit=1 high=0 med=0 low=2
+
+QUESTION: should chunk 3 use worker pools or a queue?
 ```
 
 The parser accepts these markers wrapped in markdown backticks and credits
 them identically to the bare form; only a marker that does not match the
-fields above is treated as absent.
+fields above is treated as absent. A `QUESTION:` marker carries free text
+(no counted fields); only the executor's deliveries open a question.
 
 Waiver and approval markers (must appear in the user's prompt, verbatim; a
 dispatch prompt that merely contains the marker unlocks nothing):
@@ -345,7 +359,7 @@ is described in [`docs/usage/field-tested.md`](docs/usage/field-tested.md).
 
 ## Configuration
 
-Defaults live in code (`src/config.ts`); override via
+Defaults live in code (`src/config/config.ts`); override via
 `~/.config/opencode/turnstile.json`, environment variables, or both
 (precedence: defaults < file < env; config is read once at setup; restart
 sessions to apply). Copy
@@ -359,11 +373,17 @@ The knobs most people touch:
 | ---------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `alwaysEnforce`              | `false`                | dormant-until-engaged; `true` restores always-armed from the first prompt                                                                                          |
 | `gateEvidence`               | `enforce`              | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                              |
+| `requireTestOverlap`         | `false`                | when true, a `GATE: PASS` needs file overlap between executed tests and the change set; see [configuration](docs/usage/configuration.md)                           |
+| `testOverlapExempt`          | `[]`                   | globs the overlap rule never applies to (docs, generated code)                                                                                                     |
+| `testOverlapTestFilePattern` | cross-ecosystem list   | regex list deciding which paths count as test files; extend for runners the defaults miss                                                                          |
 | `escalation`                 | `block`                | repeat-attempt escalation mode; the plan-gate escalation is mode-gated (`block` blocks, `ask` prompts)                                                             |
 | `gitGates.commitMessages`    | `true`                 | validate `git commit -m` subjects as conventional commits                                                                                                          |
 | `gitGates.landingGate`       | `true`                 | gate `git push` on a credited reviewer `VERDICT: APPROVE`                                                                                                          |
 | `reviewEnsemble`             | `enforce`              | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                         |
 | `planUserReview`             | `false`                | pause the pipeline after the planner until you accept or reject; see [User plan review](#user-plan-review-opt-in)                                                  |
+| `questionTimeoutMinutes`     | `0`                    | minutes before an unanswered executor question resolves per `questionTimeoutAction`; `0` holds indefinitely                                                        |
+| `questionTimeoutAction`      | `hold`                 | `hold` keeps blocking past the timeout; `resume` clears the pause and lets the next dispatch proceed with a warning line naming the question                       |
+| `questionCancelMarker`       | `QUESTION CANCELLED:`  | prompt literal that cancels a pending executor question without answering it                                                                                       |
 | `requirementsPhase`          | `false`                | dispatch the requirements subagent before the planner; see [Requirements phase](#requirements-phase-opt-in)                                                        |
 | `sessionSummary`             | `quiet`                | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables)                                                      |
 | `tokenUsage`                 | `summary`              | token-usage journaling: `summary` journals one rollup row per session at session.idle; `per-message` journals one row per completed assistant turn; `off` disables |
@@ -374,6 +394,9 @@ The knobs most people touch:
 | `plansDir`                   | `.opencode/plans`      | where the decomposition scan looks                                                                                                                                 |
 | `decisionLedger.enabled`     | `true`                 | observe-only decision ledger (`opencode-turnstile prov`)                                                                                                           |
 | `tamperEvidence.enabled`     | `false`                | per-record SHA-256 hash chain over every journal row + Merkle epoch commits                                                                                        |
+| `secrets.patterns`           | `[]`                   | extra secret-pattern regexes appended to the built-ins for journal redaction and the write-time guard (append semantics; built-ins are never replaceable)          |
+| `secrets.writeGuard`         | `advise`               | write-time secret guard: `off` disables, `advise` journals + nudges and never blocks, `enforce` blocks the matching write                                          |
+| `secrets.entropy`            | `false`                | advisory-only high-entropy literal flag (never blocks)                                                                                                             |
 
 Invalid keys are ignored, journaled, and summarized once into the session
 context; a malformed config file never breaks the host. The full table
@@ -391,28 +414,15 @@ lines, and shas, never session IDs or prompts:
 
     npx opencode-turnstile evidence --task latest --out .turnstile/evidence.json
 
-Commit the JSON and Markdown and a GitHub Action upserts one sticky comment
-per PR. `evidence --validate` re-checks a committed artifact in CI. The
-comment states what it is: a correlated claim, not proof. Re-emit and commit
-both files after every code push to a PR: the journal is per-machine, so CI
-can post the committed badge but never refresh it. To keep a stale badge from
-reading as current, the posting job compares the committed evidence's newest
-journaled timestamp (the plan/verdict, tests, or emit-time event; every
-artifact write journals an `event:"emit"` row that lands in the artifact as
-`emittedAt`) with the latest commit that could have changed code, found by
-walking back from the PR head to the first commit touching anything outside
-`.turnstile/`. Badge staleness therefore means exactly one thing: a code
-commit landed and nobody has re-emitted since: the normal re-emit → commit →
-push cycle is never flagged, on merge commits and mixed commits included.
-The emitter scopes its read to the task's session tree, so another agent's
-journal activity on the same machine cannot refresh the badge's freshness
-signal. One
-workflow
-detail: validation runs on the pull request itself, while the comment posts
-from a trusted `pull_request_target` run; GitHub asks a maintainer to approve
-that run for a first-time contributor's fork PR, so an outside
-contributor's first badge can sit pending; the alternative is a job that
-executes contributor code holding a write token.
+Commit the JSON and Markdown pair and a GitHub Action upserts one sticky
+comment per PR; `evidence --validate` re-checks a committed artifact in CI.
+The comment states what it is: a correlated claim, not proof. Re-emit and
+commit both files after every code push to a PR: the journal is per-machine,
+so CI can post the committed badge but never refresh it. A stale badge means
+exactly one thing: a code commit landed and nobody has re-emitted since. How
+staleness is decided, and the one workflow quirk around first-time
+contributors, are in
+[`docs/journal/replay.md`](docs/journal/replay.md#badge-staleness).
 
 ![turnstile evidence posted on a pull request: one sticky comment with the plan verdict, the verified test counts, and the journal head sha](docs/images/pr-evidence.png)
 
@@ -427,6 +437,8 @@ tools remain unguarded. The full threat model:
 
 ## Behavior contract
 
+- Zero runtime dependencies: the package ships with none; devDependencies are
+  tooling only.
 - Fail-open by design. Every hook body is guarded; internal errors are
   journaled and the tool call proceeds. The only thrown errors are the
   deliberate `BLOCKED by turnstile:` ones.
@@ -438,13 +450,13 @@ tools remain unguarded. The full threat model:
   (`{ tool.hook, session.hook, permission.hook, event.subscribe }`, with the
   permission hook registered when the host exposes it).
 - Host compatibility is checked at setup against the shipped range
-  (`HOST_COMPAT` in `src/host-compat.ts`); see the matrix below.
+  (`HOST_COMPAT` in `src/hooks/host-compat.ts`); see the matrix below.
 
 ### OpenCode compatibility matrix
 
 | OpenCode host       | turnstile (current) | Status                                                                               |
 | ------------------- | ------------------- | ------------------------------------------------------------------------------------ |
-| ≥ 2.0.22, < 3.0.0   | 0.16.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0, 2.3.2, 2.4.1) |
+| ≥ 2.0.22, < 3.0.0   | 0.18.x              | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7, 2.3.0, 2.3.2, 2.4.1) |
 | ≥ 3.0.0 or < 2.0.22 | all                 | Refuses to enforce at setup; upgrade turnstile                                       |
 | version unreadable  | all                 | Enforces; one-time journal warning                                                   |
 

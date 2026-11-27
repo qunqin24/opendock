@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>The OpenKodo subscription, inside an agent IDE.</b><br />
-  An open-source fork of <a href="https://github.com/stablyai/orca">Orca</a> (MIT), adapted so a new account can sign in, pick a model and start coding without configuring a CLI by hand.
+  An open-source fork of <a href="https://github.com/OpenKodo/openkodo">OpenKodo</a> (MIT), adapted so a new account can sign in, pick a model and start coding without configuring a CLI by hand.
 </p>
 
 <p align="center">
@@ -14,9 +14,9 @@
 
 ## What this is
 
-OpenKodo Code is the desktop client for [OpenKodo](https://openkodo.dev): one subscription, one API key, and every supported model in one place. It is built on Orca's agent IDE — parallel agents in isolated worktrees, a real editor and diff view, terminals, chat or raw CLI, and remote/mobile companions.
+OpenKodo Code is the desktop client for [OpenKodo](https://openkodo.dev): one subscription, one API key, and every supported model in one place. It is built on OpenKodo's agent IDE — parallel agents in isolated worktrees, a real editor and diff view, terminals, chat or raw CLI, and remote/mobile companions.
 
-This repository is the fork. It is not a finished product: the Orca engine is intact, and the OpenKodo-specific onboarding (browser sign-in → key provisioning → model presets) is the work in progress.
+This repository is the fork. It is not a finished product: the OpenKodo engine is intact, and the OpenKodo-specific onboarding (browser sign-in → key provisioning → model presets) is the work in progress.
 
 ## Use OpenKodo with it today
 
@@ -50,7 +50,7 @@ Anthropic-compatible clients use `https://api.openkodo.dev` with the same key.
 - Browser sign-in inside the app, with the key stored in the OS keychain
 - A first-run model preset per plan, and a quota strip (5h / 7d / monthly)
 - Branded builds for macOS, Windows and Linux with auto-update
-- One-click migration from an existing Orca install
+- One-click migration from an existing OpenKodo install
 
 ## Development
 
@@ -59,8 +59,8 @@ pnpm install
 pnpm dev
 ```
 
-Build and packaging follow Orca's scripts (`pnpm build`, `pnpm run build:mac`, and so on).
+Build and packaging follow OpenKodo's scripts (`pnpm build`, `pnpm run build:mac`, and so on).
 
 ## License and attribution
 
-MIT. This project is a fork of [Orca](https://github.com/stablyai/orca), copyright Lovecast Inc., and keeps the original license. See [ATTRIBUTION.md](./ATTRIBUTION.md). "Orca" and the Orca marks belong to their owners; OpenKodo Code is an independent fork and is not endorsed by the Orca project.
+MIT. This project is a fork of [OpenKodo](https://github.com/OpenKodo/openkodo), copyright Lovecast Inc., and keeps the original license. See [ATTRIBUTION.md](./ATTRIBUTION.md). "OpenKodo" and the OpenKodo marks belong to their owners; OpenKodo Code is an independent fork and is not endorsed by the OpenKodo project.

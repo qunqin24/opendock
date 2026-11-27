@@ -9,7 +9,11 @@ Provider id: `pollinations`.
 ## Install
 
 ```sh
+# From npm
 magpie plugin add @sterra-mind/magpie-pollinations
+
+# From GitHub
+magpie plugin add github:sterraMind/magpie-pollinations
 ```
 
 After adding the plugin, sign in from the provider page in magpie. The model list loads automatically once signed in.

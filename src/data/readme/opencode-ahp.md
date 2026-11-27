@@ -5,7 +5,7 @@ Agents window** — on this machine, and on any other machine on your LAN.
 
 It works by adding one WebSocket listener to your existing opencode
 server, speaking [AHP](https://microsoft.github.io/agent-host-protocol/)
-(Agent Host Protocol 1.0.0) on it — the protocol VS Code uses to talk to
+(Agent Host Protocol) on it — the protocol VS Code uses to talk to
 external coding agents. No separate process runs on the host, and nothing
 is installed on the client machine: VS Code ships the AHP client.
 
@@ -67,7 +67,7 @@ In the Agents window, an `opencode` host with:
 - **opencode v2** (≥ 2.2.6 verified; check with `opencode --version`). The
   plugin runs *inside* the opencode server — no extra process; it only
   opens one extra port.
-- **VS Code ≥ 1.144** (1.145.2 verified) for the Agents window and
+- **VS Code ≥ 1.144** (1.148.0 verified) for the Agents window and
   `Agents: Add Remote Agent Host…`. VS Code ships the AHP client — nothing
   is installed on the client machine.
 - Node + pnpm (via [mise](https://mise.jdx.dev)) for **development only**.

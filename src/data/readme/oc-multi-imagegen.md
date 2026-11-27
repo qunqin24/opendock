@@ -4,17 +4,17 @@
 
 Generate and edit images without leaving OpenCode. Describe what you need, give your agent a reference when you have one, and get an image saved in your project.
 
-Use your OpenCode ChatGPT sign-in with the default **Codex backend**, or connect an OpenAI Images API or NanoGPT key. The plugin works in OpenCode 1 and OpenCode 2 and includes a skill that guides agents through prompting, reference images and checking the result.
+Use your OpenCode ChatGPT sign-in with the default **Codex backend**, connect an OpenAI Images API or NanoGPT key, or on OpenCode 2 use the image models of providers already connected in OpenCode. The plugin works in OpenCode 1 and OpenCode 2 and includes a skill that guides agents through prompting, reference images and checking the result.
 
 **[Examples](#from-a-prompt-to-a-finished-asset) · [Get started](#get-started) · [Backends](#choose-a-backend) · [Documentation](#documentation)**
 
 ## What you can make
 
 - **Illustrations from a prompt:** scene art, website imagery, textures and visual concepts.
-- **Variations from references:** change the weather, restyle an image or combine several images in one request.
+- **Variations from references:** change the weather, restyle an image or combine several images in one request. References can be local files or HTTPS URLs, and the OpenAI Images API also takes an inpainting mask.
 - **Transparent assets:** request a character or object cut-out for an avatar, sticker or illustrated icon. Results depend on the model; inspect the returned alpha.
 - **Vector logos and short animations:** with an OpenAI Images API key, ask for a static SVG logo or icon, or a short looping GIF.
-- **Images your agent can keep working with:** each result is a local file with the provider's original bytes and a matching extension: PNG, JPEG or WebP, or GIF and SVG from the OpenAI Images API. Use the returned path to inspect the file or use it in your project. A PNG, JPEG or WebP result can also be the reference image for another call; a GIF or SVG result cannot.
+- **Images your agent can keep working with:** each result is a local file with the provider's original bytes and a matching extension: PNG, JPEG or WebP, or GIF and SVG from the OpenAI Images API. Use the returned path to inspect the file or use it in your project. A PNG, JPEG or WebP result can also be the reference image for another call. An SVG result cannot, and a GIF result can only on a backend that accepts GIF references (see [output files](docs/tool-reference.md#output-files)). On OpenCode 2, an agent can ask for an inline preview of the saved image.
 
 ## From a prompt to a finished asset
 
@@ -75,10 +75,11 @@ Every backend provides the same two image tools: `imagegen` creates a new image 
 | Backend | Use it with | Backend-specific controls | Model discovery |
 | --- | --- | --- | --- |
 | **Codex** (default) | Your OpenCode ChatGPT sign-in | Seven size presets | None: model and quality are sent as requested and can't be verified |
-| **OpenAI Images API** | An OpenAI image API key | Native pixel sizes, and SVG or GIF output from `imagegen` | `imagegen_models` lists the key's models live |
+| **OpenAI Images API** | An OpenAI image API key | Native pixel sizes, SVG or GIF output from `imagegen`, and an inpainting mask for `imageedit` | `imagegen_models` lists the key's models live |
 | **NanoGPT** | A NanoGPT API key | A curated choice of models, each with its own controls | `imagegen_models` describes the curated models locally |
+| **OpenCode** (OpenCode 2 only) | An image model from a provider connected in OpenCode | Aspect ratio and resolution | `imagegen_models` lists OpenCode's enabled image models |
 
-[Backend setup and model choices](docs/backends.md) explain authentication, controls, availability and [recorded NanoGPT workflow coverage](docs/backends.md#nanogpt-live-workflow-coverage). Generation uses the selected provider's account quota or API credit. If you made Codex or OpenAI reference edits with `imagegen` in an earlier release, see [moving reference edits to imageedit](docs/tool-reference.md#moving-reference-edits-to-imageedit).
+OpenCode 1 runs one backend, selected with `OC_MULTI_IMAGEGEN_BACKEND`. OpenCode 2 can also select one or several backends in its plugin options. [Backend setup and model choices](docs/backends.md) explain configuration, authentication, controls, availability and [recorded NanoGPT workflow coverage](docs/backends.md#nanogpt-live-workflow-coverage). Generation uses the selected provider's account quota or API credit. If you made Codex or OpenAI reference edits with `imagegen` in an earlier release, see [moving reference edits to imageedit](docs/tool-reference.md#moving-reference-edits-to-imageedit).
 
 ## Documentation
 
@@ -86,9 +87,9 @@ Every backend provides the same two image tools: `imagegen` creates a new image 
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Installation, ChatGPT sign-in and configuration for both OpenCode hosts |
 | [Examples](docs/examples.md) | Full prompts, reference chain and settings behind the images above |
-| [Backends](docs/backends.md) | Codex, OpenAI and NanoGPT setup, credentials and model selection |
-| [Tool reference](docs/tool-reference.md) | Arguments, sizes, references, transparency and output behavior |
-| [Permissions](docs/permissions.md) | Agent access, backend-scoped rules and file access |
+| [Backends](docs/backends.md) | Codex, OpenAI, NanoGPT and OpenCode setup, plugin options, credentials and model selection |
+| [Tool reference](docs/tool-reference.md) | Arguments, OpenCode 2 tool paths, sizes, references and URLs, masks, transparency, previews and output behavior |
+| [Permissions](docs/permissions.md) | Agent access, backend-scoped rules, reference URLs and file access |
 | [Development](docs/development.md) | Build, test, packaging and compatibility details |
 | [Container testing](https://github.com/imarshallwidjaja/oc-multi-imagegen/blob/main/docs/container-testing.md) | Source-checkout runbook for live tests with real agents |
 

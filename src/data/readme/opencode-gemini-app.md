@@ -4,7 +4,7 @@
 
 **Your coding agents. Your Gemini subscriptions. Zero-dependency native HTTP/2.**
 
-Use your eligible Google Gemini accounts in **Pi**, **OpenClaw**, **OpenCode**, **Claude Code**, **Cursor**, **Cline**, **Roo Code**, **Codex CLI**, **MCP clients**, and OpenAI SDKs—via standalone in-process plugins (no server needed) or a self-hosted Node.js gateway with multi-account pooling and native `POST /mcp`.
+Use your eligible Google Gemini accounts in **Pi**, **OpenClaw**, **OpenCode**, **Claude Code**, **Cursor**, **Cline**, **Roo Code**, **Codex CLI**, **MCP clients**, **standalone Unix CLI**, and OpenAI SDKs—via standalone in-process plugins/CLI (no server needed) or a self-hosted Node.js gateway with multi-account pooling and native `POST /mcp`.
 
 [![CI](https://github.com/ShawTim/gemini-app2api/actions/workflows/ci.yml/badge.svg)](https://github.com/ShawTim/gemini-app2api/actions/workflows/ci.yml)
 [![pi-gemini-app on npm](https://img.shields.io/npm/v/pi-gemini-app?logo=npm&label=pi-gemini-app)](https://www.npmjs.com/package/pi-gemini-app)
@@ -13,6 +13,7 @@ Use your eligible Google Gemini accounts in **Pi**, **OpenClaw**, **OpenCode**, 
 [![openclaw-gemini-app on ClawHub](https://img.shields.io/badge/ClawHub-openclaw--gemini--app-F97316)](https://clawhub.ai/shawtim/plugins/openclaw-gemini-app)
 [![opencode-gemini-app on npm](https://img.shields.io/npm/v/opencode-gemini-app?logo=npm&label=opencode-gemini-app)](https://www.npmjs.com/package/opencode-gemini-app)
 [![mcp-gemini-app on npm](https://img.shields.io/npm/v/mcp-gemini-app?logo=npm&label=mcp-gemini-app)](https://www.npmjs.com/package/mcp-gemini-app)
+[![gemini-app-cli on npm](https://img.shields.io/npm/v/gemini-app-cli?logo=npm&label=gemini-app-cli)](https://www.npmjs.com/package/gemini-app-cli)
 ![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)
 ![Zero Runtime Dependencies](https://img.shields.io/badge/runtime%20dependencies-0-0A84FF)
 ![Docker Ready](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
@@ -30,20 +31,21 @@ Use your eligible Google Gemini accounts in **Pi**, **OpenClaw**, **OpenCode**, 
 <a id="quick-start"></a>
 ## Quick Start
 
-### Path A — Standalone Native Plugins (No Server Required)
+### Path A — Standalone Native Plugins & CLI (No Server Required)
 
-![gemini-app2api — Zero-Dependency Native Extensions for Pi, OpenClaw, OpenCode & MCP](docs/assets/extensions-overview.jpg)
+![gemini-app2api — Zero-Dependency Native Extensions for Pi, OpenClaw, OpenCode, MCP & CLI](docs/assets/extensions-overview.jpg)
 
-<a id="pi-extension"></a><a id="openclaw-plugin"></a>
+<a id="pi-extension"></a><a id="openclaw-plugin"></a><a id="cli-package"></a>
 
-| Host | Install / Run | Sign In & Quota | Links & Guide |
+| Host | Install / Run | Sign In & Key Commands | Links & Guide |
 |---|---|---|---|
 | **Pi / GooeyPi** | `pi install npm:pi-gemini-app` | `/login gemini-app` · `/gemini-quota` | [npm](https://www.npmjs.com/package/pi-gemini-app) · [Pi Packages](https://pi.dev/packages/pi-gemini-app?name=pi-gemini-app) · [Guide](extensions/pi/README.md) |
 | **OpenClaw** | `openclaw plugins install openclaw-gemini-app` *(or `npm:openclaw-gemini-app`)* | `openclaw models auth login --provider gemini-app` · `/usage` | [npm](https://www.npmjs.com/package/openclaw-gemini-app) · [ClawHub](https://clawhub.ai/shawtim/plugins/openclaw-gemini-app) · [Guide](extensions/openclaw/README.md) |
 | **OpenCode** | V2: `opencode plugin add opencode-gemini-app` (V1: `"plugin": ["opencode-gemini-app"]` in `opencode.json`) | `/connect` (`gemini-app`) | [npm](https://www.npmjs.com/package/opencode-gemini-app) · [Guide](extensions/opencode/README.md) |
 | **Standalone MCP (stdio)** | `npx -y mcp-gemini-app` | `npx -y mcp-gemini-app login` · `quota` | [npm](https://www.npmjs.com/package/mcp-gemini-app) · [Guide](extensions/mcp/README.md) |
+| **Standalone CLI** | `npm i -g gemini-app-cli` *(or `npx -y gemini-app-cli ask "..."`)* | `gemini-app login` · `ask` · `search` · `--schema` · `--tools readonly` | [npm](https://www.npmjs.com/package/gemini-app-cli) · [Guide](extensions/cli/README.md) · [SKILL](extensions/cli/SKILL.md) |
 
-All standalone extensions run in-process over direct HTTP/2 (`15s` PING keepalives, `HTTPS_PROXY` support, 256 tools, parallel multimodal image uploads, automatic Free-tier `gemini-auto` filtering).
+All 5 standalone packages run in-process over direct HTTP/2 (`15s` PING keepalives, `HTTPS_PROXY` support, 256 tools, parallel multimodal image uploads, automatic Free-tier `gemini-auto` filtering). The standalone CLI (`gemini-app-cli`) is built for one-shot pipelines, CI, and bash-enabled coding agents—adding validated JSON Schema outputs (`--schema`), local file/image attachments (`-f`/`-i`), and an opt-in read-only workspace loop (`--tools readonly` with `read`/`grep`/`find`/`ls`, zero writes, zero shell execution).
 
 ### Path B — Self-Hosted OpenAI-Compatible & MCP Gateway
 
@@ -208,6 +210,7 @@ Empirical `GetUsageInfo` observations on Gemini AI Pro accounts (`neon_pro_polic
 | [OpenClaw Plugin (`extensions/openclaw/README.md`)](extensions/openclaw/README.md) | Standalone `openclaw-gemini-app` provider plugin for OpenClaw & ClawHub |
 | [OpenCode Plugin (`extensions/opencode/README.md`)](extensions/opencode/README.md) | Standalone `opencode-gemini-app` native provider plugin for OpenCode (Bun & Node) |
 | [MCP Server (`extensions/mcp/README.md`)](extensions/mcp/README.md) | Standalone stdio MCP server (`ask_gemini`, `gemini_search`, `gemini_quota`) |
+| [Standalone CLI (`extensions/cli/README.md`)](extensions/cli/README.md) | Non-interactive Unix CLI (`gemini-app-cli`) with `--schema`, `-f`/`-i`, `search`, and `--tools readonly` + bundled [SKILL.md](extensions/cli/SKILL.md) |
 | [API Support (`docs/API_SUPPORT.md`)](docs/API_SUPPORT.md) | Endpoints, tools, structured outputs, images, `native_search`, error codes |
 | [Operations (`docs/OPERATIONS.md`)](docs/OPERATIONS.md) | `.env` config, Docker Compose, TLS reverse proxy, `launchd`, troubleshooting |
 | [Completion Contract (`docs/COMPLETION_CONTRACT.md`)](docs/COMPLETION_CONTRACT.md) | Partial-output preservation, zero-output `GENERATION_FAILED`, agent loop safety |

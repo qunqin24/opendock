@@ -81,7 +81,7 @@
 | Слой | Что поставляется |
 | --- | --- |
 | Агенты | `orchestrator` (primary); read-only `factcheck`, `empiric`, `invariant`, `arbiter`, `meta`, `redteam`, `context-lint`; пишущий `fix-runner` |
-| Инструменты | Пять read-only инструментов: `orch_uni_validate_report`, `orch_uni_context_lint`, `orch_uni_snapshot`, `orch_uni_sessions`, `orch_uni_session_stats` |
+| Инструменты | Пять основных read-only инструментов в пространстве имён `orch_uni` (`tools.orch_uni.validate_report`, `context_lint`, `snapshot`, `sessions`, `session_stats`), discovery-инструмент `tools.orch_uni.list_tools` и один плоский compatibility-алиас `orch_uni_validate_report` для старых промптов |
 | Команды | Три слэш-команды: `/agents-md`, `/spec`, `/handoff` |
 | Справочник | Процессные документы как reference `audit-kit`; подробности — в [Справочнике](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md) |
 
@@ -148,11 +148,22 @@ opencode service restart
   `"provider/model[#variant]"` или `{ providerID, model, variant }`.
 - `sessionGuard` — напоминания о бюджете промпта и лимит компакций.
 - `toolOutputGuard` — урезает большие выводы `shell`/`bash`/`webfetch`.
+- `auditBudget` — одно мягкое напоминание `empiric`/`invariant` на 150
+  tool-вызовов; инструменты не блокирует. По умолчанию:
+  `{ enabled: true, softToolCalls: 150, agents: ["empiric", "invariant"] }`.
+- `sessionJournal` — персист протокольных событий (напоминания, компакции,
+  команды, валидации, loop/artifact-снимки) в хранилище плагина; включён по
+  умолчанию, последние 200 событий на сессию.
+- `protocolGuard` — метрика цикла по правкам в исходники и артефактный гейт
+  root-сессии: предупреждение на следующем контексте, если правки прошли без
+  полного цикла `empiric`+`invariant` → `fix-runner` или если срез закончился
+  без артефакта handoff/state и без отчёта.
 
 Неверные значения игнорируются с предупреждением `[orchestrator.uni] …`. Полный
 справочник опций: [Модели](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#модели),
-[Локаль](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#локаль) и
-[Гигиена сессии](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#гигиена-сессии).
+[Локаль](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#локаль),
+[Гигиена сессии](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#гигиена-сессии) и
+[Цикл и артефакты](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#цикл-и-артефакты).
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
@@ -201,8 +212,8 @@ opencode service restart
 
 | Команда     | Что делает                                                                                                                                                                       |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/agents-md` | Вставляет workflow аудита/черновика AGENTS.md: шаблон `context-efficiency.md`, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью.                              |
-| `/spec`      | Вставляет workflow SPEC.md: бриф, уточняющие вопросы, EARS/AC/трассировка, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью.                                 |
+| `/agents-md` | Вставляет workflow аудита/черновика AGENTS.md: шаблон `context-efficiency.md`, `tools.orch_uni.context_lint`, `context-lint`, подтверждение перед записью.                              |
+| `/spec`      | Вставляет workflow SPEC.md: бриф, уточняющие вопросы, EARS/AC/трассировка, `tools.orch_uni.context_lint`, `context-lint`, подтверждение перед записью.                                 |
 | `/handoff`   | Вставляет workflow закрытия среза: факты сессии и рабочего дерева, шаблон handoff из `session-discipline.md`, запись `docs/planning/handoff-<YYYY-MM-DD>.md`.                    |
 
 Команда — это промпт, а не писатель: она вставляет workflow в текущую сессию, а
@@ -213,7 +224,8 @@ opencode service restart
 ## Справочник
 
 Глубокий справочник — в [`docs/ru/reference.md`](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md):
-защита записи, все пять инструментов со схемами и лимитами, гигиена сессии,
+защита записи, пять основных инструментов плюс `list_tools` и
+compatibility-алиас со схемами и лимитами, гигиена сессии,
 модели, локаль, приоритет и заметки.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
@@ -232,7 +244,7 @@ npm run lint
 npm run lint:fix
 ```
 
-`npm test` сканирует только `./test/` и сейчас насчитывает **438 тестов в 11 файлах** — 437 pass и 1 skip. Голый `bun test` из корня красный по замыслу: он
+`npm test` сканирует только `./test/` и сейчас насчитывает **521 тест в 13 файлах** — 520 pass и 1 skip. Голый `bun test` из корня красный по замыслу: он
 подхватывает и специально падающие фикстуры в `eval/cases/`, и черновики в
 `lab/`; используйте `npm test`.
 
