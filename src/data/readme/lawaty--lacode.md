@@ -35,6 +35,7 @@ is also on disk at `node_modules/@lawaty/lacode/CHANGELOG.md`.
 | Repository context map | Every task starts by exploring your codebase cold, re-deriving the same layout, entry points and boundaries. |
 | Standing instructions | The same direction gets repeated every session, or buried in config that is not per-clone. |
 | Image attachments anywhere | A TUI with no image support locks vision models out entirely. |
+| Prompt critique (beta) | The agent follows a request that conflicts with your rules instead of flagging the conflict first. |
 
 ## Getting started
 
@@ -158,6 +159,7 @@ option is optional:
 | `probeMs` | `900000` | How often benched models are checked by actually using them. `0` turns the periodic check off and leaves the `pool_recheck` tool as the only way to ask. |
 | `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
 | `feedbackHint` | `true` | Show the one-time feedback note on the first interactive run. `false` — or `LACODE_NO_FEEDBACK_HINT=1` — turns it off. The flag lives in `~/.local/share/opencode/lacode/feedback.json`; nothing is sent anywhere. |
+| `promptCritique` | `false` | Opt-in (beta): prepend a critique instruction to primary and planner agent prompts (`build`, `plan`, and any user-defined `basic`/`expert`). Subagents and pooled variants are untouched. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
 | `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
 | `contextAutoUpdate` | `true` | Automatic context-map refresh when a session that edited files goes idle. `false` turns the automatic update off; the `/context-init` and `/context-update` commands still work. |
@@ -319,10 +321,11 @@ Two more surfaces that need no configuration:
   its ceiling, which slot the next spawn takes, cooldowns, hung claims and
   whether the watcher is on. Ask for it when you want to know what the pool is
   doing; it never changes slot selection.
-- **Notifications that wait** — a notification is never auto-dismissed; it stays
-  until you close it. On Linux a permission request carries **Allow once**,
-  **Always allow** and **Deny** buttons, and LaCode waits up to ten minutes for
-  the click.
+- **Notifications that wait** — on Linux and macOS a notification stays until
+  you close it; Windows 10/11 toasts are self-expiring. On Linux a permission
+  request carries **Allow once**, **Always allow** and **Deny** buttons, and
+  LaCode waits up to ten minutes for the click. See
+  [Notifications](docs/NOTIFICATIONS.md).
 
 ## Context map
 
@@ -402,6 +405,21 @@ directive does not restate a fact the map has already settled or contradict one 
 has not read; the map stays read-only to it, and the `context` agent remains its
 only writer.
 
+## Prompt critique (beta)
+
+Off by default, and the default changes nothing. Set `promptCritique: true` on the
+LaCode plugin entry and the primary and planner agents — `build`, `plan`, and any
+user-defined `basic` or `expert` — get a short instruction prepended to their
+prompts: check the request against the global standards first, warn explicitly
+when it conflicts with a rule, decision, or convention, and recommend the
+standards-conforming alternative. It is advisory, not a veto: the agent still does
+what you asked. Subagents (`explore`, `implement`, `context`), the hidden
+`instructions` writer, and pooled variants are untouched, and the prefix is
+idempotent.
+
+See [Prompt critique](docs/PROMPT-CRITIQUE.md) for the exact instruction, the full
+agent list, and how it differs from `AGENTS.md`.
+
 ## Cost
 
 The mechanism is specific and small: bulk exploration, implementation and
@@ -480,7 +498,7 @@ must never be able to fail the process that tried to notify you. The one
 exception is an actionable notification — one carrying a permission request id
 — which waits for the click, because the answer is the whole point of it.
 That click path is Linux-only: the popup carries **Allow once**, **Always allow**
-and **Deny**, and macOS gets a plain notice without buttons.
+and **Deny**; macOS and Windows get plain/non-actionable notices.
 `lacode forward HOST -- COMMAND` runs a command on another host over ssh and
 exits with its status.
 
@@ -494,6 +512,12 @@ the forward.
 
 Configuration, the payload format, the receiver contract and holding the forward
 open are in [docs/TUNNEL.md](docs/TUNNEL.md).
+Platform adapter matrix, env vars and Windows caveats: [Notifications](docs/NOTIFICATIONS.md).
+
+### `lacode-voice`
+
+`lacode-voice` manages the local voice sidecar: `start`, `doctor`, `status`, and
+`model fetch-model`. The model download shows a byte progress bar on a TTY.
 
 ## Further reading
 
@@ -504,6 +528,7 @@ want it.
 | --- | --- |
 | [Install and troubleshooting](docs/INSTALL.md) | Where opencode puts the package, what to do when the agents are missing, the version matrix, macOS differences, and the `lacode` CLI. |
 | [Configuration reference](docs/CONFIGURATION.md) | Every plugin option, how the pool resolves its slots, per-agent tool grants, and exactly what gets written into your config. |
+| [Prompt critique](docs/PROMPT-CRITIQUE.md) | The opt-in critique instruction: what it says, which agents receive it, why it is narrower than `AGENTS.md`, and how to turn it on. |
 | [OmniRoute gateway](docs/OMNIROUTE.md) | The optional local gateway integration: setup, full option set, a latency-measured free combo, and its troubleshooting table. |
 | [Context map](docs/CONTEXT.md) | The mechanism behind `.opencode/context/` — the one-writer permission rule, the files, and what the log lines mean. |
 | [Remote hosts and notifications](docs/TUNNEL.md) | The SSH notification hop, payload format, receiver contract, and holding the forward open. |
@@ -519,9 +544,15 @@ npm run build          # esbuild -> dist/ (what the tarball ships)
 npm test               # node --test tests/ — offline, no network, no running server
 npm run benchmark      # the cost harness; see docs/BENCHMARKS.md
 npm run score          # rank free models by context, output and measured latency
+npm run refresh-pool   # refresh the local free-tier pool; --print/--dry-run keep generated pool text on stdout
 ```
 
 Node ≥ 22.18.
+
+Shared terminal presentation lives in `scripts/cli-display.mjs`. It is
+zero-dependency and ES2019/Node-12-safe; color and progress are enabled only on
+a TTY, progress writes to stderr, and `NO_COLOR`/`FORCE_COLOR` are honored.
+The Node CLI scripts keep result output on stdout and write progress/headings to stderr; `--print`/`--json` output is unchanged.
 
 `npm run build` compiles each entry point in `package.json` (`exports` and
 `bin`) into `dist/` with esbuild, one bundle per entry point, so nothing in

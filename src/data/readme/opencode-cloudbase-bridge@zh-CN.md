@@ -37,11 +37,13 @@ Agent ─► magpie 网关 ─► 插件 ── POST /v1/functions/aiProxy ─�
 
 **DSH 生图（插件 0.2.9 起支持，默认关闭）：** 只用聊天的用户，包括仍在用 0.2.4 的用户，都不用改配置、升级插件或重新部署。
 
-1. **新用户只部署一个 `aiProxy`**：下载[聊天＋生图合并 ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/v0.2.11/aiProxy-unified-with-deps.zip)，上传到普通云函数 `aiProxy`（Node.js 20、`index.main`、关闭自动安装依赖，生图建议超时 600 秒）。在函数测试中执行 `{"action":"checkImage","prompt":"画一只猫，宽高比 5:2"}`，应返回 `requestedSize: "1600x640"`、`modelCalled: false`；不指定比例默认 `1024x1024`。
+1. **新用户只部署一个 `aiProxy`**：下载[聊天＋生图合并 ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/aiproxy-2026.11.27/aiProxy-unified-with-deps.zip)，上传到普通云函数 `aiProxy`（Node.js 20、`index.main`、关闭自动安装依赖，生图建议超时 600 秒）。在函数测试中执行 `{"action":"checkImage","prompt":"画猫，2K，5:2"}`，应返回 `requestedSize: "2560x1024"`、`modelCalled: false`；不指定比例和分辨率时默认 `1024x1024`。
 2. 在 Magpie 插件选项中打开「启用 DSH 生图」，在 DSH 选择 `cloudbase/hy-image-v3.5-preview`，输入文字提示词。
 3. 从 0.2.10 起，DSH 网页版的新回复直接显示图片，也可点「打开原图」另存。如果仍只看到网址，打开 Magpie 插件选项「始终显示图片预览」并保存；即使请求不带 DSH 标记，插件也会返回 Markdown 图片。此开关影响所有经该配置生图的客户端，不改变聊天或旧回复。需要原始 HTTPS 链接的非 DSH 客户端请保持此项关闭。
 
 **老用户不必迁移。** 插件 0.2.11 在生图前用 `ping` 检查已配置的聊天函数；支持生图就调用它，未声明支持就沿用独立 `generateImage`。探测失败不会生图，生图失败不会换函数重发。插件 0.2.9/0.2.10 仍依赖独立函数，仍有旧客户端时不要删除它。Magpie 的生图开关不代替云端鉴权；有权直接调用合并函数的客户端也有权发起生图。
+
+**2K / 4K：** 使用上面的新版云函数 ZIP 即可，Magpie 插件保持 0.2.11。把 `2K` 或 `4K` 用逗号单独隔开，例如 `画猫，4K，5:2`。方图边长分别为 2048、4096 像素；非方图长边分别为 2560、3840 像素，短边按比例取最接近的整数。不写分辨率，尺寸沿用原规则。先用 `checkImage` 查看实际请求尺寸，不会消耗生图额度。
 
 **生图标识（可选）：** 把 `IMAGE_FOOTNOTE_MODE` 设在实际生图的函数上（环境变量不会从 `generateImage` 自动复制到 `aiProxy`）。`empty`（默认）传空字符串，`space` 传一个半角空格，`omit` 不传字段。合并包用 `{"action":"checkImage"}`，独立函数用 `{"action":"check"}` 查看 `footnoteMode`，均不调用模型。[CloudBase 文档](https://docs.cloudbase.net/ai/image-model/custom-watermark)只定义了自定义水印，不保证空格的效果；发布或分享时仍须遵守[生成内容标识要求](https://cloud.tencent.com/document/product/301/97822)。
 
@@ -57,7 +59,7 @@ Agent ─► magpie 网关 ─► 插件 ── POST /v1/functions/aiProxy ─�
 
 ## 部署 aiProxy
 
-需要聊天和生图时，使用上面的[合并 ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/v0.2.11/aiProxy-unified-with-deps.zip) 即可。**以下 CLI 仅部署聊天／看图函数，不要用它覆盖合并包。** [聊天函数操作指南](cloudfunctions/aiProxy/README.md)：
+需要聊天和生图时，使用上面的[合并 ZIP](https://github.com/DaBinBinah/cloudbase-bridge/releases/download/aiproxy-2026.11.27/aiProxy-unified-with-deps.zip) 即可。**以下 CLI 仅部署聊天／看图函数，不要用它覆盖合并包。** [聊天函数操作指南](cloudfunctions/aiProxy/README.md)：
 
 ```bash
 cp cloudbaserc.example.json cloudbaserc.json   # 把 envId 改成你的

@@ -51,9 +51,9 @@ It installs **both** targets via `oc-plugin: [["server"],["tui"]]` + `exports[".
 
 No manual `tui.json` edit, no `postinstall` — `src/plugin/install.ts: patchPluginConfig()` does it (`npm install --ignore-scripts`). After install **restart OpenCode** (it loads from `~/.cache/opencode/packages/opencode-fractal-memory@latest`).
 
-**Local dev** (this repo): `bun run dev-install` (build + sync cache + ensure `tui.json` npm spec + platform binaries for `sqlite-vec`).
+**Local dev** (this repo): `bun run dev-install` (build + register the repo path as the live plugin + sync cache for npm-pack/TUI spec + platform binaries for `sqlite-vec`).
 
-Published `0.8.5` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router + squeez).
+Published `0.8.6` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router + squeez).
 
 ## Features
 
@@ -77,7 +77,7 @@ Published `0.8.5` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, 
 - **Predictive rating** — adjusts memory usefulness scores over time based on usage patterns
 - **Cache system** — in-memory LRU cache for frequently accessed nodes with configurable TTL
 - **Consolidation** — extracts semantic facts from episodic node clusters on session idle
-- **Command compression** — zero-dependency compression of bash tool output via content-type router (`output-types/` detecting coverage-log/compiler-diagnostics/test-output etc) **before** a registry-driven pipeline (`pipeline.ts` + 12-entry strategy registry: ls, test, grep, git-status, git-log, git-diff, git-quick, git pull, truncate + generic fallback). Tiered gates (verbatim pass-through, net-win, benign-aware threshold). Per-tool budgets (`perTool`: test→2500 error-first, ls→800 names, grep→1200, git diff→2000) via longest-prefix matching. Error-first for any failing bash (before signal gate). Optional **Squeez** (`KRLabsOrg/squeez-2b`, 0.86 recall @92% vs BM25 0.22) `POST /extract → relevant_lines[]` task-conditioned verbatim extraction (fails-open, empty→`[squeez-negative]`) + Ollama extraction as last-resort. Stats tracked in `compression_stats` table. View via management app Compress tab
+- **Command compression** — zero-dependency compression of `shell` tool output (OpenCode 2.x renamed `bash`→`shell`; all command-tool hooks gate via `isCommandTool` in `src/plugin/hooks/command-tool.ts`) via content-type router (`output-types/` detecting coverage-log/compiler-diagnostics/test-output etc) **before** a registry-driven pipeline (`pipeline.ts` + 12-entry strategy registry: ls, test, grep, git-status, git-log, git-diff, git-quick, git pull, truncate + generic fallback). Tiered gates (verbatim pass-through, net-win, benign-aware threshold). Per-tool budgets (`perTool`: test→2500 error-first, ls→800 names, grep→1200, git diff→2000) via longest-prefix matching. Error-first for any failing bash (before signal gate). Optional **Squeez** (`KRLabsOrg/squeez-2b`, 0.86 recall @92% vs BM25 0.22) `POST /extract → relevant_lines[]` task-conditioned verbatim extraction (fails-open, empty→`[squeez-negative]`) + Ollama extraction as last-resort. Stats tracked in `compression_stats` table. View via management app Compress tab
 - **Context dashboard** — new management app tab showing memory node count/tokens by level, active rules, compression stats, recent injection history, and estimated total context usage with overhead breakdown
 - **Structural shape detection** — automatically detects output shape (JSON, CSV, stack-trace, tree, table, compiler-diagnostics, test-output, npm-install, coverage-log) and applies tailored compressors (e.g., JSON → `Object(12 keys)`, stack-trace → error + unique frame count, compiler-diagnostics → errors grouped by file with codes). Falls through to generic if shape is unknown
 - **SmartFilter** — noise-stripping preprocessor in shape detection: removes separator lines, progress bars, repeated punctuation, and leading/trailing blank lines before shape classification. Logged as `shape-json`, `shape-csv`, etc. with noise counts
@@ -103,7 +103,8 @@ Published `0.8.5` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, 
 - **Proactive compaction nudge** — when context pressure hits warn(75%)/aggressive(85%)/critical(95%), injects a context-pressure warning into the system prompt urging the agent to use `context(mode="recall")`, `context(mode="middle_term")`, or `memory(mode="search")` to reduce token usage
 - **Graph preamble on read** — auto-injects code dependency context (imports, symbols, dependents) when reading files. Gated by `graph.enabled`. Impl at `src/plugin/hooks/graph-context.ts`
 - **Auto-skeletonize on large reads** — when reading files ≥ `autoSkeletonizeMinLines` lines, generates a skeleton (imports + symbols) before the content. Impl at `src/plugin/hooks/graph-context.ts`
-- **Auto graph hints on grep/glob/search** — after search tools, appends up to 3 matching code graph symbol suggestions. Impl at `src/plugin/hooks/graph-search-hint.ts`
+- **Auto graph hints on grep/glob/search/shell** — after search tools (and `shell` queries parsed via `extractBashQuery`), appends up to 3 matching code graph symbol suggestions as an `# Also in code graph:` block with concrete `graph(...)`/`skeletonize(path)` call shapes. Impl at `src/plugin/hooks/graph-search-hint.ts`
+- **Single-source tool instructions** — every tool description and arg `.describe()` the model sees lives in one file, `src/tools/tool-instructions.ts` (`TOOL_INSTRUCTIONS`), imported by the tool modules; handler-level describes on never-registered factories are dead text and excluded. Arg describes state real constraints (required-ness, 0–2 importance scale, `mode="verify"`) — vague describes caused real tool failures
 - **Edit-time dependency warning** — warns when editing a file that has dependents in the code graph. Impl at `src/plugin/hooks/graph-edit-check.ts`
 - **Skeletonize tool** — standalone explicit `skeletonize(path)` tool to extract file skeleton on demand. Core logic at `src/application/skeletonize.ts`
 - **Code knowledge graph** — builds a directed graph of code symbols (functions, classes, interfaces, types) and their relationships (calls, imports, references, defined_in, extends) via tree-sitter WASM AST extraction. 32 supported languages. Louvain community detection clusters related code; god-node and surprising-connections analysis highlight architectural hotspots
@@ -117,9 +118,9 @@ Published `0.8.5` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, 
 - **Auto-edge creation** — `memory(mode="set")` auto-creates NEXT edges (session chaining) and REFERENCES edges (from `label:xxx` patterns) during active sessions
 - **Synthetic evaluation** — 79-node/175-QA benchmark dataset for reproducible retrieval quality metrics (HitRate, Recall, Precision, MRR)
 - **Sub-agents** — `memory-hints`, `memory-researcher`, and `translate` agents for guided interaction
-- **Agent tool proactivity** — three mechanisms to ensure the agent proactively uses the right tools instead of defaulting to read/grep/glob/bash:
-  - **Directive tool descriptions** — all 6 consolidated tool descriptions rewritten to say "USE INSTEAD OF X" and "USE WHEN Y" with explicit triggers and token-cost comparisons
-  - **Pre-execution guard hook** — `tool.before` hook intercepts read/grep/glob/bash calls and injects a `[cost-saver]` hint when the code graph has a cheaper alternative. Impl at `src/plugin/hooks/tool-before-guard.ts`
+- **Agent tool proactivity** — three mechanisms to ensure the agent proactively uses the right tools instead of defaulting to read/grep/glob/shell:
+  - **Directive tool descriptions** — all consolidated tool descriptions live in `src/tools/tool-instructions.ts` and say "USE INSTEAD OF X" and "USE WHEN Y" with explicit triggers and token-cost comparisons
+  - **Pre-execution guard hook** — `tool.before` hook intercepts read/grep/glob/shell calls and injects a `[cost-saver]` hint when the code graph has a cheaper alternative. Impl at `src/plugin/hooks/tool-before-guard.ts`
   - **Never-strip decision tree** — `rule:mandatory:tools` seed node now has `never_strip: true` + a 7-step ordered decision tree (`graph > context > memory(mode="search") > graph(callees) > memory(mode="set") > learn`) that's always injected at the very front of the system prompt, never pressure-filtered
 
 ## Prerequisites
@@ -153,17 +154,17 @@ cd ~/.cache/opencode/packages/opencode-fractal-memory@latest/node_modules/openco
 bun add opencode-fractal-memory@latest
 ```
 
-Or use the dev-install script from a local clone (recommended for development — syncs the plugin cache that OpenCode actually loads, copies all files + runtime deps, prints a RESTART REQUIRED warning):
+Or use the dev-install script from a local clone (recommended for development — registers the repo path as the live plugin, syncs the npm-pack cache copy, prints a RESTART REQUIRED warning):
 
 ```bash
 cd <your-local-clone>
-bun run dev-install                 # build + clean + sync to ~/.config/opencode + plugin cache
+bun run dev-install                 # build + register repo path + sync cache
 bun run dev-install --skip-build    # skip tsc, just sync
 ```
 
 Then restart OpenCode — the running process holds the plugin in memory and won't see disk changes until restart.
 
-Why a script: OpenCode loads the plugin ONLY from the cache dir (`~/.cache/opencode/packages/opencode-fractal-memory@latest/node_modules/opencode-fractal-memory/`) — beacon-proven via the `PLUGIN_LOADED_FROM` startup log in `~/.config/opencode/logs/memory-plugin.log`. The `~/.config/opencode/node_modules` copy is legacy and never read by OpenCode. `scripts/dev-install.ts` syncs the cache. VS Code: "Dev Install Plugin (build+clean+sync)" launch config.
+Why a script: for local development `scripts/dev-install.ts` writes the **repo path** into `opencode.json` + `cli.json` (`ensureGlobalRegistration()`, which also strips stale npm-spec/cache entries that cause "Plugin failed" popups) — beacon-proven via the `PLUGIN_LOADED_FROM` startup log in `~/.config/opencode/logs/memory-plugin.log`, where `resolvedDir` must point at the repo. The `~/.cache/opencode/packages/opencode-fractal-memory@latest/` copy is still synced for npm-pack compatibility and TUI `tui.json` spec resolution. VS Code: "Dev Install Plugin (build+clean+sync)" launch config.
 
 This is a known OpenCode issue: [#6774](https://github.com/anomalyco/opencode/issues/6774), [#10546](https://github.com/anomalyco/opencode/issues/10546), [#25293](https://github.com/anomalyco/opencode/issues/25293).
 
@@ -340,7 +341,7 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
 | `graph.maxFiles` | int | `5000` | Max files to extract in background build |
 | `graph.refreshEnabled` | bool | `true` | Auto-re-extract on edit/write |
 | `graph.autoSkeletonizeMinLines` | int | `300` | Min file lines to auto-generate skeleton on read |
-| `commandCompression.enabled` | bool | `true` | Compress bash tool output |
+| `commandCompression.enabled` | bool | `true` | Compress `shell` tool output |
 | `commandCompression.maxLines` | int | `50` | Max lines for generic truncation |
 | `commandCompression.excludeCommands` | string[] | `["curl","wget"]` | Commands to never compress |
 | `commandCompression.alwaysFullOnFailure` | bool | `true` | Preserve full output on non-zero exit |
@@ -507,7 +508,7 @@ Automatically adjusts node usefulness scores over time. Frequently accessed node
 
 ### Command Compression
 
-Built-in, zero-dependency compression for bash tool output. A tiered pipeline (`pipeline.ts`) gates eligibility (verbatim pass-through below `verbatimBelowLines`=40 lines / <80 chars, net-win token gate, benign-aware threshold), then dispatches to a 12-entry strategy registry (`strategy.ts`):
+Built-in, zero-dependency compression for `shell` tool output. A tiered pipeline (`pipeline.ts`) gates eligibility (verbatim pass-through below `verbatimBelowLines`=40 lines / <80 chars, net-win token gate, benign-aware threshold), then dispatches to a 12-entry strategy registry (`strategy.ts`):
 
 | Strategy | Matches | Output |
 |---|---|---|
@@ -821,7 +822,7 @@ The plugin hooks into the OpenCode agent via the Plugin SDK. Here's the exact pe
 ┌─ PHASE 7: TOOL AFTER ────────────────────────────────────────────┐
 │  tool.execute.after                                                │
 │                                                                   │
-│  bash tool:                                                       │
+│  shell tool:                                                      │
 │    adaptive-           Records output size → prepends pressure     │
 │    pressure            warning if nearing context limit            │
 │    compression         Compresses output via delta / fuzzy-dedup / │
@@ -935,11 +936,11 @@ bun run test:coverage   # coverage run
 ### Installing locally (development)
 
 ```bash
-bun run dev-install                # build + clean + sync to ~/.config/opencode + plugin cache
+bun run dev-install                # build + register repo path + sync cache
 bun run dev-install --skip-build   # skip tsc, just sync
 ```
 
-The script (scripts/dev-install.ts) wipes the plugin cache dir, copies all files + runtime deps, and prints a RESTART REQUIRED warning. Models download automatically on first plugin load via `ensureModels()` in `initStorage()`.
+The script (scripts/dev-install.ts) builds `dist/`, registers the repo path in `opencode.json`/`cli.json` (`ensureGlobalRegistration()`), wipes + re-syncs the plugin cache copy, and prints a RESTART REQUIRED warning. Models download automatically on first plugin load via `ensureModels()` in `initStorage()`.
 
 ## Architecture
 

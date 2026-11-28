@@ -90,7 +90,9 @@ A correction looks like this, with only ` → complete` dimmed:
   or all-uppercase casing (`Cmplete` → `Complete`, `CMPLETE` → `COMPLETE`).
   First-person contractions use a capital `I` in corrections and next-word
   suggestions (`I'm`, `I'll`, `I've`, `I'd`). Lowercase contraction prefixes
-  are replaced on acceptance too (`i'v` → `I've`).
+  are replaced on acceptance too (`i'v` → `I've`). Typing the apostrophe
+  continues the word (`i'` offers `I'd`), and a word ending in an apostrophe
+  is never typo-corrected (`users'` stays as typed).
 - **Learned casing is kept.** A word you usually capitalize mid-sentence is
   suggested that way: `oz` shows ` → Ozan` and replaces the word, while `Oz`
   completes with `an`.
@@ -199,8 +201,9 @@ Restart OpenCode after editing `cli.json`.
 | `minSuggestedWordLength` | `number` | `0` | Minimum number of characters in a suggested word, for both prose and shell suggestions; `0` allows any length. |
 | `acceptKeys` | `string[]` | `["tab", "right"]` | Keys that accept and insert the active word suggestion. |
 | `dismissKeys` | `string[]` | `["escape"]` | Keys that dismiss the visible suggestion without inserting. |
-| `cycleNextKeys` | `string[]` | `[]` | Optional keys for the next confident word suggestion. |
-| `cyclePreviousKeys` | `string[]` | `[]` | Optional keys for the previous confident word suggestion. |
+| `cycleNextKeys` | `string[]` | `[]` | Opt-in keys to select the next alternative and open the picker, for example `["alt+n"]`. |
+| `cyclePreviousKeys` | `string[]` | `[]` | Opt-in keys to select the previous alternative and open the picker, for example `["alt+p"]`. |
+| `summonKeys` | `string[]` | `[]` | Opt-in keys to open the picker or summon candidates on demand, for example `["ctrl+y"]`. |
 
 `completeAtLineEnd` uses prose context only up to the cursor while checking
 code and attachment ranges across the full draft. It inserts only missing
@@ -209,26 +212,43 @@ replacements remain limited to chip-free draft ends. The suggestion must fit
 the visible cursor row; it never overwrites the next line. Acceptance preserves
 later lines, attachment metadata, host callbacks, and native undo/redo.
 
-Cycling changes only the ghost text; Tab still accepts the selected suggestion.
-Alternatives use the same confidence and typo guards as the best suggestion.
-The ranked list is capped at five, wraps in either direction, and resets when
-the draft, cursor, attachment ranges, or learned model changes. Alternatives
-that do not fit the visible cursor row are skipped. Without a visible,
-eligible alternative, cycle keys fall through to OpenCode.
+Quill shows one inline suggestion by default. To open the alternatives picker
+with Ctrl+Y, add this to the Quill plugin's `options`:
 
-Custom keybindings can also be overridden using OpenCode's standard
-`keybinds` map in `cli.json`:
-
-```jsonc
+```json
 {
-  "keybinds": {
-    "quill.accept": "ctrl+y",
-    "quill.dismiss": "ctrl+g",
-    "quill.next": "alt+n",
-    "quill.previous": "alt+p"
-  }
+  "summonKeys": ["ctrl+y"]
 }
 ```
+
+Press Ctrl+Y to see the available words in a box above the active word, or
+above the top of the editor when the cursor is below its first row. The box
+uses an opaque background even on transparent themes. If no
+automatic suggestion appears, Ctrl+Y can summon lower-confidence candidates.
+This matters most after a space: next-word predictions are shown automatically
+only when one word is likely, but summoning lists the words you usually type
+after the previous word, even when none of them is confident enough to show on
+its own. While the list is visible, Up and Down move the highlight and the inline ghost previews the
+selection. Tab accepts it, Escape closes the list, and editing the draft or
+moving the cursor resets it. Enter keeps its usual behavior.
+
+For direct cycling, optionally set `cycleNextKeys` to `["alt+n"]` and
+`cyclePreviousKeys` to `["alt+p"]`. These open the picker and cycle immediately,
+even without a summon key. If there isn't room above the word, the cycle keys
+still work inline. With a summon key, pressing it again selects the next
+alternative, with or without the picker drawn.
+Cycling skips suggestions that don't fit on the cursor row. Up and Down keep
+their normal behavior when no picker is visible.
+
+Each key may be bound to only one action, and keys must not contain commas.
+A key repeated within a list is kept once. A key already bound by an earlier
+configured list (order: `acceptKeys`, `dismissKeys`, `cycleNextKeys`,
+`cyclePreviousKeys`, `summonKeys`) and any key containing a comma is dropped
+with one warning toast, which also names an action left without keys. A configured key replaces the same key in another action's
+default, so `dismissKeys: ["right"]` leaves `acceptKeys` as `["tab"]`.
+Options of the wrong type fail at startup. Keys are set only with these options;
+OpenCode's `keybinds` map does not rebind Quill's commands. Hints in the
+picker and counter show the first displayable key for each action.
 
 Quill's accept/dismiss/cycle layer runs in base mode at priority `2`, only in
 the focused normal composer. A visible suggestion takes Tab/Right for
@@ -244,9 +264,8 @@ handlers remain in control. Dialogs and selections also suppress Quill.
 - `/quill shell on` / `/quill shell off` — Set shell-mode autocomplete explicitly.
 - `/quill clear casing` (alias `/quill reset casing`) — Forget only the learned word casing (`OpenCode`, `GitHub`), keeping the vocabulary and phrases.
 - `/quill clear` (alias `/quill reset`) — Erase everything Quill has learned from your prompts and shell commands.
-- `quill.next` / `quill.previous` — Keymap commands for cycling visible word
-  alternatives; no default bindings. Configure the cycle options above or
-  OpenCode's `keybinds` map.
+- `quill.next` / `quill.previous` / `quill.summon` — Keymap commands for cycling
+  or summoning word alternatives.
 - **Command Palette (`Ctrl+P`)** — Includes **Word autocomplete: on/off** and
   **Clear word autocomplete history**.
 
@@ -273,7 +292,7 @@ Quill learns from your own submitted prompts, never from assistant output:
   syntax are never learned as adjacent.
 - A word missing from the base vocabulary becomes suggestible only after it
   has been seen more than once, and not while it is a prefix of a learned word
-  you use at least as often (`addr` yields to `addressed`).
+  you use at least three times as often (`addr` yields to `addressed`).
 - Casing is learned from words written mid-sentence; sentence-initial
   capitals are ignored.
 
@@ -286,8 +305,14 @@ Quill learns from your own submitted prompts, never from assistant output:
 - **Current draft:** words already in the draft get a small boost.
 - **Confidence gating:** a suggestion is shown only when it clears a
   confidence threshold, which is stricter for next-word predictions than for
-  prefix completions. If the typed prefix is already the most likely word,
-  nothing is shown.
+  prefix completions. In prose, single-letter prefixes and two-letter prefixes
+  without repeated context also require higher confidence. When the typed prose
+  word is itself a candidate (a vocabulary word or one typed earlier in the draft), a longer word is offered only if it clears
+  the same confidence and scores at least 70% as high as the typed word in the
+  current context (typing `local` offers `locally` when it is nearly as
+  likely); the two-letter guard raises the confidence that offer needs as
+  well. Shell mode shows nothing when the typed command is already the most
+  likely word.
 - **Typo fallback:** when prefix completion is not confident enough, nearby
   words are ranked with an edit penalty and a stricter confidence threshold.
   Correction confidence is the edit-penalized model score. Suggestions must
@@ -295,8 +320,14 @@ Quill learns from your own submitted prompts, never from assistant output:
   Corrections require at least three typed letters. Short words are eligible
   only for whole-word letter swaps that preserve the first letter; other edits
   and mistyped longer prefixes require at least five letters, except for
-  apostrophe contractions, including missing apostrophes. Deletions repair only
-  doubled letters, not arbitrary extra characters or word endings.
+  apostrophe contractions, including missing apostrophes. A missing apostrophe
+  can be restored even when the typed word exists if the contraction has
+  repeated evidence and accounts for more than half of the learned continuations
+  after the previous word; the contraction is listed first and other completions
+  remain reachable by cycling or summoning. Deletions repair only doubled letters. A final letter
+  after an otherwise known word does not trigger a longer typo completion
+  by substitution alone.
+  Equally scored spelling repairs are withheld unless explicitly summoned.
   Unknown tokens such as `json`, `yaml`, `bool`, `opts`,
   and `enum` are left unchanged, and uncertain typos such as `fucn` can produce
   no suggestion. Context repair uses the same edit guards and confidence checks

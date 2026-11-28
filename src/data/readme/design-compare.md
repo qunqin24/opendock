@@ -51,7 +51,7 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
 - **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。複数の辺ではみ出す場合は辺ごとに 1 件返す。親が JSON に無い場合、自己参照（`parent` がそのノード自身）の場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前二者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／自己参照／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。`w`/`h` が 0 のノードのみ検査対象外で、Web ノードが 1 件もない、または検査対象がすべて `w`/`h` = 0 の場合も `mismatch` です。負の `w`/`h` と必須キー欠落（`width`/`height` など）は入力エラーで、この mismatch にはなりません。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` = 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`max_details` で切り詰めたときは `issues_omitted` も返す。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `duplicate_web_selectors` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`max_details` で切り詰めたときは `issues_omitted` も返す。`viewport_preset` は未指定時も既定の `ipad_portrait` として常にエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `duplicate_web_selectors` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
 意図的な横スクロール領域（カルーセル、`overflow-x: auto` の表、マーキーなど）では、スクロールコンテナ自身はビューポート内に収まっていても、子要素のボックスが `viewport_width` を越えると `viewport_overflow_x` として検出されます。これは崩れではないため CSS で「直す」対象ではなく、`ignore_nodes`（例: `.carousel-*`）や `ignore_region` で明示的に除外し、除外が効いたかは `unmatched_ignores` / `unmatched_ignore_regions` で確認してください（除外がすべて一致していればこれらのフィールドは出ません）。
 
@@ -275,7 +275,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `status` | string | 常時 | `success` / `mismatch` / `skipped` |
 | `mode` | string | 常時 | 常に `layout_integrity` |
 | `viewport_width` / `viewport_height` | number | 常時 | 実効ビューポート（CSS px） |
-| `viewport_preset` | string | 指定時 | 渡したプリセット名のエコー |
+| `viewport_preset` | string | 常時 | 実効プリセット名。未指定時は既定の `ipad_portrait`。`viewport_width` / `viewport_height` の明示上書きでは変わらない |
 | `checked_nodes` | number | 常時 | 検査したノード数（除外・ゼロ幾何を除く） |
 | `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
 | `issue_count` | number | 常時 | 検出した崩れ件数 |
@@ -323,11 +323,11 @@ go build -o design-compare
 
 既定では応答 JSON の `diff_image` に base64 PNG が入ります。ターミナルや CI で合否だけを見る場合は `--generate-diff=false`、不一致時だけ画像が欲しい場合は `--diff-on-mismatch` を使ってください（CLI の既定値は MCP と同じで変えていません）。
 
-主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch` / `--diff-image-out` / `--version`
+主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch` / `--diff-image-content` / `--diff-image-out` / `--version`
 
 真偽値フラグは `--include-aa`（値なしで true）または `--generate-diff=false` の形式で指定し、空白区切りの値（例: `--generate-diff false`）は受け付けません。位置引数や解釈できなかった引数はエラーになります。
 
-`--diff-image-out <path>` は CLI 専用です。指定時のみ応答 JSON の `diff_image`（PNG data URI）をデコードしてそのパスへ書き出し、stdout の JSON では `diff_image` を空文字にします（他のフィールドは変わりません）。`diff_image` が空のときは書き出さず stderr にその旨を出します。書き出しに失敗したときは stderr にエラーを出して exit 1 とし、比較結果の JSON は出しません。`--diff-image-content` は CLI 非対応です（CLI の出力は JSON テキストのみで、MCP の image コンテンツブロックを出しません）。入力側の `image_a_base64` / `image_b_base64` / `figma_layout` / `web_layout` はそれぞれ `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` で渡せます。
+`--diff-image-out <path>` は CLI 専用です。指定時のみ応答 JSON の `diff_image`（PNG data URI）をデコードしてそのパスへ書き出し、stdout の JSON では `diff_image` を空文字にします（他のフィールドは変わりません）。`diff_image` が空のときは書き出さず stderr にその旨を出します。書き出しに失敗したときは stderr にエラーを出して exit 1 とし、比較結果の JSON は出しません。`--diff-image-content` は CLI でも受け付けますが、CLI の出力は JSON テキストのみのため MCP の image コンテンツブロックは出ません（MCP と同じ引数をスクリプトで共有できるようにするための対称性フラグです。差分 PNG は応答 JSON の `diff_image`、または `--diff-image-out` で得てください）。入力側の `image_a_base64` / `image_b_base64` / `figma_layout` / `web_layout` はそれぞれ `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` で渡せます。
 
 ### 単体テストの実行
 ブラウザの起動を必要としない超高速なメモリ内画像/ツリーデータ検証テストが実行できます。

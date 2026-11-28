@@ -9,7 +9,8 @@ An OpenCode V2 plugin that displays [beads_rust](https://github.com/Dicklesworth
 ## What it displays
 
 - The total number of tasks.
-- Counts of open, in-progress, blocked, and closed tasks.
+- Counts of open, in-progress, blocked, deferred, and closed tasks.
+- A `Deferred` row appears before the `Closed` row only when there are deferred tasks.
 - A 10-character bar and percentage of the total for each category.
 - An `Epics ready to close: 2` line (or `Эпики готовые к закрытию: 2` for the Russian locale) when epics have all their child tasks closed. This line appears only when the count is positive, after the statistics.
 - Exactly one current-task block below the statistics. The current task is the most recently updated in-progress task, or, when nothing is in progress, the most recently closed task.
@@ -25,6 +26,7 @@ Total tasks: 8
 Open        ■■■■■□□□□□ 4 (50%)
 In progress ■■■□□□□□□□ 2 (25%)
 Blocked     ■■■□□□□□□□ 2 (25%)
+Deferred    ■□□□□□□□□□ 1 (13%)
 Closed      ■□□□□□□□□□ 1 (13%)
 
 ▼ opencode-e2-auth-5u3 20% (1/5)
@@ -43,6 +45,7 @@ Total tasks: 8
 Open        ■■■■■□□□□□ 4 (50%)
 In progress ■■■□□□□□□□ 2 (25%)
 Blocked     ■■■□□□□□□□ 2 (25%)
+Deferred    ■□□□□□□□□□ 1 (13%)
 Closed      ■□□□□□□□□□ 1 (13%)
 
 [◐] Fix retry loop
@@ -62,7 +65,7 @@ br list --status closed --json
 
 The total count and status statistics come from `stats`. The number of epics ready to close is derived from the `eligible_for_close` flags in `epic status --json`, so the epic list and the count share a single source. All five commands run in parallel when the plugin loads, and again 5 seconds after each request completes.
 
-The plugin then picks one current task: the most recently updated task from `br list --status in_progress --json`, or, when that list is empty, the most recently updated task from `br list --status closed --json`. An in-progress task always has priority. `.beads/last-touched` is no longer read.
+The plugin then picks one current task: the most recently updated task from `br list --status in_progress --json`, or, when that list is empty, the most recently updated task from `br list --status closed --json`. An in-progress task always has priority.
 
 The plugin resolves the current task's parent with `br show <task-id> --json`, because `br list --json` does not include the `parent` field. If the resolved `parent` matches one of the open epics from `br epic status --json`, the plugin runs `br show <epic-id> --json` and renders that epic with its child tasks. For an epic, `done` counts closed children and `total` counts all parent-child children. Open children present in `br ready --json` are shown as ready, and open children absent from it are shown as blocked.
 

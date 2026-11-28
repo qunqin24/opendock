@@ -31,7 +31,7 @@ Implements the [Agent Progress Tool proposal](https://gist.github.com/jakedowns/
 for OpenCode 2, and is written as a portable reference implementation any
 harness can copy or adapt.
 
-**Versions:** MCP server `2.12.0` · OpenCode plugin `2.27.0`
+**Versions:** MCP server `2.12.0` · OpenCode plugin `2.28.0`
 
 > **Advanced docs:** [schema, relay internals, state store, architecture, all
 > options, file map →](./README-advanced.md)
@@ -187,23 +187,54 @@ files, presets, and semantics.
   `treeTheme` plus `barStyle` in the OpenCode config that declares the plugin.
   Expanded child rows use the same `└─` branch prefix as the TUI, placed before
   the status dot.
+- **Nudges panel (desktop):** the sidebar's New tab page lists **Nudges** next
+  to Progress. It opens a live tab with the active engine (`shared` by default,
+  `legacy` when opted in), the standing reminder text, mute state with a
+  30-minute mute/unmute action for the shared engine, and the newest nudge
+  events for the routed session — fires,
+  gate rejections, clears, touches, and legacy suppressions. Each row is tagged
+  `[in]` (an agent wrote progress or used the nudge tool) or `[out]` (a reminder
+  aimed at the agent); child-session traffic also carries a `[sub]` tag with
+  the subagent's name. State chips above the log show the live gate:
+  `[muted • 3m remaining]`, `[nudged • 2m ago]`, `[grace say • 7m left]`,
+  `[grace progress.tree • 7m left]`, `[gap • 40s left]`, `[capped • 2/2]`, or
+  `[listening]`. Grace is split per gated producer, and its hover shows how many
+  attempts that producer had skipped in the current window. Transition rows are
+  hidden by default (**Show transitions**) and consecutive runs collapse to
+  `pending → done ×3`; each row also shows `[tree]` or `[hidden dismissed/cleared]`
+  against the current view. A health line sums fires by producer, rejection
+  reasons, and median nudge-to-progress latency; a usage table below it shows
+  applied nudges → agent usage per tool (say notes, progress updates), with
+  skipped attempts by reason on hover. **Test nudge** fires custom
+  text through the real gate (context only), **Clear log** truncates the JSONL,
+  and **Purge** resets this session's mute, standing reminder, gap clock, and
+  fire count without touching the log. A dot on the tab marks new warn/block
+  events while the tab is not selected. The tab polls every 5 seconds and stays
+  available in either layout mode.
 - **TUI:** compact tree above the composer, roots collapsed, capped at
   `tuiMaxRoots` (default 3) and scrollable inside `tuiMaxRows` (default 8) so
   long lists never push the prompt away. A `--- scroll to see N more ---` hint
   appears on overflow; `/progress` opens a dialog to expand a tree or dismiss
-  tasks, and the palette can change the root cap, switch the tree theme, or
-  collapse the tree to a one-line status summary. With `treeTheme: "compact"`,
-  TUI rows drop the progress bar and show `title 40% · & N more` instead. Set
+  tasks, and the palette can change the root cap or switch the tree theme.
+  Click the `[-]` marker in the header to collapse to a one-line
+  `[+] progress: …` summary (click it again to expand); the palette command
+  does the same. With `treeTheme: "compact"`, TUI rows drop the progress bar
+  and show `title 40% · & N more` instead. With `treeTheme: "ultra-compact"`,
+  rows match the desktop ultra theme: one line per task with a status light and
+  a short age prefix (`5m ago`), no bar, percentage, or detail row. Set
   `tuiLayout: "sidebar"` to
   park the tree in the sidebar instead, or run `/progress swap-layout` to flip
   placements at runtime.
 - Running and waiting tasks stay visible; errors stay until dismissed or
   updated; completed tasks stay unless dismissed (or `autoHideDone` is on).
 - Dismissal works at any depth: every nested row has its own `✕`; dismissing a child hides its subtree and re-rolls the parent from the remaining children. A dismissed tree stays hidden
-  through relay telemetry and sibling activity. An **agent update clears the
+  through relay ticks and sibling activity. An **agent update clears the
   dismissal** on that entry and its ancestors — except a terminal dismissal
   (dismissed while done/error), which later done/error re-reports do not revive;
-  a restart or a child failure does.
+  a lifecycle restart or a child failure does. A relay lifecycle restart (a
+  terminal entry returning to running) also revives the entry and its ancestors,
+  and any descendant update revives an ancestor that was soft-cleared with
+  *Progress: clear list*.
 - **Clear/delete are palette commands** (not pill buttons): *Progress: clear
   list* soft-deletes finished/dismissed entries while keeping records on disk,
   *hard clear this session* removes one session's store copy, and *hard clear
@@ -220,7 +251,8 @@ files, presets, and semantics.
   so `tree` falls back to the pill. An empty array records notes without
   showing them. Click the TUI line or open `/progress` → **Notes** / the pill
   popover for newest-first history; dismiss one note with its `×` or all notes
-  at once. Dismissals delete the note from the shared ring buffer, so every
+  at once. In the desktop sidebar, click the notes line to expand the full
+  undismissed list inline; each row has its own `×` and a dismiss-all button. Dismissals delete the note from the shared ring buffer, so every
   client updates. Notes also auto-hide from every surface after
   `sayAutoHideTimeoutMs` (default 60s; `0` keeps them until dismissed). An
   opt-in `sayNudge` reminds a silent agent after a long tool
@@ -263,6 +295,7 @@ files, presets, and semantics.
 | `strictMode` | `"nudge"` / `"force"` / `"off"` silent-work nudges |
 | `staleEscalateAfter` | Entry reminders before one synthetic escalation (default 3; `0` disables) |
 | `idleReminder` | Turn-end nudge when tasks remain (default on) |
+| `nudgeEngine` | `"shared"` (default) or `"legacy"`; opt back to legacy if shared delivery degrades after an update |
 | `demoSkills` | Register the demo skills (default off) |
 | `barStyle` | `"blocks"` (ASCII) or `"emoji"`; the **Progress: switch tree theme** presets set this with `treeTheme` |
 | `refreshMs` | View refresh interval (default 1000) |
@@ -272,6 +305,7 @@ files, presets, and semantics.
 | `sayToastScope` | Toast `"own"` notes (default), own + child `"warnings"`, or `"all"`; child notes still roll up in the tree/pill |
 | `sayNudge` | Opt-in reminder, only with `say: true`: `"long-tool"`/`true`, `"silent-run"` (forgot-to-narrate call count), or `"both"` (default off; context-only, never synthetic) |
 | `sayNudgeMinCalls` | Tool calls with no note before a `"silent-run"` reminder (default `3`, clamp `1..50`) |
+| `sayNudgeEscalateAfter` | Ignored say nudges before one synthetic `block` (default `3`; `0` disables) |
 | `retainDeletedSessionProgress` | Keep store entries when a session is deleted (default off) |
 
 The optional task-list mirror is always written as `tasklist-<session>.md`. Add `tasklist-*.md` (and `.progress/` if you use location `0`) to your `.gitignore` — it contains plaintext task titles and details. When enabled, the palette command **Progress: task-list mirror view** switches between the UI view and the raw store view.

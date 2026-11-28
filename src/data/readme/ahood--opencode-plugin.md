@@ -125,7 +125,7 @@ The plugin brings two things:
 | `/ahood-project` | `ahood project --json`: this repository's project guide from ahood, or an offer to write and publish one |
 | `/ahood-star <owner/slug>` | Stars it with `ahood skill star` after your yes |
 | `/ahood-publish` | Finds the artifact in this directory by its root file, shows the diff against the published version, and runs `ahood skill publish` only after your yes |
-| `/ahood-stats` | `ahood stats --json`: your artifacts' downloads and stars, totals, recent activity and evolution counts |
+| `/ahood-stats` | `ahood stats --json`: your artifacts' downloads, stars, views, reads and votes, totals, recent activity and evolution counts |
 | `/ahood-sync` | `ahood sync --dry-run`, a diff per update, then `ahood sync <owner>/<slug> --yes` only for the updates you approve in chat |
 | `/ahood-review` | `ahood review --json`, each proposal with its unified diff and evidence, then `ahood review approve\|reject <id>` only on your decision |
 | `/ahood-snap` | Drafts a structured, private snap of the session, shows it, and runs `ahood snap create ...` only if you say yes |
@@ -407,7 +407,8 @@ alice/pdf-tools is a skill, not an agent -- refusing to install it. Use `ahood s
 | `ahood review [show <id> \| approve <id> [--version <semver>] \| reject <id>] [--limit <n>] [--json]` | List the self-evolution proposals waiting for your review with their diffs, and approve or reject them. |
 | `ahood find [<query>] [--kind <kind>] [--sort rank\|downloads\|stars\|recent\|updated] [--limit <n>] [--json]` | Find skills, agents, MCP servers, docs, project guides, loops and prompts in the registry. |
 | `ahood try <owner>/<slug> [--json]` | Print an artifact's root document (SKILL.md, AGENT.md, LOOP.md, ...) without installing it. |
-| `ahood stats [--json]` | Show your own artifacts with their downloads and stars, the totals, recent activity and self-evolution counts. |
+| `ahood stats [--json]` | Show your own artifacts with their views, reads, downloads, stars and votes, the totals, recent activity and self-evolution counts. |
+| `ahood feedback "<message>" [--kind bug\|idea\|search_miss\|confusing\|praise] [--query <q>] [--artifact <owner/slug>]` | Send feedback (a bug, an idea, a search that found nothing, something confusing, praise) to the ahood team. |
 | `ahood setup [claude\|codex\|opencode] [--remove <harness>] [--yes] [--dry-run] [--store-token\|--no-store-token] [--no-auto-update]` | Add ahood (MCP server and /ahood commands) to Claude Code, Codex or opencode, or remove it again. |
 | `ahood doctor [--offline] [--json]` | Check each harness's ahood setup, the MCP server, your login and the CLI version. |
 | `ahood completion <bash\|zsh\|fish>` | Print a shell completion script for the command names. |

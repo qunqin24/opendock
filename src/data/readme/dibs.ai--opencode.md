@@ -22,11 +22,11 @@ Then connect your agent:
 
 | Agent | What it gets | Setup |
 |---|---|---|
-| Pi | Task tools, `/todos` command, task panel | [agents/pi](agents/pi/README.md) |
-| Claude Code | `dibs` skill, MCP tools, task panel | [agents/claude-code](agents/claude-code/README.md) |
-| Codex | `dibs` skill, MCP tools | [agents/codex](agents/codex/README.md) |
-| opencode | `dibs` skill, MCP tools, task panel | [agents/opencode](agents/opencode/README.md) |
-| Cursor | `dibs` skill, MCP tools | [agents/cursor](agents/cursor/README.md) |
+| Pi | Task tools, `/todos` command, task panel | [plugins/pi](plugins/pi/README.md) |
+| Claude Code | `dibs` skill, MCP tools, task panel | [plugins/claude-code](plugins/claude-code/README.md) |
+| Codex | `dibs` skill, MCP tools | [plugins/codex](plugins/codex/README.md) |
+| opencode | `dibs` skill, MCP tools, task panel | [plugins/opencode](plugins/opencode/README.md) |
+| Cursor | `dibs` skill, MCP tools | [plugins/cursor](plugins/cursor/README.md) |
 
 Pi loads dibs as a library. Every other agent runs the CLI through `npx -y @dibs.ai/dibs`.
 
@@ -69,11 +69,11 @@ The CLI finds the project by walking up from the current directory to the neares
 
 ## Init and doctor
 
-`init` explicitly creates empty durable storage and preserves existing tasks. Optional `--from dex` performs the [one-time import](#dex-import). Setup behavior is implemented in [`src/cli/index.ts`](src/cli/index.ts) and the core [`init-adapter`](src/core/init-adapter.ts), [`init-connection`](src/core/init-connection.ts), and [`init-agent`](src/core/init-agent.ts) modules.
+`init` explicitly creates empty durable storage and preserves existing tasks. Optional `--from dex` performs the [one-time import](#dex-import). Setup behavior is implemented in [`packages/dibs/src/cli/index.ts`](packages/dibs/src/cli/index.ts) and the core [`init-adapter`](packages/dibs/src/core/init-adapter.ts), [`init-connection`](packages/dibs/src/core/init-connection.ts), and [`init-agent`](packages/dibs/src/core/init-agent.ts) modules.
 
 In a TTY, `init` asks whether to enable Things with a yes/no prompt that defaults to no. Without a TTY, it instructs the agent to ask the user, then rerun `dibs init --adapter things` or `dibs init --adapter none`. An existing adapter choice is retained unless explicitly changed.
 
-For enabled Things, use `dibs init --connect` to consent to connection setup. Choosing `--adapter things` also consents to that setup. A TTY can request hidden token input; without a TTY, set `DIBS_THINGS_TOKEN` privately before rerunning. Never put tokens in chat or CLI arguments. See [Things connection](src/core/adapters/things/README.md#connect).
+For enabled Things, use `dibs init --connect` to consent to connection setup. Choosing `--adapter things` also consents to that setup. A TTY can request hidden token input; without a TTY, set `DIBS_THINGS_TOKEN` privately before rerunning. Never put tokens in chat or CLI arguments. See [Things connection](packages/dibs/src/core/adapters/things/README.md#connect).
 
 The connection probe calls only the adapter's `.list()` through `osascript`. It never syncs, creates, or updates tasks. macOS may show a real Automation permission prompt. A valid token shape and successful read do not authenticate the token for writes. Enabled Things without credentials remains pending.
 
@@ -87,11 +87,11 @@ Ask the user before passing `--install-agent`: the flag records prior consent. W
 
 Existing skill files and conflicting configuration or server entries are preserved, not overwritten. Review pending instructions for manual action. Reload Pi or restart the selected host after setup.
 
-`init` owns installation and external connection operations, then automatically runs [`doctor`](src/core/doctor.ts). Standalone `dibs doctor` executes no commands, contacts no adapters, acquires no write locks, and writes no files. It checks storage, registry, identity, bounded agent configuration evidence, and enabled Things credential shape. Warnings exit 0; errors exit 1.
+`init` owns installation and external connection operations, then automatically runs [`doctor`](packages/dibs/src/core/doctor.ts). Standalone `dibs doctor` executes no commands, contacts no adapters, acquires no write locks, and writes no files. It checks storage, registry, identity, bounded agent configuration evidence, and enabled Things credential shape. Warnings exit 0; errors exit 1.
 
 Saved storage is not rolled back when connection, agent setup, or verification fails; `init` exits 1 for those errors. Pending setup can exit 0. `init --json` emits one JSON document with nested `connection`, `agentSetup`, and `doctor` results plus pending instructions. JSON mode does not prompt; inspect these results rather than treating exit 0 as completed setup.
 
-Configuration evidence does not prove package installation or tools loaded in the current session. The agent must inspect its available tool inventory for `todo_list`, `todo_create`, `todo_edit`, `todo_status`, `todo_link`, and `todo_resolve`, without invoking task tools or syncing. Standalone doctor cannot prove runtime registration; see [`agent-verification.ts`](src/core/agent-verification.ts).
+Configuration evidence does not prove package installation or tools loaded in the current session. The agent must inspect its available tool inventory for `todo_list`, `todo_create`, `todo_edit`, `todo_status`, `todo_link`, and `todo_resolve`, without invoking task tools or syncing. Standalone doctor cannot prove runtime registration; see [`agent-verification.ts`](packages/dibs/src/core/agent-verification.ts).
 
 Doctor warns when CLI ownership falls back to a shared name. Set a distinct `DIBS_SESSION` per agent session and reuse it across that session's CLI calls. This guidance does not change the [claim semantics](#cli).
 
@@ -111,7 +111,7 @@ Each task is one JSON object per line:
 | `created_by` | Agent name, or `@user` for a human |
 | `human` | GitHub username of the human in the loop; `create` defaults it to you |
 
-`+projects`, `@contexts` and other `key:value` tags stay in `name`. The schema is `Task` in [`src/core/todo.ts`](src/core/todo.ts).
+`+projects`, `@contexts` and other `key:value` tags stay in `name`. The schema is `Task` in [`packages/dibs/src/core/todo.ts`](packages/dibs/src/core/todo.ts).
 
 Export writes each task as a [todo.txt](https://github.com/todotxt/todo.txt) line, carrying the dibs fields as `dibsid:`, `dibsstart:`, `dibsdesc:`, `dibsparent:`, `dibsresult:`, `dibsby:`, `dibshuman:` and `dibsblocked:` tags. Import reads those tags back and skips `dibsid:`s already in the store. Export does not overwrite an existing file.
 
@@ -143,13 +143,13 @@ The project's `config.json` holds its id and its settings, and stays in the proj
 | `scope` | `project` (default), `global` or `temp`; read only from the global config or `DIBS_SCOPE` |
 | `file` | An explicit todos file that overrides `scope`; `~/` expands, and relative paths resolve from the working directory |
 
-Each `config.json` that dibs writes starts with a `$schema` URL pinned to the dibs version that wrote it, so editors check every option; reads never rewrite it. The schema is [`schema.json`](schema.json), and Things options are in [`things.schema.json`](src/core/adapters/things/things.schema.json).
+Each `config.json` that dibs writes starts with a `$schema` URL pinned to the dibs version that wrote it, so editors check every option; reads never rewrite it. The schema is [`packages/dibs/schema.json`](packages/dibs/schema.json), and Things options are in [`things.schema.json`](packages/dibs/src/core/adapters/things/things.schema.json).
 
 Changing `scope` or `file` selects a different store without moving tasks; use export and import to carry them over. Invalid config raises an error.
 
 ## Dex import
 
-Run `dibs init --from dex` to copy Dex tasks into a durable dibs store once. The importer in [`src/core/imports/dex.ts`](src/core/imports/dex.ts) only reads Dex through `dex list --all --json`; it does not write to Dex.
+Run `dibs init --from dex` to copy Dex tasks into a durable dibs store once. The importer in [`packages/dibs/src/core/imports/dex.ts`](packages/dibs/src/core/imports/dex.ts) only reads Dex through `dex list --all --json`; it does not write to Dex.
 
 The `dex` CLI must be on `PATH`. Configure Dex with `.dex/config.toml` in the current folder or an ancestor, or with `$XDG_CONFIG_HOME/dex/dex.toml` (default: `~/.config/dex/dex.toml`). The importer refuses temporary Dex storage.
 
@@ -157,19 +157,19 @@ The import preserves task IDs, names, descriptions, parents, blockers, started/c
 
 Existing IDs are skipped, preserving local edits. If `sync/dex.jsonl` contains legacy links, the importer uses them to map Dex IDs and relationships to local IDs. Repeating the import adds only missing tasks.
 
-Legacy `adapters.dex` configuration is still accepted, but enabling its `sync` setting reports an actionable error directing you to this import. Remove the Dex adapter setting after importing. See [`test/dex-init.test.ts`](test/dex-init.test.ts) for import and initialization checks.
+Legacy `adapters.dex` configuration is still accepted, but enabling its `sync` setting reports an actionable error directing you to this import. Remove the Dex adapter setting after importing. See [`packages/dibs/test/dex-init.test.ts`](packages/dibs/test/dex-init.test.ts) for import and initialization checks.
 
 ## Adapters
 
 The Things 3 adapter syncs the dibs store both ways with Things. Todoist is not implemented. Pi and the MCP server sync every enabled adapter before each task list and after each change; the CLI syncs only on `dibs sync`. When another process is already syncing an adapter, the new run skips it instead of waiting. Each README covers connecting, synced fields and limits:
 
-- [Things 3](src/core/adapters/things/README.md)
+- [Things 3](packages/dibs/src/core/adapters/things/README.md)
 
 ## Documentation
 
-- Agent setup: [Pi](agents/pi/README.md), [Claude Code](agents/claude-code/README.md), [Codex](agents/codex/README.md), [opencode](agents/opencode/README.md), [Cursor](agents/cursor/README.md)
-- The skill agents follow: [`agents/shared/skills/dibs/SKILL.md`](agents/shared/skills/dibs/SKILL.md)
-- Adapters: [Things 3](src/core/adapters/things/README.md)
+- Agent setup: [Pi](plugins/pi/README.md), [Claude Code](plugins/claude-code/README.md), [Codex](plugins/codex/README.md), [opencode](plugins/opencode/README.md), [Cursor](plugins/cursor/README.md)
+- The skill agents follow: [`packages/dibs/skills/dibs/SKILL.md`](packages/dibs/skills/dibs/SKILL.md)
+- Adapters: [Things 3](packages/dibs/src/core/adapters/things/README.md)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
 - Development, project structure and releases: [CONTRIBUTING.md](CONTRIBUTING.md)
 

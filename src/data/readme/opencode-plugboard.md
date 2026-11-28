@@ -33,7 +33,7 @@ This adds plugboard to your global OpenCode config (`~/.config/opencode/opencode
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.66.0",
+      "package": "opencode-plugboard@0.68.0",
       "options": {
         "keys": { "my-app": "{env:PLUGBOARD_KEY_MY_APP}" },
         "models": "all",
@@ -70,6 +70,10 @@ Any SDK works the same way: set its base URL to `http://127.0.0.1:4010/v1` (Anth
 | Models | `GET /v1/models`, `GET /v1/models/{id}` |
 
 Streaming, tool calls, structured output, images, PDFs and reasoning output work through the usual SDK calls.
+
+`tool_choice` is a request, not a guarantee: OpenCode's session API has no tool-choice control, so
+`required` and a named function reach the model as an instruction plus that tool's list, and a model
+that ignores the instruction answers in text. The call is still a normal 200 response, never an error.
 
 ## Works with
 

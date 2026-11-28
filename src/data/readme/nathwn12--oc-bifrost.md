@@ -4,21 +4,25 @@
 
 ## Install
 
-Open [`packages/`](packages), or take a row from the table below. Each package installs on its own; nothing here requires the whole repository, and the root manifest is `private: true`, so there is nothing to install for the index itself.
+Open [`packages/`](packages), or take a row from the catalog below. Each package installs on its own; nothing here requires the whole repository, and the root manifest is `private: true`, so there is nothing to install for the index itself.
 
 ## Use it
 
+The catalog is grouped **Plugin → MCP → CLI → Repo**. Each package row links to its README and npm page; `oc-phone-link` also links its Android APK.
+
+**Version** is the source manifest version, not a live npm version. The separate registry check runs after publication.
+
 | Package | Kind | Version | What it does | Install |
 | --- | --- | --- | --- | --- |
-| janua | MCP | `0.5.2` | Persistent interactive terminals: spawn a program, write to it, read live output, resize it, kill it. | `npx @nathwn12/janua` |
-| oc-bifrost | plugin | `1.7.1` | Runs V1-era OpenCode plugins on OpenCode V2. | Add `@nathwn12/oc-bifrost` to `plugins`. |
-| oc-flight-deck | plugin | `0.24.0` | Live cost, token, cache and context telemetry in the sidebar. | Add `oc-flight-deck` to `plugins`. |
-| oc-harness-setup | CLI | `1.0.2` | Installs a Windows OpenCode starter, behind a doctor gate. | `npx --yes oc-harness-setup setup` |
-| oc-phone-link | plugin | `2.2.0` | Drives OpenCode from an Android phone on the same Wi-Fi with an in-server beacon, pinned TLS and one PIN. | Add `oc-phone-link` to `plugins`. |
-| oc-plugin-view | plugin | `0.2.0` | Lists every loaded server plugin in the sidebar. | `opencode plugin add oc-plugin-view` |
-| oc-talk | plugin | `0.6.2` | Sends addressed synthetic notes between sessions and reads the replies. | Add `oc-talk` to `plugins`. |
-| oc-title | plugin | `0.1.0` | Carries session state in the title: active, parked or closed, with scope refresh. | Add `oc-title` to `plugins`. |
-| rea-shim | CLI | `0.4.0` | Installs and launches Craft Anything on Windows x64, or serves it as a headless MCP with --mcp. | `npx -y rea-shim@latest` |
+| oc-bifrost | plugin | `1.7.1` | Runs V1-era OpenCode plugins on OpenCode V2. [README](packages/oc-bifrost/README.md) · [npm](https://www.npmjs.com/package/@nathwn12/oc-bifrost) | Add `@nathwn12/oc-bifrost` to `plugins`. |
+| oc-flight-deck | plugin | `0.24.0` | Live cost, token, cache and context telemetry in the sidebar. [README](packages/oc-flight-deck/README.md) · [npm](https://www.npmjs.com/package/oc-flight-deck) | Add `oc-flight-deck` to `plugins`. |
+| oc-phone-link | plugin | `2.2.0` | Drives OpenCode from an Android phone on the same Wi-Fi with an in-server beacon, pinned TLS and one PIN. [README](packages/oc-phone-link/README.md) · [npm](https://www.npmjs.com/package/oc-phone-link) | Add `oc-phone-link` to `plugins`. [Android APK](https://github.com/nathwn12/oc-collections/releases/tag/oc-phone-link%402.3.0). |
+| oc-plugin-view | plugin | `0.2.0` | Lists every loaded server plugin in the sidebar. [README](packages/oc-plugin-view/README.md) · [npm](https://www.npmjs.com/package/oc-plugin-view) | `opencode plugin add oc-plugin-view` |
+| oc-talk | plugin | `0.6.2` | Sends addressed synthetic notes between sessions and reads the replies. [README](packages/oc-talk/README.md) · [npm](https://www.npmjs.com/package/oc-talk) | Add `oc-talk` to `plugins`. |
+| oc-title | plugin | `0.1.0` | Carries session state in the title: active, parked or closed, with scope refresh. [README](packages/oc-title/README.md) · [npm](https://www.npmjs.com/package/oc-title) | Add `oc-title` to `plugins`. |
+| janua | MCP | `0.5.2` | Persistent interactive terminals: spawn a program, write to it, read live output, resize it, kill it. [README](packages/janua/README.md) · [npm](https://www.npmjs.com/package/@nathwn12/janua) | `npx @nathwn12/janua` |
+| oc-harness-setup | CLI | `1.0.2` | Installs a Windows OpenCode starter, behind a doctor gate. [README](packages/oc-harness-setup/README.md) · [npm](https://www.npmjs.com/package/oc-harness-setup) | `npx --yes oc-harness-setup setup` |
+| rea-shim | CLI | `0.4.0` | Installs and launches Craft Anything on Windows x64, or serves it as a headless MCP with --mcp. [README](packages/rea-shim/README.md) · [npm](https://www.npmjs.com/package/rea-shim) | `npx -y rea-shim@latest` |
 | oc-collections | repo | — | This index and the npm-workspaces monorepo behind it. | — |
 
 An MCP goes into your client's server list, a plugin into `plugins` in your `opencode.jsonc`, and a CLI runs once.
@@ -46,7 +50,7 @@ bun run pack:check
 oc-collections/
 |-- packages/    one family package per directory
 |-- scripts/     index, docs, workspace and release checks
-|-- docs/        migrations and the release lane
+|-- docs/        maintainer map, architecture, migrations and releases
 |-- assets/      shared footer signature
 |-- .github/     ci.yml and release.yml
 `-- Cargo.toml   a virtual workspace with no members
@@ -62,6 +66,7 @@ A merge to `main` is the release: `docs/RELEASE.md` derives each package's versi
 
 - [Issues](https://github.com/nathwn12/oc-collections/issues)
 - [Packages on npm](https://www.npmjs.com/~nathwn12)
+- [Maintainer map](docs/MAINTAINING.md)
 - [Release lane](docs/RELEASE.md)
 - [Migrations](docs/MIGRATIONS.md)
 - [Changelog](CHANGELOG.md)

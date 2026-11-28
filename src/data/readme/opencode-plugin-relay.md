@@ -1,4 +1,4 @@
-# opencode-plugin-relay
+| The wire stalls, turns unspent, a wall of `empty-skip` | Tool-only turns carry no text parts — the relay forwards prose, not actions | Interleave one summary line per tool batch (the law above). A skipped turn costs nothing; retry is bounded, and `stall-timeout` means the relay disarmed and needs `/relay on` again |# opencode-plugin-relay
 
 [![CI](https://github.com/darkhipo/opencode-plugin-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/darkhipo/opencode-plugin-relay/actions/workflows/ci.yml)
 
@@ -45,7 +45,10 @@ is `-1` (indefinite) — set a finite `turns` unless you mean it.
 ## The law: the relay forwards prose, not actions
 
 **If your model's turns are tool-heavy, the relay pauses until prose resumes.
-Each skipped turn costs no budget.** A wall of `empty-skip` entries in
+Each skipped turn costs no budget.** Empty turns are retried with capped
+exponential backoff (2.5s through 30s by default, six attempts). Once the cap
+is reached the relay logs `stall-timeout` and disarms rather than waiting
+forever; re-arm with `/relay on` when the model is ready. A wall of `empty-skip` entries in
 `/relay status` means your model is working silently — not that the relay is
 broken. When collaborating over code, interleave a summary line after each
 tool batch; one line keeps the wire warm.
@@ -91,8 +94,9 @@ plugin is simply not loaded — there is no fallback path.
 `.opencode/plugins/` (per-project). Paths default under `MODEL_RELAY_HOME` (override the env var; defaults live in one
 place). Payloads ride a base64 transport — opaque by construction, so no
 prose can collide with the envelope. Run the tests with
-`node relay.test.mjs` (27 cases) and `node relay.integration.test.mjs` (11
-checks, ~10s). The first tests copies of the plugin's primitives. The second
+`node relay.test.mjs` (38 cases), `node relay.integration.test.mjs` (11
+checks, ~10s), and `node relay.empty-retry.integration.test.mjs` (5 checks,
+~15s). The first tests copies of the plugin's primitives. The second
 imports `index.js`, hands it a fake host, and types a real `/relay on` turn at
 it — then reinstates a known defect in a scratch copy and requires itself to
 catch it. Keep both: a copy cannot see a defect in the original's call graph.

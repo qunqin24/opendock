@@ -24,7 +24,7 @@
 | 远程指令 | `/new /cancel /status /sessions /history /models /agents /rename /progress /queue /ledger /send /undo /amend /goal /compact /redo /btw` |
 | 忙时 steer | 回合进行中收到新消息默认并入当前回合（官方 steer 语义）；`/queue <文本>` 显式排队；`QQ_BUSY_DEFAULT=queue` 切回经典 FIFO |
 | goal 模式 | `/goal <目标>` 直通引擎目标模式——状态变化通知 + kickoff 🎯 归属；`/goal` 查状态，pause/resume/clear 控制 |
-| 富媒体 | 收图（原生附件给 AI 看图）；**收语音**（QQ 内置 ASR 免费转文字进 prompt）；**发图/发文件**——AI 调原生 `qq_send_file` 工具（路径白名单+幂等去重+精确错误，失败会告诉你可以发哪些根目录；`QQ_SEND_FILE:` 标记保留为降级通道）或 `/send <路径>`，20MB 上限 |
+| 富媒体 | 收图（原生附件给 AI 看图）；**收语音**（QQ 内置 ASR 免费转文字进 prompt）；**收文本/PDF/Office 文档**（txt/md/代码等直接注入，docx/xlsx/pptx 本地提取文本，PDF 原样注入；旧版 doc/xls/ppt 明确指引转换）；**发图/发文件**——AI 调原生 `qq_send_file` 工具（路径白名单+幂等去重+精确错误，失败会告诉你可以发哪些根目录；`QQ_SEND_FILE:` 标记保留为降级通道）或 `/send <路径>`，20MB 上限 |
 | 引用上下文 | 长按引用某条消息提问，AI 能感知被引用的内容（我方回复也会入索引缓存） |
 | 长任务不丢 | 前台 30min 超时 → 后台等待（SSE + 轮询，最长 24h）；停滞 30min 主动提醒（带「已停滞/状态不明/已终结未回传」状态位 + 最近工具动作 + 无进展时长） |
 | 投递幂等 | 双层去重：同 msgId 跨进程原子占位 + 同内容在途指纹（窗口=并发在途；已完成消息的重发按重发处理）；同文长回复 24h 出站去重；「已收到」受理回执默认关（`QQ_ACK_RECEIPT=1` 调试召回） |
@@ -86,6 +86,13 @@ QQ_SANDBOX=false
 
 - **插件形态**：无需手动启动——装好插件 + 配好凭据后，插件巡检自动拉起 bot；opencode 服务重启也会自动恢复。
 - **独立部署形态**：`openqq` 前台运行；常驻按 OS 自选（Windows：`openqq service install` 注册计划任务；Linux `systemd --user`；macOS launchd 或 `nohup`）。
+
+### 停止与卸载（避免误解）
+
+- **停止 bot**：`openqq stop`（默认等待在途回合空闲，走监督矩阵优雅停止，不拉起新进程；停止后巡检不会复活，`openqq restart` 解除并恢复）。
+- **只移除自启**：`openqq service uninstall`（bot 仍可能继续运行）。
+- **完整停用**：`openqq service uninstall --stop-bot`（先注销自启，再受控停止 bot）。
+- **插件移除边界**：`opencode plugin remove @linjz/opencode-qqbot` 只移除 OpenCode 宿主内的引导与巡检，**不会停止已独立运行的 bot**；要彻底停用请再执行 `openqq service uninstall --stop-bot`。
 
 <details>
 <summary>Linux：systemd --user 单元（复制即用）</summary>
@@ -183,9 +190,9 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 | `QQ_DIGEST_ANSWER_MAX_CHARS` | 0（全文） | 摘要卡答案截断上限 |
 | `QQ_HISTORY_USER_CLIP` / `QQ_HISTORY_TEXT_CLIP` | 500 / 1200 | /history 用户/AI 行截断 |
 | `QQ_SEND_EXTRA_ROOTS` | — | `/send` 额外允许目录（逗号分隔） |
-| `QQ_ORPHAN_MS` | 90000 | 孤儿判定阈值（受理后无下文超此时长记孤儿；合法 5s~60min，非法回退默认） |
+| `QQ_ORPHAN_MS` | 90000 | 孤儿判定阈值（受理后无下文超此时长记孤儿；合法 5s 至 60min，非法回退默认） |
 | `QQ_WATCHDOG_INTERVAL_MS` | 300000 | 插件引导器巡检间隔（5min；计划任务侧由 service install 注册，默认 10min） |
-| `QQ_PERM_DEFER_MS` | 500 | 审批弹卡延迟判定窗（0~10s）：窗口内 ask 已被其他端处置则不推 QQ 卡，与桌面静默放行对齐 |
+| `QQ_PERM_DEFER_MS` | 500 | 审批弹卡延迟判定窗（0 至 10s）：窗口内 ask 已被其他端处置则不推 QQ 卡，与桌面静默放行对齐 |
 | `QQ_QUEUE_RECEIPTS` | 关 | 队列完成回执「队列 #N 完成」（批量排空防刷，默认关） |
 | `QQ_LOG_FILE` | `~/.openqq/openqq.log`（统一日志，bot 与看门狗同文件） | 进程内文件日志路径；滚动 20MB×4 代、总预算 100MB（`QQ_LOG_MAX_MB`/`QQ_LOG_KEEP`/`QQ_LOG_TOTAL_MB` 可调） |
 | `QQBOT_DEFAULT_CWD` | bot 进程工作目录 | 新会话默认项目目录（目录继承链兜底值） |

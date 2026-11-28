@@ -1,6 +1,6 @@
 # ystack
 
-A single Claude Code plugin (`ycc`) bundling workflow orchestration, parallel planning, documentation, research, and project management. The repository also generates native packages for Cursor, Codex, opencode (the npm plugin `@yandy-r/ycc-opencode`), OMP (oh-my-pi), and Google Antigravity (experimental).
+A single Claude Code plugin (`ycc`) bundling workflow orchestration, parallel planning, documentation, research, and project management. The repository also generates native packages for Cursor, Codex, opencode (the npm plugin `@yandy-r/ycc-opencode`), OMP (oh-my-pi), Google Antigravity (experimental), and Muse Code.
 
 > **2.0.0 breaking change.** Versions ≤ 1.x shipped 9 separate plugins (`ask`, `plan-workflow`, `git-workflow`, `implement-plan`, `code-report`, `deep-research`, `orchestrate`, `write-docs`, `project`). 2.0.0 collapses all of them into a single `ycc` plugin so every skill is accessible via `ycc:{skill}`. Re-install after upgrading.
 > **Migration: `/ycc:ask` and `ycc:ask` retired.** For read-only codebase questions, ask the main session to delegate to `ycc:codebase-advisor`. Request explicit search gaps, assumptions, and analyzed/skipped scope in the answer. Request implementation separately.
@@ -107,6 +107,7 @@ The plugin bundles **55** specialized agents covering codebase analysis, languag
 - **opencode:** generated, opencode-native agent markdown files live in [`.opencode-plugin/agents/`](.opencode-plugin/agents/) (produced from `ycc/agents/`) and ship inside the npm plugin `@yandy-r/ycc-opencode` (see the [opencode install guide](docs/install/opencode.md)). Invoke via `@agent-name` or the native v2 `subagent` tool.
 - **OMP:** generated task agents live in [`packages/omp/ycc/agents/`](packages/omp/ycc/agents/) (produced from `ycc/agents/` — see the [OMP install guide](docs/install/omp.md)). They are OMP task agents with `@role` models.
 - **Antigravity:** generated agents live in [`packages/antigravity/ycc/agents/`](packages/antigravity/ycc/agents/) (produced from `ycc/agents/` with Antigravity tool names and `pro`/`flash` models — see the [Antigravity install guide](docs/install/antigravity.md)).
+- **Muse Code:** generated agents live in [`packages/muse/ycc/agents/`](packages/muse/ycc/agents/) (produced from `ycc/agents/` with Muse's native tool names — see the [Muse install guide](docs/install/muse.md)).
 
 **Contributing:** before proposing a new skill or agent, read the Scope & Guardrails policy in [`CONTRIBUTING.md`](CONTRIBUTING.md#scope--guardrails).
 
@@ -176,6 +177,11 @@ installs the `ycc`, `ycc-mcp` and `ycc-rules` plugins there (through
 `agy plugin install` when `agy` is on `PATH`). See
 [`docs/install/antigravity.md`](docs/install/antigravity.md).
 
+Muse Code: from a checkout, `./install.sh install --target muse`
+copies the `ycc`, `ycc-mcp` and `ycc-rules` plugins to `~/.local/share/ycc/muse/` and
+registers them with `muse plugins install` (then approves their agents and MCP
+servers). See [`docs/install/muse.md`](docs/install/muse.md).
+
 opencode (`>=2.0.30`) loads ycc as one npm plugin. From a checkout,
 `./install.sh install --target opencode` writes its `plugins` entry into
 `~/.config/opencode/opencode.json` (`--mode repo` pins the published
@@ -199,6 +205,7 @@ and desktop app notes, use the dedicated install guides. Recommended sync form:
 ./install.sh install --target cursor --rules --mcp --hooks              # register the marketplace + /plugins hint
 ./install.sh install --target omp                                       # OMP via omp plugin
 ./install.sh install --target antigravity                               # Antigravity plugins in ~/.gemini/config
+./install.sh install --target muse                                      # Muse Code plugins via muse plugins install
 ./install.sh install --target opencode --settings --rules               # @yandy-r/ycc-opencode + project settings + AGENTS.md
 ./install.sh sync --target claude --intent mcp                           # current project
 ./install.sh sync --target claude --intent mcp --global                  # user-global
@@ -241,6 +248,7 @@ Dedicated guides:
 | `~/.agents/skills` (Zed etc) | [`docs/install/agents.md`](docs/install/agents.md)           |
 | OMP (oh-my-pi)               | [`docs/install/omp.md`](docs/install/omp.md)                 |
 | Google Antigravity           | [`docs/install/antigravity.md`](docs/install/antigravity.md) |
+| Muse Code                    | [`docs/install/muse.md`](docs/install/muse.md)               |
 | Shared installer concepts    | [`docs/install/README.md`](docs/install/README.md)           |
 | Native package reference     | [`docs/install/v6/README.md`](docs/install/v6/README.md)     |
 

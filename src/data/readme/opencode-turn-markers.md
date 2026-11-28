@@ -123,6 +123,14 @@ commit the result with every change. `bun run typecheck` checks the types.
 Keep the package free of runtime dependencies, and don't add `build`, `prepare`, `prepack` or `install` scripts. Any of
 those makes npm prepare the Git checkout on install, which `opencode plugin add` can't do.
 
+### Releasing
+
+1. Bump `version` in `package.json`, run `bun run bundle`, and merge.
+2. Create a GitHub release with the tag `v<version>`, for example `v0.3.0`.
+
+The release starts the "Publish to npm" workflow. It checks that the tag matches `package.json` and that the committed
+bundle matches the source, then publishes to npm through npm trusted publishing, so no npm token is stored anywhere.
+
 ## License
 
 [MIT](https://github.com/sepatel/opencode-turn-markers/blob/main/LICENSE)

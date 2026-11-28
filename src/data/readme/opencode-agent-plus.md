@@ -2,15 +2,93 @@
 
 Per-agent reminders, request settings and safe-command auto-allow for [OpenCode](https://opencode.ai) v2.
 
-Set `chat_template_kwargs` (like `enable_thinking`), sampling settings (`temperature`, `top_p`, `min_p`,
-penalties) and a system reminder for each OpenCode agent. Works with llama.cpp, LiteLLM and other OpenAI-compatible
-servers, and with thinking models like Qwen.
+## Why this plugin exists?
 
-Auto-allows read-only tool calls and safe shell commands (`ls`, `cat`, `git status`, `docker compose ps`, …), so
-with `shell: ask` in your permissions you get no prompt window for them — everything else still asks.
+OpenCode v2 is a capable coding agent, but in daily use — especially with local and small models — we kept running into
+the same friction points. agent-plus is a **collection of experiments** addressing each one. None of these are proven
+solutions; they are ideas that seemed worth trying, and some of them work well enough to keep around.
 
-OpenCode v2 drops request settings such as `temperature` for OpenAI-compatible providers, and has no per-agent
-reminder. agent-plus reads extra keys from the agent's `.md` file and applies them to every model request.
+### 1. System prompt drift (reminders)
+
+The system prompt sits at the very start of the conversation. As messages and tool output pile up, the model seems to
+pay less attention to it and drifts: longer answers, extra unrequested work, guessing instead of asking. This matches
+the **"lost in the middle"** effect — LLMs show a U-shaped attention bias, favoring the start and end of the input and
+neglecting the middle ([Liu et al., 2023, arXiv:2307.03172](https://arxiv.org/abs/2307.03172);
+[Hsieh et al., 2024, ACL Findings](https://arxiv.org/abs/2403.04799)).
+
+**Idea:** inject a short reminder as the last message of every request, right where the model starts writing.
+
+**Upstream requests:** [anomalyco/opencode#14210](https://github.com/anomalyco/opencode/issues/14210) (configurable
+per-agent reminders), [#25753](https://github.com/anomalyco/opencode/issues/25753) (extensible lifecycle message
+injection), [#12498](https://github.com/anomalyco/opencode/issues/12498) (config-driven agent system). All open or
+stale.
+
+### 2. Unnecessary tool calls (auto green light)
+
+Agents often call tools even when they could answer directly. Each wasted call costs latency, tokens, and risk.
+Research suggests models **already know** when a tool is needed — the signal is linearly decodable from hidden states
+(AUROC 0.89–0.96) — but they fail to act on it during generation
+([Sun et al., 2025, arXiv:2605.09252](https://arxiv.org/abs/2605.09252)). Prompt-only suppression cuts necessary calls
+too; reasoning about tool necessity still hurts hard tasks.
+
+**Idea:** before the first tool call of each turn, a hidden judge (same model, same context) decides whether the call
+seems justified. Deny with a reason; the model must explain or ask instead.
+
+**Related:** [tool-gates](https://github.com/camjac251/tool-gates) does rule-based gating (YAML patterns, AST parsing)
+for Claude Code and Codex. agent-plus tries model self-judgment instead — no rules to maintain.
+
+### 3. No per-agent request settings (temperature, thinking, etc.)
+
+OpenCode v2 dropped `temperature`, `top_p`, `reasoning_effort`, and `chat_template_kwargs` for OpenAI-compatible
+providers. There is no built-in way to set them per agent.
+
+**Idea:** read them from agent `.md` frontmatter and inject into every request body.
+
+### 4. Permission fatigue (safe commands)
+
+With `shell: ask`, every `ls` or `git status` pops a prompt. Users tend to approve reflexively, which defeats the
+purpose.
+
+**Idea:** auto-allow a curated list of read-only tools and commands. Anything with pipes, subshells, or unknown flags
+still asks.
+
+### 5. Model drift and loops (anti-repetition, anti-loop, verifier)
+
+Small models sometimes repeat text endlessly or call the same tool in a loop. They also over-explain, use jargon, or
+state facts without checking — especially when the system prompt says "be concise" but the model has forgotten it by
+turn 20.
+
+**Idea:**
+- `max_word_repeat` — cut the stream when text loops.
+- `max_tool_repeat` — deny the 6th identical call.
+- `verifier` — after each turn, a judge checks the reply against the rules and injects a correction if needed.
+
+**Related:** self-verification as hallucination mitigation is an active research area
+([Moncada-Ramirez et al., 2025](https://arxiv.org/abs/2509.18970);
+[MeCo, ACL 2025, arXiv:2502.12961](https://arxiv.org/abs/2502.12961)).
+
+### 6. No idle-time planning (pondering)
+
+Agents only think when the user sends a message. Between turns, they sit idle even when the next step seems obvious.
+
+**Idea:** when the session goes idle, run one quiet generate (not saved to history). The result rides into the next
+user message as a `<pondering>` block the model uses silently.
+
+### 7. No hands-off loop (clockwork)
+
+For long tasks (refactors, migrations), you want the agent to keep going without clicking "continue" every 30 seconds.
+
+**Idea:** a judge reads the plan and progress after each turn, replies CONTINUE / WAIT / DONE, and the plugin drives
+the loop.
+
+### What is unique here
+
+Existing tools cover pieces: [tool-gates](https://github.com/camjac251/tool-gates) (rule-based permission gates),
+Sage by Pillar Security (enterprise policy enforcement), Claude Code's built-in hooks (pattern matching). None combine
+model self-judgment, reminder injection, self-verification, idle thinking, and hands-off loops — all configured from
+agent frontmatter with no external config files.
+
+---
 
 ![agent-plus settings in the OpenCode sidebar](screenshot.png)
 
@@ -80,7 +158,7 @@ You help the user write and edit text.
 
 | Key | Value | Effect |
 | --- | --- | --- |
-| `reminder` | `concise`, `off`, or text (one line or a `\|` block) | Preset or custom reminder, added as the last message of every model request |
+| `reminder` | `concise`, `off`, or text (one line or a `\|` block) | Built-in or custom reminder, added as the last message of every model request |
 | `on_error_command` | shell command, one line or a `\|` block | Run when a request fails with a connection error (server off), then retry |
 | `safe_commands` | `off` (default: on) | Turn safe-command auto-allow off for this agent |
 | `max_word_repeat` | `on` or `off` (default: off) | Stop the reply when the model repeats the same text |
@@ -98,6 +176,8 @@ You help the user write and edit text.
 | `misplaced_tag_filter` | `on` or `off` (default: off) | Replace leaked tag signs in thinking/message text |
 | `show_settings_on_sidebar` | `on` or `off` (default: on) | Show this agent's settings in the TUI sidebar |
 | `clockwork` | `on` or `off` (default: off) | Run the agent hands-off with auto-continue |
+| `verifier` | `on` or `off` (default: off) | After each turn, judge the reply and nudge the agent to self-correct |
+| `verifier_max_nags` | number, or `fib` (default: `1`) | Max correction nudges per user turn; `fib` uses Fibonacci windows |
 
 Names are sent as written. A setting with a wrong value is not sent.
 
@@ -108,7 +188,7 @@ has a row:
 
 - Toggles (`on` / `off`) flip with **space**.
 - Choice rows (`reasoning_effort`, `temperature`, …) offer the valid values in a picker.
-- `reminder` offers the presets, `edit…` for your own text, and `off`.
+- `reminder` offers the built-in names, `edit…` for your own text, and `off`.
 - Every row has a `default (…)` option that removes the key from the file, so the model default applies.
 
 Choices are written straight into the agent's `.md` frontmatter (agent-plus keys are kept first, in menu order), so
@@ -127,7 +207,7 @@ the most.
 
 Before every model request, agent-plus adds one message at the end of the conversation with the agent's `reminder`.
 
-`reminder` takes a preset name (`concise`, `off`) for wording held in
+`reminder` takes a built-in name (`concise`, `off`) for wording held in
 the plugin, or your own text (more than 3 words). A short unknown value means
 `off`.
 
@@ -228,8 +308,13 @@ With `manual_green_light: on`, tool calls are denied unless your latest message 
 3 words), like "run the tests, go". Deny messages tell you to approve or answer without tools. The `read` tool
 is always allowed. Set your own words with `manual_green_light_words: yes, do, go`.
 
-With `auto_green_light: on`, the model checks itself before the first tool call of each turn: it must allow the call
-and state its plan, or explain why it cannot. The check fires once per turn and is not saved in the chat history.
+With `auto_green_light: on`, before the first non-read tool call of each turn a hidden judge request checks whether the call is justified. The judge denies when:
+
+- The user's last message ends with `?` or `>` (typo of `?`) — always denied, no exceptions.
+- The user is in the middle of a chat or trying to understand code.
+- The agent's intent is unclear, based on assumptions, or the tool call is irrelevant.
+
+If allowed, the tool runs normally. If denied, the model gets the judge's reason and must explain to the user or ask a question instead. The `read` tool is always allowed. The check fires once per turn and is not saved in the chat history.
 
 ## Tool overrides
 
@@ -262,6 +347,16 @@ replies with one word:
   "JOB COMPLETED" line and stops the loop.
 
 Only agents with `clockwork: on` are affected.
+
+## Verifier
+
+With `verifier: on`, after each finished turn a hidden judge checks the agent's last reply for: over-explaining,
+jargon, drifting from the system prompt, losing the user's goal, unrequested actions, or unsourced facts. If a problem
+is found, a correction message (phrased as if from the user) is injected asking the agent to fix it. Messages always
+reach you — the verifier never blocks output.
+
+`verifier_max_nags` limits how many nudges fire per user turn: a number (`1`, `2`, …) caps it, or `fib` uses growing
+Fibonacci windows (one nudge per window, no hard cap).
 
 ## Notes
 

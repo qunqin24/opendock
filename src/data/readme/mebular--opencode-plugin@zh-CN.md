@@ -185,6 +185,12 @@ await mebular.initialize();
 
 </details>
 
+**发布状态。** v0.3.5 是最新已发布版本。v0.3.7 是记忆介入策略线的发布候选（在
+`release/v0.3.7` 准备，尚未打 tag 或发布），包含该设计的**完整实现**。真实 API provider
+校验**延后**；DSH、Hermes、OpenChamber Desktop 与真实宿主模型仍属发布门禁。当前真实证据
+矩阵为 6/20 格；外部格保持 `blocked_external`，绝不用 fake/stub 补格。详见
+[0.3.7 发布准备报告](docs/quality/0.4.0-intervention/0.3.7-release-readiness.md)。
+
 <div align="center">
 
 v0.3.5 · early · MIT · © 2026 Sobert Li

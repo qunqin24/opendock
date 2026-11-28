@@ -97,7 +97,9 @@ for 15 seconds.
 
 The endpoint sends no CORS header, so a browser window cannot call it directly. The plugin's server
 part polls and caches it, and the GUI reads that cache over RPC: one request per OpenCode server, not
-one per window. The status page's HTML is never parsed.
+one per window. The desktop app's own server holds the cache for every window, so a session on
+another OpenCode server reads the same status; that server does not need the plugin. The status
+page's HTML is never parsed.
 
 Every field, the service and reason enumerations, the speed units, the history buckets and the
 staleness rules are documented in [`docs/status-feed.md`](https://github.com/hamster007Github/OpenCodeStatusPlugin/blob/main/docs/status-feed.md).
@@ -173,7 +175,7 @@ opencode plugin update opencode-status-plugin    # just this one
 opencode plugin list                             # what is installed
 ```
 
-An entry pinned to an exact version (`"opencode-status-plugin@0.1.0"`) is skipped by both commands:
+An entry pinned to an exact version (`"opencode-status-plugin@0.1.1"`) is skipped by both commands:
 drop the version, or run `opencode plugin add opencode-status-plugin@0.2.0`. A local path is never
 updated by the CLI, because you edit that directory yourself.
 

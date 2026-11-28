@@ -39,7 +39,7 @@ Register the exact version once, globally. `setup` performs the
 registration itself as one of its plan steps, so a single command installs:
 
 ```powershell
-npx opencode-spotify@0.6.0-beta.3 setup
+npx opencode-spotify setup
 ```
 
 Re-running `setup` on an already-registered install opens the maintenance menu
@@ -99,11 +99,11 @@ it needs; the host does not inject them.
 ## Updates, repair, and uninstall
 
 ```powershell
-npx opencode-spotify@0.6.0-beta.3 update --dry-run
-npx opencode-spotify@0.6.0-beta.3 status --json
-npx opencode-spotify@0.6.0-beta.3 doctor
-npx opencode-spotify@0.6.0-beta.3 repair
-npx opencode-spotify@0.6.0-beta.3 uninstall
+npx opencode-spotify update --dry-run
+npx opencode-spotify status --json
+npx opencode-spotify doctor
+npx opencode-spotify repair
+npx opencode-spotify uninstall
 ```
 
 `--json` is supported by `status` and `doctor` only; it is rejected with exit 2 for

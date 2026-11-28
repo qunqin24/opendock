@@ -11,6 +11,7 @@ An OpenCode plugin that gives side questions a thread of their own.
 - [Getting started](#getting-started)
   - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Working in the window](#working-in-the-window)
+  - [Reasoning in side answers](#reasoning-in-side-answers)
 - [Things to keep in mind](#things-to-keep-in-mind)
 - [Compatibility](#compatibility)
 - [Agent instructions](#agent-instructions)
@@ -67,6 +68,14 @@ The quick prompt list wraps on a narrow terminal. On a short terminal, it uses t
 If you close the window while an answer is being prepared, a `btw` badge appears below the input field. Click it to open the window for that session. The badge also appears when questions are waiting or a request has failed. You can close the window at any time and come back to it later.
 
 If an answer is empty or a request throws an error, the queue pauses. The failed question and every question behind it stay visible, and opening the window again keeps the error. Press `Enter` with an empty input field or click `retry question` to retry. Asking a new question also acknowledges the error and resumes the saved queue in order.
+
+### Reasoning in side answers
+
+The header shows how much side answers reason. It reads `reasoning as is` at first, and clicking it asks for the least reasoning the model offers. When the model can turn reasoning off, the label reads `reasoning off`. When it cannot, but has a cheaper level such as `low` or `minimal`, the label names that level instead. The command palette has the same action as "Toggle reasoning in side answers". There is no keyboard shortcut for it.
+
+The setting applies to the next question you ask, including one already waiting in the queue. A request that has already gone out keeps the setting it was sent with. It belongs to the plugin rather than to a session, so every window shows the same value, and it survives closing the window and restarting OpenCode.
+
+Side questions still use your session's model, and your main conversation keeps its own reasoning setting either way. Turning the toggle off asks the provider to skip reasoning when it can, or to use its cheapest cheaper level when it cannot skip reasoning completely. The level comes from the model's own catalogue, and the toast names the level the request will use. Some models offer nothing cheaper than `high`; for those the label reads `reasoning n/a` whatever the toggle says, and clicking it says the model has no useful reasoning level and leaves the setting alone. The question is still asked, and the answer may still think.
 
 ## Things to keep in mind
 

@@ -1,5 +1,9 @@
 # opencode-zai-limits
 
+```
+opencode plugin add opencode-zai-limits
+```
+
 A credit meter and usage report for the [Z.ai GLM Coding Plan](https://z.ai/subscribe), living inside
 [OpenCode v2](https://opencode.ai). It draws your credit usage into the status line right below the input field
 and gives you a `/zai-limits` command for the full report. Zero dependencies, zero tokens: both the meter and the

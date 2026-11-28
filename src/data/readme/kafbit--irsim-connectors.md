@@ -261,7 +261,7 @@ bun test --isolate
 
 `make serve` runs this checkout's canvas without installing it or updating the plugin. It installs `app/node_modules` on first use, then runs `bin/irsim serve` from `PROJECT` (default: this repo), for example `make serve PROJECT=~/Projects/CRM`. `PORT` and `DESIGN_DIR` are optional. `make reload` first stops the canvas that serves `PROJECT` (an installed release, for example) and this checkout's own `next dev`, because Next allows one per checkout, then runs `make serve`. It refuses to touch a port held by another project's canvas. `make port`, `make build`, `make preview` and `make thumbs` run the matching `irsim` commands the same way (`preview` takes `OUT`), and `make help` lists them.
 
-`bin/irsim serve` in a source checkout runs `next dev` in `app/`. `scripts/build-release.sh` builds `dist/irsim-<version>-<os>-<arch>.tar.gz` for the host platform. Pushing a tag `v<version>` builds all four platforms and attaches them to the release.
+`bin/irsim serve` in a source checkout runs `next dev` in `app/`. It watches the checkout: after a pull, checkout, merge, rebase or reset moves `HEAD`, it stops `next dev`, runs `bun install` when `app/bun.lock` is newer than `app/node_modules`, clears the dev cache `app/.next/dev`, and starts `next dev` again, and open tabs reload once. A new commit does not restart it. Without this, a running dev server keeps a cache of the old files and answers each page load with "HMR hash mismatch", so the page reloads in a loop. `irsim serve --fresh` clears the dev cache before it starts. `scripts/build-release.sh` builds `dist/irsim-<version>-<os>-<arch>.tar.gz` for the host platform. Pushing a tag `v<version>` builds all four platforms and attaches them to the release.
 
 ## License
 

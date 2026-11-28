@@ -45,11 +45,11 @@ Use your eligible Google Gemini accounts in **Pi**, **OpenClaw**, **OpenCode**, 
 | **Standalone MCP (stdio)** | `npx -y mcp-gemini-app` | `npx -y mcp-gemini-app login` · `quota` | [npm](https://www.npmjs.com/package/mcp-gemini-app) · [Guide](extensions/mcp/README.md) |
 | **Standalone CLI** | `npm i -g gemini-app-cli` *(or `npx -y gemini-app-cli ask "..."`)* | `gemini-app login` · `ask` · `search` · `--schema` · `--tools readonly` | [npm](https://www.npmjs.com/package/gemini-app-cli) · [Guide](extensions/cli/README.md) · [SKILL](extensions/cli/SKILL.md) |
 
-All 5 standalone packages run in-process over direct HTTP/2 (`15s` PING keepalives, `HTTPS_PROXY` support, 256 tools, parallel multimodal image uploads, automatic Free-tier `gemini-auto` filtering). The standalone CLI (`gemini-app-cli`) is built for one-shot pipelines, CI, and bash-enabled coding agents—adding validated JSON Schema outputs (`--schema`), local file/image attachments (`-f`/`-i`), and an opt-in read-only workspace loop (`--tools readonly` with `read`/`grep`/`find`/`ls`, zero writes, zero shell execution).
+All 5 standalone packages run in-process over direct single-account Google OAuth HTTP/2 (no gateway server required; `15s` PING keepalives, `HTTPS_PROXY` support, 256 tools, parallel multimodal image uploads, automatic Free-tier `gemini-auto` filtering). The standalone CLI (`gemini-app-cli`) is built for one-shot pipelines, CI, and bash-enabled coding agents—adding validated JSON Schema outputs (`--schema`), local file/image attachments (`-f`/`-i`), and an opt-in read-only workspace loop (`--tools readonly` with `read`/`grep`/`find`/`ls`, zero writes, zero shell execution).
 
-### Path B — Self-Hosted OpenAI-Compatible & MCP Gateway
+### Path B — Self-Hosted Multi-Account OpenAI-Compatible & MCP Gateway
 
-Requires **Node.js `>= 22`** (macOS / Linux / WSL2) or **Docker Compose**, plus a Google account with Gemini access (AI Studio API keys are a different service).
+Need **multi-account pooling, automatic failover, sticky sessions, or an Admin console**? Run the self-hosted gateway. Requires **Node.js `>= 22`** (macOS / Linux / Windows / WSL2) or **Docker Compose**, plus one or more Google accounts with Gemini access (AI Studio API keys are a different service).
 
 **Node.js:**
 

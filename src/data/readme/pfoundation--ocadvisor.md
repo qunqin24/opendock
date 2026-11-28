@@ -291,8 +291,8 @@ What the gate receives, in the same single TypeSafe request:
   Intelligence Index, and up to two reasoning/math results (HLE, GPQA, Math
   Index) when present. Artificial Analysis no longer publishes the Coding
   Index and the free endpoint carries no per-benchmark scores, so a snapshot
-  refreshed today compares on the Intelligence Index alone; the bundled
-  baseline predates that change. Code computes oriented differences
+  refreshed today, including the bundled baseline, compares on the
+  Intelligence Index alone. Code computes oriented differences
   (`advisor_minus_requester`); the model never does arithmetic. Scores that
   cannot be strictly compared carry an explicit `reason` (`effort_mismatch`,
   `effort_unknown`, `missing_requester`, …) and no delta.
@@ -360,13 +360,13 @@ first refresh. Regenerate the shipped data with
 --refresh-snapshot` (mappings only without the flag; the docs recommend
 refreshing the user snapshot instead of rerunning this).
 
-The default advisor, Claude Fable 5.2, was published after the bundled
-baseline (fetched 2026-09-23). Its bindings (both the `anthropic` and
-`opencode` routes, every effort) are pinned to the stable Artificial
-Analysis IDs from its public model page, so with the bundled baseline the
-advisor reports `missing_record` and the gate treats its scores as unknown.
-Run `ocadvisor benchmarks update` once to get Fable 5.2 scores; the
-bindings resolve without a plugin release.
+The bundled baseline was fetched 2026-11-28 (768 models, Intelligence Index
+v5) and includes the default advisor, Claude Fable 5.2. Its bindings (both
+the `anthropic` and `opencode` routes, every effort) are pinned to the stable
+Artificial Analysis IDs from its public model page. A model pinned this way
+before Artificial Analysis lists it reports `missing_record`, and the gate
+treats its scores as unknown until `ocadvisor benchmarks update` fetches a
+snapshot that contains it; the bindings resolve without a plugin release.
 
 ### Model mappings
 

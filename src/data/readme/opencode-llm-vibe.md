@@ -15,19 +15,21 @@ per-session style.
 
 ## Install
 
-Requires OpenCode 2.2+ and Node.js 22+.
+Requires OpenCode 2.4+ and Node.js 22+.
 
 ```sh
 opencode plugin add opencode-llm-vibe
 ```
 
 One entry loads both the server and TUI parts. Check the result with
-`opencode plugin list`, and run `/reload` if the sidebar does not appear.
+`opencode plugin list`, and run `/reload` if the sidebar does not appear. In
+OpenCode 2.4 the sidebar is hidden for subagent sessions and while another
+right-side panel or terminal is open.
 
 To pin a version:
 
 ```sh
-opencode plugin add opencode-llm-vibe@0.2.1
+opencode plugin add opencode-llm-vibe@0.2.2
 ```
 
 Manual configuration is also supported:

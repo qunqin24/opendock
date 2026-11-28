@@ -45,11 +45,11 @@
 | **獨立 MCP（stdio）** | `npx -y mcp-gemini-app` | `npx -y mcp-gemini-app login` · `quota` | [npm](https://www.npmjs.com/package/mcp-gemini-app) · [說明](extensions/mcp/README.md) |
 | **獨立 CLI** | `npm i -g gemini-app-cli` *（或 `npx -y gemini-app-cli ask "..."`）* | `gemini-app login` · `ask` · `search` · `--schema` · `--tools readonly` | [npm](https://www.npmjs.com/package/gemini-app-cli) · [說明](extensions/cli/README.md) · [SKILL](extensions/cli/SKILL.md) |
 
-全部 5 個獨立套件均在進程內直連原生 HTTP/2（`15s` PING 保活、`HTTPS_PROXY` 支援、256 工具宣告、並行多圖上載、免費帳號自動切換 `gemini-auto`）。獨立 CLI（`gemini-app-cli`）專為單次 pipeline、CI 與支援 bash 的 Coding Agent 設計，提供經校驗的 JSON Schema 結構化輸出（`--schema`）、本機檔案／多圖附加（`-f`/`-i`），以及可選的唯讀工作區分析迴圈（`--tools readonly`，支援 `read`/`grep`/`find`/`ls`，零寫檔、零 shell 執行）。
+全部 5 個獨立套件均在進程內以單帳戶 Google OAuth 直連原生 HTTP/2（無需啟動閘道伺服器；支援 `15s` PING 保活、`HTTPS_PROXY`、256 工具宣告、並行多圖上載、免費帳號自動切換 `gemini-auto`）。獨立 CLI（`gemini-app-cli`）專為單次 pipeline、CI 與支援 bash 的 Coding Agent 設計，提供經校驗的 JSON Schema 結構化輸出（`--schema`）、本機檔案／多圖附加（`-f`/`-i`），以及可選的唯讀工作區分析迴圈（`--tools readonly`，支援 `read`/`grep`/`find`/`ls`，零寫檔、零 shell 執行）。
 
-### 路線 B — 自架 OpenAI 相容與 MCP 閘道伺服器
+### 路線 B — 自架多帳戶 OpenAI 相容與 MCP 閘道伺服器
 
-需要 **Node.js `>= 22`**（macOS / Linux / WSL2）或 **Docker Compose**，以及具備 Gemini 存取權限的 Google 帳戶（AI Studio API Key 屬不同服務）。
+需要 **多帳戶池化、自動容錯（Failover）、Session 親和與維運管理台**？請啟動自架閘道。需要 **Node.js `>= 22`**（macOS / Linux / Windows / WSL2）或 **Docker Compose**，以及一或多個具備 Gemini 存取權限的 Google 帳戶（AI Studio API Key 屬不同服務）。
 
 **Node.js：**
 

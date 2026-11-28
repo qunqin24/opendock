@@ -1688,6 +1688,7 @@ The combiner exposes management tools that the LLM can call:
 - `combiner__collections`, `combiner__enable_collection` / `combiner__disable_collection` — server collections, switched for everyone
 - `combiner__session_enable_collection` / `combiner__session_disable_collection` / `combiner__session_reset_collection` — a collection on or off for the calling session only (see [collections](#collections--groups-of-servers-by-machine-or-purpose))
 - `combiner__session_hide_tools` / `combiner__session_show_tools` — hide or show individual tools (names or globs) for the calling session only
+- `combiner__server_instructions` — an upstream server's own instructions (what it sends MCP clients at connect). The combiner doesn't merge upstreams' instructions into its own — they'd be stale as servers come and go, and large across many servers — so a model fetches them for the server it's about to use
 
 ### Usage
 

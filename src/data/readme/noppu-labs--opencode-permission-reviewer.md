@@ -6,6 +6,8 @@
 [![OpenCode](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.29-6E56CF)](https://opencode.ai)
 [![Bun](https://img.shields.io/badge/Bun-%E2%89%A51.3.14-000000)](https://bun.sh)
 [![license](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue)](docs/NOTICE)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17186/badge)](https://www.bestpractices.dev/projects/17186)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/17186/baseline)](https://www.bestpractices.dev/projects/17186/baseline-2)
 
 ![OpenCode Permission Reviewer: an AI reviewer for every permission prompt. A request from the agent goes to the reviewer, which weighs the task, the policy and the evidence, then allows it, denies it or asks you.](https://raw.githubusercontent.com/noppu-labs/opencode-permission-reviewer/main/docs/images/social-preview.png)
 
@@ -167,11 +169,17 @@ and long commands.
 | [Compatibility](docs/COMPATIBILITY.md)     | Supported versions and troubleshooting                                   |
 | [Migration](docs/MIGRATION.md)             | Moving between OpenCode V1 and V2, rollback                              |
 | [Development](docs/DEVELOPMENT.md)         | Build output, live testing, compatibility matrix, benchmark, TUI screens |
+| [Architecture](docs/ARCHITECTURE.md)       | Actors, actions, and every external interface of the package             |
+| [Governance](docs/GOVERNANCE.md)           | Roles, and who holds access to the repository, npm and releases          |
 
 ## Contributing
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md). Report security issues privately as described in
-[SECURITY.md](docs/SECURITY.md).
+Report bugs and request features in
+[GitHub issues](https://github.com/noppu-labs/opencode-permission-reviewer/issues/new/choose),
+using the bug report or feature request template. Report security issues privately as described
+in [SECURITY.md](docs/SECURITY.md), not in a public issue. To change the code, see
+[CONTRIBUTING.md](docs/CONTRIBUTING.md); [GOVERNANCE.md](docs/GOVERNANCE.md) says who maintains
+the project and who holds access to what.
 
 ---
 

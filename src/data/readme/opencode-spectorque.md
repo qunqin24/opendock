@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="docs/releases.md#versioning-and-releases"><img src="https://img.shields.io/badge/product-0.3.0-173f4f" alt="Product version 0.3.0"></a>
-  <a href="#how-the-engine-works"><img src="https://img.shields.io/badge/engine-0.1.16-196d83" alt="Engine version 0.1.16"></a>
+  <a href="#how-the-engine-works"><img src="https://img.shields.io/badge/engine-0.1.21-196d83" alt="Engine version 0.1.21"></a>
   <a href="docs/rubric.md"><img src="https://img.shields.io/badge/rubric-epic--heuristic--1-196d83" alt="Rubric epic-heuristic-1"></a>
   <a href=".nvmrc"><img src="https://img.shields.io/badge/node-%E2%89%A522.20-339933?logo=nodedotjs&amp;logoColor=white" alt="Node.js 22.20 or later"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0 license"></a>
@@ -64,7 +64,7 @@ SpecTorque 0.3.0 is a **prerelease**, published on the `next` channel until the 
 | Platform | Install | Then |
 |---|---|---|
 | **Claude Code** (CLI and Desktop Code tab) | `claude plugin marketplace add jayanez/spec-torque`<br>`claude plugin install spectorque@spectorque` | `/spectorque` |
-| **Codex** (CLI and Desktop) | `codex plugin marketplace add jayanez/spec-torque`<br>`codex plugin add spectorque@spectorque` | [Bind a trusted worktree](integrations/codex/README.md#install-and-bind-a-worktree), then `open_spectorque` |
+| **Codex** (CLI and Desktop) | `codex plugin marketplace add jayanez/spec-torque`<br>`codex plugin add spectorque@spectorque` | [Bind a worktree](integrations/codex/README.md#install-and-bind-a-worktree), then `$spec-view` (inline viewer: Desktop only) |
 | **OpenCode** | Add `"opencode-spectorque@0.3.0"` to `plugins` in `~/.config/opencode/cli.json` (a terminal-only plugin) | `/spectorque` in a session |
 | **Pi** | `pi install npm:pi-spectorque@0.3.0` | `/spectorque` |
 | **ThinkRail** (runs Pi) | Install the Pi package `pi-spectorque` from ThinkRail's extensions, or run the Pi command above | `/spectorque` in a trusted project |
@@ -94,7 +94,7 @@ Open the printed loopback URL. Select the finding for `FR-001`, jump to its sour
 ## What's new in 0.3.0
 
 - **Native marketplace installs** for Claude Code and Codex (this repository is a marketplace for both), npm packages for OpenCode, Pi and ThinkRail, and the VS Code Marketplace for editors (Open VSX once its namespace is approved). One [release workflow](.github/workflows/release.yml) publishes them all from one commit with npm provenance.
-- **Engine 0.1.16** after the 0.2.x precision series: requirement IDs count only in a defining position (H3a), hard-wrapped continuations stay with their item (H5a), acceptance scenarios and validation tables count as verification evidence (H6, H6a), plan-local `R-n` labels and references qualified by another specification are no longer reported as undefined (H8, H9), demonstratives no longer read as pronoun subjects (H85), and Spec Kit `checklists/` are review context, not requirements (H7a). Each change went through the pre-registered replay, and those from engine 0.1.10 on show no change in corpus predictions; see [precision decisions](docs/precision-decisions.md).
+- **Engine 0.1.21** after the 0.2.x precision series, H106, H104a, H92a, H52 and H52c-a: requirement IDs count only in a defining position (H3a), hard-wrapped continuations stay with their item (H5a), acceptance scenarios and validation tables count as verification evidence (H6, H6a), plan-local `R-n` labels and references qualified by another specification are no longer reported as undefined (H8, H9), demonstratives no longer read as pronoun subjects (H85), and Spec Kit `checklists/` are review context, not requirements (H7a), and a labeled `Dependencies: T001` field counts for P1.3 (H106), and actors named by role (developer, operator, maintainer…) count for P2.1 and C1.1 when they act on the product, not on the spec (H104a), and the templates that Spec Kit and Spec Kitty install under `.specify/` and `.kittify/` are no longer discovered, listed or scored (H92a), and a specification heading that carries a requirement ID (`### REQ-001 — …`) counts as an identified requirement for I1.2 and I2.2 even when only scenario steps follow it (H52), and a scenario step that carries a modal (`- THEN the system SHALL lock the account`) is a requirement line (H52c-a). Each change went through the pre-registered replay, and those from engine 0.1.10 on show no change in corpus predictions; see [precision decisions](docs/precision-decisions.md).
 - **Work-tree-scoped discovery** with feature, folder and changed-on-branch scopes in every host, a shared presentation layer so every panel shows the same title, summary, finding card and disclaimer, and a refined workbench with collapsible, resizable panels.
 - **One product version** across the CLI, every host package, the catalogs and the citation, checked in CI. See the [changelog](CHANGELOG.md) and the [versioning policy](docs/releases.md#versioning-and-releases).
 
@@ -192,7 +192,7 @@ Install the plugin from the marketplace, start a session in the Code tab, then r
 <details>
 <summary><strong>Codex</strong> · inline viewer</summary>
 
-The viewer opens in the conversation from the project's local MCP server. Choose a scope and finding, preview a change, then hand off to the local workbench to approve or export. Opening it in Codex Desktop takes one model turn. The capture shows the viewer as Codex renders it, driven by a local MCP Apps host. [Install for Codex](integrations/codex/README.md) · [Codex Desktop capture](docs/assets/panels/codex-desktop.jpg)
+The viewer opens in the conversation from the project's local MCP server. Choose a scope and finding, preview a change, then hand off to the local workbench to approve or export. Opening the inline viewer in Codex Desktop takes one model turn. Open the workbench directly with the environment action or the optional `$spec-workbench` skill. The capture shows the viewer as Codex renders it, driven by a local MCP Apps host. [Install for Codex](integrations/codex/README.md) · [Codex Desktop capture](docs/assets/panels/codex-desktop.jpg)
 
 [![SpecTorque 0.3.0 inline viewer with the summary, dimensions, finding card and change preview](docs/assets/panels/codex.png)](docs/assets/panels/codex.png)
 

@@ -27,7 +27,7 @@ packages:
 - [`packages/core`](packages/core): the code that loads the catalogs and
   matches patterns
 
-Everything targets **Effect `4.1.0` (stable)**.
+Everything targets **Effect `4.1.7` (stable)**.
 
 ## How the agent plugins help
 

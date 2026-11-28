@@ -185,6 +185,8 @@ ACP 使用自己的配置文件，按以下顺序加载：
 
 `logLevel` 支持 `debug`、`info`、`warn`、`error` 和 `silent`，默认值为 `info`。`debug: true` 会覆盖日志级别并启用完整调试日志及按请求快照。
 
+压缩完成、配置警告与更新提示仅写入日志，不向会话添加输入，也不触发会话执行。`pruneNotification`、`pruneNotificationType` 与 `compress.showCompression` 保留配置兼容性，但不再控制后台展示；模型上下文提醒不受这些设置影响。用户主动执行 `/acp` 的反馈仍沿用现有会话输入通道，不是纯展示通知。
+
 ### Prompt 覆盖
 
 ACP 暴露六个可编辑的 prompt：

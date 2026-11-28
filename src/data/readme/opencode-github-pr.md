@@ -435,8 +435,9 @@ make test-e2e OPENCODE_BIN=/path/to/opencode
 ```
 
 CI runs the full test suite against the latest stable patch from each current OpenCode V2 minor line: `2.0.32`,
-`2.1.4`, `2.2.7` and `2.3.2`. OpenCode V1 and older patch releases are not covered by this matrix. Update the matrix
-in `.github/workflows/ci.yml` as new V2 minor lines are released.
+`2.1.4`, `2.2.7`, `2.3.2` and `2.4.2`. The packed npm-install E2E also runs against `2.3.2` and `2.4.2` to check the
+published-package path across the latest releases. OpenCode V1 and older patch releases are not covered by these
+matrices. Update `.github/workflows/ci.yml` as new V2 minor lines are released.
 
 ### Recording the demo
 

@@ -113,6 +113,8 @@ opencode plugin add opencode-clean-arch
 
 固定到某个发布版本时写 `opencode-clean-arch@0.4.4`，版本列表见 [npm](https://www.npmjs.com/package/opencode-clean-arch) 与 [Releases](https://github.com/Gipbear/opencode-clean-arch/releases)。两种写法也都支持直接从 Git 或本地目录安装（如 `"git+https://github.com/Gipbear/opencode-clean-arch.git#v0.4.4"`、`github:Gipbear/opencode-clean-arch`、`/path/to/opencode-clean-arch`）。
 
+> **注意（防配置遮蔽与重启生效）**：若 `~/.config/opencode/`（或项目配置目录）下**同时存在** `opencode.json` 与 `opencode.jsonc`，部分版本的 `opencode plugin` CLI 会把条目写入 `opencode.json`，但启动时后加载的 `opencode.jsonc` 会整体覆盖同名 `"plugin"` 数组导致安装不生效。建议同一目录下**只保留 `opencode.jsonc`**，并在安装或升级插件后重启所有正在运行的 `opencode` 实例。
+
 ### 只用 skill，不装插件
 
 把 `skills/` 下的目录复制到项目的 `.opencode/skills/`（或 `.claude/skills/`、`.agents/skills/`）。没有工具时，skill 会改为直接调用 `skills/clean-arch/scripts/*.py`；评审改为在对话里确认。

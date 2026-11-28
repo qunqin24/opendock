@@ -49,7 +49,8 @@ Claude Code:
 
 The last line connects this machine to your advisory board and downloads it.
 
-The plugin keeps itself up to date, see "Updates" below.
+Claude Code leaves auto-update off for marketplaces outside Anthropic's own.
+To get new releases of the plugin, type `/plugin`, open the Marketplaces tab, select `wellactually` and choose Enable auto-update.
 
 Codex:
 
@@ -61,10 +62,14 @@ codex plugin marketplace add passsy/wellactually
 codex plugin add wellactually@wellactually
 ```
 
-Then open Codex, type `/hooks` and press `t` to trust the plugin's hooks, then type `$wellactually:login`.
-Codex does not run a new plugin's hooks until you trust them, so no principle reaches the agent before that.
-You trust them once: new releases update the runtime the hooks run, not the plugin Codex approved.
+Then open Codex, type `/hooks` and press `t` to trust the Well Actually hooks, then type `$wellactually:login`.
+Codex does not run a new hook until you trust it, so no principle reaches the agent before that.
+You trust them once.
+The Codex plugin brings no hooks of its own: Codex would ask again after every update of a plugin that does.
+Instead, when Codex first starts the plugin, it adds its hooks to your `~/.codex/hooks.json`, next to any others, and Codex keeps the trust of those across updates.
+Each runs `~/.wellactually/codex-hook.mjs`, which starts the hook of the plugin version Codex has installed, and does nothing while the plugin is switched off or removed.
 Until you trust them, the Review Inbox shows a banner and the agent is asked to tell you.
+To remove it, run `codex plugin remove wellactually@wellactually` and then `npx wellactually@latest uninstall`, which takes our entries out of `~/.codex/hooks.json` and leaves the others.
 
 OpenCode:
 
@@ -93,27 +98,8 @@ Run `wellactually sync`, or the plugin's sync skill, at the start of the run, so
 Ratings the agent gives reach the experts as they do from your own machine.
 Revoke the token on the website to stop it.
 
-## Updates
-
-Claude Code, Codex, OpenCode and pi update the same way.
-The plugin itself stays the same, so Codex keeps the approval you gave its hooks.
-Its hooks and MCP server run `shim.mjs`, which runs the Well Actually runtime in `~/.wellactually/runtime`.
-Once a day, at the start of a session, the plugin looks up the newest release on npm in the background, checks it against the integrity npm publishes and installs it there.
-The next session runs it.
-Until the first download, the plugin runs the copy it ships with.
-If a release cannot load, the plugin runs the one before it, and so does its updater.
-A second updater in `shim.mjs` itself, which runs none of the downloaded code, steps in when the runtime has been behind the followed npm tag for two days and the first one still has not caught up, and at once when the current release's files are gone.
-If a release misbehaves, delete `~/.wellactually/runtime`: the plugin goes back to the copy it ships with and downloads the newest release again.
-
-Run these with `node "<plugin folder>/shim.mjs"`, the folder the plugin is installed in:
-
-- `update` installs the newest release now.
-- `update --channel next` follows preview releases from now on, and `update --channel latest` goes back.
-- `update --version <version>` installs one exact release and pauses auto-update until you run `update --channel latest`.
-- `update --from <file.tgz>` installs a package built with `npm run package`, also pausing auto-update.
-
-Set `WELLACTUALLY_AUTO_UPDATE=0` to turn auto-update off; the plugin then tells you at the start of a session, at most once a day, when a newer release is out.
-Set `WELLACTUALLY_UPDATE_CHECK=0` to turn off both the check and the notice.
+When a newer release of the plugin is out, it tells you at the start of a session, at most once a day, with the command that updates it in your agent.
+Set `WELLACTUALLY_UPDATE_CHECK=0` to turn that off.
 
 ## What it does on your machine
 
@@ -123,7 +109,7 @@ Set `WELLACTUALLY_UPDATE_CHECK=0` to turn off both the check and the notice.
   It reads the principles `sync` downloaded earlier.
 - `sync` runs when a session starts.
   It downloads what is new on your advisory board and reports counts, see "What leaves your machine".
-- Once a day, in the background, it checks the published npm release for updates and installs it.
+- Once a day, in the background, it checks the published npm release for updates.
 
 ## Detectors are other people's code
 
@@ -154,7 +140,7 @@ The code that does this is public: [`packages/core/src/detector/sandbox.ts`](pac
   and fixes. Reviews do not send helpfulness ratings.
 
 No path, file content, prompt, command or finding is sent.
-The daily update check fetches public npm metadata and the release package without sending project data.
+The daily update check fetches public npm metadata without sending project data.
 Ask your agent to switch reporting off, and it turns these reports off.
 
 ## Review a change
@@ -209,19 +195,19 @@ A principle written against `v3` keeps running as it was.
 
 ## What is in here
 
-| Path                         | What it is                                                                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `hooks`, `skills`            | The plugin: when the hook runs, and the skills such as `login`, `sync` and `audit`.                |
-| `dist`                       | Ignored development build output; install payloads are published to npm.                           |
-| [`compat`](compat/README.md) | pi adapter for existing Git installs, loading the pinned npm runtime.                              |
-| `opencode`                   | Compatibility adapters for existing Git installs, loading the npm runtime.                         |
-| `packages/core`              | Builds, checks and runs principles: the isolate, the bundler and the tests.                        |
-| `packages/detector-sdk`      | The types and helpers a detector may import.                                                       |
-| `packages/connector`         | Connects agent hosts: the hooks, the host adapters, the MCP server and the `wellactually` command. |
-| `packages/board`             | The advisory board on this machine: which principles run, their detectors and the registry sync.   |
-| `packages/review-inbox`      | Review sessions, findings and verdicts, and the Review Inbox and review card that show them.       |
-| `evaluator`                  | Checks with real agents that the framing around advice moves them the right way.                   |
-| `scripts`                    | Builds `dist` and `opencode`, sets the version of a release, packs the detector SDK.               |
+| Path | What it is |
+| --- | --- |
+| `hooks`, `skills` | The plugin: when the hook runs, and the skills such as `login`, `sync` and `audit`. |
+| `dist` | Ignored development build output; install payloads are published to npm. |
+| [`compat`](compat/README.md) | pi adapter for existing Git installs, loading the pinned npm runtime. |
+| `opencode` | Compatibility adapters for existing Git installs, loading the npm runtime. |
+| `packages/core` | Builds, checks and runs principles: the isolate, the bundler and the tests. |
+| `packages/detector-sdk` | The types and helpers a detector may import. |
+| `packages/connector` | Connects agent hosts: the hooks, the host adapters, the MCP server and the `wellactually` command. |
+| `packages/board` | The advisory board on this machine: which principles run, their detectors and the registry sync. |
+| `packages/review-inbox` | Review sessions, findings and verdicts, and the Review Inbox and review card that show them. |
+| `evaluator` | Checks with real agents that the framing around advice moves them the right way. |
+| `scripts` | Builds `dist` and `opencode`, sets the version of a release, packs the detector SDK. |
 
 The registry is not in this repository.
 
