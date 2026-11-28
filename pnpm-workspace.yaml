@@ -1,3 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
 allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
   esbuild: true
   sharp: true
+
+# Packages above set to false are only needed by build tooling we do not use
+# (next-intl's message extractor); skipping their install scripts is intended.
+strictDepBuilds: false
